@@ -4,6 +4,8 @@
 
 # DSH Studio
 
+[![CI](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml)
+
 **A native desktop shell for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).**
 
 Rust + Tauri 2. It supervises the local `dsh` service, reclaims every process it
@@ -76,18 +78,18 @@ vendored.
 Early. The Windows path is built and verified end to end; the rest is honest
 about being unfinished.
 
-| | |
-|---|---|
-| Environment detection, one-click install | ✅ |
-| Supervisor, backoff restart, health probing | ✅ |
-| Process-tree reclamation (Windows / Unix) | ✅ |
-| Harness hosting, log console, English + 中文 | ✅ |
-| Verified on Windows 11 | ✅ |
-| macOS / Linux rendering | ⏳ not yet run |
-| Bundled Node runtime (no system Node needed) | ⏳ planned |
-| Tray icon, close-to-tray while serving | ✅ |
-| Native context menus, auto-update | ⏳ planned |
-| Packaged releases | ⏳ not yet published |
+|                                              |                                                                    |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| Environment detection, one-click install     | ✅                                                                 |
+| Supervisor, backoff restart, health probing  | ✅                                                                 |
+| Process-tree reclamation (Windows / Unix)    | ✅                                                                 |
+| Harness hosting, log console, English + 中文 | ✅                                                                 |
+| Verified on Windows 11                       | ✅                                                                 |
+| macOS / Linux rendering                      | ⏳ not yet run                                                     |
+| Bundled Node runtime (no system Node needed) | ⏳ planned                                                         |
+| Tray icon, close-to-tray while serving       | ✅                                                                 |
+| Native context menus, auto-update            | ⏳ planned                                                         |
+| Packaged releases                            | ✅ automated for Windows, Linux, and macOS (Intel + Apple Silicon) |
 
 ## Requirements
 
@@ -129,7 +131,7 @@ desktop app wrapping a Node service has to answer.
 ## Contributing
 
 Issues and pull requests are welcome. The one house rule is in the code style:
-comments explain *why* a thing is the way it is, not what the line below does.
+comments explain _why_ a thing is the way it is, not what the line below does.
 
 ## License
 

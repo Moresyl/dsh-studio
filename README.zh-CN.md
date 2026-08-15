@@ -4,6 +4,8 @@
 
 # DSH Studio
 
+[![CI](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml)
+
 **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的原生桌面外壳。**
 
 Rust + Tauri 2 编写。它托管本地 `dsh` 服务、回收服务派生出的每一个进程，
@@ -67,18 +69,18 @@ harness 的界面加载在外壳自绘标题栏下方的一个 frame 里，
 
 还很早期。Windows 这条路径已经端到端跑通并验证过；其余部分如实标注为未完成。
 
-| | |
-|---|---|
-| 环境检测、一键安装 | ✅ |
-| Supervisor、退避重启、健康探测 | ✅ |
-| 进程树回收（Windows / Unix） | ✅ |
-| harness 承载、日志控制台、中英双语 | ✅ |
-| Windows 11 实测通过 | ✅ |
-| macOS / Linux 渲染 | ⏳ 尚未验证 |
-| 内置 Node runtime（无需系统 Node） | ⏳ 计划中 |
-| 托盘图标、运行中关闭到托盘 | ✅ |
-| 原生右键菜单、自动更新 | ⏳ 计划中 |
-| 打包发布 | ⏳ 尚未发布 |
+|                                    |                                                               |
+| ---------------------------------- | ------------------------------------------------------------- |
+| 环境检测、一键安装                 | ✅                                                            |
+| Supervisor、退避重启、健康探测     | ✅                                                            |
+| 进程树回收（Windows / Unix）       | ✅                                                            |
+| harness 承载、日志控制台、中英双语 | ✅                                                            |
+| Windows 11 实测通过                | ✅                                                            |
+| macOS / Linux 渲染                 | ⏳ 尚未验证                                                   |
+| 内置 Node runtime（无需系统 Node） | ⏳ 计划中                                                     |
+| 托盘图标、运行中关闭到托盘         | ✅                                                            |
+| 原生右键菜单、自动更新             | ⏳ 计划中                                                     |
+| 打包发布                           | ✅ 自动构建 Windows、Linux、macOS Intel 与 Apple Silicon 版本 |
 
 ## 环境要求
 
