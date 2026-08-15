@@ -2,7 +2,9 @@
 
 mod error;
 mod harness;
+mod locale;
 mod paths;
+mod tray;
 mod window;
 
 use std::sync::Arc;
@@ -11,7 +13,7 @@ use tauri::{Emitter, Manager};
 use tokio::sync::broadcast::error::RecvError;
 
 use harness::commands::AppState;
-use harness::supervisor::Supervisor;
+use harness::supervisor::{Event, Supervisor};
 
 /// Channel the frontend listens on for supervisor status and log events.
 const EVENT_CHANNEL: &str = "harness://event";
@@ -35,6 +37,7 @@ pub fn run() {
             app.manage(AppState::new(Arc::clone(&supervisor)));
 
             window::build(app.handle())?;
+            tray::build(app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -50,6 +53,9 @@ pub fn run() {
 }
 
 /// Relay supervisor events to the frontend for as long as the app is running.
+///
+/// Also the one place the tray learns anything: it reads the same stream the UI
+/// does, so the two cannot end up describing different states.
 fn forward_events(app: &tauri::AppHandle, supervisor: &Arc<Supervisor>) {
     let handle = app.clone();
     let mut events = supervisor.subscribe();
@@ -58,6 +64,9 @@ fn forward_events(app: &tauri::AppHandle, supervisor: &Arc<Supervisor>) {
         loop {
             match events.recv().await {
                 Ok(event) => {
+                    if let Event::Status(status) = &event {
+                        tray::sync(&handle, status);
+                    }
                     let _ = handle.emit(EVENT_CHANNEL, event);
                 }
                 // A slow frontend drops old log lines rather than stalling the

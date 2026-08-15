@@ -1,28 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <title>DSH Studio</title>
+  <!--
+    A prompt caret and its cursor rule: this app's whole job is to hold a local
+    service up, and a shell prompt is what that looks like.
+
+    The geometry is centred on the ink, not on the paths — the caret and the rule
+    together span 202..822, so the tile's midpoint falls between them. Stroke is
+    104 (about a tenth of the tile) because the same artwork has to survive being
+    a 16px tray icon, where anything finer turns to grey mush.
+  -->
   <defs>
     <linearGradient id="tile" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#243A7A"/>
+      <stop offset="0" stop-color="#2A3F82"/>
       <stop offset="0.55" stop-color="#141E4A"/>
-      <stop offset="1" stop-color="#080C22"/>
+      <stop offset="1" stop-color="#070B20"/>
     </linearGradient>
-    <linearGradient id="glyph" x1="0.1" y1="0" x2="0.9" y2="1">
-      <stop offset="0" stop-color="#7FF3FF"/>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#5C8BFF" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#5C8BFF" stop-opacity="0"/>
+    </radialGradient>
+    <!--
+      User space, not the default object bounding box, for two reasons. The
+      cursor rule is a horizontal line, so its bounding box has zero height and
+      an objectBoundingBox gradient makes it vanish entirely — that is a spec
+      rule, not a renderer quirk. And one ramp laid across the whole mark reads
+      as a single object lit from one side, which two per-path ramps do not.
+    -->
+    <linearGradient id="glyph" gradientUnits="userSpaceOnUse" x1="264" y1="270" x2="760" y2="754">
+      <stop offset="0" stop-color="#8FF6FF"/>
       <stop offset="0.5" stop-color="#6E9BFF"/>
-      <stop offset="1" stop-color="#A98CFF"/>
+      <stop offset="1" stop-color="#AC8CFF"/>
     </linearGradient>
     <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.17"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
     </linearGradient>
   </defs>
 
   <rect width="1024" height="1024" rx="232" fill="url(#tile)"/>
+  <ellipse cx="512" cy="500" rx="420" ry="360" fill="url(#halo)"/>
   <rect width="1024" height="1024" rx="232" fill="url(#sheen)"/>
-  <rect x="6" y="6" width="1012" height="1012" rx="226" fill="none" stroke="#8FB2FF" stroke-opacity="0.22" stroke-width="12"/>
+  <rect x="7" y="7" width="1010" height="1010" rx="225" fill="none" stroke="#8FB2FF" stroke-opacity="0.24" stroke-width="14"/>
 
-  <g fill="none" stroke="url(#glyph)" stroke-width="98" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M330 322 L556 512 L330 702"/>
-    <path d="M646 702 L790 702"/>
+  <g fill="none" stroke="url(#glyph)" stroke-width="104" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 -8)">
+    <path d="M254 322 L470 512 L254 702"/>
+    <path d="M596 702 L770 702"/>
   </g>
 </svg>

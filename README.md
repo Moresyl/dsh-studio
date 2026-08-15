@@ -85,7 +85,8 @@ about being unfinished.
 | Verified on Windows 11 | ✅ |
 | macOS / Linux rendering | ⏳ not yet run |
 | Bundled Node runtime (no system Node needed) | ⏳ planned |
-| Tray icon, native menus, auto-update | ⏳ planned |
+| Tray icon, close-to-tray while serving | ✅ |
+| Native context menus, auto-update | ⏳ planned |
 | Packaged releases | ⏳ not yet published |
 
 ## Requirements

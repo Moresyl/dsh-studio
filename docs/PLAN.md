@@ -401,7 +401,7 @@ src-tauri/src/
 | 阶段 | 内容 | 出口条件 |
 |---|---|---|
 | **M0 · 验证**（1~2 天） | ① 实测 dsh CLI 契约，产出 V1~V6 清单 ✅<br>② **最小 Tauri 壳跑通，三平台各验一遍 UI 渲染**（风险 3）— Windows ✅，mac / Linux ⏳ | V1 有结论 ✅（`--port 0`，见 §3.2）；Linux WebKitGTK 待确认 |
-| **M1 · 能跑起来**（约 1 周）**← 当前** | 系统 Node 检测 ✅ + supervisor ✅ + **Job Object** ✅ + 静默子进程 ✅ + 按需装 harness ✅ + 启动器 UI ✅ + 健康检查 ✅ + iframe 承载 ✅ ／ 托盘、Win11 Mica、原生右键 ⏳ | 有 Node 的机器上一键起 dsh 并在 WebView 里可用；对位干掉 #15/#12/#14/#18 |
+| **M1 · 能跑起来**（约 1 周）**← 当前** | 系统 Node 检测 ✅ + supervisor ✅ + **Job Object** ✅ + 静默子进程 ✅ + 按需装 harness ✅ + 启动器 UI ✅ + 健康检查 ✅ + iframe 承载 ✅ + 托盘常驻与关闭到托盘 ✅ ／ Win11 Mica、原生右键 ⏳ | 有 Node 的机器上一键起 dsh 并在 WebView 里可用；对位干掉 #15/#12/#14/#18 |
 | **M2 · 免装 Node**（约 1 周） | 按需下载 + 镜像回退 + SHA-256 + 进度 UI | 干净机器开箱即用（核心价值达成） |
 | **M3 · 发布** | CI 六平台产物矩阵（win x64/arm64、mac intel/arm、linux deb/AppImage）、自动更新、README 双语 | **带 Linux 包首发**，对位干掉 #9 |
 | **M4 · 沉淀** | `runtime/` `proc/` 抽 crate 回流 CCHub | 路径 C 闭环 |
@@ -445,7 +445,7 @@ M0-① 已出结论，M1 据此开工；M0-② 的 mac / Linux 两块仍是风�
 
 1. **补完 M0-②**：mac / Linux 各跑一遍 `pnpm tauri dev`，重点看 WebKitGTK 下启动器与 dsh Web UI 的渲染（风险 3）。
    —— 这是目前唯一还没闭掉的敞口，且「带 Linux 包首发」是主要卖点，必须在 M3 打包前解决。
-2. **M1 剩余**：托盘图标、Win11 Mica/窗口材质、原生右键与剪贴板、dsh 版本管理与更新。
+2. **M1 剩余**：Win11 Mica/窗口材质、原生右键与剪贴板、dsh 版本管理与更新。
 3. **M2 起点**：走 dsh 自己的客户端插件系统（`window.__DSH_BOOT__` / `/plugins/<id>/client.js`）做扩展——
    竞品为了改界面永久 fork 了整个 monorepo，我们用上游给的那扇门，不 fork（见 §3.3）。
 4. CI：六平台产物矩阵 + 在 CI 上跑 `pnpm lint / test` 与 `cargo test`。
