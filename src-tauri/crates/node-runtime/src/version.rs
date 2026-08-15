@@ -82,7 +82,10 @@ mod tests {
             Version::parse("v25.0.0-nightly20260101"),
             Some(Version::new(25, 0, 0))
         );
-        assert_eq!(Version::parse("v20.1.0+build7"), Some(Version::new(20, 1, 0)));
+        assert_eq!(
+            Version::parse("v20.1.0+build7"),
+            Some(Version::new(20, 1, 0))
+        );
     }
 
     #[test]

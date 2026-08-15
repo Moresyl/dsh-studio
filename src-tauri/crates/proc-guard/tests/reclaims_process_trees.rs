@@ -75,7 +75,9 @@ async fn dropping_the_guard_ends_a_grandchild() {
     let outer = write_tree_fixture(&workspace, &ticks);
 
     let guard = ProcessGuard::new().expect("create guard");
-    let _child = guard.spawn(&mut shell(&[&outer.to_string_lossy()])).expect("spawn");
+    let _child = guard
+        .spawn(&mut shell(&[&outer.to_string_lossy()]))
+        .expect("spawn");
 
     let alive = wait_until_growing(&ticks).await;
     assert!(alive > 0, "the grandchild never started ticking");
@@ -167,8 +169,11 @@ fn write_tree_fixture(workspace: &Path, ticks: &Path) -> PathBuf {
             ),
         )
         .expect("write inner fixture");
-        fs::write(&outer, format!("@echo off\r\ncmd /c \"{}\"\r\n", inner.display()))
-            .expect("write outer fixture");
+        fs::write(
+            &outer,
+            format!("@echo off\r\ncmd /c \"{}\"\r\n", inner.display()),
+        )
+        .expect("write outer fixture");
         outer
     }
 

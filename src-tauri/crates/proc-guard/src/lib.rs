@@ -42,7 +42,10 @@ impl ProcessGuard {
     ///
     /// The child is placed under this guard before it executes a single
     /// instruction, so descendants it spawns cannot escape the guard.
-    pub fn spawn(&self, command: &mut tokio::process::Command) -> io::Result<tokio::process::Child> {
+    pub fn spawn(
+        &self,
+        command: &mut tokio::process::Command,
+    ) -> io::Result<tokio::process::Child> {
         self.inner.spawn(command)
     }
 

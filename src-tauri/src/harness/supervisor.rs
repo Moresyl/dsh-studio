@@ -55,7 +55,11 @@ pub enum Stream {
 
 /// What the harness is doing right now.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[serde(tag = "phase", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "phase",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum Status {
     Stopped,
     Starting,

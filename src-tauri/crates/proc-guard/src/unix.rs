@@ -42,12 +42,8 @@ impl Inner {
     }
 
     pub(crate) fn terminate_all(&self) -> io::Result<()> {
-        let groups = std::mem::take(
-            &mut *self
-                .groups
-                .lock()
-                .expect("proc-guard group list poisoned"),
-        );
+        let groups =
+            std::mem::take(&mut *self.groups.lock().expect("proc-guard group list poisoned"));
 
         for pgid in groups {
             // ESRCH just means the group already exited, which is the goal state.
