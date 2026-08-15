@@ -12,16 +12,23 @@
  * is designed around.
  */
 @theme {
-  --color-canvas: #070a18;
-  --color-canvas-deep: #04060f;
-  --color-surface: #101733;
-  --color-surface-2: #18213f;
-  --color-line: #ffffff1a;
-  --color-line-strong: #ffffff2e;
+  /* Four grounds, back to front: the chrome a window wears (`surface`), the
+     content area it frames (`canvas`), the deepest pane inside that (`deep`),
+     and the raised state of a control (`surface-2`).
+   *
+   * Near-neutral on purpose. Saturated chrome is most of what makes a desktop
+   * app read as a web page wearing a title bar; the colour budget is spent on
+   * the one accent and on status, where it carries meaning. */
+  --color-canvas: #0b0e15;
+  --color-canvas-deep: #07090f;
+  --color-surface: #12161f;
+  --color-surface-2: #1b2029;
+  --color-line: #ffffff14;
+  --color-line-strong: #ffffff29;
 
-  --color-text: #e9edfb;
-  --color-muted: #9aa5c6;
-  --color-faint: #6b769a;
+  --color-text: #e7eaf1;
+  --color-muted: #98a0b2;
+  --color-faint: #6a7288;
 
   --color-brand: #6e9bff;
   --color-brand-cyan: #7ff3ff;
@@ -31,48 +38,26 @@
   --color-danger: #ff7a8a;
 
   --font-sans:
-    'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI',
-    system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+    'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', system-ui,
+    'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
   --font-mono:
     'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  --radius-panel: 1rem;
-  --radius-control: 0.625rem;
+  /* A window corner is 8px, so nothing framed by one has any business being
+     rounder than that. Controls sit a step tighter again. */
+  --radius-panel: 0.5rem;
+  --radius-control: 0.3125rem;
 
-  --shadow-panel: 0 1px 0 #ffffff0f inset, 0 24px 60px -24px #00000099;
-  --shadow-lift: 0 12px 32px -12px #000000b3;
+  --shadow-panel: 0 1px 2px #00000045;
+  --shadow-lift: 0 6px 18px -8px #000000a6;
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Ambient light that moves slowly enough to notice only if you look for it.
-     Transform-only, so it composites on the GPU and costs nothing to run. */
-  --animate-drift-a: drift-a 26s ease-in-out infinite;
-  --animate-drift-b: drift-b 34s ease-in-out infinite;
-
-  @keyframes drift-a {
-    0%,
-    100% {
-      transform: translate3d(0, 0, 0) scale(1);
-    }
-    50% {
-      transform: translate3d(7%, 5%, 0) scale(1.09);
-    }
-  }
-
-  @keyframes drift-b {
-    0%,
-    100% {
-      transform: translate3d(0, 0, 0) scale(1);
-    }
-    50% {
-      transform: translate3d(-6%, -7%, 0) scale(1.07);
-    }
-  }
-
+  /* Short enough to read as the view settling rather than as an entrance. */
   @keyframes rise {
     from {
       opacity: 0;
-      transform: translate3d(0, 10px, 0);
+      transform: translate3d(0, 4px, 0);
     }
     to {
       opacity: 1;
@@ -80,56 +65,40 @@
     }
   }
 
-  --animate-rise: rise 0.5s var(--ease-out-soft) both;
+  --animate-rise: rise 0.22s var(--ease-out-soft) both;
 }
 
-/* Follow the system unless the user pinned a theme. */
+/*
+ * The light palette.
+ *
+ * Only the system preference selects it. There is deliberately no second block
+ * for an in-app theme pin: nothing sets `data-theme` yet, and a duplicated
+ * palette maintained against a switch that does not exist is a palette that
+ * will already be wrong on the day the switch arrives.
+ */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
-    --color-canvas: #eef1fa;
-    --color-canvas-deep: #e2e7f5;
+  :root {
+    --color-canvas: #f6f7fa;
+    --color-canvas-deep: #eceef4;
     --color-surface: #ffffff;
-    --color-surface-2: #f4f6fd;
-    --color-line: #0b143b1f;
-    --color-line-strong: #0b143b33;
+    --color-surface-2: #eef0f6;
+    --color-line: #0d132b1f;
+    --color-line-strong: #0d132b36;
 
-    --color-text: #0d1428;
-    --color-muted: #4d5876;
-    --color-faint: #7b86a5;
+    --color-text: #101623;
+    --color-muted: #4c5468;
+    --color-faint: #7b8398;
 
     --color-brand: #3f6cf0;
     --color-brand-cyan: #1fa8c4;
     --color-brand-violet: #7d5ce8;
-    --color-ok: #129d72;
-    --color-warn: #b47612;
-    --color-danger: #d2415a;
+    --color-ok: #0e9e74;
+    --color-warn: #a8710e;
+    --color-danger: #d43f57;
 
-    --shadow-panel: 0 1px 0 #ffffff inset, 0 18px 44px -22px #1b234a29;
-    --shadow-lift: 0 10px 28px -14px #1b234a3d;
+    --shadow-panel: 0 1px 2px #1b234a1f;
+    --shadow-lift: 0 6px 16px -8px #1b234a3d;
   }
-}
-
-:root[data-theme='light'] {
-  --color-canvas: #eef1fa;
-  --color-canvas-deep: #e2e7f5;
-  --color-surface: #ffffff;
-  --color-surface-2: #f4f6fd;
-  --color-line: #0b143b1f;
-  --color-line-strong: #0b143b33;
-
-  --color-text: #0d1428;
-  --color-muted: #4d5876;
-  --color-faint: #7b86a5;
-
-  --color-brand: #3f6cf0;
-  --color-brand-cyan: #1fa8c4;
-  --color-brand-violet: #7d5ce8;
-  --color-ok: #129d72;
-  --color-warn: #b47612;
-  --color-danger: #d2415a;
-
-  --shadow-panel: 0 1px 0 #ffffff inset, 0 18px 44px -22px #1b234a29;
-  --shadow-lift: 0 10px 28px -14px #1b234a3d;
 }
 
 @layer base {
@@ -164,9 +133,12 @@
     border-radius: 4px;
   }
 
+  /* Thin, unobtrusive, and always the same width — a scrollbar that grows on
+     hover reflows the text beside it, which is exactly what a log pane must
+     not do while someone is reading an error in it. */
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 11px;
+    height: 11px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
@@ -180,6 +152,9 @@
   ::-webkit-scrollbar-thumb:hover {
     background: var(--color-faint);
     background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
 
@@ -195,18 +170,22 @@
   .hairline {
     box-shadow: 0 0 0 1px var(--color-line);
   }
-}
 
-@layer utilities {
-  .text-gradient-brand {
-    background-image: linear-gradient(
-      100deg,
-      var(--color-brand-cyan),
-      var(--color-brand) 46%,
-      var(--color-brand-violet)
-    );
-    background-clip: text;
-    color: transparent;
+  /* The strips a window wears at its top and bottom edge. Both are chrome, so
+     both sit a shade above the content they frame and are separated from it by
+     a line rather than by a gap. */
+  .chrome {
+    background-color: var(--color-surface);
+  }
+
+  /* Section captions in the panel — the small tracked-out label a desktop tool
+     puts above a group of settings. */
+  .caption {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-faint);
   }
 }
 

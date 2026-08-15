@@ -1,10 +1,16 @@
 import { useEffect, useRef } from 'react'
+import { TerminalSquare } from 'lucide-react'
 
 import { t } from '@/lib/i18n'
 import type { LogLine } from '@/lib/ipc'
 
 /**
- * Raw harness output.
+ * Raw harness output, as a pane rather than a disclosure.
+ *
+ * It used to be collapsed behind a "show output" toggle, which is the right
+ * call on a web page and the wrong one here: this is a supervisor, the output
+ * is the evidence, and a tool that hides its evidence by default sends people
+ * to a terminal to find out what it is doing.
  *
  * It follows the tail while the reader is already at the bottom, and stops
  * following the moment they scroll up — so reading an error is not a fight with
@@ -28,18 +34,29 @@ export function LogConsole({ lines }: { lines: LogLine[] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-panel bg-canvas-deep/70 shadow-panel backdrop-blur-xl hairline">
-      <h2 className="border-b border-line px-4 py-2 text-[11px] font-medium tracking-[0.08em] text-faint uppercase">
-        {t('log.title')}
-      </h2>
+    <section className="flex min-h-0 flex-1 flex-col bg-canvas-deep">
+      <header className="flex h-8 shrink-0 items-center gap-2 border-b border-line px-3">
+        <h2 className="caption">{t('log.title')}</h2>
+        {lines.length > 0 && (
+          <span className="ml-auto font-mono text-[11px] tabular-nums text-faint">
+            {t('log.lines', { count: lines.length })}
+          </span>
+        )}
+      </header>
 
       <div
         ref={viewport}
         onScroll={onScroll}
-        className="selectable max-h-[34vh] min-h-24 overflow-y-auto px-4 py-3 font-mono text-[11.5px] leading-[1.65]"
+        className="selectable min-h-0 flex-1 overflow-y-auto px-3 py-2 font-mono text-[11.5px] leading-[1.65]"
       >
         {lines.length === 0 ? (
-          <p className="text-faint">{t('log.empty')}</p>
+          // Centred, because an empty pane's message is the whole content of
+          // that pane — left in the corner it reads as the first line of output
+          // that never came.
+          <div className="flex h-full flex-col items-center justify-center gap-2.5 text-faint">
+            <TerminalSquare size={24} strokeWidth={1.4} className="opacity-45" aria-hidden="true" />
+            <p className="font-sans text-[12px]">{t('log.empty')}</p>
+          </div>
         ) : (
           lines.map((entry, index) => (
             <p

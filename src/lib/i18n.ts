@@ -7,7 +7,9 @@
  */
 
 const en = {
-  'app.tagline': 'A native shell for the DeepSeek Harness',
+  'section.environment': 'Environment',
+  'section.service': 'Service',
+  'section.runtimes': 'Node runtimes',
 
   'status.stopped': 'Not running',
   'status.starting': 'Starting the harness',
@@ -21,7 +23,12 @@ const en = {
   'check.harness': 'DeepSeek Harness',
   'check.harness.missing': 'Not installed yet',
   'check.harness.installed': 'Ready',
-  'check.workspace': 'Workspace',
+
+  'service.address': 'Address',
+  'service.process': 'Process',
+
+  'runtime.active': 'in use',
+  'runtime.tooOld': 'too old',
 
   'source.path': 'on PATH',
   'source.nvm': 'via nvm',
@@ -33,7 +40,6 @@ const en = {
   'action.starting': 'Starting…',
   'action.retry': 'Try again',
   'action.stop': 'Stop',
-  'action.open': 'Open workspace',
   'action.recheck': 'Check again',
   'action.install': 'Install',
   'action.installing': 'Installing…',
@@ -43,24 +49,33 @@ const en = {
   'install.progress': '{count} packages so far',
   'install.slow': 'This takes several minutes on a first install.',
 
-  'chip.openPanel': 'Open control panel',
-  'chip.backToHarness': 'Back to the harness',
+  'view.harness': 'Harness',
+  'view.panel': 'Control panel',
 
-  'log.show': 'Show output',
-  'log.hide': 'Hide output',
+  'statusbar.open': 'Open in your browser',
+  'statusbar.copy': 'right-click to copy',
+  'statusbar.copied': 'Copied',
+  'statusbar.reveal': 'Show in file manager',
+
   'log.empty': 'No output yet.',
   'log.title': 'Harness output',
+  'log.lines': '{count} lines',
 
   'window.minimize': 'Minimize',
   'window.maximize': 'Maximize',
   'window.restore': 'Restore',
   'window.close': 'Close',
+  // Said on the button rather than discovered afterwards: while the harness is
+  // up, closing the window leaves it running under the tray icon.
+  'window.hide': 'Close to tray — the harness keeps running',
 } as const
 
 export type MessageKey = keyof typeof en
 
 const zh: Record<MessageKey, string> = {
-  'app.tagline': 'DeepSeek Harness 的原生桌面外壳',
+  'section.environment': '运行环境',
+  'section.service': '服务',
+  'section.runtimes': 'Node 运行时',
 
   'status.stopped': '未运行',
   'status.starting': '正在启动',
@@ -74,7 +89,12 @@ const zh: Record<MessageKey, string> = {
   'check.harness': 'DeepSeek Harness',
   'check.harness.missing': '尚未安装',
   'check.harness.installed': '就绪',
-  'check.workspace': '工作目录',
+
+  'service.address': '地址',
+  'service.process': '进程',
+
+  'runtime.active': '使用中',
+  'runtime.tooOld': '版本过低',
 
   'source.path': '来自 PATH',
   'source.nvm': '来自 nvm',
@@ -86,7 +106,6 @@ const zh: Record<MessageKey, string> = {
   'action.starting': '启动中…',
   'action.retry': '重试',
   'action.stop': '停止',
-  'action.open': '打开工作目录',
   'action.recheck': '重新检测',
   'action.install': '安装',
   'action.installing': '安装中…',
@@ -96,18 +115,23 @@ const zh: Record<MessageKey, string> = {
   'install.progress': '已处理 {count} 个包',
   'install.slow': '首次安装需要几分钟。',
 
-  'chip.openPanel': '打开控制面板',
-  'chip.backToHarness': '返回 Harness',
+  'view.harness': 'Harness',
+  'view.panel': '控制面板',
 
-  'log.show': '查看输出',
-  'log.hide': '收起输出',
+  'statusbar.open': '在浏览器中打开',
+  'statusbar.copy': '右键复制',
+  'statusbar.copied': '已复制',
+  'statusbar.reveal': '在文件管理器中显示',
+
   'log.empty': '暂无输出。',
   'log.title': 'Harness 输出',
+  'log.lines': '{count} 行',
 
   'window.minimize': '最小化',
   'window.maximize': '最大化',
   'window.restore': '还原',
   'window.close': '关闭',
+  'window.hide': '关闭到托盘（Harness 继续运行）',
 }
 
 const dictionaries = { en, zh }

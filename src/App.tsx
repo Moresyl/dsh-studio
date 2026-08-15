@@ -1,22 +1,23 @@
 import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
-import { Ambient } from '@/components/Ambient'
 import { HarnessFrame } from '@/components/HarnessFrame'
 import { Launcher } from '@/components/Launcher'
+import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 
 /**
- * Two layers under one title bar.
+ * The window: a title bar, a status bar, and whichever view is between them.
  *
- * The control panel is what a user sees before the harness is serving, and what
- * they can always return to afterwards; the harness itself is a frame that
- * stays loaded underneath. Neither replaces the window, so the shell keeps its
- * chrome and its supervisor no matter which one is in front.
+ * The two strips never go away, whatever is in the middle. That is the whole
+ * difference between an application window and a page — the frame is a constant
+ * the user can rely on, so the harness can take the content area without taking
+ * the controls or the readout with it.
  */
 export default function App() {
   const status = useHarness((state) => state.status)
+  const environment = useHarness((state) => state.environment)
   const origin = status.phase === 'ready' ? status.origin : null
 
   // Which harness the user asked to look away from, rather than a bare boolean.
@@ -46,27 +47,21 @@ export default function App() {
   const showPanel = origin === null || panelFor === origin
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-canvas">
-      {/* Only under our own surface. With the harness in front the ambient is
-          visible through nothing but the title bar, where a coloured wash
-          against the harness's flat dark reads as two apps stacked. */}
-      {showPanel && <Ambient />}
+    <div className="flex h-full flex-col overflow-hidden bg-canvas">
       <TitleBar
-        origin={origin}
+        serving={origin !== null}
         panelOpen={showPanel}
         onTogglePanel={
           origin ? () => setPanelFor((current) => (current === origin ? null : origin)) : undefined
         }
       />
 
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col">
+      <div className="relative flex min-h-0 flex-1">
         {origin && <HarnessFrame origin={origin} hidden={showPanel} />}
-        {showPanel && (
-          <div className="flex min-h-0 flex-1 animate-rise flex-col">
-            <Launcher />
-          </div>
-        )}
+        {showPanel && <Launcher />}
       </div>
+
+      <StatusBar status={status} environment={environment} />
     </div>
   )
 }

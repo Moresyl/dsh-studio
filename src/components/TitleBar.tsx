@@ -9,11 +9,11 @@ import { drawsWindowControls, isMac } from '@/lib/platform'
 const TRAFFIC_LIGHT_INSET = 78
 
 interface TitleBarProps {
-  /** Origin the harness is serving on, or `null` when it is not running. */
-  origin?: string | null
-  /** Whether the control panel is the layer currently in front. */
-  panelOpen?: boolean
-  /** Switch layers. Absent while there is only one layer to show. */
+  /** Whether the harness is serving, and so whether there are two views. */
+  serving: boolean
+  /** Whether the control panel is the view currently in front. */
+  panelOpen: boolean
+  /** Switch views. Absent while there is only one view to show. */
   onTogglePanel?: () => void
 }
 
@@ -24,11 +24,12 @@ interface TitleBarProps {
  * bar is turned off. On macOS it only leaves room for the traffic lights the
  * system still draws.
  *
- * Once the harness fills the window this is the only chrome left, so it also
- * carries the way back to the control panel — otherwise starting the harness
- * would be a one-way door.
+ * It also carries the view switch, because once the harness fills the window
+ * this is the only chrome left and starting the harness would otherwise be a
+ * one-way door. A switch and not a badge: it is the same two views every time,
+ * so the pair belongs on screen together with the current one marked.
  */
-export function TitleBar({ origin, panelOpen, onTogglePanel }: TitleBarProps) {
+export function TitleBar({ serving, panelOpen, onTogglePanel }: TitleBarProps) {
   const appWindow = getCurrentWindow()
   const [maximized, setMaximized] = useState(false)
 
@@ -49,29 +50,17 @@ export function TitleBar({ origin, panelOpen, onTogglePanel }: TitleBarProps) {
     }
   }, [appWindow])
 
-  // The harness draws its own flat dark surface right up to our strip. A hairline
-  // and a deeper ground keep that meeting point deliberate instead of accidental.
-  const overContent = origin != null && panelOpen === false
-
   return (
     <header
       data-tauri-drag-region
-      className={[
-        'relative z-20 flex h-10 shrink-0 items-center pr-0 select-none',
-        overContent ? 'border-b border-line bg-canvas-deep' : '',
-      ].join(' ')}
+      className="chrome relative z-20 flex h-9 shrink-0 items-center border-b border-line select-none"
       style={isMac ? { paddingLeft: TRAFFIC_LIGHT_INSET } : undefined}
     >
-      <div
-        data-tauri-drag-region
-        className="flex flex-1 items-center gap-2 self-stretch pl-3"
-      >
-        <BrandMark size={16} className="rounded-[4px] opacity-90" />
-        <span className="text-[12px] font-medium tracking-wide text-muted">DSH Studio</span>
+      <div data-tauri-drag-region className="flex flex-1 items-center gap-2 self-stretch pl-2.5">
+        <BrandMark size={15} className="rounded-[4px]" />
+        <span className="text-[12px] font-medium text-muted">DSH Studio</span>
 
-        {origin && onTogglePanel && (
-          <ServiceChip origin={origin} panelOpen={panelOpen === true} onClick={onTogglePanel} />
-        )}
+        {serving && onTogglePanel && <ViewSwitch panelOpen={panelOpen} onToggle={onTogglePanel} />}
       </div>
 
       {drawsWindowControls && (
@@ -94,8 +83,11 @@ export function TitleBar({ origin, panelOpen, onTogglePanel }: TitleBarProps) {
             )}
           </ControlButton>
 
+          {/* While the harness is up the shell hides instead of quitting, so the
+              tooltip has to say so — a window that vanishes while a service it
+              started stays alive is exactly the surprise worth avoiding. */}
           <ControlButton
-            label={t('window.close')}
+            label={serving ? t('window.hide') : t('window.close')}
             danger
             onClick={() => void appWindow.close()}
           >
@@ -107,40 +99,38 @@ export function TitleBar({ origin, panelOpen, onTogglePanel }: TitleBarProps) {
   )
 }
 
-interface ServiceChipProps {
-  origin: string
-  panelOpen: boolean
-  onClick: () => void
-}
-
-/**
- * Live service indicator, and the door back to the control panel.
- *
- * It reports the port rather than a generic "connected", because the port is
- * the thing someone actually needs when they want to reach the service from a
- * terminal or another browser.
- */
-function ServiceChip({ origin, panelOpen, onClick }: ServiceChipProps) {
-  const label = panelOpen ? t('chip.backToHarness') : t('chip.openPanel')
-
+/** Two views, both named, with the current one raised. */
+function ViewSwitch({ panelOpen, onToggle }: { panelOpen: boolean; onToggle: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={`${label} · ${origin}`}
-      aria-label={label}
-      className="ml-1 flex items-center gap-1.5 rounded-full border border-line px-2 py-[3px] text-[11px] text-muted transition-colors duration-150 hover:border-line-strong hover:text-text"
-    >
-      <span className="size-1.5 rounded-full bg-ok shadow-[0_0_6px_var(--color-ok)]" />
-      <span className="font-mono tabular-nums">{portOf(origin)}</span>
-    </button>
+    <div className="ml-2 flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
+      <SwitchTab label={t('view.harness')} active={!panelOpen} onClick={onToggle} />
+      <SwitchTab label={t('view.panel')} active={panelOpen} onClick={onToggle} />
+    </div>
   )
 }
 
-/** `http://127.0.0.1:62943` → `:62943`, which is the part that varies. */
-const portOf = (origin: string): string => {
-  const port = origin.slice(origin.lastIndexOf(':'))
-  return port.startsWith(':') ? port : origin
+interface SwitchTabProps {
+  label: string
+  active: boolean
+  onClick: () => void
+}
+
+function SwitchTab({ label, active, onClick }: SwitchTabProps) {
+  return (
+    <button
+      type="button"
+      // The pair is one control, so the pressed one is the state of the whole
+      // rather than two buttons that happen to look related.
+      aria-pressed={active}
+      onClick={active ? undefined : onClick}
+      className={[
+        'h-[20px] rounded-[3px] px-2 text-[11.5px] transition-colors duration-100',
+        active ? 'bg-surface-2 text-text shadow-panel' : 'text-faint hover:text-muted',
+      ].join(' ')}
+    >
+      {label}
+    </button>
+  )
 }
 
 interface ControlButtonProps {

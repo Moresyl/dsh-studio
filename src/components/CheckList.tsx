@@ -13,7 +13,6 @@ export interface CheckAction {
 
 export interface CheckItem {
   key: string
-  icon: LucideIcon
   label: string
   value: string
   /** Full text when `value` had to be shortened to fit. */
@@ -22,46 +21,43 @@ export interface CheckItem {
   action?: CheckAction
 }
 
-const BADGE: Record<CheckState, { icon: LucideIcon; className: string }> = {
-  ok: { icon: Check, className: 'text-ok bg-ok/12' },
-  missing: { icon: CircleAlert, className: 'text-danger bg-danger/12' },
-  neutral: {
-    icon: Minus,
-    className: 'text-faint bg-[color-mix(in_oklab,var(--color-faint)_14%,transparent)]',
-  },
+const GLYPH: Record<CheckState, { icon: LucideIcon; className: string }> = {
+  ok: { icon: Check, className: 'text-ok' },
+  missing: { icon: CircleAlert, className: 'text-danger' },
+  neutral: { icon: Minus, className: 'text-faint' },
 }
 
 /**
- * The pre-flight checks, as one grouped card.
+ * The pre-flight checks, as one bordered list.
+ *
+ * Rows are 34px and the state is a bare glyph rather than a badge on a coloured
+ * disc: a check list is read by scanning down the left edge, and at that job a
+ * dense column of marks beats a column of decorated pills.
  *
  * A row that reports something missing carries the fix next to it — being told
  * what is wrong and then left to solve it elsewhere is the failure this avoids.
  */
 export function CheckList({ items }: { items: CheckItem[] }) {
   return (
-    <ul className="overflow-hidden rounded-panel bg-surface/60 shadow-panel backdrop-blur-xl hairline">
-      {items.map((item, index) => {
-        const badge = BADGE[item.state]
-        const BadgeIcon = badge.icon
+    <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
+      {items.map((item) => {
+        const glyph = GLYPH[item.state]
+        const GlyphIcon = glyph.icon
         const ActionIcon = item.action?.icon
 
         return (
-          <li
-            key={item.key}
-            className={`flex items-center gap-3 px-4 py-3 ${index > 0 ? 'border-t border-line' : ''}`}
-          >
-            <span
-              className={`grid size-6 shrink-0 place-items-center rounded-full ${badge.className}`}
-            >
-              <BadgeIcon size={13} strokeWidth={2.5} aria-hidden="true" />
-            </span>
+          <li key={item.key} className="flex h-[34px] items-center gap-2 px-2.5">
+            <GlyphIcon
+              size={13}
+              strokeWidth={2.6}
+              className={`shrink-0 ${glyph.className}`}
+              aria-hidden="true"
+            />
 
-            <item.icon size={15} className="shrink-0 text-faint" aria-hidden="true" />
-
-            <span className="shrink-0 text-[13.5px] text-text">{item.label}</span>
+            <span className="shrink-0 text-[12.5px] text-text">{item.label}</span>
 
             <span
-              className="ml-auto truncate text-right font-mono text-[12px] text-muted"
+              className="ml-auto truncate text-right font-mono text-[11.5px] text-muted"
               title={item.title ?? item.value}
             >
               {item.value}
@@ -72,12 +68,12 @@ export function CheckList({ items }: { items: CheckItem[] }) {
                 type="button"
                 onClick={item.action.run}
                 disabled={item.action.busy}
-                className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-brand/15 px-3 text-[12px] font-medium text-brand transition duration-150 hover:bg-brand/25 active:scale-[0.97] disabled:pointer-events-none disabled:opacity-55"
+                className="inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 hover:brightness-[1.2] disabled:pointer-events-none disabled:opacity-55"
               >
                 {item.action.busy ? (
-                  <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+                  <Loader2 size={11} className="animate-spin" aria-hidden="true" />
                 ) : (
-                  <ActionIcon size={12} strokeWidth={2.4} aria-hidden="true" />
+                  <ActionIcon size={11} strokeWidth={2.4} aria-hidden="true" />
                 )}
                 {item.action.label}
               </button>

@@ -56,6 +56,17 @@ const EVENT_CHANNEL = 'harness://event'
 export const formatVersion = (version: NodeVersion): string =>
   `${version.major}.${version.minor}.${version.patch}`
 
+/**
+ * Whether `version` satisfies `minimum`, ordered the way `Version` orders itself
+ * in Rust. The backend already picked a runtime with this rule; the UI needs it
+ * again only to say which of the others were rejected and why.
+ */
+export function isAtLeast(version: NodeVersion, minimum: NodeVersion): boolean {
+  if (version.major !== minimum.major) return version.major > minimum.major
+  if (version.minor !== minimum.minor) return version.minor > minimum.minor
+  return version.patch >= minimum.patch
+}
+
 export const environment = (): Promise<Environment> => invoke('harness_environment')
 
 export const status = (): Promise<Status> => invoke('harness_status')
@@ -71,7 +82,5 @@ export const install = (): Promise<void> => invoke('harness_install')
 export const log = (): Promise<LogLine[]> => invoke('harness_log')
 
 /** Subscribe to supervisor status changes and log output. */
-export const onHarnessEvent = (
-  handler: (event: HarnessEvent) => void,
-): Promise<UnlistenFn> =>
+export const onHarnessEvent = (handler: (event: HarnessEvent) => void): Promise<UnlistenFn> =>
   listen<HarnessEvent>(EVENT_CHANNEL, (message) => handler(message.payload))

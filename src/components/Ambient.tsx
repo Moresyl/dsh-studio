@@ -1,9 +1,13 @@
 /**
- * The light behind the window.
+ * The light on the panel surface.
  *
- * Two slow radial washes and a film of noise. Both are pure paint — no blur
- * filter, no layout — so the effect costs one composited layer rather than a
- * per-frame blur of half the window.
+ * One static wash and a film of noise, both at the edge of visibility. It used
+ * to be two slowly drifting colour blobs — which is the signature of a landing
+ * page, not of a tool window. What is left does the one job worth doing: stop a
+ * large flat fill from reading as painted cardboard.
+ *
+ * Pure paint, no blur filter and no layout, so it costs a single composited
+ * layer and nothing per frame.
  */
 
 const NOISE =
@@ -13,19 +17,13 @@ export function Ambient() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       <div
-        className="absolute -top-[38%] -left-[22%] size-[44rem] animate-drift-a rounded-full opacity-35"
+        className="absolute -top-56 -left-32 size-[32rem] rounded-full opacity-[0.13]"
         style={{
-          background: 'radial-gradient(circle, var(--color-brand-cyan) 0%, transparent 62%)',
+          background: 'radial-gradient(circle, var(--color-brand) 0%, transparent 68%)',
         }}
       />
       <div
-        className="absolute -right-[24%] -bottom-[40%] size-[48rem] animate-drift-b rounded-full opacity-30"
-        style={{
-          background: 'radial-gradient(circle, var(--color-brand-violet) 0%, transparent 64%)',
-        }}
-      />
-      <div
-        className="absolute inset-0 opacity-[0.035] mix-blend-overlay"
+        className="absolute inset-0 opacity-[0.022] mix-blend-overlay"
         style={{ backgroundImage: NOISE }}
       />
     </div>
