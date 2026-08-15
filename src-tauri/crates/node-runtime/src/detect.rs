@@ -119,7 +119,9 @@ fn candidates() -> Vec<(PathBuf, Source)> {
         );
         // fnm keeps `<root>/node-versions/v22.14.0/installation/node.exe`.
         collect_versioned(
-            appdata.as_deref().map(|base| base.join("fnm/node-versions")),
+            appdata
+                .as_deref()
+                .map(|base| base.join("fnm/node-versions")),
             &["installation"],
             Source::Fnm,
             &mut candidates,
@@ -225,7 +227,9 @@ fn collect_versioned(
         })
         .collect();
 
-    // Newest release of a given manager first.
-    releases.sort_by(|a, b| b.0.cmp(&a.0));
+    // Newest release of a given manager first, and the path decides ties: two
+    // directories can parse to the same version (`v20.11.0` beside `20.11.0`),
+    // and without a tiebreak which one wins would come down to directory order.
+    releases.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
     out.extend(releases.into_iter().map(|(_, path)| (path, source)));
 }
