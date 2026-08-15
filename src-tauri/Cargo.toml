@@ -1,0 +1,76 @@
+[workspace]
+members = [".", "crates/proc-guard", "crates/node-runtime"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/Moresyl/dsh-studio"
+
+[workspace.dependencies]
+proc-guard = { path = "crates/proc-guard" }
+node-runtime = { path = "crates/node-runtime" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["full", "parking_lot"] }
+url = "2"
+
+[package]
+name = "dsh-studio"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Native desktop studio for DeepSeek Harness"
+
+[lib]
+name = "dsh_studio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "dsh-studio"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+proc-guard.workspace = true
+node-runtime.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+url.workspace = true
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+tauri-plugin-single-instance = "2"
+dirs = "6"
+
+[profile.dev]
+# Match CCHub: optimized dev builds have tripped intermittent MSVC linker
+# failures (`anon.*.llvm.*` unresolved symbols). Keep dev codegen conservative.
+opt-level = 0
+codegen-units = 1
+incremental = false
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = "s"
+panic = "unwind"
+strip = "symbols"
+incremental = false
+debug = false
+overflow-checks = false
+
+[profile.release.package."*"]
+opt-level = "s"
+codegen-units = 1
+
+[profile.release.build-override]
+opt-level = 0
+codegen-units = 256

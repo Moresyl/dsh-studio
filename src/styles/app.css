@@ -1,0 +1,221 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens.
+ *
+ * `@theme` emits these as custom properties on `:root`, and the utilities
+ * compile to `var(--color-…)`. That means a later rule can re-point a token and
+ * every utility follows — which is how the light theme below works without a
+ * second set of class names.
+ *
+ * The defaults are the dark values, because the dark surface is the one the app
+ * is designed around.
+ */
+@theme {
+  --color-canvas: #070a18;
+  --color-canvas-deep: #04060f;
+  --color-surface: #101733;
+  --color-surface-2: #18213f;
+  --color-line: #ffffff1a;
+  --color-line-strong: #ffffff2e;
+
+  --color-text: #e9edfb;
+  --color-muted: #9aa5c6;
+  --color-faint: #6b769a;
+
+  --color-brand: #6e9bff;
+  --color-brand-cyan: #7ff3ff;
+  --color-brand-violet: #a98cff;
+  --color-ok: #46d9a2;
+  --color-warn: #ffc46b;
+  --color-danger: #ff7a8a;
+
+  --font-sans:
+    'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI',
+    system-ui, 'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+  --font-mono:
+    'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --radius-panel: 1rem;
+  --radius-control: 0.625rem;
+
+  --shadow-panel: 0 1px 0 #ffffff0f inset, 0 24px 60px -24px #00000099;
+  --shadow-lift: 0 12px 32px -12px #000000b3;
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Ambient light that moves slowly enough to notice only if you look for it.
+     Transform-only, so it composites on the GPU and costs nothing to run. */
+  --animate-drift-a: drift-a 26s ease-in-out infinite;
+  --animate-drift-b: drift-b 34s ease-in-out infinite;
+
+  @keyframes drift-a {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(7%, 5%, 0) scale(1.09);
+    }
+  }
+
+  @keyframes drift-b {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    50% {
+      transform: translate3d(-6%, -7%, 0) scale(1.07);
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 10px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  --animate-rise: rise 0.5s var(--ease-out-soft) both;
+}
+
+/* Follow the system unless the user pinned a theme. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --color-canvas: #eef1fa;
+    --color-canvas-deep: #e2e7f5;
+    --color-surface: #ffffff;
+    --color-surface-2: #f4f6fd;
+    --color-line: #0b143b1f;
+    --color-line-strong: #0b143b33;
+
+    --color-text: #0d1428;
+    --color-muted: #4d5876;
+    --color-faint: #7b86a5;
+
+    --color-brand: #3f6cf0;
+    --color-brand-cyan: #1fa8c4;
+    --color-brand-violet: #7d5ce8;
+    --color-ok: #129d72;
+    --color-warn: #b47612;
+    --color-danger: #d2415a;
+
+    --shadow-panel: 0 1px 0 #ffffff inset, 0 18px 44px -22px #1b234a29;
+    --shadow-lift: 0 10px 28px -14px #1b234a3d;
+  }
+}
+
+:root[data-theme='light'] {
+  --color-canvas: #eef1fa;
+  --color-canvas-deep: #e2e7f5;
+  --color-surface: #ffffff;
+  --color-surface-2: #f4f6fd;
+  --color-line: #0b143b1f;
+  --color-line-strong: #0b143b33;
+
+  --color-text: #0d1428;
+  --color-muted: #4d5876;
+  --color-faint: #7b86a5;
+
+  --color-brand: #3f6cf0;
+  --color-brand-cyan: #1fa8c4;
+  --color-brand-violet: #7d5ce8;
+  --color-ok: #129d72;
+  --color-warn: #b47612;
+  --color-danger: #d2415a;
+
+  --shadow-panel: 0 1px 0 #ffffff inset, 0 18px 44px -22px #1b234a29;
+  --shadow-lift: 0 10px 28px -14px #1b234a3d;
+}
+
+@layer base {
+  html {
+    color-scheme: dark light;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv05', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    /* Desktop chrome does not select on drag; text that should still be
+       selectable opts back in with `.selectable`. */
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .selectable {
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-faint);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /* Tauri starts a window drag from any element carrying
+     `data-tauri-drag-region`, and it matches on the event target — so the
+     cursor has to say "grab the window" only on the parts that really do. */
+  [data-tauri-drag-region] {
+    cursor: default;
+  }
+
+  /* A hairline that reads as a bevel rather than a border. */
+  .hairline {
+    box-shadow: 0 0 0 1px var(--color-line);
+  }
+}
+
+@layer utilities {
+  .text-gradient-brand {
+    background-image: linear-gradient(
+      100deg,
+      var(--color-brand-cyan),
+      var(--color-brand) 46%,
+      var(--color-brand-violet)
+    );
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,12 @@
+[package]
+name = "node-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Locate a usable Node.js runtime across PATH, nvm, fnm, volta and system installs"
+
+[dependencies]
+proc-guard.workspace = true
+serde.workspace = true
+dirs = "6"
