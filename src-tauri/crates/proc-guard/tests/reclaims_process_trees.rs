@@ -179,6 +179,8 @@ fn write_tree_fixture(workspace: &Path, ticks: &Path) -> PathBuf {
 
     #[cfg(not(windows))]
     {
+        use std::os::unix::fs::PermissionsExt;
+
         let inner = workspace.join("inner.sh");
         let outer = workspace.join("outer.sh");
         fs::write(
@@ -196,6 +198,8 @@ fn write_tree_fixture(workspace: &Path, ticks: &Path) -> PathBuf {
             format!("#!/bin/sh\nsh \"{}\" &\nwait\n", inner.display()),
         )
         .expect("write outer fixture");
+        fs::set_permissions(&outer, fs::Permissions::from_mode(0o700))
+            .expect("make outer fixture executable");
         outer
     }
 }
