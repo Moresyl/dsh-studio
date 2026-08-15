@@ -4,6 +4,25 @@
   "version": "0.1.1",
   "type": "module",
   "description": "Native desktop studio for DeepSeek Harness — Linux/macOS/Windows, built with Rust + Tauri",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "tauri",
+    "rust",
+    "desktop",
+    "supervisor",
+    "cross-platform"
+  ],
+  "homepage": "https://github.com/Moresyl/dsh-studio#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Moresyl/dsh-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Moresyl/dsh-studio/issues"
+  },
+  "author": "Moresyl",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

@@ -1,0 +1,109 @@
+name: Bug report / 报告问题
+description: Something in the shell misbehaves — 外壳的行为不对
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. This tracker is for **the shell**: the window, launching and
+        supervising the service, installing, process cleanup. Bugs in the harness UI or in what the
+        agent produced belong [upstream](https://github.com/deepseek-ai/deepseek-harness/issues).
+
+        谢谢你花时间。这个 issue 区管的是**外壳**：窗口、拉起与托管服务、安装、进程清理。
+        harness 界面本身或者 agent 输出的问题，请提到[上游](https://github.com/deepseek-ai/deepseek-harness/issues)。
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before reporting / 提交之前
+      options:
+        - label: I searched the existing issues and did not find a duplicate. / 我搜索过现有 issue，没有找到重复的。
+          required: true
+        - label: I am on the latest release, or have confirmed the problem is still there on it. / 我用的是最新版本，或者确认过这个问题在最新版本上仍然存在。
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened / 出了什么问题
+      description: What you saw, and what you expected instead. / 你看到了什么，以及你本来期望发生什么。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      description: >-
+        If it only happens sometimes, say roughly how often and what seems to bring it on.
+        如果只是偶发，请说明大概多久出现一次、以及什么情况下更容易出现。
+      placeholder: |
+        1. Launch DSH Studio / 启动 DSH Studio
+        2. Click 启动 / Click Start
+        3. …
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system / 操作系统
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: DSH Studio version / 版本
+      description: >-
+        The installer's file name carries it. If you built from source, the commit hash instead.
+        安装包的文件名里带着版本号；如果是从源码构建的，写 commit 哈希。
+      placeholder: '0.1.1'
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node / Node 运行时
+      description: >-
+        Copy the Node segment from the status bar along the bottom of the window — it says both the
+        version and where it came from. If the shell never found one, say so.
+        直接抄窗口底部状态栏里的那一段——它同时写着版本和来源。如果外壳压根没找到 Node，写明这一点。
+      placeholder: 'Node 22.14.0 · via nvm'
+
+  - type: dropdown
+    id: service-state
+    attributes:
+      label: Was the service running? / 当时服务在运行吗？
+      options:
+        - Yes, the harness was up / 是，harness 已经起来了
+        - No, it was stopped / 否，服务是停着的
+        - It was starting / 正在启动的过程中
+        - Not sure / 不确定
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output / 日志输出
+      description: >-
+        The log console in the control panel is selectable — copy whatever it printed around the
+        failure. This block is formatted as code, so no backticks needed.
+        控制面板里的日志是可以选中的，把出问题前后的输出复制进来。这一栏会按代码块渲染，不用加反引号。
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else / 其他补充
+      description: >-
+        Screenshots, an antivirus or corporate policy that might be involved, an unusual Node setup.
+        截图、可能有影响的杀毒软件或公司策略、不太常见的 Node 装法，都可以写在这里。

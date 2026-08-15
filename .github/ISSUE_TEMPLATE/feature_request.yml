@@ -1,0 +1,60 @@
+name: Feature request / 功能建议
+description: Suggest something the shell should do — 建议外壳该做的事
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The design goal is that this shell stays **boring**: start the service, keep it alive, stay
+        out of the harness's way. Ideas that make the shell better at that have an easy road; ideas
+        that add a second UI on top of the harness are probably a
+        [client plugin](https://github.com/deepseek-ai/deepseek-harness) instead of a change here.
+
+        这个外壳的设计目标是**足够无聊**：把服务拉起来、让它一直活着、别挡着 harness。
+        让外壳把这件事做得更好的想法很好推进；而想在 harness 之上再加一层界面的想法，
+        大概率应该做成 harness 自己的[客户端插件](https://github.com/deepseek-ai/deepseek-harness)，
+        而不是改这里。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem / 想解决的问题
+      description: >-
+        What are you doing when this bites, and what do you do about it today?
+        A problem stated well usually outlives whatever solution gets picked.
+        你在做什么的时候会被这件事卡住，现在又是怎么绕过去的？
+        问题描述清楚了，通常比最后选中的那个方案活得更久。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like / 你希望的做法
+      description: >-
+        Where it would live in the window, and what it would do. Rough is fine.
+        它会出现在窗口的什么位置、会做什么。写得粗一点也没关系。
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you considered / 你想过的其他办法
+      description: >-
+        Including doing nothing — sometimes that is the right answer and it is useful to know you
+        weighed it. 包括「什么都不做」——有时候那才是对的，而知道你权衡过是有用的。
+
+  - type: checkboxes
+    id: invariants
+    attributes:
+      label: Two things that are not settings / 两件不作为配置项的事
+      description: >-
+        The service binds `127.0.0.1` and takes its port from the kernel. Neither is configurable,
+        because the harness can run shell commands. A request to change that is not off limits, but
+        it has to argue the security case.
+        服务绑定 `127.0.0.1`，端口由内核分配。这两件事都不可配置，因为 harness 是能执行 shell 命令的。
+        想改这个不是禁区，但需要先把安全上的道理讲清楚。
+      options:
+        - label: This request does not need the service reachable off loopback, or explains above why it should be. / 这个建议不需要服务能被回环之外访问，或者我已经在上面说明了为什么应该。
+          required: true

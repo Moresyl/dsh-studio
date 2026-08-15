@@ -13,6 +13,7 @@ src-tauri/runtime-cache/
 
 # Local working notes and scratch captures
 .workflow/
+.firecrawl/
 
 # Editor / OS
 .DS_Store

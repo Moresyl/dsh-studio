@@ -1,0 +1,16 @@
+# Blank issues are off so that reports land in a form that already asks for the
+# platform, the Node, and the log — the three things every triage starts by
+# asking for anyway.
+blank_issues_enabled: false
+contact_links:
+  - name: DeepSeek Harness itself / harness 本身的问题
+    url: https://github.com/deepseek-ai/deepseek-harness/issues
+    about: The agent, its UI, its models. This repository is only the desktop shell around it. / agent、它的界面、它的模型。本仓库只是它外面的桌面外壳。
+
+  - name: Security issue / 安全问题
+    url: https://github.com/Moresyl/dsh-studio/security/advisories/new
+    about: Report privately instead of opening an issue. See SECURITY.md. / 请私下报告，不要开公开 issue，详见 SECURITY.md。
+
+  - name: Setting up to contribute / 参与贡献
+    url: https://github.com/Moresyl/dsh-studio/blob/main/CONTRIBUTING.md
+    about: Build instructions, the checks CI runs, and how commits are worded here. / 怎么搭环境、CI 会跑哪些检查、提交信息怎么写。
