@@ -9,6 +9,42 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-16
+
+Two features that change what the shell is for: it now extends the harness, and
+it can hand it to your phone.
+
+### Added
+
+- **Plugin marketplace.** Search the npm registry from inside the window, read
+  what a package declares — version, license, dependencies, and whether it
+  carries a profile patch at all — and install it into the harness's hosted
+  profile. Installs and removals go through the harness's own plugin command
+  rather than editing its files behind its back, so the result is exactly what
+  the harness would have produced itself. A package with no profile patch is
+  labelled the library it is instead of appearing as a plugin that silently did
+  nothing, and one that came with the profile template is shown as built in and
+  cannot be removed from here.
+- **Remote access from a phone.** Off until you open it, and opening it does not
+  move the service: `dsh` stays on loopback. What opens is a separate gateway
+  bound to one chosen LAN address, holding a 128-bit token minted for that
+  session and never written to disk or into a log. Pairing is a QR code the Rust
+  side encodes — scan it, the token is exchanged for a cookie, and everything
+  after that is spliced straight through to the harness. The pane reports how
+  many connections are live, how many it has served, and how many it refused.
+  Closing the door, or the harness stopping, invalidates the token; the next
+  session mints a different one.
+- **Update check.** The About pane asks the release feed what the newest
+  published version is and says whether it is newer than what is running.
+  Nothing is downloaded and nothing is installed — the answer is a link.
+- **About pane.** Version, platform and architecture, and the three directories
+  the app actually uses, each of which opens in the file manager.
+- **A workbench instead of a single panel.** The control panel became four
+  views — Console, Plugins, Remote, About — behind a navigation rail that
+  carries live state: a dot when remote access is open, a count of what is
+  installed. Views keep their state while the harness is on screen, so a typed
+  search and a pairing code on display survive a glance at the harness.
+
 ### Fixed
 
 - The Unix process-tree test wrote its fixture script without an executable
@@ -20,8 +56,11 @@ pre-1.0 caveat that anything may still move.
 - `CONTRIBUTING.md`, `SECURITY.md`, this changelog, and GitHub issue and pull
   request templates, each with a Chinese counterpart.
 - README gained an architecture diagram, the startup sequence step by step, an
-  install table of the four release targets, a comparison with the other
-  desktop app for the harness, and an FAQ.
+  install table of the four release targets, the design decisions and what each
+  one gives up, and an FAQ.
+- `SECURITY.md` states what the remote gateway guarantees — off by default, one
+  bound address, no forwarding without the session token, and no token on disk —
+  so that a report about any of them has something to be measured against.
 
 ## [0.1.1] — 2026-08-15
 
@@ -74,6 +113,7 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Moresyl/dsh-studio/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Moresyl/dsh-studio/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Moresyl/dsh-studio/releases/tag/v0.1.0
