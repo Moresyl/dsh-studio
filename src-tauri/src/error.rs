@@ -33,6 +33,27 @@ pub enum Error {
 
     #[error("an install is already running")]
     AlreadyInstalling,
+
+    #[error("{0}")]
+    Network(String),
+
+    #[error("start the harness before opening it to your other devices")]
+    RemoteNeedsHarness,
+
+    #[error("this machine is not on a network any other device could reach it over")]
+    RemoteNoNetwork,
+
+    #[error("could not open a port for remote access: {0}")]
+    RemoteBind(#[source] io::Error),
+
+    #[error("the system entropy source is unavailable, so no pairing secret can be made")]
+    NoEntropy,
+
+    #[error("{0}")]
+    Plugin(String),
+
+    #[error("a plugin change is already running")]
+    PluginBusy,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

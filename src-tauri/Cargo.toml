@@ -50,6 +50,11 @@ tauri-plugin-process = "2"
 tauri-plugin-single-instance = "2"
 dirs = "6"
 sys-locale = "0.3"
+# Pairing secrets come from the OS entropy source, never from a PRNG we seed.
+getrandom = "0.3"
+# QR encoding only; the modules are rendered as SVG by the frontend, so nothing
+# here has to draw or write an image.
+qrcodegen = "1.8"
 
 [profile.dev]
 # Match CCHub: optimized dev builds have tripped intermittent MSVC linker

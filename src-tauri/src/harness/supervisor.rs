@@ -1,9 +1,9 @@
 //! Keep one `dsh web` process alive and observable.
 //!
-//! The shell makes one promise the competing Electron build does not: the local
-//! service does not silently disappear. That means owning the whole lifecycle —
-//! bounded startup, streamed output, crash detection, and backoff restart — in
-//! one place, and exposing it as a state machine the UI can render honestly.
+//! The shell makes one promise: the local service does not silently disappear.
+//! That means owning the whole lifecycle — bounded startup, streamed output,
+//! crash detection, and backoff restart — in one place, and exposing it as a
+//! state machine the UI can render honestly.
 
 use std::collections::VecDeque;
 use std::path::PathBuf;

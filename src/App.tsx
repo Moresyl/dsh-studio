@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import { HarnessFrame } from '@/components/HarnessFrame'
-import { Launcher } from '@/components/Launcher'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
+import { Workbench } from '@/components/Workbench'
 import { subscribeToHarness, useHarness } from '@/state/harness'
+import { subscribeToRemote, useRemote } from '@/state/remote'
 
 /**
  * The window: a title bar, a status bar, and whichever view is between them.
@@ -18,6 +19,7 @@ import { subscribeToHarness, useHarness } from '@/state/harness'
 export default function App() {
   const status = useHarness((state) => state.status)
   const environment = useHarness((state) => state.environment)
+  const refreshRemote = useRemote((state) => state.refresh)
   const origin = status.phase === 'ready' ? status.origin : null
 
   // Which harness the user asked to look away from, rather than a bare boolean.
@@ -43,6 +45,17 @@ export default function App() {
     }
   }, [])
 
+  // Subscribed for the lifetime of the window, not from the pane that shows it:
+  // the supervisor closes remote access when the harness stops, and the nav rail
+  // has to stop claiming otherwise even while the user is looking elsewhere.
+  useEffect(() => {
+    void refreshRemote()
+    const pending = subscribeToRemote()
+    return () => {
+      void pending.then((unlisten) => unlisten())
+    }
+  }, [refreshRemote])
+
   // With nothing serving there is nothing else to show.
   const showPanel = origin === null || panelFor === origin
 
@@ -58,7 +71,10 @@ export default function App() {
 
       <div className="relative flex min-h-0 flex-1">
         {origin && <HarnessFrame origin={origin} hidden={showPanel} />}
-        {showPanel && <Launcher />}
+        {/* Hidden rather than unmounted, for the same reason the frame is: a
+            search someone typed and a pairing code on screen must survive a
+            glance at the harness. */}
+        <Workbench hidden={!showPanel} />
       </div>
 
       <StatusBar status={status} environment={environment} />

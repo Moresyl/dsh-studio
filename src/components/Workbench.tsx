@@ -1,0 +1,147 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { Gauge, Info, Puzzle, Smartphone, type LucideIcon } from 'lucide-react'
+
+import { AboutPane } from '@/components/AboutPane'
+import { ConsolePane } from '@/components/ConsolePane'
+import { PluginMarket } from '@/components/PluginMarket'
+import { RemotePane } from '@/components/RemotePane'
+import { t } from '@/lib/i18n'
+import type { MessageKey } from '@/lib/i18n'
+import { usePlugins } from '@/state/plugins'
+import { useRemote } from '@/state/remote'
+
+type View = 'console' | 'plugins' | 'remote' | 'about'
+
+const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
+  { id: 'console', icon: Gauge, label: 'nav.console' },
+  { id: 'plugins', icon: Puzzle, label: 'nav.plugins' },
+  { id: 'remote', icon: Smartphone, label: 'nav.remote' },
+  { id: 'about', icon: Info, label: 'nav.about' },
+]
+
+/**
+ * Everything this shell offers, behind one rail.
+ *
+ * The console used to be the whole panel, and bolting three more screens onto
+ * it as tabs along the top would have cost the console the height it spends on
+ * a log. A vertical rail costs width the log does not need instead, and it is
+ * the arrangement every desktop tool with more than one workspace has converged
+ * on — so it is also the one a user already knows how to read.
+ *
+ * The rail carries live state rather than only names: a dot on Remote while a
+ * door is open, a count on Plugins. Those are the two facts someone would
+ * otherwise have to open a pane to check, and a nav item that answers the
+ * question is worth more than one that merely leads to the answer.
+ */
+export function Workbench({ hidden }: { hidden: boolean }) {
+  const [view, setView] = useState<View>('console')
+
+  const remoteOpen = useRemote((state) => state.status?.open ?? false)
+  const refreshPlugins = usePlugins((state) => state.refresh)
+  const installed = usePlugins(
+    (state) => state.profile?.plugins.filter((plugin) => !plugin.builtin).length ?? 0,
+  )
+
+  // Read once for the badge, not once per visit to the plugin pane — the count
+  // has to be true while the user is looking at something else.
+  useEffect(() => {
+    void refreshPlugins()
+  }, [refreshPlugins])
+
+  return (
+    <div className={hidden ? 'hidden' : 'flex min-h-0 flex-1'}>
+      <nav
+        aria-label={t('view.panel')}
+        className="chrome relative z-10 flex w-[62px] shrink-0 flex-col items-center gap-0.5 border-r border-line py-2"
+      >
+        {VIEWS.map((entry) => (
+          <RailItem
+            key={entry.id}
+            icon={entry.icon}
+            label={t(entry.label)}
+            active={view === entry.id}
+            onClick={() => setView(entry.id)}
+            badge={
+              entry.id === 'remote' && remoteOpen ? (
+                <LiveDot />
+              ) : entry.id === 'plugins' && installed > 0 ? (
+                <Count value={installed} />
+              ) : undefined
+            }
+          />
+        ))}
+      </nav>
+
+      {/* Keyed so a pane switch replays the settle animation and so no pane
+          inherits another's scroll position. The console is the exception: it
+          holds a live log and is cheap to keep, so it is only hidden. */}
+      <div className="flex min-h-0 flex-1">
+        <div className={view === 'console' ? 'flex min-h-0 flex-1' : 'hidden'}>
+          <ConsolePane />
+        </div>
+        {view === 'plugins' && <PluginMarket />}
+        {view === 'remote' && <RemotePane />}
+        {view === 'about' && <AboutPane />}
+      </div>
+    </div>
+  )
+}
+
+interface RailItemProps {
+  icon: LucideIcon
+  label: string
+  active: boolean
+  badge?: ReactNode
+  onClick: () => void
+}
+
+function RailItem({ icon: Icon, label, active, badge, onClick }: RailItemProps) {
+  return (
+    <button
+      type="button"
+      aria-current={active ? 'page' : undefined}
+      onClick={onClick}
+      className={[
+        'relative flex h-[52px] w-[52px] flex-col items-center justify-center gap-[5px] rounded-panel transition-colors duration-100',
+        active ? 'bg-surface-2 text-text' : 'text-faint hover:bg-surface-2/60 hover:text-muted',
+      ].join(' ')}
+    >
+      {/* On the rail's edge rather than on the button, which is what makes it
+          read as "you are here in this rail" instead of as a border. */}
+      {active && (
+        <span
+          aria-hidden="true"
+          className="absolute top-1/2 left-[-2px] h-[18px] w-[2.5px] -translate-y-1/2 rounded-full bg-brand"
+        />
+      )}
+
+      <span className="relative">
+        <Icon size={17} strokeWidth={active ? 2.2 : 1.9} aria-hidden="true" />
+        {badge && <span className="absolute -top-1 -right-2">{badge}</span>}
+      </span>
+
+      <span className="text-[10px] leading-none font-medium">{label}</span>
+    </button>
+  )
+}
+
+/** A door is open. Same colour the status indicator uses for a live service. */
+function LiveDot() {
+  return (
+    <span
+      aria-hidden="true"
+      className="block size-[6px] rounded-full bg-ok shadow-[0_0_5px_var(--color-ok)]"
+    />
+  )
+}
+
+function Count({ value }: { value: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="block min-w-[14px] rounded-full bg-brand px-[3px] text-center text-[9px] leading-[14px] font-semibold text-[#07101f] tabular-nums"
+    >
+      {value}
+    </span>
+  )
+}

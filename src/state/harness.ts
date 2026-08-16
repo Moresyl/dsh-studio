@@ -7,6 +7,7 @@
  */
 import { create } from 'zustand'
 
+import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type { Environment, HarnessEvent, LogLine, Status } from '@/lib/ipc'
 
@@ -118,10 +119,6 @@ export const useHarness = create<HarnessStore>((set, get) => ({
     set({ status: status as Status })
   },
 }))
-
-/** Commands reject with the error's message, but a thrown value is still `unknown`. */
-const describe = (cause: unknown): string =>
-  typeof cause === 'string' ? cause : cause instanceof Error ? cause.message : String(cause)
 
 /** Wire the store to the Rust event stream for the lifetime of the app. */
 export const subscribeToHarness = (): Promise<() => void> =>

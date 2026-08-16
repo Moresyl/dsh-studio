@@ -67,6 +67,23 @@ window stays movable and closable, and switching to the control panel does not
 throw away a running session. Nothing about the upstream project is patched or
 vendored.
 
+**Extends it through its own plugin system.**
+There is a marketplace in the window: search the npm registry, read what a
+package declares before you commit to it, and install into the harness's hosted
+profile. Installation goes through the harness's own plugin command rather than
+around it — no private side channel into somebody else's config. A package whose
+manifest declares a profile patch becomes a layer the harness loads; one that
+does not is labelled the plain library it is, instead of appearing as a plugin
+that mysteriously did nothing.
+
+**Reaches your phone without putting the agent on the network.**
+Remote access is off until you open it, and opening it does not move the
+service — `dsh` stays bound to loopback, which is not configurable. What opens is
+a separate gateway, bound to one LAN address, holding a 128-bit token minted for
+that session. Pairing is a QR code: scan it, the token lands in a cookie, and the
+phone is in. Everything after that is spliced straight through to the harness.
+Close the door and the token dies with it; the next one is a different secret.
+
 [Job Object]: https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects
 
 <div align="center">
@@ -81,10 +98,14 @@ what you see is the real upstream UI rather than a re-implementation of it.
 
 ```mermaid
 flowchart LR
+  phone["phone on the same network"]
+
   subgraph app["DSH Studio — one process"]
     ui["WebView<br/>React shell UI"]
     sup["Rust supervisor<br/>backoff · readiness · health"]
+    gw["remote gateway<br/>one LAN address · session token"]
     ui <-->|Tauri IPC| sup
+    ui <-->|Tauri IPC| gw
   end
 
   sup ==>|"spawn: node dsh web --port 0"| dsh
@@ -99,6 +120,8 @@ flowchart LR
 
   ui -.->|iframe loads the origin| dsh
   sup -.->|"HTTP probe every 10s"| dsh
+  phone -.->|"paired by QR, then cookie"| gw
+  gw ==>|"spliced, once the token checks out"| dsh
 ```
 
 The startup sequence is worth spelling out, because every step exists to remove
@@ -148,41 +171,40 @@ about being unfinished.
 | Supervisor, backoff restart, health probing  | ✅                                                                 |
 | Process-tree reclamation (Windows / Unix)    | ✅                                                                 |
 | Harness hosting, log console, English + 中文 | ✅                                                                 |
+| Plugin marketplace — search, install, remove | ✅                                                                 |
+| Remote access from a phone, paired by QR     | ✅                                                                 |
+| Update check from inside the window          | ✅                                                                 |
 | Verified on Windows 11                       | ✅                                                                 |
 | macOS / Linux rendering                      | ⏳ not yet run                                                     |
 | Bundled Node runtime (no system Node needed) | ⏳ planned                                                         |
 | Tray icon, close-to-tray while serving       | ✅                                                                 |
-| Native context menus, auto-update            | ⏳ planned                                                         |
+| Native context menus, silent self-update     | ⏳ planned                                                         |
 | Packaged releases                            | ✅ automated for Windows, Linux, and macOS (Intel + Apple Silicon) |
 
-## How this compares
+## Design notes
 
-There is another desktop app for the harness —
-[`anywhere-labs/deepseek-harness-desktop`][alt]. It got there first and it is
-ahead in two places that matter, so this table says where each project stands
-rather than making a case. Every row is checkable in the two repositories.
+Three decisions shape everything else here, and each one gives something up.
 
-|                          | DSH Studio                                                             | `deepseek-harness-desktop`                                                           |
-| ------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Runtime                  | Rust + Tauri 2, system WebView                                         | Electron 43                                                                          |
-| Relationship to upstream | Hosts the unmodified `dsh` service. Nothing vendored, nothing patched. | A fork of the entire `@deepseek-ai/dsh-root` monorepo, with the app added inside it. |
-| Shutdown                 | Whole process tree, via Job Object / process group                     | `SIGTERM` then `SIGKILL` on the spawned child                                        |
-| Bundled Node runtime     | ⏳ Planned. Detects system Node today.                                 | ✅ Staged into the package                                                           |
-| macOS signing            | ⏳ Not yet — builds are unsigned                                       | ✅ Hardened runtime + notarization                                                   |
+**The upstream service is hosted, not forked.** Vendoring the harness into this
+repository would buy direct control of its UI, at the price of merging every
+upstream release forward forever. Hosting it unmodified gives up that control —
+the plan for extending the UI is to go through the harness's own plugin system
+rather than around it — and takes upstream updates for free. A plugin installed
+from the shell's own marketplace is the supported way to change what the harness
+does.
 
-The fork question is the one real design disagreement, and it is a trade, not a
-verdict. Forking the monorepo buys direct control of the harness UI; the cost is
-that every upstream release has to be merged forward. Hosting the service
-unmodified gives up that control — the plan for extending the UI is to go
-through the harness's own client-plugin system rather than around it — and buys
-upstream updates for free.
+**Shutdown is the kernel's job, not a signal's.** Killing the process you
+spawned does not kill the tools it spawned, and on Windows there is no process
+group to fall back on — so a shell that crashes can strand a compiler, a test
+runner, or a language server nobody can now see. A Job Object makes the kernel
+responsible for the whole tree, which is why closing this window is enough even
+when the closing was not graceful.
 
-The shutdown row is the difference with real consequences today. `child.kill()`
-signals the process you spawned, not the tools it spawned; on Windows there is
-no process group to fall back on, so a crashed shell can leave those behind. A
-Job Object makes the kernel responsible for the whole tree instead.
-
-[alt]: https://github.com/anywhere-labs/deepseek-harness-desktop
+**The service stays on loopback; reach is a separate, authenticated door.**
+Binding an agent that can run shell commands to a LAN interface is not something
+to do by default, and not something to do without a credential. Remote access is
+off until you turn it on, and when you do, a gateway with a per-session token
+proxies to a service that never stopped being loopback-only.
 
 ## Requirements
 
@@ -212,6 +234,8 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 ```
 src/                       React 19 + Tailwind 4 shell UI
 src-tauri/src/harness/     supervisor, readiness parsing, health probe, install
+src-tauri/src/remote/      LAN gateway, session token, QR, address selection
+src-tauri/src/plugins/     registry search, profile inspection, install/remove
 src-tauri/crates/
   node-runtime/            find a usable Node on this machine
   proc-guard/              kill a process tree and mean it
@@ -254,11 +278,27 @@ It should not, including if the shell is killed outright rather than closed.
 That is what `proc-guard` is for. If you ever find an orphan, that is a bug
 worth reporting.
 
+**How do I use it from my phone?**
+Open the Remote pane, press Open access, and scan the code with the phone's
+camera. Both devices have to be on the same network — there is no relay and no
+account, so nothing about the pairing leaves the room. The link in the code
+carries the session's secret, which is why the pane offers to copy it rather
+than print it: paste it into a chat and you have handed over the door key.
+
+**Can I install any npm package as a plugin?**
+You can install any package, but only one that declares a profile patch in its
+manifest becomes an active layer — the marketplace says which is which before
+you install. Plugins land in the harness's own profile through its own plugin
+command, so what the shell installs is exactly what the harness would have.
+
 **Is my data sent anywhere?**
-Not by this shell. It binds the service to loopback only, and that is not a
+Not by this shell. The service itself is bound to loopback and that is not a
 setting — an agent that can run shell commands has no business being reachable
-from the local network. What the harness itself does with your API keys is
-upstream's business, not this project's.
+by default. Remote access does not change that: the service stays on loopback,
+and what listens on the network is a gateway that will not forward a byte
+without the session's token. It is off until you switch it on, and it goes off
+again the moment the harness stops. What the harness itself does with your API
+keys is upstream's business, not this project's.
 
 ## Contributing
 

@@ -39,6 +39,15 @@ software it does not own, so the boundary is worth stating plainly.
 - The service's network exposure. It is bound to `127.0.0.1` with a
   kernel-assigned port, and neither is configurable. Anything that widens that
   binding is a vulnerability in this project.
+- The remote access gateway. Reaching the harness from another device does not
+  move the service — a separate listener proxies to it, and it holds to four
+  rules: it is off until switched on, it binds one chosen address rather than
+  `0.0.0.0`, it forwards nothing without the token minted for that session, and
+  that token lives in memory for the life of the session and is never written to
+  disk or into a log. A way to make it forward without a valid token, to reach
+  it from an address it did not bind, to recover the token from anything it
+  leaves behind, or to keep it open after the harness stops, is a vulnerability
+  in this project.
 - The frontend capability surface in `src-tauri/capabilities/default.json` and
   the CSP in `src-tauri/tauri.conf.json`. The harness is loaded in a frame from
   its own origin and must not be able to reach Tauri commands.
@@ -54,7 +63,14 @@ software it does not own, so the boundary is worth stating plainly.
 - Vulnerabilities in DeepSeek Harness itself. It is installed from npm,
   unmodified, and belongs to [its own project][upstream]. Report those there.
 - The agent's designed ability to run commands and edit files. That is what the
-  harness is for; the shell's job is to keep it on loopback, not to sandbox it.
+  harness is for; the shell's job is to control who can reach it, not to sandbox
+  what it does.
+- A pairing link that was given away. Whoever holds it holds the session, which
+  is why the app offers to copy it rather than display it — but where it goes
+  after that is a decision, not a defect. Close remote access to invalidate it.
+- Plugins you chose to install. They run inside the harness with everything the
+  harness has; the marketplace reports what a package declares, and installing
+  it is still trusting its author.
 - Anything requiring an attacker who already has code execution as your user.
   At that point they can run `dsh` themselves.
 
@@ -83,9 +99,22 @@ this repository, and treat installers from anywhere else as untrusted.
 前端能力面与 CSP（harness 在 frame 里加载，不得够到 Tauri 命令）、
 子进程调用不经过 shell、进程树能被彻底回收，以及发布流水线产出的内容。
 
+远程访问同样在范围内。它不会挪动服务，而是另起一个监听去代理，并守四条规矩：
+默认关闭、只绑定选定的那一个地址而不是 `0.0.0.0`、
+没有本次会话现铸的令牌就不转发任何字节、
+令牌只活在内存里且从不落盘也不进日志。
+能让它在没有有效令牌时转发、能从它没绑定的地址够到它、
+能从它留下的任何东西里还原出令牌，或者能让它在 harness 停掉之后仍然开着——
+这些都是本项目的漏洞。
+
 DeepSeek Harness 本身的漏洞不在范围内——它是原样从 npm 安装的，
 请到[上游项目][upstream]报告。agent 能执行命令、能改文件，这是它的设计意图，
-不是漏洞；外壳的职责是把它按在回环地址上，而不是给它做沙箱。
+不是漏洞；外壳的职责是管住「谁够得着它」，而不是给它做沙箱。
+配对链接被交出去也不算漏洞：拿到它的人就等于拿到了这次会话，
+所以应用只提供「复制」而不把它显示出来——但它之后去了哪里是一个决定，不是一个缺陷，
+关掉远程访问即可让它作废。你自己选择安装的插件同理：
+它们在 harness 里跑，拥有 harness 的一切；
+市场会如实报出一个包声明了什么，但装下去仍然等于信任它的作者。
 
 另外：目前 macOS 版本**未签名未公证**，Windows 版本**未签名**，
 所以系统无法替你验证安装包确实来自本项目且未被篡改。

@@ -17,15 +17,14 @@ import { useHarness } from '@/state/harness'
 const NODE_DOWNLOADS = 'https://nodejs.org/en/download'
 
 /**
- * The control panel: what the window shows before the harness is serving, and
- * what it can always be switched back to afterwards.
+ * The console: the state of the machine, and the harness's own output.
  *
- * Two regions, not one centred column. A rail on the left holds the state of
- * the machine and the one button that changes it; the rest of the window is the
- * harness's own output. That is the shape of a tool that supervises something —
- * controls on one side, the thing being controlled on the other — and it is the
- * reason the window looks occupied at 1360px instead of holding a small card in
- * the middle of a lot of nothing.
+ * Two regions, not one centred column. A rail on the left holds what the
+ * machine has and the one button that changes it; the rest of the pane is the
+ * output of the thing being supervised. That is the shape of a tool that
+ * supervises something — controls on one side, the thing being controlled on
+ * the other — and it is the reason the window looks occupied at 1360px instead
+ * of holding a small card in the middle of a lot of nothing.
  *
  * Inside the rail the sections run static-first — environment, then the
  * runtimes it chose between, then the service once there is one — so that a
@@ -34,7 +33,7 @@ const NODE_DOWNLOADS = 'https://nodejs.org/en/download'
  * button belongs and what turns the leftover height into margin instead of a
  * hole.
  */
-export function Launcher() {
+export function ConsolePane() {
   const {
     environment,
     status,
@@ -64,7 +63,7 @@ export function Launcher() {
 
   return (
     <div className="flex min-h-0 flex-1 animate-rise">
-      <aside className="chrome relative flex w-[368px] shrink-0 flex-col border-r border-line">
+      <aside className="chrome relative flex w-[340px] shrink-0 flex-col border-r border-line">
         <Ambient />
 
         <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">

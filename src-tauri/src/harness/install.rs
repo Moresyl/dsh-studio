@@ -120,7 +120,7 @@ where
 /// Running `npm-cli.js` with a known Node is exact: it cannot pick up a
 /// different runtime from PATH, and on Windows it avoids invoking `npm.cmd`
 /// through the command processor.
-fn npm_cli(node: &Path) -> Option<PathBuf> {
+pub(crate) fn npm_cli(node: &Path) -> Option<PathBuf> {
     let directory = node.parent()?;
     [
         // Windows: npm sits beside node.exe.

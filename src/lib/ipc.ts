@@ -1,8 +1,8 @@
 /**
  * Typed view of the Rust command surface.
  *
- * These declarations mirror `src-tauri/src/harness`; when a shape changes there
- * it must change here, because nothing else keeps the two sides honest.
+ * These declarations mirror `src-tauri/src`; when a shape changes there it must
+ * change here, because nothing else keeps the two sides honest.
  */
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
@@ -84,3 +84,135 @@ export const log = (): Promise<LogLine[]> => invoke('harness_log')
 /** Subscribe to supervisor status changes and log output. */
 export const onHarnessEvent = (handler: (event: HarnessEvent) => void): Promise<UnlistenFn> =>
   listen<HarnessEvent>(EVENT_CHANNEL, (message) => handler(message.payload))
+
+/* -------------------------------------------------------------------------- */
+/* Remote access                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** A QR symbol as `size` × `size` modules, row-major, true meaning dark. */
+export interface QrMatrix {
+  size: number
+  modules: boolean[]
+}
+
+export interface RemoteStatus {
+  open: boolean
+  /** Addresses this machine could be reached on, open or not. */
+  addresses: string[]
+  /** Where the harness is reachable, without the secret in it. */
+  url: string | null
+  /** The one URL that pairs a device. Never logged, never persisted. */
+  pairingUrl: string | null
+  qr: QrMatrix | null
+  active: number
+  served: number
+  refused: number
+}
+
+/** Channel `lib.rs` pokes when a remote connection opens or closes. */
+const REMOTE_CHANNEL = 'remote://changed'
+
+export const remoteStatus = (): Promise<RemoteStatus> => invoke('remote_status')
+
+/** Open a door in front of the harness. Requires it to be serving. */
+export const remoteOpen = (): Promise<RemoteStatus> => invoke('remote_open')
+
+export const remoteClose = (): Promise<RemoteStatus> => invoke('remote_close')
+
+/**
+ * Subscribe to connection changes.
+ *
+ * The signal carries nothing on purpose — the panel asks for the numbers itself,
+ * so a coalesced notification costs a redraw rather than a wrong count.
+ */
+export const onRemoteChange = (handler: () => void): Promise<UnlistenFn> =>
+  listen(REMOTE_CHANNEL, () => handler())
+
+/* -------------------------------------------------------------------------- */
+/* Plugins                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export interface InstalledPlugin {
+  name: string
+  /** The range recorded in the profile manifest, empty for an in-box bundle. */
+  spec: string
+  /** Whether the package's profile patch is in the layer stack. */
+  active: boolean
+  /** Part of the profile template, so never removable from here. */
+  builtin: boolean
+}
+
+export interface PluginState {
+  profile: string
+  profileDir: string
+  /** False until the harness has created the profile for the first time. */
+  initialized: boolean
+  plugins: InstalledPlugin[]
+  /** Whether a package manager is reachable without installing one first. */
+  packageManager: boolean
+}
+
+export interface PluginListing {
+  name: string
+  version: string
+  description: string
+  publisher: string
+  /** ISO timestamp of the last publish. */
+  updated: string
+  weeklyDownloads: number
+  link: string | null
+}
+
+export interface PluginDetail {
+  name: string
+  version: string
+  description: string
+  license: string
+  homepage: string | null
+  repository: string | null
+  /** Whether the manifest declares a profile patch — a plugin, not a library. */
+  bundle: boolean
+  dependencies: string[]
+}
+
+export const pluginState = (): Promise<PluginState> => invoke('plugin_state')
+
+export const pluginSearch = (query: string): Promise<PluginListing[]> =>
+  invoke('plugin_search', { query })
+
+export const pluginDetail = (name: string): Promise<PluginDetail> =>
+  invoke('plugin_detail', { name })
+
+/** Install into the hosted profile; resolves with the profile afterwards. */
+export const pluginAdd = (spec: string): Promise<PluginState> => invoke('plugin_add', { spec })
+
+export const pluginRemove = (name: string): Promise<PluginState> =>
+  invoke('plugin_remove', { name })
+
+/* -------------------------------------------------------------------------- */
+/* About                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface About {
+  version: string
+  platform: string
+  arch: string
+  appData: string
+  harnessDir: string
+  profileDir: string
+}
+
+export interface Release {
+  /** The published version, without any leading `v`. */
+  version: string
+  /** True only when it is actually newer than what is running. */
+  newer: boolean
+  url: string
+  notes: string
+  published: string
+}
+
+export const about = (): Promise<About> => invoke('app_about')
+
+/** Ask the release feed what the newest published version is. Nothing downloads. */
+export const checkUpdate = (): Promise<Release> => invoke('app_check_update')
