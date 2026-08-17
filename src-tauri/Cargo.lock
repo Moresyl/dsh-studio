@@ -831,7 +831,7 @@ dependencies = [
 
 [[package]]
 name = "dsh-studio"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "getrandom 0.3.4",
@@ -2165,7 +2165,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "node-runtime"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dirs",
  "proc-guard",
@@ -2665,7 +2665,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "proc-guard"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "libc",
  "tokio",

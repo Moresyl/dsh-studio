@@ -9,6 +9,12 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-17
+
+The desktop shell feels more native, announces new releases without taking over
+the update process, and replaces a shared remote secret with revocable device
+credentials.
+
 ### Added
 
 - **A new release announces itself.** The window asks the release feed a few
@@ -200,7 +206,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Moresyl/dsh-studio/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Moresyl/dsh-studio/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Moresyl/dsh-studio/releases/tag/v0.1.0

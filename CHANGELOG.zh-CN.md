@@ -9,6 +9,11 @@
 
 ## [未发布]
 
+## [0.3.0] —— 2026-08-17
+
+这一版让桌面外壳更像桌面软件，在不接管更新过程的前提下主动提示新版本，
+并把远程访问的共用秘密换成可以逐台吊销的设备密钥。
+
 ### 新增
 
 - **有新版本时会自己说一声。** 窗口在启动几秒后、以及此后每六个小时
@@ -177,7 +182,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Moresyl/dsh-studio/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Moresyl/dsh-studio/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Moresyl/dsh-studio/releases/tag/v0.1.0
