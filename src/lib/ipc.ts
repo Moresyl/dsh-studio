@@ -262,6 +262,32 @@ export const pluginRemove = (name: string): Promise<PluginState> =>
 export const pluginSwitch = (name: string, enabled: boolean): Promise<PluginState> =>
   invoke('plugin_switch', { name, enabled })
 
+/** A plugin archive on this machine, as its own manifest describes it. */
+export interface ArchivePackage {
+  name: string
+  version: string
+  description: string
+  /** Whether it declares a profile patch — a plugin, not just a package. */
+  bundle: boolean
+  /** The file it was read out of. */
+  path: string
+  bytes: number
+}
+
+/**
+ * Read a picked archive without installing anything from it.
+ *
+ * Its own call so the file can be described before it is installed: a file name
+ * is whatever the person who sent it typed, and the package inside is the thing
+ * about to be added to a profile.
+ */
+export const pluginArchive = (path: string): Promise<ArchivePackage> =>
+  invoke('plugin_archive', { path })
+
+/** Install from an archive instead of the registry; answers with the profile. */
+export const pluginImport = (path: string): Promise<PluginState> =>
+  invoke('plugin_import', { path })
+
 /* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */
 /* -------------------------------------------------------------------------- */

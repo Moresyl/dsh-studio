@@ -140,6 +140,15 @@ const en = {
   'plugins.profile': 'Profile',
   'plugins.pick': 'Pick a package to see what it declares.',
   'plugins.detailFailed': 'Could not read the published manifest.',
+  'plugins.import': 'Import file',
+  'plugins.importHint': 'Install a plugin from a .tgz on this machine',
+  'plugins.importTitle': 'Pick a plugin archive',
+  'plugins.importKind': 'npm package (.tgz)',
+  'plugins.confirmImport': 'Install this package?',
+  'plugins.confirmImportBody':
+    'Read from the archive ({size}), not from the registry. A copy is kept, because the profile records where it was installed from.',
+  'plugins.confirmImportLibrary':
+    'This archive ({size}) declares no profile patch, so it adds no layer. Installing it is still fine — a plugin may depend on it.',
 
   'profile.switch': 'Switch profile',
   'profile.manage': 'Manage profiles…',
@@ -590,6 +599,15 @@ const zh: Record<MessageKey, string> = {
   'plugins.profile': '配置',
   'plugins.pick': '选择一个扩展包，查看它声明了什么。',
   'plugins.detailFailed': '无法读取已发布的清单。',
+  'plugins.import': '导入文件',
+  'plugins.importHint': '从本机的 .tgz 文件安装插件',
+  'plugins.importTitle': '选择插件压缩包',
+  'plugins.importKind': 'npm 扩展包 (.tgz)',
+  'plugins.confirmImport': '要安装这个扩展包吗？',
+  'plugins.confirmImportBody':
+    '内容读自这个压缩包（{size}），不经过源。安装后会保留一份副本，因为配置里记录的是它的安装来源路径。',
+  'plugins.confirmImportLibrary':
+    '这个压缩包（{size}）没有声明配置补丁，装上也不会新增图层。仍然可以安装——某个插件可能依赖它。',
 
   'profile.switch': '切换配置',
   'profile.manage': '管理配置…',

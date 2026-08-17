@@ -15,6 +15,7 @@
 //! data directory and puts it on the PATH of that one child process — not on
 //! the user's, and not on any other program's.
 
+pub mod archive;
 pub mod commands;
 pub mod registry;
 pub mod switches;
@@ -214,6 +215,53 @@ where
     switches::apply(&profile, &paths::profile_dir(&profile))
 }
 
+/// Install a plugin from a file on this machine instead of from a registry.
+///
+/// The point of it is the machine with no route to a registry at all, which is
+/// where a plugin arrives as a file somebody carried in. Everything after the
+/// first two lines is the same install the market does, and the two lines are
+/// the whole difference: the archive is read first so the panel can say what is
+/// in it, and it is copied somewhere the app owns before pnpm is pointed at it.
+///
+/// That copy is not tidiness. pnpm records a tarball install as the path it was
+/// installed from, so the file becomes part of the profile — reinstalling or
+/// duplicating that profile reads the same path again, and the path the user
+/// picked may well have been on a stick that has since been taken out.
+pub async fn import<R>(path: &Path, guard: &ProcessGuard, report: R) -> Result<archive::Package>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    let package = archive::read(path)?;
+    let kept = archive::stage(path, &package)?;
+
+    let profile = crate::profiles::selected();
+    let installed = run(
+        &profile,
+        &[Change::Add.verb().to_string(), archive::spec(&kept.path)],
+        guard,
+        report,
+    )
+    .await;
+
+    if let Err(failure) = installed {
+        // Only ever a copy this import made. The same archive may be what an
+        // existing profile was installed from, and taking it away would break
+        // that profile the next time anybody duplicates or reinstalls it. The
+        // removal itself is best-effort: the install already failed, and a
+        // leftover file in the app's own directory is not worth replacing that
+        // failure with a less useful one.
+        if kept.fresh {
+            let _ = std::fs::remove_file(&kept.path);
+        }
+        return Err(failure);
+    }
+
+    // Same as `change`: the harness has just rebuilt the layer list from what is
+    // installed, which puts back anything the user had switched off.
+    switches::apply(&profile, &paths::profile_dir(&profile))?;
+    Ok(package)
+}
+
 /// Run one `dsh plugin` invocation against `profile` and report its output.
 ///
 /// Separate from [`change`] because installing into a profile is not only what
@@ -241,9 +289,10 @@ where
         .arg("--profile")
         .arg(profile)
         .args(args)
-        // Relative specs would be anchored against this directory. Only package
-        // names get this far, so it exists to be somewhere predictable rather
-        // than wherever the app happened to be launched from.
+        // Relative specs would be anchored against this directory, and nothing
+        // that reaches here is one — package names and absolute archive paths
+        // only. So it exists to be somewhere predictable rather than wherever
+        // the app happened to be launched from.
         .current_dir(paths::app_data_dir())
         .env("PATH", path_with(&node.path, manager.as_deref()))
         .stdin(std::process::Stdio::null())

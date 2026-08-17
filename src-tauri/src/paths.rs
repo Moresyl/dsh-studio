@@ -48,6 +48,16 @@ pub fn managed_node_dir() -> PathBuf {
     tools_dir().join("node")
 }
 
+/// Where plugin archives installed from a file are kept.
+///
+/// Kept rather than read and forgotten, because installing from a tarball
+/// records the path to it in the profile manifest: the file has to still be
+/// there the next time that profile is installed, and the one the user picked
+/// may well have been on a stick that has since been taken out.
+pub fn imports_dir() -> PathBuf {
+    app_data_dir().join("imports")
+}
+
 /// Root the harness keeps its own state under: `$DSH_HOME`, else `~/.dsh`.
 ///
 /// This one is not ours. The harness owns the directory, the shell only reads

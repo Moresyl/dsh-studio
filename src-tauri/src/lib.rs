@@ -110,6 +110,8 @@ pub fn run() {
             plugins::commands::plugin_add,
             plugins::commands::plugin_remove,
             plugins::commands::plugin_switch,
+            plugins::commands::plugin_archive,
+            plugins::commands::plugin_import,
             presets::preset_roster,
             presets::preset_choose,
             profiles::commands::profile_roster,

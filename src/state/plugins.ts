@@ -13,7 +13,13 @@ import { create } from 'zustand'
 
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
-import type { InstalledPlugin, PluginDetail, PluginListing, PluginState } from '@/lib/ipc'
+import type {
+  ArchivePackage,
+  InstalledPlugin,
+  PluginDetail,
+  PluginListing,
+  PluginState,
+} from '@/lib/ipc'
 
 interface PluginStore {
   /** The hosted profile as it is on disk. Null until the first read lands. */
@@ -36,6 +42,10 @@ interface PluginStore {
   remove: (name: string) => Promise<void>
   /** Take an installed plugin out of the layer stack, or put it back. */
   toggle: (name: string, enabled: boolean) => Promise<void>
+  /** Read a picked archive, so its package can be named before it is installed. */
+  inspect: (path: string) => Promise<ArchivePackage | null>
+  /** Install from an archive already read by `inspect`. */
+  bringIn: (archive: ArchivePackage) => Promise<void>
 }
 
 /** Only the newest search may write results; older answers are dropped. */
@@ -138,6 +148,32 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     set({ working: name, error: null })
     try {
       landed(set, await ipc.pluginSwitch(name, enabled))
+    } catch (cause) {
+      set({ error: describe(cause) })
+    } finally {
+      set({ working: null })
+    }
+  },
+
+  inspect: async (path) => {
+    set({ error: null })
+    try {
+      return await ipc.pluginArchive(path)
+    } catch (cause) {
+      // The usual answer here is that the file is not a package at all, and the
+      // sentence Rust wrote about it says which file and why.
+      set({ error: describe(cause) })
+      return null
+    }
+  },
+
+  bringIn: async (archive) => {
+    if (get().working) return
+    // Named by the package rather than by the file: the progress line under the
+    // list is about what is being installed, not about where it was found.
+    set({ working: archive.name, error: null })
+    try {
+      landed(set, await ipc.pluginImport(archive.path))
     } catch (cause) {
       set({ error: describe(cause) })
     } finally {

@@ -19,6 +19,20 @@ export const count = (value: number): string =>
 export const megabytes = (bytes: number): string => `${(bytes / 1_000_000).toFixed(1)} MB`
 
 /**
+ * A file's size, in whichever unit keeps it readable.
+ *
+ * The unit moves here where `megabytes` fixes it, and for the same reason that
+ * one does not: this measures files with no scale of their own — a plugin
+ * archive is as likely to be 40 KB as 40 MB — so a fixed unit would print
+ * `0.0 MB` for half of them. Rounded up rather than to zero, because a file
+ * that exists has a size.
+ */
+export const filesize = (bytes: number): string =>
+  bytes >= 1_000_000
+    ? `${(bytes / 1_000_000).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1000))} KB`
+
+/**
  * A publish date, in whatever order the user's own locale writes one.
  *
  * Returned unchanged when it will not parse: a registry that answers with

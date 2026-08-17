@@ -108,6 +108,13 @@ qrcodegen = "1.8"
 # elsewhere, behind one API. This is wezterm's own pty layer.
 portable-pty = "0.9"
 ruzstd = { version = "0.9", default-features = false, features = ["std"] }
+# Gzipped tar, which this reads on every platform and for two unrelated reasons:
+# Node ships as one everywhere but Windows (`src/node/archive.rs`), and an npm
+# package is one everywhere full stop — which is what the plugin panel opens
+# when a plugin arrives as a file instead of from a registry
+# (`src/plugins/archive.rs`).
+flate2 = "1"
+tar = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 # Which backdrop the compositor understands is a build-number question, and it
@@ -115,15 +122,11 @@ ruzstd = { version = "0.9", default-features = false, features = ["std"] }
 # `window-vibrancy`, which tauri pulls in for the effects themselves, so asking
 # for it directly costs no binary size.
 windows-version = "0.1"
-# Node ships Windows as a zip and every other platform as a tarball, so the
-# extractor is per-platform rather than one crate that handles both. Only the
-# reading half of deflate is wanted, so this asks for the flate2 backend by name
-# rather than the `deflate` bundle, which drags in a compressor as well.
+# Node ships Windows as a zip and every other platform as a tarball, so this is
+# the half of that extractor only Windows needs. Only the reading half of
+# deflate is wanted, so this asks for the flate2 backend by name rather than the
+# `deflate` bundle, which drags in a compressor as well.
 zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
-
-[target.'cfg(not(windows))'.dependencies]
-flate2 = "1"
-tar = "0.4"
 
 [profile.dev]
 # Match CCHub: optimized dev builds have tripped intermittent MSVC linker

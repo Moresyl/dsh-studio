@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { open as pickFile } from '@tauri-apps/plugin-dialog'
 import {
   Check,
   Download,
@@ -6,17 +7,19 @@ import {
   Layers,
   Loader2,
   Package,
+  PackagePlus,
   Search,
   Trash2,
   TriangleAlert,
   X,
 } from 'lucide-react'
 
+import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PluginDialog } from '@/components/PluginDialog'
 import { Switch } from '@/components/Switch'
 import { TabButton } from '@/components/TabButton'
-import { count, day } from '@/lib/format'
+import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { InstalledPlugin, PluginListing } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
@@ -63,6 +66,8 @@ export function PluginMarket() {
   const select = usePlugins((state) => state.select)
   const remove = usePlugins((state) => state.remove)
   const toggle = usePlugins((state) => state.toggle)
+  const inspect = usePlugins((state) => state.inspect)
+  const bringIn = usePlugins((state) => state.bringIn)
 
   const [tab, setTab] = useState<Tab>('discover')
   const [query, setQuery] = useState('')
@@ -83,6 +88,41 @@ export function PluginMarket() {
     },
     [remove],
   )
+
+  // Installing a plugin nobody can download.
+  //
+  // The search above this needs a route to the registry, and the machines that
+  // most want a plugin system are often the ones with no route to anything. So
+  // the other way in is a file: an npm tarball, which is what the registry
+  // serves and what `npm pack` writes, carried in on whatever the site allows.
+  //
+  // Read before installed, for the same reason a profile import is. A file name
+  // is whatever the person who sent it typed; the package inside it is the thing
+  // about to be added to this profile, and it is the one worth confirming.
+  const importArchive = useCallback(async () => {
+    const path = await pickFile({
+      title: t('plugins.importTitle'),
+      filters: [{ name: t('plugins.importKind'), extensions: ['tgz', 'gz'] }],
+    })
+    if (typeof path !== 'string') return
+
+    const archive = await inspect(path)
+    if (!archive) return
+
+    const taken = await ask({
+      title: t('plugins.confirmImport'),
+      // A package that patches nothing is still worth installing on a machine
+      // with no registry — it may be what a plugin depends on — but somebody who
+      // picked it expecting a plugin should be told before, not after.
+      body: archive.bundle
+        ? t('plugins.confirmImportBody', { size: filesize(archive.bytes) })
+        : t('plugins.confirmImportLibrary', { size: filesize(archive.bytes) }),
+      subject: `${archive.name} ${archive.version}`.trim(),
+      confirm: t('plugins.install'),
+      tone: 'brand',
+    })
+    if (taken) await bringIn(archive)
+  }, [inspect, bringIn])
 
   // The package manager talks while it works, and it talks through the
   // supervisor's log — so the tail of that log is this pane's progress bar.
@@ -126,6 +166,19 @@ export function PluginMarket() {
               onClick={() => setTab('installed')}
             />
           </div>
+
+          {/* Beside the tabs rather than inside either one: this installs, so it
+              belongs with discovery, but it is the only way in on a machine
+              where discovery finds nothing at all. */}
+          <Button
+            variant="secondary"
+            onClick={() => void importArchive()}
+            disabled={working !== null}
+            data-hint={t('plugins.importHint')}
+          >
+            <PackagePlus size={13} strokeWidth={2.2} aria-hidden="true" />
+            {t('plugins.import')}
+          </Button>
         </PaneHeader>
 
         {tab === 'discover' && (
