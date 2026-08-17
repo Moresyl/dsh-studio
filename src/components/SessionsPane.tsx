@@ -21,7 +21,7 @@ import { Empty } from '@/components/Empty'
 import { PaneHeader } from '@/components/PaneHeader'
 import { TabButton } from '@/components/TabButton'
 import { UsageReport } from '@/components/UsageReport'
-import { count, day } from '@/lib/format'
+import { count, day, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
 import type { Role, SessionCard, SessionHit, SessionLine, SessionMark, Tokens } from '@/lib/ipc'
@@ -34,9 +34,6 @@ const DEBOUNCE = 320
 /** How much of a long line is shown before the rest has to be asked for. */
 const PEEK_LINES = 8
 const PEEK_CHARS = 640
-
-/** Past this, "3 days ago" stops locating anything and a date starts to. */
-const WEEK = 7 * 86_400_000
 
 const ROLE: Record<Role, MessageKey> = {
   user: 'sessions.role.user',
@@ -622,31 +619,7 @@ function fold(text: string): { head: string; folded: boolean } {
   return { head: rows.slice(0, PEEK_LINES).join('\n').slice(0, PEEK_CHARS), folded: true }
 }
 
-/**
- * How long ago, until that stops being the useful thing to say.
- *
- * Deliberately not the rule the remote pane follows: its subjects are phones
- * seen minutes ago, and these go back as far as the machine does — "112 d ago"
- * is a number nobody converts back into a week.
- */
-function when(ms: number): string {
-  if (ms <= 0) return ''
-
-  const since = Date.now() - ms
-  if (since < 60_000) return t('when.now')
-  if (since < 3_600_000) return t('when.minutes', { count: Math.floor(since / 60_000) })
-  if (since < 86_400_000) return t('when.hours', { count: Math.floor(since / 3_600_000) })
-  if (since < WEEK) return t('when.days', { count: Math.floor(since / 86_400_000) })
-  return day(new Date(ms).toISOString())
-}
-
 /** The time of day a line was written, in the user's own clock. */
 function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
-}
-
-/** The last segment of a path, which is what people call the directory. */
-function leaf(path: string): string {
-  const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  return cut < 0 ? path : path.slice(cut + 1) || path
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
+import { CommandPalette } from '@/components/CommandPalette'
 import { ContextMenu } from '@/components/ContextMenu'
 import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
@@ -13,6 +14,7 @@ import { Workbench, VIEWS, type View } from '@/components/Workbench'
 import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
+import { usePalette } from '@/state/palette'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { subscribeToTerminals } from '@/state/terminals'
 import { watchForUpdates } from '@/state/update'
@@ -46,6 +48,9 @@ export default function App() {
   // covers the window, and a modal inside a strip 36px tall would be positioned
   // against a strip 36px tall.
   const [managing, setManaging] = useState(false)
+  // Stable, because the palette rebuilds its command list from its props and
+  // this window re-renders on every line the harness prints.
+  const manage = useCallback(() => setManaging(true), [])
 
   // Showing a pane always means putting it in front. Anything else answers a
   // keystroke by changing something the user cannot see.
@@ -116,14 +121,28 @@ export default function App() {
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
 
-  // Ctrl+1 through Ctrl+6, in rail order. Every application with a fixed set of
-  // views has these, and a user who tries one and gets nothing has just learned
-  // that this is not one of those applications.
+  // Ctrl+K, and Ctrl+1 through Ctrl+6 in rail order. Every application with a
+  // fixed set of views has the numbers, and a user who tries one and gets
+  // nothing has just learned that this is not one of those applications. The
+  // palette is the other half of that: the keystroke for when someone knows the
+  // name of what they want and not where it lives.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
       // A modal is a question, and the rest of the window is not answering it.
-      if (managing || useDialog.getState().pending) return
+      // Nor is the guide, which is the whole window until it is done with.
+      if (managing || stage === 'guiding' || useDialog.getState().pending) return
+
+      if (event.key === 'k' || event.key === 'K') {
+        event.preventDefault()
+        usePalette.getState().toggle()
+        return
+      }
+
+      // The palette is a modal of the same kind, and the numbers behind it would
+      // switch a pane nobody can see.
+      if (usePalette.getState().open) return
+
       const wanted = VIEWS[Number(event.key) - 1]
       if (!wanted) return
       event.preventDefault()
@@ -132,7 +151,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [managing, show])
+  }, [managing, stage, show])
 
   // With nothing serving there is nothing else to show.
   const showPanel = origin === null || panelFor === origin
@@ -149,7 +168,7 @@ export default function App() {
         }
         // Not while the guide is up: which profile to work in is a question for
         // somebody who already has a harness to point at one.
-        onManageProfiles={stage === 'guiding' ? undefined : () => setManaging(true)}
+        onManageProfiles={stage === 'guiding' ? undefined : manage}
       />
 
       {stage === 'guiding' ? (
@@ -171,6 +190,11 @@ export default function App() {
       <StatusBar status={status} environment={environment} onOpenUpdate={() => show('about')} />
 
       {managing && <ProfileManager onClose={() => setManaging(false)} />}
+
+      {/* Not while the guide is up, for the same reason the manager is not
+          reachable from the title bar there: every command it offers is about a
+          workspace the user is still assembling. */}
+      {stage !== 'guiding' && <CommandPalette onView={show} onManageProfiles={manage} />}
 
       {/* Last, and outside the layout: these are positioned against the window
           and have to be able to cover anything in it. The dialog is mounted after

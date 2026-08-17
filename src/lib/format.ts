@@ -1,4 +1,8 @@
-/** Numbers and dates as a metadata line writes them. */
+/** Numbers, dates and paths as a metadata line writes them. */
+import { t } from '@/lib/i18n'
+
+/** Past this, "3 days ago" stops locating anything and a date starts to. */
+const WEEK = 7 * 86_400_000
 
 /** Compact enough to sit beside a name: 12,400 becomes 12.4k. */
 export const count = (value: number): string =>
@@ -24,4 +28,28 @@ export const day = (iso: string): string => {
   const parsed = new Date(iso)
   if (Number.isNaN(parsed.getTime())) return iso
   return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+/**
+ * How long ago, until that stops being the useful thing to say.
+ *
+ * Deliberately not the rule the remote pane follows: its subjects are phones
+ * seen minutes ago, and these go back as far as the machine does — "112 d ago"
+ * is a number nobody converts back into a week.
+ */
+export function when(ms: number): string {
+  if (ms <= 0) return ''
+
+  const since = Date.now() - ms
+  if (since < 60_000) return t('when.now')
+  if (since < 3_600_000) return t('when.minutes', { count: Math.floor(since / 60_000) })
+  if (since < 86_400_000) return t('when.hours', { count: Math.floor(since / 3_600_000) })
+  if (since < WEEK) return t('when.days', { count: Math.floor(since / 86_400_000) })
+  return day(new Date(ms).toISOString())
+}
+
+/** The last segment of a path, which is what people call the directory. */
+export function leaf(path: string): string {
+  const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return cut < 0 ? path : path.slice(cut + 1) || path
 }
