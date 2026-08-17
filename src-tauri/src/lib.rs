@@ -5,6 +5,7 @@ mod error;
 mod fetch;
 mod harness;
 mod locale;
+mod node;
 mod paths;
 mod plugins;
 mod remote;
@@ -18,6 +19,7 @@ use tokio::sync::broadcast::error::RecvError;
 
 use harness::commands::AppState;
 use harness::supervisor::{Event, Status, Supervisor};
+use node::NodeJobs;
 use plugins::PluginJobs;
 use remote::Remote;
 
@@ -51,6 +53,7 @@ pub fn run() {
             app.manage(AppState::new(Arc::clone(&supervisor)));
             app.manage(remote);
             app.manage(Arc::new(PluginJobs::default()));
+            app.manage(Arc::new(NodeJobs::default()));
 
             window::build(app.handle())?;
             tray::build(app.handle())?;
@@ -63,6 +66,7 @@ pub fn run() {
             harness::commands::harness_stop,
             harness::commands::harness_install,
             harness::commands::harness_log,
+            node::commands::node_provision,
             remote::commands::remote_status,
             remote::commands::remote_open,
             remote::commands::remote_close,

@@ -38,6 +38,16 @@ pub fn tools_dir() -> PathBuf {
     app_data_dir().join("tools")
 }
 
+/// Where Node runtimes the shell downloaded are unpacked, one directory per
+/// release: `.../tools/node/v24.19.0`.
+///
+/// The same shape the version managers use, which is the point — the scanner
+/// that finds an nvm install finds these with the same code, and a user who wants
+/// this copy gone can delete a directory named after a version they recognise.
+pub fn managed_node_dir() -> PathBuf {
+    tools_dir().join("node")
+}
+
 /// Root the harness keeps its own state under: `$DSH_HOME`, else `~/.dsh`.
 ///
 /// This one is not ours. The harness owns the directory, the shell only reads

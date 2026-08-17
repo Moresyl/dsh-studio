@@ -51,11 +51,36 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 dirs = "6"
 sys-locale = "0.3"
+# Provisioning a Node runtime needs an HTTPS client that does not depend on Node
+# already being here. Every one of these is already linked by
+# `tauri-plugin-updater`, so declaring them directly costs no binary size — the
+# features below are the ones that plugin already turns on, kept in step so
+# cargo unifies rather than compiling a second configuration.
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls-no-provider",
+  "stream",
+] }
+# `rustls-no-provider` leaves the cipher suites to the application. The plugin
+# picks ring and installs it as the process default; this declares the same one
+# so both callers share a provider instead of racing to install two.
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+sha2 = "0.10"
 # Pairing secrets come from the OS entropy source, never from a PRNG we seed.
 getrandom = "0.3"
 # QR encoding only; the modules are rendered as SVG by the frontend, so nothing
 # here has to draw or write an image.
 qrcodegen = "1.8"
+
+[target.'cfg(windows)'.dependencies]
+# Node ships Windows as a zip and every other platform as a tarball, so the
+# extractor is per-platform rather than one crate that handles both. Only the
+# reading half of deflate is wanted, so this asks for the flate2 backend by name
+# rather than the `deflate` bundle, which drags in a compressor as well.
+zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+
+[target.'cfg(not(windows))'.dependencies]
+flate2 = "1"
+tar = "0.4"
 
 [profile.dev]
 # Match CCHub: optimized dev builds have tripped intermittent MSVC linker

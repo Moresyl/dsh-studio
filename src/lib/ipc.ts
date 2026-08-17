@@ -13,7 +13,8 @@ export interface NodeVersion {
   patch: number
 }
 
-export type NodeSource = 'path' | 'nvm' | 'fnm' | 'volta' | 'system'
+/** `managed` is a runtime this application downloaded; the rest were already here. */
+export type NodeSource = 'path' | 'nvm' | 'fnm' | 'volta' | 'system' | 'managed'
 
 export interface NodeInstallation {
   path: string
@@ -84,6 +85,42 @@ export const log = (): Promise<LogLine[]> => invoke('harness_log')
 /** Subscribe to supervisor status changes and log output. */
 export const onHarnessEvent = (handler: (event: HarnessEvent) => void): Promise<UnlistenFn> =>
   listen<HarnessEvent>(EVENT_CHANNEL, (message) => handler(message.payload))
+
+/* -------------------------------------------------------------------------- */
+/* Node runtime                                                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * How far along an in-app Node install is.
+ *
+ * Every phase past the first names its own release, so nothing here has to be
+ * read in sequence — see `Progress` in `src-tauri/src/node/mod.rs`.
+ *
+ * `total` is whatever the mirror declared, so it can be missing: a chunked reply
+ * has no content length, and a progress bar that invents one would be a lie the
+ * moment it reached the end and kept going.
+ */
+export type NodeProgress =
+  | { phase: 'resolving' }
+  | { phase: 'chosen'; version: string; url: string }
+  | { phase: 'downloading'; version: string; received: number; total: number | null }
+  | { phase: 'verifying'; version: string }
+  | { phase: 'extracting'; version: string }
+  | { phase: 'installed'; version: string }
+
+/** Channel `node/commands.rs` reports install progress on. */
+const NODE_CHANNEL = 'node://progress'
+
+/**
+ * Download and install a Node runtime into this application's own directory.
+ *
+ * Resolves once the runtime has answered `--version`, so the environment can be
+ * re-read straight afterwards and will show it.
+ */
+export const nodeProvision = (): Promise<NodeInstallation> => invoke('node_provision')
+
+export const onNodeProgress = (handler: (progress: NodeProgress) => void): Promise<UnlistenFn> =>
+  listen<NodeProgress>(NODE_CHANNEL, (message) => handler(message.payload))
 
 /* -------------------------------------------------------------------------- */
 /* Remote access                                                              */

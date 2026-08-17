@@ -14,6 +14,13 @@ use crate::version::Version;
 
 const EXECUTABLE: &str = if cfg!(windows) { "node.exe" } else { "node" };
 
+/// Path from an unpacked official release down to the directory holding `node`.
+///
+/// The Windows zip puts the executable at the top; every other platform's
+/// tarball puts it in `bin`. One constant because two things depend on it — the
+/// scan below and whatever unpacked the release — and they have to agree.
+const RELEASE_SUFFIX: &[&str] = if cfg!(windows) { &[] } else { &["bin"] };
+
 /// Where a runtime was found, so the UI can say something better than a path.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize)]
 #[serde(rename_all = "kebab-case")]
@@ -25,10 +32,17 @@ pub enum Source {
     Volta,
     /// A system-wide install directory.
     System,
+    /// Downloaded by this application into its own data directory, for a machine
+    /// that had no usable Node of its own.
+    Managed,
 }
 
 impl Source {
     /// Tie-break order when two sources offer the same version.
+    ///
+    /// The copy this application downloaded ranks last on purpose: when a
+    /// machine has its own Node of the same version, running the one the user's
+    /// shell would run is the answer with no surprises in it.
     fn rank(self) -> u8 {
         match self {
             Source::Path => 0,
@@ -36,6 +50,7 @@ impl Source {
             Source::Nvm => 2,
             Source::Volta => 3,
             Source::System => 4,
+            Source::Managed => 5,
         }
     }
 }
@@ -64,11 +79,31 @@ pub fn probe(path: &Path) -> Option<Version> {
     Version::parse(&String::from_utf8_lossy(&output.stdout))
 }
 
-/// Every working Node on this machine, newest first.
+/// Where `node` sits inside a release directory unpacked from an official
+/// archive, so a downloader and this scanner cannot disagree about the layout.
+pub fn release_executable(release_dir: &Path) -> PathBuf {
+    let mut path = release_dir.to_path_buf();
+    for part in RELEASE_SUFFIX {
+        path.push(part);
+    }
+    path.push(EXECUTABLE);
+    path
+}
+
+/// Every working Node this machine already had, newest first.
 pub fn discover() -> Vec<NodeInstallation> {
+    discover_in(None)
+}
+
+/// The same scan, plus a directory of releases this application downloaded.
+///
+/// The managed store is passed in rather than computed here: this crate knows
+/// how to recognise a Node install, and the application knows where it keeps its
+/// own data. Handing the path in keeps that split intact.
+pub fn discover_in(managed: Option<&Path>) -> Vec<NodeInstallation> {
     let mut found: Vec<NodeInstallation> = Vec::new();
 
-    for (candidate, source) in candidates() {
+    for (candidate, source) in candidates(managed) {
         // Resolve first so the same install reached through two paths — a
         // version-manager shim and its target — is only reported once.
         let resolved = plain_path(candidate.canonicalize().unwrap_or(candidate));
@@ -140,8 +175,18 @@ pub fn plain_path(path: PathBuf) -> PathBuf {
 }
 
 /// Paths worth probing, in the order they should win ties.
-fn candidates() -> Vec<(PathBuf, Source)> {
+fn candidates(managed: Option<&Path>) -> Vec<(PathBuf, Source)> {
     let mut candidates: Vec<(PathBuf, Source)> = Vec::new();
+
+    // First because it is the cheapest to rule out — one directory, always ours,
+    // and usually absent. Order past this point only decides which spelling of a
+    // duplicate is kept; the caller sorts by version regardless.
+    collect_versioned(
+        managed.map(Path::to_path_buf),
+        RELEASE_SUFFIX,
+        Source::Managed,
+        &mut candidates,
+    );
 
     for directory in path_directories() {
         let executable = directory.join(EXECUTABLE);

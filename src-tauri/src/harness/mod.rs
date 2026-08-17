@@ -40,7 +40,10 @@ pub struct Environment {
 
 /// Inspect the machine. Cheap enough to call whenever the UI needs it.
 pub fn environment() -> Environment {
-    let all_node_runtimes = node_runtime::discover();
+    // The shell's own store is searched alongside the version managers, so a
+    // runtime it installed is chosen by exactly the same rule as one the user
+    // installed — and shows up in the same list, labelled for what it is.
+    let all_node_runtimes = node_runtime::discover_in(Some(&paths::managed_node_dir()));
     let node = all_node_runtimes
         .iter()
         .find(|install| install.version >= node_runtime::MINIMUM_SUPPORTED)

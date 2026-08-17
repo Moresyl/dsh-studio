@@ -854,13 +854,18 @@ name = "dsh-studio"
 version = "0.4.0"
 dependencies = [
  "dirs",
+ "flate2",
  "getrandom 0.3.4",
  "node-runtime",
  "proc-guard",
  "qrcodegen",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
+ "sha2",
  "sys-locale",
+ "tar",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -871,6 +876,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio",
  "url",
+ "zip",
 ]
 
 [[package]]
@@ -5587,6 +5593,7 @@ checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
 dependencies = [
  "arbitrary",
  "crc32fast",
+ "flate2",
  "indexmap 2.14.0",
  "memchr",
 ]

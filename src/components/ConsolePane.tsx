@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Copy, Download, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
+import {
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  Loader2,
+  RotateCw,
+  Square,
+  Terminal,
+} from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
 import { Ambient } from '@/components/Ambient'
@@ -8,14 +17,18 @@ import { Button } from '@/components/Button'
 import { CheckList, type CheckItem } from '@/components/CheckList'
 import { LogConsole } from '@/components/LogConsole'
 import { StatusDot } from '@/components/StatusDot'
+import { megabytes } from '@/lib/format'
 import { t } from '@/lib/i18n'
-import { formatVersion, isAtLeast, type Environment, type NodeInstallation } from '@/lib/ipc'
+import {
+  formatVersion,
+  isAtLeast,
+  type Environment,
+  type NodeInstallation,
+  type NodeProgress,
+} from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
 import { useHarness } from '@/state/harness'
 import { contextMenu } from '@/state/menu'
-
-/** Where someone without Node goes to get one. */
-const NODE_DOWNLOADS = 'https://nodejs.org/en/download'
 
 /**
  * The console: the state of the machine, and the harness's own output.
@@ -42,11 +55,14 @@ export function ConsolePane() {
     busy,
     installing,
     installProgress,
+    provisioningNode,
+    nodeProgress,
     error,
     inspect,
     start,
     stop,
     install,
+    provisionNode,
     clear,
   } = useHarness()
 
@@ -55,10 +71,11 @@ export function ConsolePane() {
   }, [inspect])
 
   const checks = useMemo(
-    () => buildChecks(environment, installing, install),
-    [environment, installing, install],
+    () => buildChecks({ environment, installing, install, provisioningNode, provisionNode }),
+    [environment, installing, install, provisioningNode, provisionNode],
   )
   const runnable = environment !== null && environment.node !== null && environment.harnessInstalled
+  const working = installing || provisioningNode
   const starting = busy || status.phase === 'starting' || status.phase === 'restarting'
   const running = status.phase === 'ready'
   const runtimes = environment?.allNodeRuntimes ?? []
@@ -89,7 +106,7 @@ export function ConsolePane() {
                 variant="ghost"
                 className="h-5 px-1.5 text-[11.5px]"
                 onClick={() => void inspect()}
-                disabled={installing}
+                disabled={working}
               >
                 <RotateCw size={11} strokeWidth={2.4} />
                 {t('action.recheck')}
@@ -118,6 +135,8 @@ export function ConsolePane() {
             </Section>
           )}
 
+          {provisioningNode && <NodeInstallProgress progress={nodeProgress} />}
+
           {installing && <InstallProgress packages={installProgress} />}
 
           <div className="mt-auto flex flex-col gap-2">
@@ -136,7 +155,7 @@ export function ConsolePane() {
                 variant="primary"
                 className="w-full"
                 onClick={() => void start()}
-                disabled={!runnable || starting || installing}
+                disabled={!runnable || starting || working}
               >
                 {starting ? (
                   <>
@@ -340,16 +359,102 @@ function InstallProgress({ packages }: { packages: number }) {
 }
 
 /**
+ * What the Node install is doing, and how much of it is left.
+ *
+ * A download has a real total, unlike npm, so this is the one place in the pane
+ * that earns a bar with a percentage in it. The line above the bar matters just
+ * as much: resolving, verifying and unpacking have no bytes to count, and
+ * without a name they are indistinguishable from a bar that has stopped.
+ *
+ * The note underneath is there for every run, not just the first. Software that
+ * downloads a language runtime on someone's behalf should say where it put it
+ * before it is asked.
+ */
+function NodeInstallProgress({ progress }: { progress: NodeProgress | null }) {
+  const done = progress?.phase === 'installed'
+  const bytes = progress?.phase === 'downloading' ? progress : null
+  const fraction = bytes && bytes.total ? Math.min(bytes.received / bytes.total, 1) : null
+
+  return (
+    <div className="rounded-panel border border-line bg-canvas-deep/50 px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        {done ? (
+          <Check size={13} strokeWidth={2.6} className="shrink-0 text-ok" aria-hidden="true" />
+        ) : (
+          <Loader2 size={13} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
+        )}
+        <span className="truncate text-[12.5px] text-text">{phaseText(progress)}</span>
+        {bytes && (
+          <span className="ml-auto shrink-0 font-mono text-[11.5px] text-muted tabular-nums">
+            {bytes.total
+              ? `${megabytes(bytes.received)} / ${megabytes(bytes.total)}`
+              : megabytes(bytes.received)}
+          </span>
+        )}
+      </div>
+
+      <div
+        className="mt-2 ml-[21px] h-[3px] overflow-hidden rounded-full bg-line-strong"
+        role="progressbar"
+        aria-valuenow={fraction === null ? undefined : Math.round(fraction * 100)}
+      >
+        <div
+          className={
+            fraction === null
+              ? 'h-full w-1/4 animate-drift rounded-full bg-brand'
+              : 'h-full rounded-full bg-brand transition-[width] duration-200 ease-[var(--ease-out-soft)]'
+          }
+          style={fraction === null ? undefined : { width: `${fraction * 100}%` }}
+        />
+      </div>
+
+      <p className="mt-1.5 ml-[21px] text-[11.5px] text-faint">{t('node.explain')}</p>
+    </div>
+  )
+}
+
+/** The phase, said in words, with the release it is about. */
+function phaseText(progress: NodeProgress | null): string {
+  switch (progress?.phase) {
+    // One line for both: a release has been settled on and its bytes are what
+    // happens next, which is the same sentence either way.
+    case 'chosen':
+    case 'downloading':
+      return t('node.downloading', { version: progress.version })
+    case 'verifying':
+      return t('node.verifying')
+    case 'extracting':
+      return t('node.extracting', { version: progress.version })
+    case 'installed':
+      return t('node.installed', { version: progress.version })
+    // `resolving`, and the moment before the first report arrives.
+    default:
+      return t('node.resolving')
+  }
+}
+
+/** The report, plus the two fixes the rows are allowed to offer. */
+interface CheckContext {
+  environment: Environment | null
+  installing: boolean
+  install: () => Promise<void>
+  provisioningNode: boolean
+  provisionNode: () => Promise<void>
+}
+
+/**
  * Turn the environment report into the rows the list shows.
  *
  * Only things that can be wrong. The workspace is neither a check nor something
  * anyone acts on from here, so it reports itself from the status bar instead.
  */
-function buildChecks(
-  environment: Environment | null,
-  installing: boolean,
-  install: () => Promise<void>,
-): CheckItem[] {
+function buildChecks({
+  environment,
+  installing,
+  install,
+  provisioningNode,
+  provisionNode,
+}: CheckContext): CheckItem[] {
   const node = environment?.node ?? null
   const minimum = environment ? formatVersion(environment.minimumNode) : ''
   const harnessInstalled = environment?.harnessInstalled ?? false
@@ -366,14 +471,16 @@ function buildChecks(
         : t('check.node.missing', { minimum }),
       title: node?.path,
       state: environment === null ? 'neutral' : node ? 'ok' : 'missing',
-      // Node is a system runtime, not something this shell should install
-      // behind someone's back — so the offer is to take them to it.
+      // The row that says something is missing carries the thing that fixes it,
+      // and for Node that is a runtime this app fetches into its own directory —
+      // not a link to a download page and a second installer to get through.
       action:
         environment !== null && node === null
           ? {
-              label: t('action.getNode'),
-              icon: ExternalLink,
-              run: () => void openUrl(NODE_DOWNLOADS),
+              label: provisioningNode ? t('action.installing') : t('action.getNode'),
+              icon: Download,
+              busy: provisioningNode,
+              run: () => void provisionNode(),
             }
           : undefined,
     },

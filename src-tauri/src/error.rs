@@ -28,6 +28,17 @@ pub enum Error {
     #[error("this Node.js install has no npm next to it, so the harness cannot be installed")]
     NpmMissing,
 
+    #[error("Node.js could not be installed: {0}")]
+    NodeProvision(String),
+
+    #[error("Node.js is already being installed")]
+    NodeProvisionBusy,
+
+    #[error(
+        "Node.js publishes no build for this system, so it has to be installed by hand from nodejs.org"
+    )]
+    NodePlatformUnsupported,
+
     #[error("the harness could not be installed: {0}")]
     Install(String),
 

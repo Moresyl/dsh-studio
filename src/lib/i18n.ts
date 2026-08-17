@@ -35,6 +35,7 @@ const en = {
   'source.fnm': 'via fnm',
   'source.volta': 'via Volta',
   'source.system': 'system install',
+  'source.managed': 'installed by DSH Studio',
 
   'action.start': 'Start harness',
   'action.starting': 'Starting…',
@@ -43,11 +44,21 @@ const en = {
   'action.recheck': 'Check again',
   'action.install': 'Install',
   'action.installing': 'Installing…',
-  'action.getNode': 'Get Node.js',
+  'action.getNode': 'Install Node.js',
 
   'install.working': 'Fetching the harness and its dependencies',
   'install.progress': '{count} packages so far',
   'install.slow': 'This takes several minutes on a first install.',
+
+  'node.resolving': 'Finding the newest Node.js LTS release',
+  'node.downloading': 'Downloading Node {version}',
+  'node.verifying': 'Checking the download against its published checksum',
+  'node.extracting': 'Unpacking Node {version}',
+  'node.installed': 'Node {version} is ready',
+  // Said while it happens, not buried in a settings page: an application that
+  // downloads a runtime on someone's behalf owes them the two facts they would
+  // otherwise have to take on trust.
+  'node.explain': 'Installed under this app only. Nothing on your PATH changes.',
 
   'view.harness': 'Harness',
   'view.panel': 'Control panel',
@@ -238,6 +249,7 @@ const zh: Record<MessageKey, string> = {
   'source.fnm': '来自 fnm',
   'source.volta': '来自 Volta',
   'source.system': '系统安装',
+  'source.managed': '由 DSH Studio 安装',
 
   'action.start': '启动 Harness',
   'action.starting': '启动中…',
@@ -246,11 +258,18 @@ const zh: Record<MessageKey, string> = {
   'action.recheck': '重新检测',
   'action.install': '安装',
   'action.installing': '安装中…',
-  'action.getNode': '获取 Node.js',
+  'action.getNode': '安装 Node.js',
 
   'install.working': '正在获取 Harness 及其依赖',
   'install.progress': '已处理 {count} 个包',
   'install.slow': '首次安装需要几分钟。',
+
+  'node.resolving': '正在查找最新的 Node.js LTS 版本',
+  'node.downloading': '正在下载 Node {version}',
+  'node.verifying': '正在与官方校验和比对',
+  'node.extracting': '正在解压 Node {version}',
+  'node.installed': 'Node {version} 已就绪',
+  'node.explain': '仅安装在本应用目录下，不会改动系统 PATH。',
 
   'view.harness': 'Harness',
   'view.panel': '控制面板',

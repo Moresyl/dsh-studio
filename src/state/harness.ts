@@ -9,7 +9,7 @@ import { create } from 'zustand'
 
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
-import type { Environment, HarnessEvent, LogLine, Status } from '@/lib/ipc'
+import type { Environment, HarnessEvent, LogLine, NodeProgress, Status } from '@/lib/ipc'
 
 /** Matches the ring the supervisor keeps, so scrollback agrees on both sides. */
 const MAX_LINES = 2000
@@ -33,6 +33,10 @@ interface HarnessStore {
   installing: boolean
   /** Packages seen during the current install. */
   installProgress: number
+  /** A Node runtime is being downloaded and unpacked. */
+  provisioningNode: boolean
+  /** Last thing the Node install said, or null when none is running. */
+  nodeProgress: NodeProgress | null
   /** Last request failure, cleared when the next one begins. */
   error: string | null
 
@@ -40,10 +44,14 @@ interface HarnessStore {
   start: () => Promise<void>
   stop: () => Promise<void>
   install: () => Promise<void>
+  /** Fetch a Node runtime for a machine that has none. */
+  provisionNode: () => Promise<void>
   /** Empty the visible scrollback. The supervisor's own ring is untouched. */
   clear: () => void
   /** Apply one event from the Rust side. */
   apply: (event: HarnessEvent) => void
+  /** Apply one progress report from an in-app Node install. */
+  applyNodeProgress: (progress: NodeProgress) => void
 }
 
 export const useHarness = create<HarnessStore>((set, get) => ({
@@ -53,6 +61,8 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   busy: false,
   installing: false,
   installProgress: 0,
+  provisioningNode: false,
+  nodeProgress: null,
   error: null,
 
   inspect: async () => {
@@ -101,6 +111,20 @@ export const useHarness = create<HarnessStore>((set, get) => ({
     }
   },
 
+  provisionNode: async () => {
+    if (get().provisioningNode) return
+    set({ provisioningNode: true, nodeProgress: null, error: null })
+    try {
+      await ipc.nodeProvision()
+      // The runtime now exists on disk; the check card reads it from there.
+      await get().inspect()
+    } catch (cause) {
+      set({ error: describe(cause), nodeProgress: null })
+    } finally {
+      set({ provisioningNode: false })
+    }
+  },
+
   // Only what is on screen: asking the supervisor to forget its buffer would
   // throw away the evidence of a crash for everyone, including a later report.
   clear: () => set({ lines: [] }),
@@ -124,8 +148,20 @@ export const useHarness = create<HarnessStore>((set, get) => ({
     const { kind: _kind, ...status } = event
     set({ status: status as Status })
   },
+
+  // Held rather than interpreted: the phase names are the Rust enum's own, so
+  // the card describes what the installer is doing and not what we assume next.
+  applyNodeProgress: (progress) => set({ nodeProgress: progress }),
 }))
 
-/** Wire the store to the Rust event stream for the lifetime of the app. */
-export const subscribeToHarness = (): Promise<() => void> =>
-  ipc.onHarnessEvent((event) => useHarness.getState().apply(event))
+/** Wire the store to the Rust event streams for the lifetime of the app. */
+export const subscribeToHarness = async (): Promise<() => void> => {
+  const [harness, node] = await Promise.all([
+    ipc.onHarnessEvent((event) => useHarness.getState().apply(event)),
+    ipc.onNodeProgress((progress) => useHarness.getState().applyNodeProgress(progress)),
+  ])
+  return () => {
+    harness()
+    node()
+  }
+}
