@@ -99,7 +99,9 @@ export default function App() {
   const showPanel = origin === null || panelFor === origin
 
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-canvas">
+    // No ground of its own: the body is the window's ground, and where a
+    // backdrop material is drawn behind it, a second fill here would cover it.
+    <div className="flex h-full flex-col overflow-hidden">
       <TitleBar
         serving={origin !== null}
         panelOpen={showPanel}

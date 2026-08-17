@@ -263,6 +263,21 @@ export const pluginSwitch = (name: string, enabled: boolean): Promise<PluginStat
   invoke('plugin_switch', { name, enabled })
 
 /* -------------------------------------------------------------------------- */
+/* Window                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Move the window's material into the given light or dark.
+ *
+ * A no-op where there is no material, so the caller does not have to know. Worth
+ * the round trip even though the stylesheet has already changed: on Windows the
+ * Mica attributes carry the frame's dark-mode flag with them, and that flag is
+ * what colours the resize border and the snap-layouts flyout — parts of the
+ * window CSS cannot reach.
+ */
+export const windowMaterial = (dark: boolean): Promise<void> => invoke('window_material', { dark })
+
+/* -------------------------------------------------------------------------- */
 /* About                                                                      */
 /* -------------------------------------------------------------------------- */
 

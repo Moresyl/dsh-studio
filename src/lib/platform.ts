@@ -25,3 +25,32 @@ export const drawsWindowControls = !isMac
  * a Mac is a tooltip written by someone who has never used one.
  */
 export const ACCELERATOR = isMac ? '⌘' : 'Ctrl+'
+
+/** The backdrop materials `src-tauri/src/material.rs` knows how to ask for. */
+export type Material = 'micaAlt' | 'mica' | 'acrylic' | 'vibrancy'
+
+declare global {
+  interface Window {
+    /** Published before this bundle runs; see `announce` in `window.rs`. */
+    __DSH_MATERIAL__?: unknown
+  }
+}
+
+const isMaterial = (value: unknown): value is Material =>
+  value === 'micaAlt' || value === 'mica' || value === 'acrylic' || value === 'vibrancy'
+
+/**
+ * Which material the window was given, if any.
+ *
+ * Rust decides — the question is a Windows build number on one platform, a
+ * compositor's cooperation on another — and writes the answer into the page
+ * before this bundle runs. So it is a constant here rather than something to
+ * await: the grounds a glass window paints are not the ones an opaque window
+ * paints, and there must be no frame in which the wrong set is on screen.
+ *
+ * `null` outside the app as well, which is what the browser-hosted capture
+ * harness in `media/` gets — and correctly, since there is nothing behind it.
+ */
+export const material: Material | null = isMaterial(window.__DSH_MATERIAL__)
+  ? window.__DSH_MATERIAL__
+  : null

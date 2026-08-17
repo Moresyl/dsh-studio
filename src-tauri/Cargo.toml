@@ -43,7 +43,15 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true
-tauri = { version = "2", features = ["tray-icon", "image-png"] }
+# `macos-private-api` is what makes `.transparent()` exist on macOS, and a
+# transparent window is the prerequisite for every backdrop material — see
+# `src/material.rs`. It is a private-API opt-in, so it is also declared in
+# `tauri.conf.json`; the two have to agree or the build fails.
+tauri = { version = "2", features = [
+  "tray-icon",
+  "image-png",
+  "macos-private-api",
+] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
@@ -72,6 +80,11 @@ getrandom = "0.3"
 qrcodegen = "1.8"
 
 [target.'cfg(windows)'.dependencies]
+# Which backdrop the compositor understands is a build-number question, and it
+# has to be answered before the window is built. Already linked by
+# `window-vibrancy`, which tauri pulls in for the effects themselves, so asking
+# for it directly costs no binary size.
+windows-version = "0.1"
 # Node ships Windows as a zip and every other platform as a tarball, so the
 # extractor is per-platform rather than one crate that handles both. Only the
 # reading half of deflate is wanted, so this asks for the flate2 backend by name
@@ -84,10 +97,11 @@ tar = "0.4"
 
 [profile.dev]
 # Match CCHub: optimized dev builds have tripped intermittent MSVC linker
-# failures (`anon.*.llvm.*` unresolved symbols). Keep dev codegen conservative.
+# failures (`anon.*.llvm.*` unresolved symbols), so the optimizer stays off here.
+# Everything else is left at cargo's dev defaults — a single codegen unit with
+# incremental compilation disabled bought nothing at `opt-level = 0` and cost
+# every rebuild a full one.
 opt-level = 0
-codegen-units = 1
-incremental = false
 
 [profile.release]
 codegen-units = 1

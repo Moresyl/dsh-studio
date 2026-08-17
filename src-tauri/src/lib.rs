@@ -5,6 +5,7 @@ mod error;
 mod fetch;
 mod harness;
 mod locale;
+mod material;
 mod node;
 mod paths;
 mod plugins;
@@ -78,6 +79,7 @@ pub fn run() {
             plugins::commands::plugin_add,
             plugins::commands::plugin_remove,
             plugins::commands::plugin_switch,
+            material::window_material,
             about::app_about,
         ])
         .run(tauri::generate_context!())

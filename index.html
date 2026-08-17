@@ -6,12 +6,15 @@
     <meta name="color-scheme" content="dark light" />
     <title>DSH Studio</title>
     <style>
-      /* Painted before the bundle loads, so the window never flashes white. */
-      html {
+      /* Painted before the bundle loads, so the window never flashes white.
+         Given up the moment the bundle sets `data-material`: from then on the
+         compositor is drawing behind this window, and an opaque root element
+         would be a lid over it. Machines with no material keep the paint. */
+      html:not([data-material]) {
         background: #070a18;
       }
       @media (prefers-color-scheme: light) {
-        html {
+        html:not([data-material]) {
           background: #eef1fa;
         }
       }

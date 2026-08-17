@@ -183,6 +183,39 @@
   --shadow-lift: 0 6px 16px -8px #1b234a3d;
 }
 
+/*
+ * The window's two grounds.
+ *
+ * Their own tokens rather than the colours they default to, because a backdrop
+ * turns a ground translucent and this window has grounds that must never be:
+ * `--color-surface` also paints menus, dialogs and cards, and glass under a
+ * dialog is text over text. Only these two ever become see-through, and only
+ * where the compositor is drawing something behind them.
+ *
+ * `data-material` is written by `state/theme.ts` from whatever `material.rs`
+ * managed to apply — never from what the platform ought to support. So the
+ * opaque defaults below are what a Windows 10 build too old for acrylic gets, and
+ * a Linux desktop, and the browser-hosted capture harness in `media/`.
+ */
+:root {
+  --ground-window: var(--color-canvas);
+  --ground-chrome: var(--color-surface);
+}
+
+:root[data-material] {
+  /* Nothing: the material *is* this window's ground, and a tint over it would
+     only be a worse version of it. What shows through here is the gap between
+     one piece of chrome and the next — every pane inside paints its own opaque
+     ground, so no text is ever read off glass. */
+  --ground-window: transparent;
+
+  /* The strips do keep a tint, because they are the chrome the material shows
+     through and they carry 11px text. At this much surface the desktop's hue
+     reaches the window, and a status line still clears 5:1 against the brightest
+     backdrop the compositor will hand it. */
+  --ground-chrome: color-mix(in oklab, var(--color-surface) 46%, transparent);
+}
+
 @layer base {
   /* Dark first, so a machine with no stated preference gets the surface this
      app was designed around. The two pins below are what keep the furniture the
@@ -201,7 +234,7 @@
   }
 
   body {
-    background-color: var(--color-canvas);
+    background-color: var(--ground-window);
     color: var(--color-text);
     font-family: var(--font-sans);
     font-feature-settings: 'cv05', 'ss01';
@@ -314,11 +347,14 @@
     box-shadow: 0 0 0 1px var(--color-line);
   }
 
-  /* The strips a window wears at its top and bottom edge. Both are chrome, so
-     both sit a shade above the content they frame and are separated from it by
-     a line rather than by a gap. */
+  /* Every strip and rail this window wears: the title bar, the status bar, the
+     nav rail, a pane's header, the console's sidebar. All of it is chrome, so all
+     of it sits a shade above the content it frames and is separated from it by a
+     line rather than by a gap — and all of it is where a backdrop material shows
+     through, which is why the colour comes from `--ground-chrome` and not
+     straight from the surface token. */
   .chrome {
-    background-color: var(--color-surface);
+    background-color: var(--ground-chrome);
   }
 
   /* Section captions in the panel — the small tracked-out label a desktop tool

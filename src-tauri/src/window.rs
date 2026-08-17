@@ -12,10 +12,11 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewUrl, WebviewWindow,
+    Manager, PhysicalPosition, PhysicalSize, Runtime, Theme, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
 
+use crate::material::{self, Material};
 use crate::paths;
 
 /// Label every other module uses to find the window.
@@ -43,11 +44,19 @@ const SETTLE: Duration = Duration::from_millis(600);
 /// The frontend reveals it once it has painted, so the first thing a user sees
 /// is the application rather than a white rectangle.
 pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<WebviewWindow<R>> {
+    // Asked once, before the builder, because two of its arguments depend on the
+    // answer: a window is only made transparent where something will be drawn
+    // behind it, and the frontend has to know which of its grounds are glass
+    // before it paints the first one.
+    let material = material::supported();
+
     let builder = WebviewWindowBuilder::new(manager, MAIN_LABEL, WebviewUrl::default())
         .title("DSH Studio")
         .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .center()
+        .transparent(material.is_some())
+        .initialization_script(announce(material))
         .visible(false);
 
     // macOS keeps its traffic lights and floats them over the content, which is
@@ -63,6 +72,16 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
     let builder = builder.decorations(false);
 
     let window = builder.build()?;
+
+    // After the window exists rather than on the builder, because the material
+    // carries the frame's light-or-dark with it and the system's answer to that
+    // is only readable from a window. The frontend replaces this as soon as it
+    // has read what was chosen last time; the window is still hidden here, so
+    // there is no frame in which either one is seen being wrong.
+    if let Some(material) = material {
+        let dark = !matches!(window.theme(), Ok(Theme::Light));
+        material::apply(&window, material, dark);
+    }
 
     // While it is still hidden, so the window is only ever seen where the user
     // left it — never centred first and then jumping.
@@ -81,6 +100,18 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
     });
 
     Ok(window)
+}
+
+/// Tell the frontend which material it is sitting on, before it paints.
+///
+/// An initialization script and not a command, because the difference matters
+/// once: the grounds a translucent window paints are not the ones an opaque
+/// window paints, and asking over IPC would mean a frame of the wrong answer
+/// before the right one arrives. This runs before the page's own scripts, so the
+/// stylesheet is already correct at the first paint.
+fn announce(material: Option<Material>) -> String {
+    let value = serde_json::to_string(&material).unwrap_or_else(|_| "null".to_string());
+    format!("window.__DSH_MATERIAL__ = {value};")
 }
 
 /// Bring an existing window back to the front.
