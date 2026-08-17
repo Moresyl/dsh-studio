@@ -53,6 +53,11 @@ tauri = { version = "2", features = [
   "macos-private-api",
 ] }
 tauri-plugin-dialog = "2"
+# Reading the clipboard, and only that. A webview can write to the clipboard from
+# a click on its own, but reading it is a permission a Chromium host answers with
+# a prompt of its own — and a terminal pane whose Paste opens a browser
+# permission dialog is not a terminal pane. Writing stays with the webview.
+tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-single-instance = "2"
@@ -78,6 +83,11 @@ getrandom = "0.3"
 # QR encoding only; the modules are rendered as SVG by the frontend, so nothing
 # here has to draw or write an image.
 qrcodegen = "1.8"
+# A real pty, so the shell in the terminal pane believes it is talking to a
+# terminal — line editing, colour, Ctrl-C and progress bars all depend on that,
+# and a plain piped stdio gets none of them. ConPTY on Windows, forkpty
+# elsewhere, behind one API. This is wezterm's own pty layer.
+portable-pty = "0.9"
 
 [target.'cfg(windows)'.dependencies]
 # Which backdrop the compositor understands is a build-number question, and it

@@ -41,6 +41,17 @@ impl Inner {
         Ok(child)
     }
 
+    pub(crate) fn adopt(&self, pid: u32) -> io::Result<()> {
+        // Nothing to arrange: the caller's pid *is* the group id, so recording it
+        // is the whole of the work. `spawn` differs only in that it arranges that
+        // fact itself instead of being told it.
+        self.groups
+            .lock()
+            .expect("proc-guard group list poisoned")
+            .push(pid as i32);
+        Ok(())
+    }
+
     pub(crate) fn terminate_all(&self) -> io::Result<()> {
         let groups =
             std::mem::take(&mut *self.groups.lock().expect("proc-guard group list poisoned"));

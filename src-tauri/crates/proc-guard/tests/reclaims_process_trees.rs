@@ -11,6 +11,8 @@
 //! zombie while its PID still resolves. A file that stops growing is evidence.
 
 use std::fs;
+#[cfg(not(windows))]
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
@@ -95,6 +97,50 @@ async fn dropping_the_guard_ends_a_grandchild() {
         "the grandchild kept running after its guard was dropped"
     );
 
+    let _ = fs::remove_dir_all(&workspace);
+}
+
+/// The same guarantee for a tree the guard did not start.
+///
+/// `adopt` exists for pty children, which the pty layer must create itself. The
+/// stand-in here is a plainly spawned shell — same situation from the guard's
+/// point of view: a pid that was already running when it was handed over.
+#[tokio::test]
+async fn dropping_the_guard_ends_an_adopted_grandchild() {
+    let workspace = scratch_dir("adopted");
+    let ticks = workspace.join("ticks.log");
+    let outer = write_tree_fixture(&workspace, &ticks);
+
+    let mut command = shell(&[&outer.to_string_lossy()]);
+    // What a pty child gets from `setsid`, arranged by hand: `adopt` reclaims a
+    // process group on Unix, and a child left in this test's own group is not one.
+    #[cfg(not(windows))]
+    command.as_std_mut().process_group(0);
+
+    let mut child = command.spawn().expect("spawn unguarded");
+    let pid = child.id().expect("the fixture exited immediately");
+
+    let guard = ProcessGuard::new().expect("create guard");
+    guard.adopt(pid).expect("adopt");
+
+    let alive = wait_until_growing(&ticks).await;
+    assert!(alive > 0, "the grandchild never started ticking");
+
+    drop(guard);
+
+    tokio::time::sleep(SETTLE).await;
+    let after_drop = size_of(&ticks);
+    tokio::time::sleep(SETTLE).await;
+
+    assert_eq!(
+        size_of(&ticks),
+        after_drop,
+        "the grandchild kept running after the guard that adopted it was dropped"
+    );
+
+    // Nothing waits on an unguarded child, so reap it before the temp files go.
+    let _ = child.start_kill();
+    let _ = child.wait().await;
     let _ = fs::remove_dir_all(&workspace);
 }
 

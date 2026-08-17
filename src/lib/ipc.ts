@@ -301,6 +301,64 @@ export const presetRoster = (): Promise<PresetRoster> => invoke('preset_roster')
 export const presetChoose = (id: string): Promise<PresetRoster> => invoke('preset_choose', { id })
 
 /* -------------------------------------------------------------------------- */
+/* Terminal                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** One shell, running under a pty this window owns. */
+export interface TerminalSession {
+  /** Handle for every other terminal command. Never reused within a run. */
+  id: string
+  /** What is running, for the tab: `pwsh`, `bash`, `fish`. */
+  label: string
+  cwd: string
+}
+
+/** Output from one shell, already decoded on the Rust side. */
+export interface TerminalOutput {
+  id: string
+  data: string
+}
+
+/** A shell that has finished. */
+export interface TerminalExit {
+  id: string
+  /** Null when a signal ended it rather than an exit. */
+  code: number | null
+}
+
+/** Channels `terminal/mod.rs` emits on. */
+const TERMINAL_OUTPUT = 'terminal://output'
+const TERMINAL_EXIT = 'terminal://exit'
+
+/**
+ * Open a shell, sized to the pane that is about to show it.
+ *
+ * The size is not a detail that can be corrected afterwards: a shell reads it
+ * once, at startup, and a prompt drawn for the wrong width stays wrong until
+ * something redraws it.
+ */
+export const terminalOpen = (rows: number, cols: number): Promise<TerminalSession> =>
+  invoke('terminal_open', { rows, cols })
+
+export const terminalWrite = (id: string, data: string): Promise<void> =>
+  invoke('terminal_write', { id, data })
+
+export const terminalResize = (id: string, rows: number, cols: number): Promise<void> =>
+  invoke('terminal_resize', { id, rows, cols })
+
+/** End a shell. The exit event is what confirms it, not this promise. */
+export const terminalClose = (id: string): Promise<void> => invoke('terminal_close', { id })
+
+/** Shells that are still running, so a reloaded window can find them again. */
+export const terminalList = (): Promise<TerminalSession[]> => invoke('terminal_list')
+
+export const onTerminalOutput = (handler: (output: TerminalOutput) => void): Promise<UnlistenFn> =>
+  listen<TerminalOutput>(TERMINAL_OUTPUT, (message) => handler(message.payload))
+
+export const onTerminalExit = (handler: (exit: TerminalExit) => void): Promise<UnlistenFn> =>
+  listen<TerminalExit>(TERMINAL_EXIT, (message) => handler(message.payload))
+
+/* -------------------------------------------------------------------------- */
 /* Window                                                                     */
 /* -------------------------------------------------------------------------- */
 

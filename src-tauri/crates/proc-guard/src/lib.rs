@@ -49,6 +49,30 @@ impl ProcessGuard {
         self.inner.spawn(command)
     }
 
+    /// Put an already-running process tree under this guard.
+    ///
+    /// For trees this crate did not start. A pty child is the case that needs it:
+    /// the pty layer has to create the process itself, because the pseudoconsole
+    /// has to be attached through a process-creation attribute that only the
+    /// caller of `CreateProcess` can set. Pass the root of the tree.
+    ///
+    /// Weaker than [`ProcessGuard::spawn`] on Windows by exactly one gap. `spawn`
+    /// starts the child suspended, so it cannot have spawned anything before it
+    /// joins the job; an adopted child has been running for however long it took
+    /// to get here, and a descendant it started inside that window is outside the
+    /// job and will not be reclaimed. Microseconds for a shell that has yet to
+    /// print a prompt, but not zero, and there is no way to close it from out
+    /// here — the suspension would have to happen at creation.
+    ///
+    /// On Unix `pid` is taken to be a process-group leader's, which is what a pty
+    /// child is: the pty layer calls `setsid` before `exec`, so the child leads a
+    /// new session and its pgid equals its pid. Adopting a process that is *not*
+    /// a group leader records a group that does not exist, and nothing is
+    /// reclaimed.
+    pub fn adopt(&self, pid: u32) -> io::Result<()> {
+        self.inner.adopt(pid)
+    }
+
     /// Terminate every process still running under this guard.
     ///
     /// Callers that want a graceful shutdown should signal the child and wait

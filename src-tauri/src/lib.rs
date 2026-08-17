@@ -11,6 +11,7 @@ mod paths;
 mod plugins;
 mod presets;
 mod remote;
+mod terminal;
 mod tray;
 mod window;
 
@@ -42,6 +43,7 @@ pub fn run() {
             }
         }))
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -56,6 +58,7 @@ pub fn run() {
             app.manage(remote);
             app.manage(Arc::new(PluginJobs::default()));
             app.manage(Arc::new(NodeJobs::default()));
+            app.manage(terminal::Terminals::new()?);
 
             window::build(app.handle())?;
             tray::build(app.handle())?;
@@ -82,6 +85,11 @@ pub fn run() {
             plugins::commands::plugin_switch,
             presets::preset_roster,
             presets::preset_choose,
+            terminal::commands::terminal_open,
+            terminal::commands::terminal_write,
+            terminal::commands::terminal_resize,
+            terminal::commands::terminal_close,
+            terminal::commands::terminal_list,
             material::window_material,
             about::app_about,
         ])

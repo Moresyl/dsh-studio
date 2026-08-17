@@ -1,22 +1,25 @@
 import { useEffect, type ReactNode } from 'react'
-import { Gauge, Info, Puzzle, Smartphone, type LucideIcon } from 'lucide-react'
+import { Gauge, Info, Puzzle, Smartphone, SquareTerminal, type LucideIcon } from 'lucide-react'
 
 import { AboutPane } from '@/components/AboutPane'
 import { ConsolePane } from '@/components/ConsolePane'
 import { PluginMarket } from '@/components/PluginMarket'
 import { RemotePane } from '@/components/RemotePane'
+import { TerminalPane } from '@/components/TerminalPane'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
 import { ACCELERATOR } from '@/lib/platform'
 import { usePlugins } from '@/state/plugins'
 import { useRemote } from '@/state/remote'
+import { runningCount, useTerminals } from '@/state/terminals'
 import { useUpdate } from '@/state/update'
 
-export type View = 'console' | 'plugins' | 'remote' | 'about'
+export type View = 'console' | 'terminal' | 'plugins' | 'remote' | 'about'
 
 /** Rail order, which is also the order the number accelerators follow. */
 export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'console', icon: Gauge, label: 'nav.console' },
+  { id: 'terminal', icon: SquareTerminal, label: 'nav.terminal' },
   { id: 'plugins', icon: Puzzle, label: 'nav.plugins' },
   { id: 'remote', icon: Smartphone, label: 'nav.remote' },
   { id: 'about', icon: Info, label: 'nav.about' },
@@ -57,6 +60,10 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
   const installed = usePlugins(
     (state) => state.profile?.plugins.filter((plugin) => !plugin.builtin).length ?? 0,
   )
+  // Shells still running, which is the one thing about this pane worth knowing
+  // from somewhere else: they are this app's children, and the badge is how
+  // someone remembers that before closing the window.
+  const shells = useTerminals((state) => runningCount(state.tabs))
 
   // Read once for the badge, not once per visit to the plugin pane — the count
   // has to be true while the user is looking at something else.
@@ -83,6 +90,8 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
             badge={
               entry.id === 'remote' && remoteOpen ? (
                 <LiveDot />
+              ) : entry.id === 'terminal' && shells > 0 ? (
+                <Count value={shells} />
               ) : entry.id === 'plugins' && installed > 0 ? (
                 <Count value={installed} />
               ) : entry.id === 'about' && updatable ? (
@@ -100,6 +109,7 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
         <div className={view === 'console' ? 'flex min-h-0 flex-1' : 'hidden'}>
           <ConsolePane />
         </div>
+        {view === 'terminal' && <TerminalPane />}
         {view === 'plugins' && <PluginMarket />}
         {view === 'remote' && <RemotePane />}
         {view === 'about' && <AboutPane />}

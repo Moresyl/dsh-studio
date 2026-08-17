@@ -82,6 +82,7 @@ const en = {
   'window.hide': 'Close to tray — the harness keeps running',
 
   'nav.console': 'Console',
+  'nav.terminal': 'Terminal',
   'nav.plugins': 'Plugins',
   'nav.remote': 'Remote',
   'nav.about': 'About',
@@ -175,6 +176,22 @@ const en = {
   'remote.note.oneAddress':
     'One address, not every interface — a VPN or a virtual switch does not quietly become a second way in.',
 
+  'terminal.title': 'Terminal',
+  'terminal.subtitle': 'A shell in this window, under this app',
+  'terminal.new': 'New terminal',
+  'terminal.close': 'Close terminal',
+  'terminal.clear': 'Clear',
+  'terminal.running': 'Running',
+  'terminal.finished': 'Finished',
+  'terminal.empty': 'No terminal open.',
+  // Said before the first shell starts, because it is the one thing that makes
+  // this pane different from any other terminal on the machine.
+  'terminal.emptyHint':
+    'Shells opened here are children of this app: closing the window ends them, and nothing is left running behind your back.',
+  'terminal.exited': 'The shell exited with code {code}.',
+  'terminal.ended': 'The shell was ended.',
+  'terminal.reattached': 'Reconnected. Anything printed before now is not in this window.',
+
   'when.now': 'just now',
   'when.minutes': '{count} min ago',
   'when.hours': '{count} h ago',
@@ -206,6 +223,7 @@ const en = {
   'update.dismiss': 'Not now',
 
   'menu.copy': 'Copy',
+  'menu.paste': 'Paste',
   'menu.copyAll': 'Copy everything',
   'menu.clearLog': 'Clear console',
   'menu.copyAddress': 'Copy address',
@@ -322,6 +340,7 @@ const zh: Record<MessageKey, string> = {
   'window.hide': '关闭到托盘（Harness 继续运行）',
 
   'nav.console': '控制台',
+  'nav.terminal': '终端',
   'nav.plugins': '插件',
   'nav.remote': '远程',
   'nav.about': '关于',
@@ -410,6 +429,20 @@ const zh: Record<MessageKey, string> = {
   'remote.note.perDevice': '每台设备各持一把密钥，因此移除其中一台不会影响其它设备。',
   'remote.note.oneAddress': '只绑定一个地址而不是全部网卡，VPN 或虚拟网卡不会悄悄变成第二个入口。',
 
+  'terminal.title': '终端',
+  'terminal.subtitle': '窗口内的 shell，随本应用一同结束',
+  'terminal.new': '新建终端',
+  'terminal.close': '关闭终端',
+  'terminal.clear': '清屏',
+  'terminal.running': '运行中',
+  'terminal.finished': '已结束',
+  'terminal.empty': '还没有打开终端。',
+  'terminal.emptyHint':
+    '这里打开的 shell 是本应用的子进程：关闭窗口即随之结束，不会留下任何你不知道的后台进程。',
+  'terminal.exited': 'shell 已退出，退出码 {code}。',
+  'terminal.ended': 'shell 已结束。',
+  'terminal.reattached': '已重新接上。此前的输出不在这个窗口里。',
+
   'when.now': '刚刚',
   'when.minutes': '{count} 分钟前',
   'when.hours': '{count} 小时前',
@@ -441,6 +474,7 @@ const zh: Record<MessageKey, string> = {
   'update.dismiss': '暂不提醒',
 
   'menu.copy': '复制',
+  'menu.paste': '粘贴',
   'menu.copyAll': '复制全部',
   'menu.clearLog': '清空控制台',
   'menu.copyAddress': '复制地址',

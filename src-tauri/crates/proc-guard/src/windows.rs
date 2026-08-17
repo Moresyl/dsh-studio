@@ -12,8 +12,8 @@ use windows_sys::Win32::System::JobObjects::{
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
 };
 use windows_sys::Win32::System::Threading::{
-    OpenThread, ResumeThread, TerminateProcess, CREATE_NO_WINDOW, CREATE_SUSPENDED,
-    THREAD_SUSPEND_RESUME,
+    OpenProcess, OpenThread, ResumeThread, TerminateProcess, CREATE_NO_WINDOW, CREATE_SUSPENDED,
+    PROCESS_SET_QUOTA, PROCESS_TERMINATE, THREAD_SUSPEND_RESUME,
 };
 
 /// A kernel handle that closes itself.
@@ -91,6 +91,22 @@ impl Inner {
 
         resume_process(pid)?;
         Ok(child)
+    }
+
+    pub(crate) fn adopt(&self, pid: u32) -> io::Result<()> {
+        // The two rights `AssignProcessToJobObject` insists on, and nothing more:
+        // a handle able to read the process's memory would be a bigger capability
+        // than this needs to hold.
+        let handle = unsafe { OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, pid) };
+        if handle.is_null() {
+            return Err(io::Error::last_os_error());
+        }
+        let handle = OwnedHandle(handle);
+
+        if unsafe { AssignProcessToJobObject(self.job.0, handle.0) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(())
     }
 
     pub(crate) fn terminate_all(&self) -> io::Result<()> {

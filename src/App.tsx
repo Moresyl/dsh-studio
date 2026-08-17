@@ -13,6 +13,7 @@ import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
 import { subscribeToRemote, useRemote } from '@/state/remote'
+import { subscribeToTerminals } from '@/state/terminals'
 import { watchForUpdates } from '@/state/update'
 
 /**
@@ -94,12 +95,23 @@ export default function App() {
     }
   }, [refreshRemote])
 
+  // Shells have to keep printing while the user is looking at something else,
+  // and a shell that falls over has to be able to say so from a pane that is not
+  // on screen. Subscribing from the window is also what lets the rail carry a
+  // count of them, which is the reminder that they end with this window.
+  useEffect(() => {
+    const pending = subscribeToTerminals()
+    return () => {
+      void pending.then((unlisten) => unlisten())
+    }
+  }, [])
+
   // Also here rather than in the status bar that shows the result: the check
   // should keep its schedule while the user is reading a pane, and a component
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
 
-  // Ctrl+1 through Ctrl+4, in rail order. Every application with a fixed set of
+  // Ctrl+1 through Ctrl+5, in rail order. Every application with a fixed set of
   // views has these, and a user who tries one and gets nothing has just learned
   // that this is not one of those applications.
   useEffect(() => {

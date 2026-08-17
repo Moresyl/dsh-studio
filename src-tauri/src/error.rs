@@ -68,6 +68,9 @@ pub enum Error {
 
     #[error("{0}")]
     Preset(String),
+
+    #[error("{0}")]
+    Terminal(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

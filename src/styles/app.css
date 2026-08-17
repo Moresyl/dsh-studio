@@ -115,6 +115,47 @@
 }
 
 /*
+ * The terminal's sixteen colours.
+ *
+ * Not in `@theme` and not utilities, because no rule in this stylesheet paints
+ * with them: the only consumer is `lib/screen.ts`, which hands them to xterm as
+ * a theme object. They are here rather than as a constant in that file for one
+ * reason — read from the cascade, the answer is automatically right in all three
+ * of this window's states, and the terminal follows the light switch without any
+ * code deciding which palette is in force.
+ *
+ * Chosen to be the app's own accents where an ANSI slot has an obvious
+ * counterpart, so a green from `npm` and a green from the status dot are the same
+ * green. The rest are picked to stay apart from each other and legible on the
+ * pane's ground, which is what a terminal palette is actually for. `white` and
+ * `bright-white` invert between the themes: a program that prints white text is
+ * assuming a dark terminal, and on a light one that assumption has to be read as
+ * "the strong foreground" rather than obeyed literally.
+ *
+ * Specificity, not order, is what makes the two light blocks below win: a bare
+ * `:root` scores under both of them wherever it sits in the file.
+ */
+:root {
+  --term-black: #2b3244;
+  --term-red: #ff7a8a;
+  --term-green: #46d9a2;
+  --term-yellow: #ffc46b;
+  --term-blue: #6e9bff;
+  --term-magenta: #a98cff;
+  --term-cyan: #5fd8e8;
+  --term-white: #c3cad9;
+  --term-bright-black: #59617a;
+  --term-bright-red: #ff9fac;
+  --term-bright-green: #6fe7bd;
+  --term-bright-yellow: #ffd694;
+  --term-bright-blue: #93b4ff;
+  --term-bright-magenta: #c4aeff;
+  --term-bright-cyan: #7ff3ff;
+  --term-bright-white: #f2f4f9;
+  --term-selection: #6e9bff4d;
+}
+
+/*
  * The light palette, selected two ways.
  *
  * The system preference is one of them, and it has to stay a real one: a window
@@ -154,6 +195,24 @@
 
     --shadow-panel: 0 1px 2px #1b234a1f;
     --shadow-lift: 0 6px 16px -8px #1b234a3d;
+
+    --term-black: #1b2231;
+    --term-red: #c62d46;
+    --term-green: #0e7f5f;
+    --term-yellow: #8a5c07;
+    --term-blue: #3560e8;
+    --term-magenta: #6b46df;
+    --term-cyan: #11788f;
+    --term-white: #5c6479;
+    --term-bright-black: #7b8398;
+    --term-bright-red: #9c1f34;
+    --term-bright-green: #0a6349;
+    --term-bright-yellow: #6d4805;
+    --term-bright-blue: #2446bd;
+    --term-bright-magenta: #5533b4;
+    --term-bright-cyan: #0c5d70;
+    --term-bright-white: #2a3243;
+    --term-selection: #3560e83d;
   }
 }
 
@@ -181,6 +240,24 @@
 
   --shadow-panel: 0 1px 2px #1b234a1f;
   --shadow-lift: 0 6px 16px -8px #1b234a3d;
+
+  --term-black: #1b2231;
+  --term-red: #c62d46;
+  --term-green: #0e7f5f;
+  --term-yellow: #8a5c07;
+  --term-blue: #3560e8;
+  --term-magenta: #6b46df;
+  --term-cyan: #11788f;
+  --term-white: #5c6479;
+  --term-bright-black: #7b8398;
+  --term-bright-red: #9c1f34;
+  --term-bright-green: #0a6349;
+  --term-bright-yellow: #6d4805;
+  --term-bright-blue: #2446bd;
+  --term-bright-magenta: #5533b4;
+  --term-bright-cyan: #0c5d70;
+  --term-bright-white: #2a3243;
+  --term-selection: #3560e83d;
 }
 
 /*
@@ -366,6 +443,30 @@
     text-transform: uppercase;
     color: var(--color-faint);
   }
+}
+
+/* The terminal, fitted to this window.
+   Outside every layer on purpose: xterm ships its own stylesheet, and that one
+   is in no layer either — so a correction to it has to be unlayered as well, or
+   the cascade hands the round to the library no matter how specific we get. */
+
+/* Room around the terminal's text.
+   Set on xterm's own element rather than on the box we put it in, because the
+   fitter reads the padding from exactly here when it works out how many rows and
+   columns fit — and because the scrollbar is positioned against this element's
+   padding box, so it still hugs the pane's edge instead of floating a few pixels
+   inside it. */
+.xterm {
+  padding: 6px 4px 6px 10px;
+}
+
+/* The ground the terminal scrolls over.
+   xterm hard-codes black here, for a macOS scrollbar reason its own stylesheet
+   explains, and the element it themes to match the palette sits underneath this
+   one — so a light theme would show a black pane with dark text floating in it.
+   Qualified with `:root` only to outweigh the library's two-class selector. */
+:root .xterm .xterm-viewport {
+  background-color: var(--color-canvas-deep);
 }
 
 @media (prefers-reduced-motion: reduce) {
