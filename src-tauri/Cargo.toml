@@ -60,7 +60,18 @@ tauri-plugin-dialog = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
-tauri-plugin-single-instance = "2"
+# `deep-link` is what makes the second launch hand its URL over instead of
+# swallowing it: on Windows and Linux the system answers a `dsh://` link by
+# starting the app again with the URL as an argument, and this app folds second
+# launches into the running one. Without the feature the fold would be where the
+# link goes to die.
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
+# A notification is the one thing the desktop can do that a page in a frame
+# cannot: outlive the window being looked at. It is here for the service
+# interface — see `src/desktop/mod.rs` — rather than for the shell's own UI,
+# which has a status bar and does not need to interrupt anybody.
+tauri-plugin-notification = "2"
 tauri-plugin-updater = "2"
 dirs = "6"
 sys-locale = "0.3"

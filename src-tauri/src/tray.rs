@@ -9,6 +9,7 @@
 //! a missing runtime, an install, a failure and its reason — opens the window,
 //! because a tray menu is the wrong place to read.
 
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use tauri::image::Image;
@@ -16,6 +17,7 @@ use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Runtime, WindowEvent};
 
+use crate::desktop::badge;
 use crate::harness::commands::AppState;
 use crate::harness::supervisor::{Status, Stream, Supervisor};
 use crate::locale::pick;
@@ -30,6 +32,10 @@ struct Handles<R: Runtime> {
     icon: TrayIcon<R>,
     toggle: MenuItem<R>,
     art: Option<Art>,
+    /// What the harness asked to have counted here, if anything. Kept because
+    /// the icon is redrawn on every status change and a count that vanished when
+    /// the service restarted would be a count nobody could trust.
+    count: AtomicU32,
 }
 
 /// The same mark twice: lit while the harness serves, muted while it does not.
@@ -74,7 +80,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         // Left click belongs to the window, not to a menu: the thing a user
         // wants from a tray icon nine times out of ten is the app back.
         .show_menu_on_left_click(false)
-        .tooltip(tooltip_for(&Status::Stopped))
+        .tooltip(tooltip_for(&Status::Stopped, 0))
         .on_menu_event(on_menu)
         .on_tray_icon_event(|icon, event| {
             if let TrayIconEvent::Click {
@@ -95,7 +101,12 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     };
 
     let icon = builder.build(app)?;
-    app.manage(Handles { icon, toggle, art });
+    app.manage(Handles {
+        icon,
+        toggle,
+        art,
+        count: AtomicU32::new(0),
+    });
     hide_instead_of_quitting(app);
     Ok(())
 }
@@ -151,8 +162,14 @@ fn hide_instead_of_quitting<R: Runtime>(app: &AppHandle<R>) {
 }
 
 fn harness_running<R: Runtime>(app: &AppHandle<R>) -> bool {
+    running(&current(app))
+}
+
+/// What the supervisor is doing, for the paths that arrive without being told.
+fn current<R: Runtime>(app: &AppHandle<R>) -> Status {
     app.try_state::<AppState>()
-        .is_some_and(|state| running(&state.supervisor.status()))
+        .map(|state| state.supervisor.status())
+        .unwrap_or(Status::Stopped)
 }
 
 /// Bring the tray in line with what the harness is actually doing.
@@ -164,15 +181,42 @@ pub fn sync<R: Runtime>(app: &AppHandle<R>, status: &Status) {
         return;
     };
     let _ = handles.toggle.set_text(label_for(status));
-    let _ = handles.icon.set_tooltip(Some(tooltip_for(status)));
+    dress(&handles, status);
+}
+
+/// Put a count on the tray, or take it off again at zero.
+///
+/// The count belongs to whoever the harness is running — see `desktop::mark`,
+/// which sets this and the taskbar's own badge together so the two agree.
+pub fn badge<R: Runtime>(app: &AppHandle<R>, count: u32) {
+    let Some(handles) = app.try_state::<Handles<R>>() else {
+        return;
+    };
+    handles.count.store(count, Ordering::Relaxed);
+    dress(&handles, &current(app));
+}
+
+/// Draw the icon and write the tooltip the status and the count call for.
+///
+/// One function for both, because they are one statement: an icon that says a
+/// count is waiting and a tooltip that says something else is worse than either
+/// alone.
+fn dress<R: Runtime>(handles: &Handles<R>, status: &Status) {
+    let count = handles.count.load(Ordering::Relaxed);
+    let _ = handles.icon.set_tooltip(Some(tooltip_for(status, count)));
 
     if let Some(art) = &handles.art {
-        let wanted = if running(status) {
+        let base = if running(status) {
             &art.live
         } else {
             &art.idle
         };
-        let _ = handles.icon.set_icon(Some(wanted.clone()));
+        let wanted = if count == 0 {
+            base.clone()
+        } else {
+            badge::stamp(base, count)
+        };
+        let _ = handles.icon.set_icon(Some(wanted));
     }
 }
 
@@ -245,7 +289,10 @@ fn label_for(status: &Status) -> &'static str {
 }
 
 /// Kept short: a tooltip is read at a glance, over a taskbar, at 11px.
-fn tooltip_for(status: &Status) -> String {
+///
+/// The count is spelled out here because the badge cannot: the mark stops
+/// counting at nine, and this is where the number itself lives.
+fn tooltip_for(status: &Status, count: u32) -> String {
     let detail = match status {
         Status::Stopped => pick("not running", "未运行").to_string(),
         Status::Starting => pick("starting", "正在启动").to_string(),
@@ -260,7 +307,14 @@ fn tooltip_for(status: &Status) -> String {
         }
         Status::Failed { .. } => pick("stopped on an error", "已因错误停止").to_string(),
     };
-    format!("DSH Studio — {detail}")
+
+    match count {
+        0 => format!("DSH Studio — {detail}"),
+        _ => format!(
+            "DSH Studio — {detail} · {count} {}",
+            pick("waiting", "项待处理")
+        ),
+    }
 }
 
 #[cfg(test)]
@@ -313,9 +367,22 @@ mod tests {
     /// to reach the service from a terminal or another browser.
     #[test]
     fn a_running_tooltip_carries_the_origin() {
-        let tooltip = tooltip_for(&ready());
+        let tooltip = tooltip_for(&ready(), 0);
         assert!(tooltip.contains("http://127.0.0.1:57652"), "{tooltip}");
         assert!(tooltip.starts_with("DSH Studio"), "{tooltip}");
+    }
+
+    /// The badge stops drawing at nine, so a tooltip that also stopped there
+    /// would leave the exact number with nowhere to be read.
+    #[test]
+    fn the_tooltip_spells_out_a_count_the_badge_cannot() {
+        assert!(!tooltip_for(&ready(), 0).contains('·'));
+
+        let many = tooltip_for(&ready(), 42);
+        assert!(many.contains("42"), "{many}");
+        // Still the origin: a count is added to what the tooltip said, not
+        // swapped in for it.
+        assert!(many.contains("http://127.0.0.1:57652"), "{many}");
     }
 
     /// Muting has to leave the mark recognisable: same size, same silhouette,
@@ -352,9 +419,12 @@ mod tests {
     /// in the window, not smeared across a tooltip.
     #[test]
     fn a_failure_tooltip_does_not_carry_the_reason() {
-        let tooltip = tooltip_for(&Status::Failed {
-            reason: "npm ERR! code ENOENT".into(),
-        });
+        let tooltip = tooltip_for(
+            &Status::Failed {
+                reason: "npm ERR! code ENOENT".into(),
+            },
+            0,
+        );
         assert!(!tooltip.contains("ENOENT"), "{tooltip}");
     }
 }

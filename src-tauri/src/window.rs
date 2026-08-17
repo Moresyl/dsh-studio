@@ -57,6 +57,10 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
         .center()
         .transparent(material.is_some())
         .initialization_script(announce(material))
+        // Every frame and not just the top one: the shell's own document is the
+        // top frame, and everything the desktop interface exists for runs below
+        // it — the harness, and the plugin pages the harness frames in turn.
+        .initialization_script_for_all_frames(crate::desktop::client())
         .visible(false);
 
     // macOS keeps its traffic lights and floats them over the content, which is

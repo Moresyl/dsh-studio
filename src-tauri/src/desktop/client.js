@@ -1,0 +1,96 @@
+/**
+ * The desktop, as seen from a page inside the harness.
+ *
+ * Injected into every frame this window loads, before that frame's own scripts
+ * run, so a plugin finds `window.dshStudio` already there and never has to
+ * install anything to look for it. Absent means a browser rather than the
+ * studio, which is the whole of feature detection:
+ *
+ *     if (window.dshStudio) await window.dshStudio.notify({ title: 'Done' })
+ *
+ * Nothing here reaches the shell's own command surface. Every call is a message
+ * to the window above, which answers it or refuses it — see `src/lib/bridge.ts`
+ * for what is allowed and `src-tauri/src/desktop/mod.rs` for why it is so little.
+ */
+;(() => {
+  // The shell's own document is a frame too, and it does not need a client to
+  // talk to itself.
+  if (window.top === window) return
+
+  const PROTOCOL = __DSH_PROTOCOL__
+
+  // A person can leave a file dialog open over lunch. Everything else either
+  // answers immediately or is not going to.
+  const PATIENT = new Set(['pick'])
+  const DEADLINE = 20000
+
+  /** Calls waiting for an answer, by the id they were sent under. */
+  const waiting = new Map()
+  const listeners = new Set()
+  let sent = 0
+
+  window.addEventListener('message', (event) => {
+    // The window above is the only thing that speaks this protocol, and a page
+    // that frames this one cannot become it.
+    if (event.source !== window.top) return
+
+    const message = event.data
+    if (!message || message.dsh !== PROTOCOL) return
+
+    if (message.event === 'link') {
+      for (const listener of listeners) listener(message.link)
+      return
+    }
+
+    const pending = waiting.get(message.id)
+    if (!pending) return
+    waiting.delete(message.id)
+    clearTimeout(pending.timer)
+
+    if (message.ok) pending.resolve(message.value)
+    else pending.reject(new Error(message.error || 'the desktop refused the request'))
+  })
+
+  const call = (method, params) =>
+    new Promise((resolve, reject) => {
+      const id = `dsh-${++sent}`
+      const timer = PATIENT.has(method)
+        ? 0
+        : setTimeout(() => {
+            waiting.delete(id)
+            reject(new Error(`the desktop did not answer ${method}`))
+          }, DEADLINE)
+
+      waiting.set(id, { resolve, reject, timer })
+      // The window above is this app's own, and it is the only recipient a
+      // message to `window.top` can have.
+      window.top.postMessage({ dsh: PROTOCOL, id, method, params: params || {} }, '*')
+    })
+
+  window.dshStudio = Object.freeze({
+    protocol: PROTOCOL,
+
+    /** What this desktop is, what it grants, and any link that was waiting. */
+    hello: () => call('hello'),
+
+    /** Say something the window does not have to be open to hear. */
+    notify: (options) => call('notify', options),
+
+    /**
+     * Ask for a path the way the system asks: `open`, `save` or `directory`.
+     *
+     * Resolves with `{ path: null }` when the dialog was dismissed, because
+     * choosing nothing is an answer and not a failure.
+     */
+    pick: (options) => call('pick', options),
+
+    /** Put a count on the tray and the taskbar, or zero to take it off. */
+    badge: (count) => call('badge', { count }),
+
+    /** Hear `dsh://` links as they arrive. Returns the way to stop hearing them. */
+    onLink: (handler) => {
+      listeners.add(handler)
+      return () => listeners.delete(handler)
+    },
+  })
+})()

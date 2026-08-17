@@ -481,6 +481,51 @@ export const onTerminalExit = (handler: (exit: TerminalExit) => void): Promise<U
 export const windowMaterial = (dark: boolean): Promise<void> => invoke('window_material', { dark })
 
 /* -------------------------------------------------------------------------- */
+/* Desktop service interface                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** A `dsh://` link, already taken apart — see `src-tauri/src/desktop/mod.rs`. */
+export interface DesktopLink {
+  url: string
+  /** Host and path as one path, slashes trimmed: `profile/lab`. */
+  route: string
+  query: Record<string, string>
+}
+
+/** What the shell tells a frame about the desktop it is running on. */
+export interface DesktopOffer {
+  protocol: number
+  app: string
+  version: string
+  platform: string
+  /** The URL scheme that reaches this app from anywhere on the machine. */
+  scheme: string
+  capabilities: string[]
+  /** A link that arrived before there was anything to hand it to, if one did. */
+  link: DesktopLink | null
+}
+
+/** Channel `desktop/mod.rs` forwards `dsh://` links on. */
+const LINK_CHANNEL = 'desktop://link'
+
+/**
+ * Describe the desktop, and take any link that was waiting for a listener.
+ *
+ * Taken and not copied: a link is an instruction to carry out once, so asking
+ * twice answers the second caller with nothing.
+ */
+export const desktopOffer = (): Promise<DesktopOffer> => invoke('desktop_offer')
+
+export const desktopNotify = (title: string, body: string): Promise<void> =>
+  invoke('desktop_notify', { title, body })
+
+/** Put a count on the tray and the taskbar, or zero to take it off. */
+export const desktopBadge = (count: number): Promise<void> => invoke('desktop_badge', { count })
+
+export const onDesktopLink = (handler: (link: DesktopLink) => void): Promise<UnlistenFn> =>
+  listen<DesktopLink>(LINK_CHANNEL, (message) => handler(message.payload))
+
+/* -------------------------------------------------------------------------- */
 /* About                                                                      */
 /* -------------------------------------------------------------------------- */
 

@@ -1,6 +1,7 @@
 //! dsh-studio — a native desktop shell for the DeepSeek Harness.
 
 mod about;
+mod desktop;
 mod error;
 mod fetch;
 mod harness;
@@ -47,6 +48,8 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let supervisor = Supervisor::new()?;
@@ -60,9 +63,13 @@ pub fn run() {
             app.manage(Arc::new(PluginJobs::default()));
             app.manage(Arc::new(NodeJobs::default()));
             app.manage(terminal::Terminals::new()?);
+            // Before `desktop::wire`, which is where a link that started the app
+            // is put down for whoever asks for it first.
+            app.manage(desktop::Desk::default());
 
             window::build(app.handle())?;
             tray::build(app.handle())?;
+            desktop::wire(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -102,6 +109,9 @@ pub fn run() {
             terminal::commands::terminal_close,
             terminal::commands::terminal_list,
             material::window_material,
+            desktop::commands::desktop_offer,
+            desktop::commands::desktop_notify,
+            desktop::commands::desktop_badge,
             about::app_about,
         ])
         .run(tauri::generate_context!())
