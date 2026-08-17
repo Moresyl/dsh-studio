@@ -29,7 +29,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
-    "format": "prettier --write src website packaging .github",
+    "format": "prettier --write src media website packaging .github",
     "test": "vitest run",
     "tauri": "tauri"
   },

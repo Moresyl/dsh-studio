@@ -9,6 +9,52 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Added
+
+- **The shell brings its own Node when the machine has none.** A machine without
+  Node used to get pointed at nodejs.org and asked to come back, which is where
+  most people stop. The Node row is now a button: it reads the current LTS from
+  the official release index rather than pinning a version, downloads that build,
+  checks it against the published SHA-256 _before_ unpacking, and only calls it
+  installed once the unpacked binary answers `--version` — which also catches a
+  glibc/musl mismatch on Linux. It lands in the app's own data directory, so
+  nothing touches `PATH` or the registry and deleting the directory undoes it.
+  Fetching it needed an HTTPS path that does not depend on Node, because the
+  existing one runs `fetch` through `node -e` and cannot bootstrap Node itself;
+  the crates it uses were already linked in by the updater plugin, so the binary
+  did not grow. A second mirror serves the same bytes where nodejs.org is slow.
+  The runtime it installs carries its own npm, so installing the harness still
+  works the same way.
+- **Releases are signed, notarized, and come with a checksum manifest.** macOS
+  builds are signed with an Apple Developer ID, notarized with `notarytool` and
+  stapled; Windows installers are signed through Azure Artifact Signing. Both are
+  conditional on the credentials existing, so a fork's build comes out unsigned
+  rather than failing. Every artifact's SHA-256 is then collected into a
+  `SHA256SUMS.txt` on the release, for anyone downloading through a mirror.
+- **A download page, and five package-manager channels.** The site is two
+  bilingual static pages that link no webfont — a 2.7 MB installer should not
+  ask you to fetch 200 KB of type from a CDN you may not reach — and it takes its
+  design variables from the app's own stylesheet. Every link and size in the HTML
+  is already correct before any script runs; the script only swaps in live values,
+  because an unauthenticated GitHub API allows 60 requests per hour per address
+  and a visitor behind a large NAT may arrive with none left. Manifests for Scoop,
+  winget, Homebrew Cask, AUR and Flathub are generated from a real release rather
+  than hand-edited, taking each digest from that release's own `SHA256SUMS.txt`.
+  Only the Scoop bucket is live right now; [`packaging/README.md`](packaging/README.md)
+  says what each of the other four is still waiting on.
+
+### Changed
+
+- **Pointers, hover states and disabled controls behave like a desktop app's.**
+  Anything clickable shows a hand, anything disabled does not pretend otherwise,
+  and rows that respond to a click say so before it happens.
+- **Every image in the README is now captured from the shipped UI.** The two
+  hand-taken screenshots leaked a real home directory in the status bar, and one
+  of them is now an animation instead: installing a plugin and pairing a phone
+  are both sequences, and a still frame of either only shows the end. The script
+  that produces them lives in [`media/`](media) and runs the actual interface
+  against a stand-in backend, so nothing personal can appear in one by accident.
+
 ## [0.4.0] — 2026-08-17
 
 This release adds a light palette and reversible plugin switches, fixes plugin

@@ -4,20 +4,38 @@
 
 # DSH Studio
 
-[![CI](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml)
-
 **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的原生桌面外壳。**
 
 Rust + Tauri 2 编写。它托管本地 `dsh` 服务、回收服务派生出的每一个进程，
 并且做到这些不需要 fork 上游项目。
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+[![Release](https://img.shields.io/github/v/release/Moresyl/dsh-studio?style=flat-square&color=3560e8&label=release)](https://github.com/Moresyl/dsh-studio/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Moresyl/dsh-studio/total?style=flat-square&color=3560e8&label=downloads)](https://github.com/Moresyl/dsh-studio/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Moresyl/dsh-studio/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml)
+[![Stars](https://img.shields.io/github/stars/Moresyl/dsh-studio?style=flat-square&color=3560e8)](https://github.com/Moresyl/dsh-studio/stargazers)
+[![License](https://img.shields.io/badge/license-MIT-3560e8?style=flat-square)](LICENSE)
 
-<img src="assets/screenshot-launcher.png" width="760" alt="DSH Studio 启动器">
+[![Windows 下载](https://img.shields.io/badge/Windows-.exe%20%C2%B7%20.msi-3560e8?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
+[![macOS 下载](https://img.shields.io/badge/macOS-.dmg-1c1c1e?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
+[![Linux 下载](https://img.shields.io/badge/Linux-.AppImage%20%C2%B7%20.deb%20%C2%B7%20.rpm-0e9e74?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
+
+每个安装包不到 4 MB · [全部产物与校验和](#安装) · [English](README.md)
+
+<br>
+
+<img src="assets/plugin-install.zh.png" width="820" alt="安装一个插件：市场列表、清单、npm 输出，以及写进 harness profile 的那一层">
+
+**从一条 registry 列表到 harness profile 里的一个层，只隔一次点击**
+——先读清单，再走 harness 自己的插件命令装进去，想关掉也不必卸载。
 
 </div>
 
 ---
+
+|                                                                                                                                                                  |                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **⟳ 是托管，不只是启动**<br>退出后按退避策略重启，并且每 10 秒发一次真正的 HTTP 探测，专门抓那种「活着但卡死」的 harness。重启会落到新端口上，窗口自动跟过去。   | **⛨ 没有东西能活过这个窗口**<br>每个子进程都被并入 Windows job object 或 POSIX 进程组，由内核回收整棵树——包括普通 kill 会漏掉的孙子进程，哪怕外壳自己是被强杀的。             |
+| **⬗ 窗口里自带插件市场**<br>搜索 npm registry，在决定装之前先看清这个包声明了什么，然后走 harness 自己的命令装进它托管的 profile。装好的插件可以只停用、不卸载。 | **▣ 够得着你的手机，但不把 agent 放到网络上**<br>`dsh` 始终绑在回环上，而且这一点不可配置。打开的是另一扇门：一个只绑定单个局域网地址的网关，靠二维码配对，一台设备、两分钟。 |
 
 ## 为什么做这个
 
@@ -47,6 +65,14 @@ Unix 上则单独建进程组、按组发信号。关掉窗口不留任何残余
 **端口自己挑。**
 `--port 0` 让操作系统给一个空闲端口，supervisor 再把服务实际绑定到的端口读回来。
 既没有需要配置的端口可冲突，也不存在「先扫描再绑定」之间的竞态。
+
+**自带 Node，如果这台机器没有。**
+被打发去 nodejs.org 官网、装完再回来——大部分人就是在这一步走掉的。
+所以那行「未检测到 Node」本身就是按钮：它从官方 release 索引读出当前 LTS、
+下载对应构建、解包之前先核对官方公布的 SHA-256，
+并且只有在解包出来的可执行文件真的答得出 `--version` 之后，才算装成功。
+它落在应用自己的数据目录里——不往 `PATH` 加东西、不写注册表，删掉那个目录就等于撤销。
+另外备了一路国内镜像，给 nodejs.org 慢的地方用，字节完全一致。
 
 **帮你把 harness 装上。**
 如果机器上没有 `@deepseek-ai/dsh`，那一行提示本身就是按钮。
@@ -80,7 +106,12 @@ harness 的界面加载在外壳自绘标题栏下方的一个 frame 里，
 [Job Object]: https://learn.microsoft.com/zh-cn/windows/win32/procthread/job-objects
 
 <div align="center">
-<img src="assets/screenshot-harness.png" width="760" alt="在 DSH Studio 中运行的 harness">
+
+<img src="assets/remote-pairing.zh.png" width="820" alt="开启远程访问：带倒计时的二维码，然后是一台已配对的手机和一个已用掉的配对码">
+
+**开门、扫一次，码就没了**——兑换它的那台手机留下一把属于自己的密钥，
+列在面板上，也能单独收回。
+
 </div>
 
 ## 它是怎么工作的
@@ -129,6 +160,17 @@ flowchart LR
 5. **承载。** 窗口在一个 frame 里加载这个源，并持续用 HTTP 探测它。
    连续三次没响应，就回到第 3 步。
 
+<div align="center">
+
+<img src="assets/console.zh.png" width="820" alt="控制面板：环境检查、服务地址与 PID，以及 harness 的输出">
+
+<sub>五步走完之后的控制面板：检测到了什么、内核发下来的是什么，以及服务自己的输出。
+本页每一张图都由 <a href="media/"><code>media/</code></a> 里那个确定性脚本
+从实际发布的界面上抓取，跑在一个替身后端上——
+所以里面不会出现任何真实的用户目录、局域网地址或配对码。</sub>
+
+</div>
+
 ## 安装
 
 到 [Releases] 下载对应平台的安装包。每一个打了 tag 的版本都由 CI 构建四个目标：
@@ -140,10 +182,28 @@ flowchart LR
 | macOS Intel         | `.dmg`                                              |
 | Linux x64           | `.AppImage`、`.deb`、`.rpm`                         |
 
-> **macOS 版本目前没有签名和公证。** 首次启动会被 Gatekeeper 拦下，
-> 需要到「系统设置 → 隐私与安全性」里放行。签名已列入路线图。
+也可以走包管理器。所有清单都放在 [`packaging/`](packaging) 下，
+并且是从一个真实 release 生成的——里面的版本号和 SHA-256 从来不是手打的：
 
-机器上还需要 Node.js 20 或更新版本，见[环境要求](#环境要求)。
+```powershell
+scoop bucket add dsh https://github.com/Moresyl/dsh-studio
+scoop install dsh-studio
+```
+
+winget、Homebrew Cask 和 AUR 的清单已经写好并校验过，但还没提交到各自的
+registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每一个还差什么。
+
+> **签名。** 发布流水线会用 Apple Developer ID 给 macOS 构建签名、公证并装订票据，
+> 并通过 Azure Artifact Signing 给 Windows 安装包签名。两者都以凭证是否配置为条件，
+> 所以 fork 出去的构建是「没签名」，而不是「构建失败」。
+> **v0.4.0 及之前的版本是在这套流水线之前发的**——那些 macOS 包首次启动会被
+> Gatekeeper 拦下，需要到「系统设置 → 隐私与安全性」里放行。
+
+从镜像而不是从 GitHub 下载的？每个 release 都带一份 `SHA256SUMS.txt`；
+[`packaging/MIRRORS.md`](packaging/MIRRORS.md) 讲了怎么拿它核对下载的文件，
+以及为什么就算字节不是从 GitHub 来的，校验和也必须从 GitHub 来。
+
+机器上没有 Node.js 也没关系——应用会替你装一个。
 每个版本改了什么，见[更新日志](CHANGELOG.zh-CN.md)。
 
 [Releases]: https://github.com/Moresyl/dsh-studio/releases
@@ -163,7 +223,9 @@ flowchart LR
 | 签名应用内更新、定时自动检查       | ✅                                                            |
 | Windows 11 实测通过                | ✅                                                            |
 | macOS / Linux 渲染                 | ⏳ 尚未验证                                                   |
-| 内置 Node runtime（无需系统 Node） | ⏳ 计划中                                                     |
+| 按需拉取并校验 Node runtime        | ✅ 无需系统 Node                                              |
+| 签名、公证、`SHA256SUMS.txt`       | ✅ 已进流水线，从下一个版本起生效                             |
+| 下载页与五条打包渠道               | ✅ Scoop 已可用；另四条已写好，尚未提交                       |
 | 托盘图标、运行中关闭到托盘         | ✅                                                            |
 | 原生右键菜单、窗口位置记忆         | ✅                                                            |
 | 深色 / 浅色，可跟随系统也可不跟随  | ✅                                                            |
@@ -195,8 +257,10 @@ flowchart LR
 
 ## 环境要求
 
-- **Node.js 20 或更新版本。** 目前 DSH Studio 是检测系统 Node 而不是内置它，
-  见上方路线图。harness 本身会由它替你安装。
+- **不需要你先装任何东西。** DSH Studio 需要 Node.js 20 或更新版本来跑 harness，
+  你有的话它就去找出来——包括版本管理器装了、但从没加进 `PATH` 的那些。
+  你没有的话，它会下载一个、校验过之后放进自己的数据目录。
+  harness 本身两种情况下都由它替你安装。
 - Windows 10/11，需要 WebView2（Windows 11 默认自带）。
 
 ## 从源码构建
@@ -241,9 +305,11 @@ src-tauri/crates/
 不需要。如果它不在，那一行提示本身就是按钮。
 它装进应用数据目录下的私有 prefix，而不是你的全局 npm root，机器上别的东西不受影响。
 
-**为什么还需要系统 Node？**
-因为内置 runtime 还没做完，那是下一个里程碑。
-在那之前，外壳会去找一个你已经有的 Node——包括 nvm、fnm、Volta 装了但从没加进 `PATH` 的那些。
+**需要先装 Node.js 吗？**
+不需要。你有的话外壳就用你的——包括 nvm、fnm、Volta 装了但从没加进 `PATH` 的那些。
+你没有的话，那行提示本身就是按钮：拉取当前 LTS、核对官方公布的 SHA-256，
+然后放进应用自己的数据目录。你的 `PATH` 不会被动，
+所以这件事不可能弄坏你留着做别的事情的那个 Node。
 
 **它用哪个端口？**
 内核给哪个就用哪个。`--port 0` 意味着没有一个「配置好的端口」可供冲突，
@@ -283,6 +349,18 @@ supervisor 再从服务自己打印的就绪行里把真实端口读回来。
 监听网络的是一个网关，而它在拿到自己现铸的那把密钥之前一个字节都不会转发。
 它默认关闭，需要你亲手打开；harness 一停，它也随之关上。
 至于 harness 本身怎么处理你的 API key，那是上游的事，不归这个项目管。
+
+## 社区
+
+| 去哪儿                                                                                      | 做什么                                                                      |
+| ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| [报一个 bug](https://github.com/Moresyl/dsh-studio/issues/new?template=bug_report.yml)      | 表单一上来就问平台、Node 版本和日志——定位问题最需要的就是这三样。           |
+| [提一个需求](https://github.com/Moresyl/dsh-studio/issues/new?template=feature_request.yml) | 包括「这件事 harness 在终端里能做，窗口里做不了」。                         |
+| [私下报告问题](https://github.com/Moresyl/dsh-studio/security/advisories/new)               | 关于网关、配对密钥或 supervisor 的任何事。另见 [SECURITY.md](SECURITY.md)。 |
+| [harness 本身](https://github.com/deepseek-ai/deepseek-harness/issues)                      | agent、它的界面、它的模型。这个仓库只是它外面那个窗口。                     |
+
+用中文提 issue 完全没问题，也会用中文回复——
+应用、README、更新日志、贡献指南全都是双语的，处理 issue 也一样。
 
 ## 参与贡献
 

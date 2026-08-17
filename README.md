@@ -4,20 +4,39 @@
 
 # DSH Studio
 
-[![CI](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml)
-
 **A native desktop shell for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).**
 
 Rust + Tauri 2. It supervises the local `dsh` service, reclaims every process it
 spawns, and never forks the upstream project to do it.
 
-[English](README.md) · [简体中文](README.zh-CN.md)
+[![Release](https://img.shields.io/github/v/release/Moresyl/dsh-studio?style=flat-square&color=3560e8&label=release)](https://github.com/Moresyl/dsh-studio/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Moresyl/dsh-studio/total?style=flat-square&color=3560e8&label=downloads)](https://github.com/Moresyl/dsh-studio/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/Moresyl/dsh-studio/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Moresyl/dsh-studio/actions/workflows/ci.yml)
+[![Stars](https://img.shields.io/github/stars/Moresyl/dsh-studio?style=flat-square&color=3560e8)](https://github.com/Moresyl/dsh-studio/stargazers)
+[![License](https://img.shields.io/badge/license-MIT-3560e8?style=flat-square)](LICENSE)
 
-<img src="assets/screenshot-launcher.png" width="760" alt="DSH Studio launcher">
+[![Download for Windows](https://img.shields.io/badge/Windows-.exe%20%C2%B7%20.msi-3560e8?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
+[![Download for macOS](https://img.shields.io/badge/macOS-.dmg-1c1c1e?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
+[![Download for Linux](https://img.shields.io/badge/Linux-.AppImage%20%C2%B7%20.deb%20%C2%B7%20.rpm-0e9e74?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
+
+Under 4 MB per installer · [all artifacts and checksums](#install) · [简体中文](README.zh-CN.md)
+
+<br>
+
+<img src="assets/plugin-install.png" width="820" alt="Installing a plugin: the marketplace row, the manifest, the npm output, and the layer written to the harness profile">
+
+**One click from a registry listing to a layer in the harness's profile** — read the
+manifest, install through the harness's own plugin command, switch it off again
+without uninstalling it.
 
 </div>
 
 ---
+
+|                                                                                                                                                                                                                                        |                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **⟳ Supervised, not just launched**<br>Backoff restart when it exits, and a real HTTP probe every 10 seconds to catch the harness that is alive but wedged. A restart lands on a new port and the window follows it.                   | **⛨ Nothing outlives the window**<br>Every child joins a Windows job object or a POSIX process group, so the kernel reclaims the whole tree — including the grandchildren a plain kill would orphan, and even if the shell is killed outright. |
+| **⬗ A plugin marketplace in the window**<br>Search the npm registry, see what a package declares before you commit to it, install into the hosted profile through the harness's own command. Disable a plugin without uninstalling it. | **▣ Your phone, without putting the agent on the network**<br>`dsh` stays on loopback, and that is not configurable. What opens is a separate gateway on one LAN address, paired by a QR code good for one device and two minutes.             |
 
 ## Why this exists
 
@@ -55,6 +74,16 @@ nothing behind.
 the service actually bound. There is no configured port to collide with, and no
 scan-for-a-free-port race between the check and the bind.
 
+**Brings its own Node, if the machine has none.**
+Being sent to nodejs.org and told to come back is where most people stop. So the
+row that says Node is missing is also a button: it reads the current LTS from the
+official release index, downloads that build, checks it against the published
+SHA-256 before unpacking it, and only calls it installed once the unpacked binary
+answers `--version`. It lands inside the app's own data directory — nothing is
+added to `PATH`, nothing is written to the registry, and deleting the directory
+undoes it. There is a second mirror for places where nodejs.org is slow, serving
+the same bytes.
+
 **Installs the harness for you.**
 If `@deepseek-ai/dsh` is not on the machine, the row that says so is a button.
 It runs `npm install` against a private prefix inside the app's data directory —
@@ -91,7 +120,12 @@ connection it already had. Close the door and all of them die with it.
 [Job Object]: https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects
 
 <div align="center">
-<img src="assets/screenshot-harness.png" width="760" alt="The harness running inside DSH Studio">
+
+<img src="assets/remote-pairing.png" width="820" alt="Opening remote access: a QR code with a countdown on it, then a paired phone and a spent code">
+
+**Open the door, scan once, and the code is gone** — the phone that redeemed it
+keeps a key of its own, listed on the pane and revocable on its own.
+
 </div>
 
 ## How it works
@@ -143,6 +177,18 @@ a failure the terminal version has:
 5. **Host.** The window loads that origin in a frame, and keeps probing it over
    HTTP. Three consecutive misses and step 3 runs again.
 
+<div align="center">
+
+<img src="assets/console.png" width="820" alt="The control panel: environment checks, the service address and PID, and the harness output">
+
+<sub>The control panel after all five steps: what was detected, what the kernel
+handed out, and the service's own output. Every image on this page is captured
+from the shipped UI by the deterministic script in <a href="media/"><code>media/</code></a>,
+against a stand-in backend — which is why no real home directory, LAN address or
+pairing key appears in any of them.</sub>
+
+</div>
+
 ## Install
 
 Grab an installer from [Releases]. Every tagged version is built by CI for four
@@ -155,12 +201,34 @@ targets:
 | macOS Intel         | `.dmg`                                                       |
 | Linux x64           | `.AppImage`, `.deb`, `.rpm`                                  |
 
-> **macOS builds are not yet signed or notarized.** The first launch will be
-> blocked by Gatekeeper; approve the app in System Settings → Privacy & Security.
-> Signing is on the roadmap.
+Or through a package manager. The manifests all live in [`packaging/`](packaging)
+and are generated from a real release, so the version and the SHA-256 in them are
+never hand-typed:
 
-You will also need Node.js 20 or newer on the machine — see [Requirements](#requirements).
-What changed between versions is in the [changelog](CHANGELOG.md).
+```powershell
+scoop bucket add dsh https://github.com/Moresyl/dsh-studio
+scoop install dsh-studio
+```
+
+winget, Homebrew Cask and AUR manifests are written and validated but not yet
+submitted to their registries — [`packaging/README.md`](packaging/README.md) says
+exactly what each one is still waiting on.
+
+> **Signing.** The release pipeline signs macOS builds with an Apple Developer ID,
+> notarizes and staples them, and signs the Windows installers through Azure
+> Artifact Signing. Both are conditional on the credentials being configured, so a
+> fork's build comes out unsigned rather than broken. **Releases up to and
+> including v0.4.0 were cut before this existed** — on macOS the first launch is
+> blocked by Gatekeeper, so approve the app in System Settings → Privacy &
+> Security.
+
+Downloading from a mirror rather than from GitHub? Releases carry a
+`SHA256SUMS.txt`; [`packaging/MIRRORS.md`](packaging/MIRRORS.md) covers checking a
+download against it, and why the checksum has to come from GitHub even when the
+bytes did not.
+
+No Node.js on the machine is fine — the app installs one for you. What changed
+between versions is in the [changelog](CHANGELOG.md).
 
 [Releases]: https://github.com/Moresyl/dsh-studio/releases
 
@@ -180,7 +248,9 @@ about being unfinished.
 | Signed in-app update, checked on a schedule  | ✅                                                                 |
 | Verified on Windows 11                       | ✅                                                                 |
 | macOS / Linux rendering                      | ⏳ not yet run                                                     |
-| Bundled Node runtime (no system Node needed) | ⏳ planned                                                         |
+| Node runtime fetched and verified on demand  | ✅ no system Node needed                                           |
+| Code signing, notarization, `SHA256SUMS.txt` | ✅ in the pipeline, from the next release on                       |
+| Download page, five packaging channels       | ✅ Scoop live; four written, not yet submitted                     |
 | Tray icon, close-to-tray while serving       | ✅                                                                 |
 | Native context menus, saved window bounds    | ✅                                                                 |
 | Light and dark, following the system or not  | ✅                                                                 |
@@ -215,8 +285,11 @@ one of those credentials can be taken back on its own, mid-connection.
 
 ## Requirements
 
-- **Node.js 20 or newer.** DSH Studio detects it rather than bundling it, for
-  now — see the roadmap above. The harness itself is installed for you.
+- **Nothing you have to install first.** DSH Studio needs Node.js 20 or newer to
+  run the harness, and it finds one if you have it — including the ones a version
+  manager installed but never put on `PATH`. If you do not, it downloads and
+  verifies one into its own data directory. The harness itself is installed for
+  you either way.
 - Windows 10/11 with WebView2 (present on Windows 11 by default).
 
 ## Building from source
@@ -264,10 +337,12 @@ No. If it is missing, the row that says so is a button. It installs into a
 private prefix inside the app's data directory rather than your global npm root,
 so nothing on the rest of your machine changes.
 
-**Why does it need system Node?**
-Because bundling a runtime is not done yet — it is the next milestone. Until
-then the shell finds a Node you already have, including ones installed by nvm,
-fnm or Volta that were never added to `PATH`.
+**Do I need Node.js installed?**
+No. If you have one the shell uses it — including the ones nvm, fnm or Volta
+installed but never added to `PATH`. If you do not, the row that says so is a
+button: it fetches the current LTS, checks it against the published SHA-256, and
+keeps it inside the app's own data directory. Your `PATH` is not touched, so this
+cannot disturb a Node you rely on for something else.
 
 **Which port does it use?**
 Whichever one the kernel hands out. `--port 0` means there is no configured port
@@ -312,6 +387,18 @@ loopback, and what listens on the network is a gateway that will not forward a
 byte without a credential it minted itself. It is off until you switch it on,
 and it goes off again the moment the harness stops. What the harness itself does with your
 API keys is upstream's business, not this project's.
+
+## Community
+
+| Where                                                                                              | For                                                                                              |
+| -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [Report a bug](https://github.com/Moresyl/dsh-studio/issues/new?template=bug_report.yml)           | The form asks for the platform, the Node and the log up front — the three things triage needs.   |
+| [Ask for a feature](https://github.com/Moresyl/dsh-studio/issues/new?template=feature_request.yml) | Including "the harness can do this from a terminal and the window cannot".                       |
+| [Report something privately](https://github.com/Moresyl/dsh-studio/security/advisories/new)        | Anything about the gateway, the pairing keys, or the supervisor. See [SECURITY.md](SECURITY.md). |
+| [The harness itself](https://github.com/deepseek-ai/deepseek-harness/issues)                       | The agent, its UI, its models. This repository is only the window around it.                     |
+
+Issues in Chinese are welcome and get answered in Chinese — the app, the README,
+the changelog and the contributing guide are all bilingual, and so is triage.
 
 ## Contributing
 
