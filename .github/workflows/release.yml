@@ -58,6 +58,151 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Code signing is deliberately optional. A fork, or a maintainer running
+      # this workflow before any certificate exists, has none of the credentials
+      # below and should still get a complete set of installers out of the run —
+      # unsigned, with a warning that says so — rather than a red X and nothing
+      # to download.
+      #
+      # Which is also why this step exists at all rather than an `env:` block on
+      # the build step. An unset secret interpolates to an empty string, and the
+      # bundler reads these with `var_os` — so an empty APPLE_ID is not an absent
+      # one. It is a set of notarization credentials whose Apple ID happens to be
+      # blank, which it will submit, and Apple will reject.
+      - name: Set up macOS code signing
+        if: runner.os == 'macOS'
+        env:
+          # The signing half is these two and nothing else. The bundler imports
+          # the certificate into a throwaway keychain of its own, reads the
+          # signing identity back out of the certificate, and signs against that
+          # keychain by path — so there is nothing to import here, and no
+          # identity to spell out and keep in step with the certificate.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          # An app-specific password, not the Apple account's own. The App Store
+          # Connect API key (APPLE_API_KEY / APPLE_API_ISSUER / APPLE_API_KEY_PATH)
+          # is the other set the bundler accepts, and wants the key on disk first.
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -u
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "::warning title=Unsigned macOS build::No APPLE_CERTIFICATE secret is configured, so the .app and .dmg from this run are unsigned and Gatekeeper will refuse to open them on any other machine."
+            exit 0
+          fi
+          if [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
+            echo "::error title=Incomplete macOS credentials::APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD is empty. The bundler needs both to open the .p12, and it will not fall back to an unsigned build."
+            exit 1
+          fi
+          if [ -z "$APPLE_ID" ] || [ -z "$APPLE_PASSWORD" ] || [ -z "$APPLE_TEAM_ID" ]; then
+            # Refused in the first ten seconds rather than after a half-hour
+            # build. An app that is signed but was never notarized is still an
+            # app Gatekeeper blocks, so this combination has nothing to ship.
+            echo "::error title=Incomplete macOS credentials::APPLE_CERTIFICATE is set, but APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID are not all present. Signing without notarizing produces a build Gatekeeper still refuses to open."
+            exit 1
+          fi
+
+          # Written with a delimiter rather than KEY=value because a base64 blob
+          # produced without -w0 arrives line-wrapped.
+          {
+            echo "APPLE_CERTIFICATE<<DSH_SIGNING_SECRET"
+            printf '%s\n' "$APPLE_CERTIFICATE"
+            echo "DSH_SIGNING_SECRET"
+            echo "APPLE_CERTIFICATE_PASSWORD<<DSH_SIGNING_SECRET"
+            printf '%s\n' "$APPLE_CERTIFICATE_PASSWORD"
+            echo "DSH_SIGNING_SECRET"
+            echo "APPLE_ID=$APPLE_ID"
+            echo "APPLE_PASSWORD<<DSH_SIGNING_SECRET"
+            printf '%s\n' "$APPLE_PASSWORD"
+            echo "DSH_SIGNING_SECRET"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+          } >> "$GITHUB_ENV"
+          # No values: every one of them is a secret, and would print as ***.
+          echo "A certificate and notarization credentials are configured; this build will be signed, notarized and stapled."
+
+      - name: Set up Windows code signing
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          # Not secrets, and not committed either: these three address one
+          # signing account, and the account belongs to whoever cuts the
+          # release. Repository variables let a fork sign with its own without
+          # this file naming anybody's.
+          SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: |
+          set -u
+          if [ -z "$AZURE_CLIENT_ID" ]; then
+            echo "::warning title=Unsigned Windows build::No AZURE_CLIENT_ID secret is configured, so the installers from this run are unsigned and SmartScreen will warn about them until the download builds a reputation."
+            exit 0
+          fi
+
+          missing=""
+          [ -n "$AZURE_CLIENT_SECRET" ] || missing="$missing AZURE_CLIENT_SECRET"
+          [ -n "$AZURE_TENANT_ID" ] || missing="$missing AZURE_TENANT_ID"
+          [ -n "$SIGNING_ENDPOINT" ] || missing="$missing AZURE_SIGNING_ENDPOINT"
+          [ -n "$SIGNING_ACCOUNT" ] || missing="$missing AZURE_SIGNING_ACCOUNT"
+          [ -n "$SIGNING_PROFILE" ] || missing="$missing AZURE_SIGNING_PROFILE"
+          if [ -n "$missing" ]; then
+            echo "::error title=Incomplete Windows signing setup::AZURE_CLIENT_ID is set, but these are empty:$missing. Azure Artifact Signing needs the AZURE_CLIENT_* and AZURE_TENANT_ID secrets to authenticate, and the AZURE_SIGNING_* repository variables to say which account and certificate profile to sign with."
+            exit 1
+          fi
+
+          # Signs with a certificate that is never on the runner, which is the
+          # whole reason for preferring this to an EV token. Windows runners
+          # already carry the .NET runtime, the Azure CLI and the signtool it
+          # leans on.
+          cargo install artifact-signing-cli --locked
+
+          # Picked up on its own: the CLI merges tauri.windows.conf.json into the
+          # base configuration for every Windows build, with no flag to pass and
+          # no path to resolve. Written here rather than committed because a
+          # machine without the signing tool installed would then fail every
+          # local `tauri build`.
+          #
+          # Built through JSON.stringify rather than pasted into a template, so
+          # an account name with a character that means something to JSON is
+          # escaped instead of producing a config file that will not parse.
+          node --input-type=module -e '
+            import { writeFileSync } from "node:fs"
+            const { SIGNING_ENDPOINT, SIGNING_ACCOUNT, SIGNING_PROFILE } = process.env
+            const config = {
+              bundle: {
+                windows: {
+                  // The object form rather than the string one: the description
+                  // carries a space, and the string form is split on spaces.
+                  // -d is what names the app in the UAC prompt an installer
+                  // raises; unset, that prompt reads as a random string.
+                  signCommand: {
+                    cmd: "artifact-signing-cli",
+                    args: [
+                      "-e", SIGNING_ENDPOINT,
+                      "-a", SIGNING_ACCOUNT,
+                      "-c", SIGNING_PROFILE,
+                      "-d", "DSH Studio",
+                      "%1",
+                    ],
+                  },
+                },
+              },
+            }
+            writeFileSync("src-tauri/tauri.windows.conf.json", JSON.stringify(config, null, 2) + "\n")
+            console.log(`signing against ${SIGNING_ACCOUNT}/${SIGNING_PROFILE}`)
+          '
+
+          {
+            echo "AZURE_CLIENT_ID=$AZURE_CLIENT_ID"
+            echo "AZURE_CLIENT_SECRET<<DSH_SIGNING_SECRET"
+            printf '%s\n' "$AZURE_CLIENT_SECRET"
+            echo "DSH_SIGNING_SECRET"
+            echo "AZURE_TENANT_ID=$AZURE_TENANT_ID"
+          } >> "$GITHUB_ENV"
+
       - name: Prepare release notes
         id: release_notes
         shell: bash
@@ -84,3 +229,35 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
+
+  # Signatures say who built an installer; these say the bytes are the ones that
+  # were built. Worth having for the mirrors this project will be downloaded
+  # from, where the file someone gets is not necessarily the file GitHub served.
+  checksums:
+    name: Publish checksums
+    needs: publish
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sum every artifact on the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            # A manual run has no tag to read, and the release was named from the
+            # version in the configuration — so that is where to look for it.
+            tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          fi
+          echo "Summing the artifacts on $tag"
+
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir artifacts --clobber
+          # Not its own subject: a previous run may have left one up there, and
+          # a file cannot state its own digest.
+          rm -f artifacts/SHA256SUMS.txt
+          ( cd artifacts && sha256sum -- * ) > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+          gh release upload "$tag" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber

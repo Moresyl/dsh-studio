@@ -11,6 +11,12 @@ src-tauri/gen/
 # Runtime artifacts staged for packaging
 src-tauri/runtime-cache/
 
+# Written by the release workflow on Windows runners, and only there. It names
+# one Azure signing account, which belongs to whoever cuts the release rather
+# than to this repository — and committing it would make every local Windows
+# build demand a signing tool that is not installed.
+src-tauri/tauri.windows.conf.json
+
 # Local working notes and scratch captures
 .workflow/
 .firecrawl/
