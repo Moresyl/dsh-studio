@@ -63,9 +63,14 @@ pub fn dsh_home() -> PathBuf {
         })
 }
 
+/// Where every profile lives, one directory each.
+pub fn profiles_dir() -> PathBuf {
+    dsh_home().join("profiles")
+}
+
 /// Directory holding one profile's plugin dependencies and manifest.
 pub fn profile_dir(profile: &str) -> PathBuf {
-    dsh_home().join("profiles").join(profile)
+    profiles_dir().join(profile)
 }
 
 /// Default working directory for harness sessions.

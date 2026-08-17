@@ -34,10 +34,6 @@ use crate::harness::install;
 use crate::harness::supervisor::Stream;
 use crate::paths;
 
-/// The profile `dsh web` boots, and therefore the only one a plugin installed
-/// from this panel would affect.
-pub const PROFILE: &str = "web";
-
 /// What the shell installs when the machine has no package manager of its own.
 const PNPM_SPEC: &str = "pnpm@latest";
 
@@ -100,15 +96,19 @@ impl Change {
     }
 }
 
-/// Read the profile as it is right now. Cheap; safe to call on every render.
+/// Read the hosted profile as it is right now. Cheap; safe to call on every
+/// render — which is also why the profile is read here rather than passed in:
+/// the panel describes whichever profile this window is hosting at the moment it
+/// draws, and a stale answer would be a list of the wrong profile's plugins.
 pub fn state() -> PluginState {
-    let profile_dir = paths::profile_dir(PROFILE);
+    let profile = crate::profiles::selected();
+    let profile_dir = paths::profile_dir(&profile);
     let manifest = read_manifest(&profile_dir);
 
-    let switched_off = switches::switched_off(PROFILE);
+    let switched_off = switches::switched_off(&profile);
 
     PluginState {
-        profile: PROFILE.to_string(),
+        profile,
         initialized: manifest.is_some(),
         plugins: manifest
             .as_ref()
@@ -119,7 +119,7 @@ pub fn state() -> PluginState {
     }
 }
 
-fn read_manifest(profile_dir: &Path) -> Option<serde_json::Value> {
+pub(crate) fn read_manifest(profile_dir: &Path) -> Option<serde_json::Value> {
     let raw = std::fs::read_to_string(profile_dir.join("package.json")).ok()?;
     serde_json::from_str(&raw).ok()
 }
@@ -130,7 +130,10 @@ fn read_manifest(profile_dir: &Path) -> Option<serde_json::Value> {
 /// `dsh.profile.bundles` is what is switched on, and `switched_off` is what the
 /// user took out of that list. A name in the second but not the first came with
 /// the profile template.
-fn list(manifest: &serde_json::Value, switched_off: &BTreeSet<String>) -> Vec<InstalledPlugin> {
+pub(crate) fn list(
+    manifest: &serde_json::Value,
+    switched_off: &BTreeSet<String>,
+) -> Vec<InstalledPlugin> {
     let bundles: Vec<&str> = manifest
         .pointer("/dsh/profile/bundles")
         .and_then(serde_json::Value::as_array)
@@ -196,6 +199,32 @@ where
         )));
     }
 
+    let profile = crate::profiles::selected();
+    run(
+        &profile,
+        &[change.verb().to_string(), spec.to_string()],
+        guard,
+        report,
+    )
+    .await?;
+
+    // The harness has just rebuilt the layer list from what is installed, which
+    // puts back anything the user had switched off. Saying so again here is the
+    // only reason a switched-off plugin stays switched off across an install.
+    switches::apply(&profile, &paths::profile_dir(&profile))
+}
+
+/// Run one `dsh plugin` invocation against `profile` and report its output.
+///
+/// Separate from [`change`] because installing into a profile is not only what
+/// the market does: a profile copied from another one has to be given what the
+/// original had installed, and that is the same command with different arguments.
+/// Both go through here so there is one place that knows how to find a package
+/// manager and where the child's working directory has to be.
+pub async fn run<R>(profile: &str, args: &[String], guard: &ProcessGuard, report: R) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
     let environment = crate::harness::environment();
     let node = environment.node.ok_or(Error::NoNodeRuntime {
         minimum: node_runtime::MINIMUM_SUPPORTED,
@@ -210,9 +239,8 @@ where
         .arg(&environment.harness_entry)
         .arg("plugin")
         .arg("--profile")
-        .arg(PROFILE)
-        .arg(change.verb())
-        .arg(spec)
+        .arg(profile)
+        .args(args)
         // Relative specs would be anchored against this directory. Only package
         // names get this far, so it exists to be somewhere predictable rather
         // than wherever the app happened to be launched from.
@@ -252,11 +280,6 @@ where
             },
         ));
     }
-
-    // The harness has just rebuilt the layer list from what is installed, which
-    // puts back anything the user had switched off. Saying so again here is the
-    // only reason a switched-off plugin stays switched off across an install.
-    switches::apply(PROFILE, &paths::profile_dir(PROFILE))?;
     Ok(())
 }
 
@@ -275,7 +298,8 @@ pub fn switch(name: &str, enabled: bool) -> Result<()> {
     // The profile template's own bundles are what make the harness a harness.
     // Switching one off would leave a running application with no interface and
     // no obvious way back; they are shown, and they are not ours to turn off.
-    if state()
+    let hosted = state();
+    if hosted
         .plugins
         .iter()
         .any(|plugin| plugin.name == name && plugin.builtin)
@@ -285,7 +309,7 @@ pub fn switch(name: &str, enabled: bool) -> Result<()> {
         )));
     }
 
-    switches::set(PROFILE, name, enabled, &paths::profile_dir(PROFILE))
+    switches::set(&hosted.profile, name, enabled, &hosted.profile_dir)
 }
 
 /// How many trailing lines are kept to explain a failure. Enough to hold an
@@ -436,7 +460,7 @@ fn path_with(node: &Path, manager: Option<&Path>) -> OsString {
 /// is about the one thing that would otherwise slip through: an argument
 /// beginning with `-` is a flag to the package manager, not a package, and a
 /// relative path spec would be resolved somewhere the user did not mean.
-fn is_package_spec(spec: &str) -> bool {
+pub(crate) fn is_package_spec(spec: &str) -> bool {
     if spec.is_empty() || spec.len() > 214 {
         return false;
     }

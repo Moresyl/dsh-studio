@@ -83,6 +83,9 @@ pub struct LaunchPlan {
     pub node: PathBuf,
     /// Path to the harness CLI entry point.
     pub entry: PathBuf,
+    /// Profile to boot: which layer stack the harness composes, and therefore
+    /// which plugins the session has.
+    pub profile: String,
     /// Working directory inherited by agent sessions and their tools.
     pub workspace: PathBuf,
     /// Interface to bind. Loopback unless the user opts into remote access.
@@ -96,7 +99,13 @@ impl LaunchPlan {
         let mut command = Command::new(&self.node);
         command
             .arg(&self.entry)
-            .arg("web")
+            // Named rather than using the `web` alias, and before the arguments
+            // meant for the profile's own application: the launcher stops reading
+            // its own flags at the first token it does not recognise and hands
+            // everything after it on. `web` would say all of this for exactly one
+            // profile.
+            .arg("--profile")
+            .arg(&self.profile)
             .arg("--host")
             .arg(&self.host)
             .arg("--port")

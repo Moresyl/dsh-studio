@@ -70,6 +70,9 @@ pub enum Error {
     Preset(String),
 
     #[error("{0}")]
+    Profile(String),
+
+    #[error("{0}")]
     Terminal(String),
 }
 

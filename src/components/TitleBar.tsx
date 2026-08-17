@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import { BrandMark } from '@/components/BrandMark'
+import { ProfileSwitch } from '@/components/ProfileSwitch'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { t } from '@/lib/i18n'
 import { drawsWindowControls, isMac } from '@/lib/platform'
@@ -17,6 +18,8 @@ interface TitleBarProps {
   panelOpen: boolean
   /** Switch views. Absent while there is only one view to show. */
   onTogglePanel?: () => void
+  /** Open the profile manager. Absent while the first-run guide is up. */
+  onManageProfiles?: () => void
 }
 
 /**
@@ -29,9 +32,11 @@ interface TitleBarProps {
  * It also carries the view switch, because once the harness fills the window
  * this is the only chrome left and starting the harness would otherwise be a
  * one-way door. A switch and not a badge: it is the same two views every time,
- * so the pair belongs on screen together with the current one marked.
+ * so the pair belongs on screen together with the current one marked. The
+ * profile chip is here for the same reason: which stack is running is a property
+ * of the window, and this strip is what survives the harness taking the rest.
  */
-export function TitleBar({ serving, panelOpen, onTogglePanel }: TitleBarProps) {
+export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }: TitleBarProps) {
   const appWindow = getCurrentWindow()
   const [maximized, setMaximized] = useState(false)
 
@@ -79,6 +84,8 @@ export function TitleBar({ serving, panelOpen, onTogglePanel }: TitleBarProps) {
         <span className="text-[12px] font-medium text-muted">DSH Studio</span>
 
         {serving && onTogglePanel && <ViewSwitch panelOpen={panelOpen} onToggle={onTogglePanel} />}
+
+        {onManageProfiles && <ProfileSwitch onManage={onManageProfiles} />}
       </div>
 
       {/* Beside the window buttons rather than inside a pane, because the theme

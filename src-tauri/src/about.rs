@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use crate::paths;
-use crate::plugins;
+use crate::profiles;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +31,6 @@ pub fn app_about(app: tauri::AppHandle) -> About {
         arch: std::env::consts::ARCH.to_string(),
         app_data: paths::app_data_dir(),
         harness_dir: paths::harness_dir(),
-        profile_dir: paths::profile_dir(plugins::PROFILE),
+        profile_dir: paths::profile_dir(&profiles::selected()),
     }
 }

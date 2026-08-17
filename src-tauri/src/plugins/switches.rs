@@ -146,6 +146,46 @@ fn relist(profile_dir: &Path, name: &str) -> Result<()> {
     write(&path, &manifest)
 }
 
+/// Carry what was switched off in one profile over to a copy of it.
+///
+/// A copy that installs the same plugins but runs the ones its original does not
+/// is not a copy of it, and the difference would be invisible: both manifests
+/// would list the same layers.
+pub fn copy(from: &str, to: &str) -> Result<()> {
+    let off = switched_off(from);
+    if off.is_empty() {
+        return Ok(());
+    }
+    remember(to, &off)
+}
+
+/// Follow a profile that was renamed. The record is keyed by name, so without
+/// this a rename would silently switch everything back on.
+pub fn rename(from: &str, to: &str) -> Result<()> {
+    let off = switched_off(from);
+    if !off.is_empty() {
+        remember(to, &off)?;
+    }
+    forget(from)
+}
+
+/// Drop a profile's record once the profile itself is gone.
+///
+/// Not for tidiness: profile names get reused, and a new profile that inherited
+/// a deleted one's switched-off list would start by hiding plugins nobody had
+/// switched off.
+pub fn forget(profile: &str) -> Result<()> {
+    let path = store();
+    let mut document = document();
+    let Some(disabled) = document.get_mut("disabled").and_then(Value::as_object_mut) else {
+        return Ok(());
+    };
+    if disabled.remove(profile).is_none() {
+        return Ok(());
+    }
+    write(&path, &Value::Object(document))
+}
+
 fn manifest_path(profile_dir: &Path) -> PathBuf {
     profile_dir.join("package.json")
 }
@@ -165,12 +205,21 @@ fn write(path: &Path, manifest: &Value) -> Result<()> {
         .map_err(|cause| Error::Plugin(format!("{} could not be written: {cause}", path.display())))
 }
 
-fn remember(profile: &str, names: &BTreeSet<String>) -> Result<()> {
-    let path = store();
-    let mut document = std::fs::read_to_string(&path)
+/// The record as it stands, or an empty one when there is nothing to read.
+fn document() -> Map<String, Value> {
+    std::fs::read_to_string(store())
         .ok()
         .and_then(|raw| serde_json::from_str::<Map<String, Value>>(&raw).ok())
-        .unwrap_or_default();
+        .unwrap_or_default()
+}
+
+/// Record the whole switched-off list for one profile, replacing what was there.
+///
+/// Public for the one caller that has a list without having a profile to read it
+/// from: an imported profile, whose switched-off names came out of a file.
+pub(crate) fn remember(profile: &str, names: &BTreeSet<String>) -> Result<()> {
+    let path = store();
+    let mut document = document();
 
     let mut disabled = document
         .get("disabled")

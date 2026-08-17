@@ -74,6 +74,7 @@ pub fn launch_plan() -> Result<LaunchPlan> {
     Ok(LaunchPlan {
         node: node.path,
         entry: environment.harness_entry,
+        profile: crate::profiles::selected(),
         workspace: environment.workspace,
         host: BIND_HOST.to_string(),
         port: EPHEMERAL_PORT,

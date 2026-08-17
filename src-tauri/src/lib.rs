@@ -10,6 +10,7 @@ mod node;
 mod paths;
 mod plugins;
 mod presets;
+mod profiles;
 mod remote;
 mod terminal;
 mod tray;
@@ -85,6 +86,16 @@ pub fn run() {
             plugins::commands::plugin_switch,
             presets::preset_roster,
             presets::preset_choose,
+            profiles::commands::profile_roster,
+            profiles::commands::profile_select,
+            profiles::commands::profile_create,
+            profiles::commands::profile_duplicate,
+            profiles::commands::profile_rename,
+            profiles::commands::profile_remove,
+            profiles::commands::profile_compare,
+            profiles::commands::profile_export,
+            profiles::commands::profile_declaration,
+            profiles::commands::profile_import,
             terminal::commands::terminal_open,
             terminal::commands::terminal_write,
             terminal::commands::terminal_resize,

@@ -5,6 +5,7 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
 import { Onboarding } from '@/components/Onboarding'
+import { ProfileManager } from '@/components/ProfileManager'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
@@ -41,6 +42,10 @@ export default function App() {
   // lands on a fresh port, is a new origin and so gets the same treatment.
   const [panelFor, setPanelFor] = useState<string | null>(null)
   const [view, setView] = useState<View>('console')
+  // Held by the window rather than by the title bar that opens it: the manager
+  // covers the window, and a modal inside a strip 36px tall would be positioned
+  // against a strip 36px tall.
+  const [managing, setManaging] = useState(false)
 
   // Showing a pane always means putting it in front. Anything else answers a
   // keystroke by changing something the user cannot see.
@@ -118,7 +123,7 @@ export default function App() {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
       // A modal is a question, and the rest of the window is not answering it.
-      if (useDialog.getState().pending) return
+      if (managing || useDialog.getState().pending) return
       const wanted = VIEWS[Number(event.key) - 1]
       if (!wanted) return
       event.preventDefault()
@@ -127,7 +132,7 @@ export default function App() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [show])
+  }, [managing, show])
 
   // With nothing serving there is nothing else to show.
   const showPanel = origin === null || panelFor === origin
@@ -142,6 +147,9 @@ export default function App() {
         onTogglePanel={
           origin ? () => setPanelFor((current) => (current === origin ? null : origin)) : undefined
         }
+        // Not while the guide is up: which profile to work in is a question for
+        // somebody who already has a harness to point at one.
+        onManageProfiles={stage === 'guiding' ? undefined : () => setManaging(true)}
       />
 
       {stage === 'guiding' ? (
@@ -162,8 +170,11 @@ export default function App() {
 
       <StatusBar status={status} environment={environment} onOpenUpdate={() => show('about')} />
 
-      {/* Last, and outside the layout: both are positioned against the window
-          and have to be able to cover anything in it. The menu is mounted after
+      {managing && <ProfileManager onClose={() => setManaging(false)} />}
+
+      {/* Last, and outside the layout: these are positioned against the window
+          and have to be able to cover anything in it. The dialog is mounted after
+          the manager because the manager asks it questions, and the menu after
           the dialog because a right-click inside a dialog still gets a menu. */}
       <Dialog />
       <ContextMenu />

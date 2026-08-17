@@ -263,6 +263,113 @@ export const pluginSwitch = (name: string, enabled: boolean): Promise<PluginStat
   invoke('plugin_switch', { name, enabled })
 
 /* -------------------------------------------------------------------------- */
+/* Profiles                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** One profile: a directory, a layer stack, and whatever was installed into it. */
+export interface Profile {
+  name: string
+  dir: string
+  /** False until a manifest has been written for it. */
+  initialized: boolean
+  /** A name the harness ships a template for, and re-creates if it goes. */
+  shipped: boolean
+  /**
+   * Whether it carries the bundles that serve this window. Reported, never
+   * enforced: what boots is the harness's call, and the shell only has to make
+   * sure the answer is not a surprise.
+   */
+  servesWindow: boolean
+  /** Plugins installed into it, the bundles it came with excluded. */
+  plugins: number
+  disabled: number
+}
+
+export interface Roster {
+  profiles: Profile[]
+  selected: string
+  /** The directory the profiles live in, shown because a profile is a directory. */
+  root: string
+}
+
+/** How one package stands in one profile. */
+export type Standing = 'absent' | 'active' | 'disabled' | 'library' | 'builtin'
+
+/** One package, and what two profiles say about it. */
+export interface Difference {
+  name: string
+  left: Standing
+  right: Standing
+  /** The range each side records. Two profiles can run the same plugin at different versions. */
+  leftSpec: string
+  rightSpec: string
+  same: boolean
+}
+
+export interface Comparison {
+  left: string
+  right: string
+  /** Already sorted with what differs first. */
+  rows: Difference[]
+  differences: number
+}
+
+/**
+ * A profile as a file.
+ *
+ * A declaration and not an archive: what a profile has is packages from a
+ * registry and layers from the installation, so the file records what was asked
+ * for and the import asks for it again.
+ */
+export interface Declaration {
+  kind: string
+  version: number
+  /** The profile it came from, offered as the name to import it under. */
+  name: string
+  /** Plugins as name → range. */
+  plugins: Record<string, string>
+  disabled: string[]
+  /** The profile's own patch layer, verbatim. */
+  patch: string
+}
+
+export const profileRoster = (): Promise<Roster> => invoke('profile_roster')
+
+/**
+ * Point this window at another profile.
+ *
+ * Records the choice and nothing else. The layer stack is composed at boot, so
+ * a running harness keeps running what it started with until it is restarted.
+ */
+export const profileSelect = (name: string): Promise<Roster> => invoke('profile_select', { name })
+
+export const profileCreate = (name: string): Promise<Roster> => invoke('profile_create', { name })
+
+/** Copy a profile, plugins and all. Installs, so it can take a while. */
+export const profileDuplicate = (source: string, name: string): Promise<Roster> =>
+  invoke('profile_duplicate', { source, name })
+
+export const profileRename = (from: string, to: string): Promise<Roster> =>
+  invoke('profile_rename', { from, to })
+
+/** Delete a profile and everything in it. */
+export const profileRemove = (name: string): Promise<Roster> => invoke('profile_remove', { name })
+
+export const profileCompare = (left: string, right: string): Promise<Comparison> =>
+  invoke('profile_compare', { left, right })
+
+/** Write a profile out to a path the user picked. */
+export const profileExport = (name: string, path: string): Promise<void> =>
+  invoke('profile_export', { name, path })
+
+/** Read an exported profile without importing it, so it can be shown first. */
+export const profileDeclaration = (path: string): Promise<Declaration> =>
+  invoke('profile_declaration', { path })
+
+export const profileImport = (path: string, name: string): Promise<Roster> =>
+  invoke('profile_import', { path, name })
+
+/* -------------------------------------------------------------------------- */
 /* Agent presets                                                              */
 /* -------------------------------------------------------------------------- */
 

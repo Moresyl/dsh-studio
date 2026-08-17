@@ -11,8 +11,8 @@ import type { KeyboardEvent, MouseEvent } from 'react'
 /**
  * Answer Escape, and keep Tab inside `card`.
  *
- * Every focusable thing in these cards is a `button`, so that is what the ring
- * is built from — including the links, which are buttons precisely because a
+ * Buttons and text fields are all these cards hold, so that is what the ring is
+ * built from — including the links, which are buttons precisely because a
  * published URL opens in the user's own browser rather than in this window.
  */
 export function holdFocus(
@@ -30,7 +30,7 @@ export function holdFocus(
 
   if (event.key !== 'Tab') return
 
-  const stops = Array.from(card?.querySelectorAll<HTMLElement>('button') ?? []).filter(
+  const stops = Array.from(card?.querySelectorAll<HTMLElement>('button, input') ?? []).filter(
     (stop) => !stop.hasAttribute('disabled'),
   )
   const first = stops.at(0)
