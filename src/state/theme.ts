@@ -18,7 +18,7 @@
  */
 import { create } from 'zustand'
 
-import { windowMaterial } from '@/lib/ipc'
+import { announce, onSharedChange, windowMaterial } from '@/lib/ipc'
 import { material } from '@/lib/platform'
 
 export type Theme = 'system' | 'light' | 'dark'
@@ -96,6 +96,12 @@ export const useTheme = create<ThemeState>((set) => ({
       // less than the window that refused to change colour.
     }
     set({ theme })
+    // Storage is shared between the windows and nothing watches it: the DOM's
+    // own `storage` event does not reliably cross webviews on every platform
+    // this ships to. So the windows are told. This is the one choice that is on
+    // screen in all of them at once, and one of them still drawing the old
+    // theme reads as a window that has stopped working.
+    void announce('theme')
   },
 }))
 
@@ -112,4 +118,17 @@ apply(useTheme.getState().theme)
 // The stylesheet notices by itself; the compositor does not.
 prefersDark?.addEventListener('change', () => {
   if (useTheme.getState().theme === 'system') apply('system')
+})
+
+// Somebody chose a theme, possibly in this window. Read the choice back out of
+// storage rather than taking it from the signal, and stop where it is already
+// the one on screen — which is what this window's copy of its own announcement
+// comes to, and what a second window that was already following makes of a
+// switch to `system`.
+void onSharedChange((subject) => {
+  if (subject !== 'theme') return
+  const theme = remembered()
+  if (theme === useTheme.getState().theme) return
+  apply(theme)
+  useTheme.setState({ theme })
 })

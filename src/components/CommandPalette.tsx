@@ -8,6 +8,7 @@ import {
   type MouseEvent,
 } from 'react'
 import {
+  AppWindow,
   Check,
   CornerDownLeft,
   History,
@@ -30,8 +31,9 @@ import { SETTINGS, SETTINGS_KEYS, VIEWS, type View } from '@/components/Workbenc
 import { leaf, when } from '@/lib/format'
 import { fuzzy, segments } from '@/lib/fuzzy'
 import { t, type MessageKey } from '@/lib/i18n'
+import * as ipc from '@/lib/ipc'
 import { pressedBackdrop } from '@/lib/modal'
-import { ACCELERATOR } from '@/lib/platform'
+import { ACCELERATOR, SHIFT } from '@/lib/platform'
 import { useHarness } from '@/state/harness'
 import { usePalette } from '@/state/palette'
 import { usePlugins } from '@/state/plugins'
@@ -57,6 +59,9 @@ const RECENT = 6
  * pane is where an exhaustive search belongs, and it quotes the matching line.
  */
 const LIMIT = 40
+
+/** What this prints for the new-window key, on either platform. */
+const NEW_WINDOW_KEYS = `${ACCELERATOR}${SHIFT}N`
 
 const THEMES: { id: Theme; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'system', icon: SunMoon, label: 'theme.system' },
@@ -184,6 +189,19 @@ function Palette({
       label: t(SETTINGS.label),
       hint: SETTINGS_KEYS,
       run: close(() => onView(SETTINGS.id)),
+    })
+
+    // The one command here that does not act on this window. It is closed first
+    // all the same: the palette belongs to the window it was opened in, and
+    // leaving it standing behind a window that has just taken the focus is a
+    // modal the user has to come back and dismiss.
+    all.push({
+      id: 'window:new',
+      group: 'palette.group.window',
+      icon: AppWindow,
+      label: t('window.new'),
+      hint: NEW_WINDOW_KEYS,
+      run: close(() => void ipc.windowOpen()),
     })
 
     // Offered by what the supervisor last said, not by what a click implied: a

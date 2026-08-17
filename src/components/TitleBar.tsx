@@ -5,6 +5,7 @@ import { BrandMark } from '@/components/BrandMark'
 import { ProfileSwitch } from '@/components/ProfileSwitch'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { t } from '@/lib/i18n'
+import * as ipc from '@/lib/ipc'
 import { drawsWindowControls, isMac } from '@/lib/platform'
 import { contextMenu, SEPARATOR } from '@/state/menu'
 
@@ -40,6 +41,17 @@ export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }
   const appWindow = getCurrentWindow()
   const [maximized, setMaximized] = useState(false)
 
+  // Which window this is, or nothing at all in the first one — read off the
+  // label rather than asked for over IPC, because it is fixed for the life of
+  // the window and a title bar that numbered itself a frame late would be seen
+  // doing it. See `label` in `src-tauri/src/window.rs`, which makes the label.
+  const ordinal = /^work-(\d+)$/.exec(appWindow.label)?.[1]
+
+  // Only the first window is put away instead of closed, so only the first one
+  // may say so — see `hide_instead_of_quitting` in `src-tauri/src/tray.rs`,
+  // which is attached to that window alone.
+  const closeLabel = serving && !ordinal ? t('window.hide') : t('window.close')
+
   useEffect(() => {
     if (!drawsWindowControls) return
 
@@ -63,13 +75,19 @@ export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }
   // page in a frame". Only where this app draws the chrome: macOS keeps its own
   // title bar, and has no window menu to imitate.
   const windowMenu = contextMenu(() => [
+    // Above the strip's own commands and set apart from them, because it is the
+    // one entry here that makes a window rather than changing this one. The
+    // system's window menu has no equivalent to imitate, and this is the only
+    // place a second window is reachable without knowing it exists.
+    { label: t('window.new'), run: () => void ipc.windowOpen() },
+    SEPARATOR,
     { label: t('window.minimize'), run: () => void appWindow.minimize() },
     {
       label: maximized ? t('window.restore') : t('window.maximize'),
       run: () => void appWindow.toggleMaximize(),
     },
     SEPARATOR,
-    { label: serving ? t('window.hide') : t('window.close'), run: () => void appWindow.close() },
+    { label: closeLabel, run: () => void appWindow.close() },
   ])
 
   return (
@@ -82,6 +100,18 @@ export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }
       <div data-tauri-drag-region className="flex flex-1 items-center gap-2 self-stretch pl-2.5">
         <BrandMark size={15} className="rounded-[4px]" />
         <span className="text-[12px] font-medium text-muted">DSH Studio</span>
+
+        {/* Windows opened for a task look alike, and the number is what makes
+            them referable — the same one the system title carries, so the
+            taskbar and the strip agree about which window this is. */}
+        {ordinal && (
+          <span
+            data-hint={t('window.ordinal', { name: ordinal })}
+            className="grid h-[15px] min-w-[15px] shrink-0 place-items-center rounded-[4px] border border-line px-1 text-[10px] text-faint tabular-nums"
+          >
+            {ordinal}
+          </span>
+        )}
 
         {serving && onTogglePanel && <ViewSwitch panelOpen={panelOpen} onToggle={onTogglePanel} />}
 
@@ -118,11 +148,7 @@ export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }
           {/* While the harness is up the shell hides instead of quitting, so the
               tooltip has to say so — a window that vanishes while a service it
               started stays alive is exactly the surprise worth avoiding. */}
-          <ControlButton
-            label={serving ? t('window.hide') : t('window.close')}
-            danger
-            onClick={() => void appWindow.close()}
-          >
+          <ControlButton label={closeLabel} danger onClick={() => void appWindow.close()}>
             <path d="M1.5 1.5 9.5 9.5M9.5 1.5 1.5 9.5" />
           </ControlButton>
         </div>

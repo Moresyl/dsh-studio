@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "What the shell UI running on the local asset protocol may do.",
-  "windows": ["main"],
+  "windows": ["main", "work-*"],
   "permissions": [
     "core:default",
     "core:window:allow-show",

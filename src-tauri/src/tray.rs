@@ -142,6 +142,11 @@ fn muted(base: &Image<'_>) -> Image<'static> {
 /// The title bar says which of the two it is about to do — see `window.hide` in
 /// `src/lib/i18n.ts`. A window that disappears while a service it started keeps
 /// running is the one surprise worth spending a tooltip on.
+///
+/// The first window only, and that is the difference between the first window
+/// and the rest. The others are opened for one task and closed when it is done;
+/// one that hid instead would have to be hunted back out of the tray just to be
+/// got rid of.
 fn hide_instead_of_quitting<R: Runtime>(app: &AppHandle<R>) {
     let Some(main) = app.get_webview_window(window::MAIN_LABEL) else {
         return;
@@ -232,7 +237,7 @@ fn on_menu<R: Runtime>(app: &AppHandle<R>, event: MenuEvent) {
 }
 
 fn open_window<R: Runtime>(app: &AppHandle<R>) {
-    if let Some(existing) = app.get_webview_window(window::MAIN_LABEL) {
+    if let Some(existing) = window::front(app) {
         window::reveal(&existing);
     }
 }

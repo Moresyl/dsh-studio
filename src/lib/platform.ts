@@ -26,6 +26,14 @@ export const drawsWindowControls = !isMac
  */
 export const ACCELERATOR = isMac ? '⌘' : 'Ctrl+'
 
+/**
+ * And the second modifier, for the few shortcuts that need both.
+ *
+ * Written the same way round: macOS runs its modifiers together as symbols,
+ * everywhere else spells them out and joins them with a plus.
+ */
+export const SHIFT = isMac ? '⇧' : 'Shift+'
+
 /** The backdrop materials `src-tauri/src/material.rs` knows how to ask for. */
 export type Material = 'micaAlt' | 'mica' | 'acrylic' | 'vibrancy'
 

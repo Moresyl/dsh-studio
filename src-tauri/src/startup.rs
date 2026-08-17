@@ -226,7 +226,7 @@ fn release<R: Runtime>(app: &AppHandle<R>) {
 /// another application: whoever wants a look at the harness wants the same
 /// keystroke to give the screen back.
 fn summon<R: Runtime>(app: &AppHandle<R>) {
-    let Some(main) = app.get_webview_window(window::MAIN_LABEL) else {
+    let Some(main) = window::front(app) else {
         return;
     };
 

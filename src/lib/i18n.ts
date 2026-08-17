@@ -80,6 +80,9 @@ const en = {
   // Said on the button rather than discovered afterwards: while the harness is
   // up, closing the window leaves it running under the tray icon.
   'window.hide': 'Close to tray — the harness keeps running',
+  'window.new': 'New window',
+  'window.newHint': 'Another window on the same harness, for a task of its own',
+  'window.ordinal': 'Window {name}',
 
   'nav.console': 'Console',
   'nav.terminal': 'Terminal',
@@ -353,6 +356,7 @@ const en = {
   'palette.empty': 'Nothing here matches that.',
   'palette.emptyHint': 'Try fewer letters, or the name of the thing you want to reach.',
   'palette.group.go': 'Go to',
+  'palette.group.window': 'Window',
   'palette.group.service': 'Service',
   'palette.group.profile': 'Profiles',
   'palette.group.plugins': 'Plugins',
@@ -527,6 +531,9 @@ const zh: Record<MessageKey, string> = {
   'window.restore': '还原',
   'window.close': '关闭',
   'window.hide': '关闭到托盘（Harness 继续运行）',
+  'window.new': '新建窗口',
+  'window.newHint': '在同一个 harness 上再开一个窗口，各跑各的任务',
+  'window.ordinal': '第 {name} 个窗口',
 
   'nav.console': '控制台',
   'nav.terminal': '终端',
@@ -782,6 +789,7 @@ const zh: Record<MessageKey, string> = {
   'palette.empty': '这里没有匹配的项。',
   'palette.emptyHint': '试试少打几个字，或者直接输入你想去的地方的名字。',
   'palette.group.go': '前往',
+  'palette.group.window': '窗口',
   'palette.group.service': '服务',
   'palette.group.profile': '配置',
   'palette.group.plugins': '插件',

@@ -80,6 +80,11 @@ const change = async (
     // been renamed, emptied or deleted.
     set({ roster, comparison: null })
     if (hostedMoved(before, roster)) resubject()
+    // The directory this read is a reading of is the same directory every other
+    // window is reading. Told rather than left to notice: a rename is a name
+    // that no longer exists, and a window still offering it would be offering a
+    // switch that fails.
+    void ipc.announce('profiles')
     return true
   } catch (cause) {
     set({ error: describe(cause) })
@@ -217,3 +222,24 @@ const hostedMoved = (before: Roster | null, after: Roster): boolean => {
 
 /** Tell the plugin panel to read its profile again. */
 const resubject = (): void => void usePlugins.getState().refresh()
+
+/**
+ * Follow what the other windows do to the profiles.
+ *
+ * Subscribed for the lifetime of the window rather than by the manager that
+ * shows the roster, because the chip in the title bar shows it too and that one
+ * is never closed. Both readings are redone, for the reason at the top of this
+ * file: the roster counts what is installed in each profile, so installing a
+ * plugin in another window moves a number here as well.
+ *
+ * The window that made the change hears its own announcement and rereads what
+ * it has just been handed. That is one directory listing per change made by a
+ * person, and it is what keeps this a signal rather than a second copy of the
+ * roster travelling between windows.
+ */
+export const subscribeToProfiles = (): Promise<() => void> =>
+  ipc.onSharedChange((subject) => {
+    if (subject !== 'profiles') return
+    void useProfiles.getState().refresh()
+    resubject()
+  })

@@ -5,7 +5,7 @@
  * change here, because nothing else keeps the two sides honest.
  */
 import { invoke } from '@tauri-apps/api/core'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 
 export interface NodeVersion {
   major: number
@@ -612,6 +612,50 @@ export const sessionSave = (path: string, text: string): Promise<void> =>
  * window CSS cannot reach.
  */
 export const windowMaterial = (dark: boolean): Promise<void> => invoke('window_material', { dark })
+
+/**
+ * Open another window onto the same harness.
+ *
+ * Nothing is duplicated by this: one supervisor, one profile, one shelf of
+ * sessions, and every window a view onto them. What the second window has of its
+ * own is the conversation loaded in it, which is the reason to ask for one.
+ *
+ * Rust picks where it lands and what it is called, because both are answers
+ * about the machine — which display the window that asked is on, and which
+ * numbers are already taken.
+ */
+export const windowOpen = (): Promise<void> => invoke('window_open')
+
+/* -------------------------------------------------------------------------- */
+/* Between windows                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The things that are one thing on the machine and a copy in every window.
+ *
+ * `theme` is a line in storage, `profiles` is a set of directories on disk.
+ * Nothing the supervisor owns belongs here — the harness, remote access and the
+ * shells are already emitted from Rust to every window, and echoing one of them
+ * would be a second source of truth for something that has one.
+ */
+export type Shared = 'theme' | 'profiles'
+
+/** Channel the windows use to poke each other. */
+const SHARED_CHANNEL = 'shell://changed'
+
+/**
+ * Say that a shared thing has changed.
+ *
+ * The signal names a subject and never carries the new value, for the reason
+ * `onRemoteChange` gives: a listener that reads the answer itself cannot apply
+ * a stale one. It also comes back to the window that sent it, which is why
+ * every listener has to be idempotent — being told twice must cost a reread
+ * rather than a wrong screen.
+ */
+export const announce = (subject: Shared): Promise<void> => emit(SHARED_CHANNEL, subject)
+
+export const onSharedChange = (handler: (subject: Shared) => void): Promise<UnlistenFn> =>
+  listen<Shared>(SHARED_CHANNEL, (message) => handler(message.payload))
 
 /* -------------------------------------------------------------------------- */
 /* Desktop service interface                                                  */

@@ -42,7 +42,9 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             // A second launch surfaces the running app instead of starting
             // another harness — two would fight over the same session store.
-            if let Some(existing) = app.get_webview_window(window::MAIN_LABEL) {
+            // Opening another window is a thing this app does; it is just not
+            // something starting the binary twice should be taken to mean.
+            if let Some(existing) = window::front(app) {
                 window::reveal(&existing);
             }
         }))
@@ -134,6 +136,7 @@ pub fn run() {
             startup::startup_autostart,
             startup::startup_shortcut,
             material::window_material,
+            window::window_open,
             desktop::commands::desktop_offer,
             desktop::commands::desktop_notify,
             desktop::commands::desktop_badge,

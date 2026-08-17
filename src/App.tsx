@@ -11,11 +11,13 @@ import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
 import { Workbench, SETTINGS, VIEWS, type View } from '@/components/Workbench'
+import * as ipc from '@/lib/ipc'
 import { standby } from '@/lib/platform'
 import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
 import { usePalette } from '@/state/palette'
+import { subscribeToProfiles } from '@/state/profiles'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { subscribeToTerminals } from '@/state/terminals'
 import { watchForUpdates } from '@/state/update'
@@ -121,19 +123,31 @@ export default function App() {
     }
   }, [])
 
+  // Windows are views onto one set of profiles, so a profile made, renamed or
+  // switched to in another window is a change to this one. From the window and
+  // not from the manager, because the chip in the title bar reads the same
+  // roster and is never closed.
+  useEffect(() => {
+    const pending = subscribeToProfiles()
+    return () => {
+      void pending.then((unlisten) => unlisten())
+    }
+  }, [])
+
   // Also here rather than in the status bar that shows the result: the check
   // should keep its schedule while the user is reading a pane, and a component
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
 
-  // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, and Ctrl+comma for settings.
-  // Every application with a fixed set of views has the numbers, and a user who
-  // tries one and gets nothing has just learned that this is not one of those
-  // applications. The palette is the other half of that: the keystroke for when
-  // someone knows the name of what they want and not where it lives.
+  // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, Ctrl+comma for settings, and
+  // Ctrl+Shift+N for another window. Every application with a fixed set of views
+  // has the numbers, and a user who tries one and gets nothing has just learned
+  // that this is not one of those applications. The palette is the other half of
+  // that: the keystroke for when someone knows the name of what they want and
+  // not where it lives.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return
       // A modal is a question, and the rest of the window is not answering it.
       // Nor is the guide, which is the whole window until it is done with.
       if (managing || stage === 'guiding' || useDialog.getState().pending) return
@@ -147,6 +161,17 @@ export default function App() {
       // The palette is a modal of the same kind, and the numbers behind it would
       // switch a pane nobody can see.
       if (usePalette.getState().open) return
+
+      // The one shortcut here that carries Shift, and the reason nothing above
+      // it may reach a shifted key: Ctrl+Shift+1 is not Ctrl+1.
+      if (event.shiftKey) {
+        if (event.key !== 'n' && event.key !== 'N') return
+        event.preventDefault()
+        // Held down, a key repeats — and this one asks for a whole webview every
+        // time it does. The first press is the one somebody meant.
+        if (!event.repeat) void ipc.windowOpen()
+        return
+      }
 
       // The keystroke every desktop application answers with its preferences,
       // and the reason settings is not the seventh number.

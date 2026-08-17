@@ -41,6 +41,21 @@ interface PluginStore {
 /** Only the newest search may write results; older answers are dropped. */
 let generation = 0
 
+type Write = (partial: Partial<PluginStore>) => void
+
+/**
+ * A change to the hosted profile landed.
+ *
+ * All three changes end the same way — the reply is the profile as it now is,
+ * and the profile is a directory the other windows are reading too. The roster
+ * behind the title bar chip counts what is installed in each one, so this is
+ * not only for another window with this panel open.
+ */
+const landed = (set: Write, profile: PluginState): void => {
+  set({ profile })
+  void ipc.announce('profiles')
+}
+
 export const usePlugins = create<PluginStore>((set, get) => ({
   profile: null,
   results: [],
@@ -95,7 +110,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working) return
     set({ working: spec, error: null })
     try {
-      set({ profile: await ipc.pluginAdd(spec) })
+      landed(set, await ipc.pluginAdd(spec))
     } catch (cause) {
       set({ error: describe(cause) })
     } finally {
@@ -107,7 +122,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working) return
     set({ working: name, error: null })
     try {
-      set({ profile: await ipc.pluginRemove(name) })
+      landed(set, await ipc.pluginRemove(name))
     } catch (cause) {
       set({ error: describe(cause) })
     } finally {
@@ -122,7 +137,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working) return
     set({ working: name, error: null })
     try {
-      set({ profile: await ipc.pluginSwitch(name, enabled) })
+      landed(set, await ipc.pluginSwitch(name, enabled))
     } catch (cause) {
       set({ error: describe(cause) })
     } finally {

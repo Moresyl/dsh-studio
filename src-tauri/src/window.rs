@@ -4,7 +4,18 @@
 //! platform differences below can be expressed as code. They are not cosmetic
 //! preferences: each platform has one arrangement that reads as native, and
 //! picking the wrong one is what makes a cross-platform app feel ported.
+//!
+//! There can be more than one. A second window is not a second application —
+//! the supervisor, the profile stack and the shelf of sessions all stay single,
+//! and every window is a view onto the same ones. What a window owns is what
+//! somebody is doing in it, which is exactly what a person running two tasks
+//! through one agent needs a second of.
+//!
+//! Only the first is what the rest of this codebase means by "the window": it is
+//! the one that is put away rather than closed while the harness runs, and the
+//! only one whose size and position are written down between runs.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -12,16 +23,40 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    Manager, PhysicalPosition, PhysicalSize, Runtime, Theme, WebviewUrl, WebviewWindow,
+    AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, Theme, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
 
+use crate::error::{Error, Result};
 use crate::material::{self, Material};
 use crate::paths;
 use crate::startup;
 
 /// Label every other module uses to find the window.
 pub const MAIN_LABEL: &str = "main";
+
+/// What the windows after the first are called: `work-2`, `work-3`, and so on.
+///
+/// Numbered from two because the number is also what the window calls itself in
+/// its own title bar, and the first window is the first window.
+///
+/// The prefix is load-bearing outside this file: `capabilities/default.json`
+/// grants its permissions to `main` and `work-*`, and a window whose label
+/// matched neither would be handed a webview that is not allowed to close it.
+const WORK_PREFIX: &str = "work-";
+
+/// How many windows one harness is worth being spread across.
+///
+/// Not a licence: the twelfth window costs exactly what the second did. The
+/// number is here because a held-down shortcut opens windows faster than a
+/// person can close them, and every one of them is a whole webview.
+const CEILING: usize = 12;
+
+/// How far a new window sits from the one it was opened from, in logical pixels.
+const CASCADE: f64 = 30.0;
+
+/// What every window is called before its number is added.
+const TITLE: &str = "DSH Studio";
 
 const DEFAULT_WIDTH: f64 = 1360.0;
 const DEFAULT_HEIGHT: f64 = 880.0;
@@ -55,11 +90,111 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
     // is one nobody is watching.
     let standby = startup::standby();
 
-    let builder = WebviewWindowBuilder::new(manager, MAIN_LABEL, WebviewUrl::default())
-        .title("DSH Studio")
+    let window = shell(manager, MAIN_LABEL.to_string(), material, standby)
+        .title(TITLE)
         .inner_size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
-        .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .center()
+        .build()?;
+
+    dress(&window, material);
+
+    // While it is still hidden, so the window is only ever seen where the user
+    // left it — never centred first and then jumping.
+    restore(&window);
+    remember(&window);
+
+    // Standing by is the one launch where nothing appearing is the correct
+    // outcome, so there is no deadline to rescue: the tray is already there, and
+    // it is what the user will reach for.
+    if !standby {
+        rescue(&window);
+    }
+
+    Ok(window)
+}
+
+/// Open another window onto the same harness.
+///
+/// Everything a window points at is shared — one supervisor, one profile, one
+/// shelf of sessions — so nothing here is a second copy of anything. What it
+/// creates is a second place to work, and the harness loaded into it is a fresh
+/// page: two windows are two conversations, which is the entire reason to want
+/// the second one.
+///
+/// Deliberately not the first window twice over. Where it lands is not written
+/// down, because `window.json` records where the user keeps *their* window and a
+/// window opened for one task should not move it. And it closes when it is
+/// asked to rather than hiding, because the tray already has one window to put
+/// the application away into and does not need three.
+pub fn open<R: Runtime>(
+    app: &AppHandle<R>,
+    from: Option<&WebviewWindow<R>>,
+) -> Result<WebviewWindow<R>> {
+    let ordinal = vacancy(&app.webview_windows()).ok_or_else(|| {
+        Error::Window(format!(
+            "{CEILING} windows are open already, which is as many as this app will run at once"
+        ))
+    })?;
+
+    let material = material::supported();
+    let (width, height) = size_of(from);
+
+    // Never standing by: a window nobody asked for is the login item's, and this
+    // one was asked for by somebody who just pressed a key.
+    let window = shell(app, label(ordinal), material, false)
+        .title(format!("{TITLE} — {ordinal}"))
+        .inner_size(width, height)
+        .center()
+        .build()
+        .map_err(|cause| Error::Window(format!("the window could not be opened: {cause}")))?;
+
+    dress(&window, material);
+    if let Some(from) = from {
+        cascade(&window, from);
+    }
+    rescue(&window);
+
+    Ok(window)
+}
+
+/// Open another window, from whichever one asked for it.
+///
+/// Async because it has to be: on Windows a webview built from inside a
+/// synchronous command deadlocks against the event loop that is waiting for that
+/// command to return — see the note on `WebviewWindowBuilder::new`.
+#[tauri::command]
+pub async fn window_open(app: AppHandle, window: WebviewWindow) -> Result<()> {
+    open(&app, Some(&window)).map(drop)
+}
+
+/// The lowest number no window is using, or nothing once the ceiling is reached.
+///
+/// The lowest rather than the next one, so closing the third window and opening
+/// another gives the third window back instead of counting on forever. The
+/// number is on screen, and a user who has two windows open should not be
+/// looking at one labelled nine.
+fn vacancy<T>(taken: &HashMap<String, T>) -> Option<usize> {
+    (2..=CEILING).find(|ordinal| !taken.contains_key(&label(*ordinal)))
+}
+
+fn label(ordinal: usize) -> String {
+    format!("{WORK_PREFIX}{ordinal}")
+}
+
+/// The builder every window in this application starts from.
+///
+/// One function rather than a copy per window, because this chrome is what makes
+/// the app an application instead of a browser: a second window that kept the
+/// system title bar, or that missed the script the harness frame is spoken to
+/// through, would be a different program wearing the same icon.
+fn shell<'a, R: Runtime, M: Manager<R>>(
+    manager: &'a M,
+    label: String,
+    material: Option<Material>,
+    standby: bool,
+) -> WebviewWindowBuilder<'a, R, M> {
+    let builder = WebviewWindowBuilder::new(manager, label, WebviewUrl::default())
+        .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .transparent(material.is_some())
         .initialization_script(announce(material, standby))
         // Every frame and not just the top one: the shell's own document is the
@@ -80,41 +215,92 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
     #[cfg(not(target_os = "macos"))]
     let builder = builder.decorations(false);
 
-    let window = builder.build()?;
+    builder
+}
 
-    // After the window exists rather than on the builder, because the material
-    // carries the frame's light-or-dark with it and the system's answer to that
-    // is only readable from a window. The frontend replaces this as soon as it
-    // has read what was chosen last time; the window is still hidden here, so
-    // there is no frame in which either one is seen being wrong.
+/// Put the backdrop behind a window that has just been built.
+///
+/// After the window exists rather than on the builder, because the material
+/// carries the frame's light-or-dark with it and the system's answer to that is
+/// only readable from a window. The frontend replaces this as soon as it has
+/// read what was chosen last time; the window is still hidden here, so there is
+/// no frame in which either one is seen being wrong.
+fn dress<R: Runtime>(window: &WebviewWindow<R>, material: Option<Material>) {
     if let Some(material) = material {
         let dark = !matches!(window.theme(), Ok(Theme::Light));
-        material::apply(&window, material, dark);
+        material::apply(window, material, dark);
+    }
+}
+
+/// Show the window anyway, if the frontend never gets round to it.
+///
+/// Hiding a window until the frontend paints is only a safe trade if a frontend
+/// that never paints still leaves something on screen to report the problem in.
+/// Otherwise the app would simply appear not to launch.
+fn rescue<R: Runtime>(window: &WebviewWindow<R>) {
+    let fallback = window.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(REVEAL_DEADLINE).await;
+        if let Ok(false) = fallback.is_visible() {
+            let _ = fallback.show();
+        }
+    });
+}
+
+/// How big a new window opens: the size of the one it was opened from.
+///
+/// Somebody who has sized a window to their screen has already answered this
+/// question, and answering it again with a default would make the second window
+/// read as belonging to a different application. A maximized window is the
+/// exception — its size is the display's, and a new window that filled the
+/// display would bury the one that asked for it.
+fn size_of<R: Runtime>(from: Option<&WebviewWindow<R>>) -> (f64, f64) {
+    let default = (DEFAULT_WIDTH, DEFAULT_HEIGHT);
+    let Some(from) = from else {
+        return default;
+    };
+
+    if from.is_maximized().unwrap_or(false) {
+        return default;
     }
 
-    // While it is still hidden, so the window is only ever seen where the user
-    // left it — never centred first and then jumping.
-    restore(&window);
-    remember(&window);
+    let (Ok(size), Ok(scale)) = (from.inner_size(), from.scale_factor()) else {
+        return default;
+    };
+    let logical = size.to_logical::<f64>(scale);
 
-    // Hiding the window until the frontend paints is only a safe trade if a
-    // frontend that never paints still leaves something on screen to report the
-    // problem in. Otherwise the app would simply appear not to launch.
-    //
-    // Standing by is the one launch where nothing appearing is the correct
-    // outcome, so there is no deadline to rescue: the tray is already there, and
-    // it is what the user will reach for.
-    if !standby {
-        let fallback = window.clone();
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(REVEAL_DEADLINE).await;
-            if let Ok(false) = fallback.is_visible() {
-                let _ = fallback.show();
-            }
-        });
+    (logical.width, logical.height)
+}
+
+/// Put a new window down beside the one it was opened from.
+///
+/// Cascading rather than centring: a centred second window lands exactly on top
+/// of the first, and two windows sharing one rectangle look like one window that
+/// swallowed the work in the other.
+fn cascade<R: Runtime>(window: &WebviewWindow<R>, from: &WebviewWindow<R>) {
+    let (Ok(origin), Ok(size), Ok(scale)) = (
+        from.outer_position(),
+        window.outer_size(),
+        from.scale_factor(),
+    ) else {
+        return;
+    };
+
+    let step = (CASCADE * scale) as i32;
+    let placement = Placement {
+        x: origin.x + step,
+        y: origin.y + step,
+        width: size.width,
+        height: size.height,
+        maximized: false,
+    };
+
+    // Off the end of the display it was cascading towards. The centred position
+    // the window already has is the safe answer, and it is the same one
+    // `restore` falls back to for the same reason.
+    if on_screen(window, &placement) {
+        let _ = window.set_position(PhysicalPosition::new(placement.x, placement.y));
     }
-
-    Ok(window)
 }
 
 /// Tell the frontend what kind of window it is in, before it paints.
@@ -137,6 +323,18 @@ pub fn reveal<R: tauri::Runtime>(window: &WebviewWindow<R>) {
     let _ = window.show();
     let _ = window.unminimize();
     let _ = window.set_focus();
+}
+
+/// The window a request from outside the application should land on.
+///
+/// The first one while it is still there: the tray, a second launch and a
+/// `dsh://` link all mean "bring the application back", and that is the window
+/// the application is built around. But it can be closed while another window
+/// keeps the process alive, and then any window is a better answer than none —
+/// the alternative is a tray icon whose Open does nothing at all.
+pub fn front<R: Runtime>(app: &AppHandle<R>) -> Option<WebviewWindow<R>> {
+    app.get_webview_window(MAIN_LABEL)
+        .or_else(|| app.webview_windows().into_values().next())
 }
 
 /// Where the window was and how big, in physical pixels.
@@ -297,5 +495,48 @@ fn write_placement(placement: &Placement) {
     }
     if let Ok(raw) = serde_json::to_vec(placement) {
         let _ = std::fs::write(path, raw);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Labels of windows that are open, as `webview_windows` reports them.
+    fn open(labels: &[&str]) -> HashMap<String, ()> {
+        labels
+            .iter()
+            .map(|label| ((*label).to_string(), ()))
+            .collect()
+    }
+
+    /// Two windows cannot share a label — the second build fails — so the number
+    /// the first window does not use is where the numbered run has to start.
+    #[test]
+    fn no_numbered_window_can_be_called_the_main_one() {
+        assert!((2..=CEILING).all(|ordinal| label(ordinal) != MAIN_LABEL));
+        assert_eq!(vacancy(&open(&[MAIN_LABEL])), Some(2));
+    }
+
+    /// The gap gets filled before the end is extended. Somebody with two windows
+    /// open should not be looking at one that calls itself the ninth.
+    #[test]
+    fn a_new_window_takes_the_lowest_free_number() {
+        assert_eq!(vacancy(&open(&[MAIN_LABEL, "work-2"])), Some(3));
+        assert_eq!(vacancy(&open(&[MAIN_LABEL, "work-2", "work-3"])), Some(4));
+        // Window three was closed; the next one is three again, not five.
+        assert_eq!(vacancy(&open(&[MAIN_LABEL, "work-2", "work-4"])), Some(3));
+    }
+
+    /// A held-down shortcut asks for windows faster than anyone can close them,
+    /// and every one of them is a whole webview with the harness loaded in it.
+    #[test]
+    fn the_ceiling_is_a_ceiling() {
+        let mut labels = vec![MAIN_LABEL.to_string()];
+        labels.extend((2..=CEILING).map(label));
+        let full: HashMap<String, ()> = labels.into_iter().map(|label| (label, ())).collect();
+
+        assert_eq!(full.len(), CEILING);
+        assert_eq!(vacancy(&full), None);
     }
 }

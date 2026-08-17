@@ -160,7 +160,10 @@ pub fn notify<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) -> Result
 pub fn mark<R: Runtime>(app: &AppHandle<R>, count: u32) {
     crate::tray::badge(app, count);
 
-    let Some(main) = app.get_webview_window(window::MAIN_LABEL) else {
+    // One taskbar button carries the mark, even where there are several windows:
+    // the count is the harness's and not any one window's, and stamping it on
+    // every button would read as that many things waiting rather than one.
+    let Some(main) = window::front(app) else {
         return;
     };
 
@@ -207,7 +210,7 @@ pub fn wire(app: &AppHandle) {
 
 /// A link that arrived while the app is up: show the window and pass it on.
 fn arrive(app: &AppHandle, link: Link) {
-    if let Some(main) = app.get_webview_window(window::MAIN_LABEL) {
+    if let Some(main) = window::front(app) {
         // Whatever the link asks for, it was asked for by somebody who is at this
         // machine right now. Answering it behind a hidden window would look like
         // the link did nothing.

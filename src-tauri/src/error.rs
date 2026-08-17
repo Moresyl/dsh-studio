@@ -83,6 +83,9 @@ pub enum Error {
 
     #[error("{0}")]
     Startup(String),
+
+    #[error("{0}")]
+    Window(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
