@@ -9,6 +9,7 @@ mod material;
 mod node;
 mod paths;
 mod plugins;
+mod presets;
 mod remote;
 mod tray;
 mod window;
@@ -79,6 +80,8 @@ pub fn run() {
             plugins::commands::plugin_add,
             plugins::commands::plugin_remove,
             plugins::commands::plugin_switch,
+            presets::preset_roster,
+            presets::preset_choose,
             material::window_material,
             about::app_about,
         ])

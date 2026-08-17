@@ -65,6 +65,9 @@ pub enum Error {
 
     #[error("a plugin change is already running")]
     PluginBusy,
+
+    #[error("{0}")]
+    Preset(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

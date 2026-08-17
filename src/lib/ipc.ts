@@ -263,6 +263,44 @@ export const pluginSwitch = (name: string, enabled: boolean): Promise<PluginStat
   invoke('plugin_switch', { name, enabled })
 
 /* -------------------------------------------------------------------------- */
+/* Agent presets                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One of the agents the harness can start a session as.
+ *
+ * `name` and `description` are the harness's own words, in whatever language it
+ * shipped them in — not translated here, because a preset the user wrote gets
+ * shown the same way and inventing text for someone else's preset would be worse
+ * than showing theirs. Both are absent when the preset carries no readable
+ * metadata, and then the id is what there is to show.
+ */
+export interface AgentPreset {
+  id: string
+  name: string | null
+  description: string | null
+  /** False for one the user authored in their own preset directory. */
+  shipped: boolean
+}
+
+export interface PresetRoster {
+  /** Already in the order the harness lists them in. */
+  presets: AgentPreset[]
+  /** What new sessions start as, which may name a preset that is no longer there. */
+  default: string | null
+}
+
+export const presetRoster = (): Promise<PresetRoster> => invoke('preset_roster')
+
+/**
+ * Choose what new sessions start as.
+ *
+ * Safe while the harness is running: it re-reads the choice for every session it
+ * creates, so this changes the next one and leaves open ones alone.
+ */
+export const presetChoose = (id: string): Promise<PresetRoster> => invoke('preset_choose', { id })
+
+/* -------------------------------------------------------------------------- */
 /* Window                                                                     */
 /* -------------------------------------------------------------------------- */
 

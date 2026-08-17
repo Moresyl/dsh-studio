@@ -4,12 +4,14 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { ContextMenu } from '@/components/ContextMenu'
 import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
+import { Onboarding } from '@/components/Onboarding'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
 import { Workbench, VIEWS, type View } from '@/components/Workbench'
 import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
+import { useOnboarding } from '@/state/onboarding'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { watchForUpdates } from '@/state/update'
 
@@ -19,12 +21,17 @@ import { watchForUpdates } from '@/state/update'
  * The two strips never go away, whatever is in the middle. That is the whole
  * difference between an application window and a page — the frame is a constant
  * the user can rely on, so the harness can take the content area without taking
- * the controls or the readout with it.
+ * the controls or the readout with it. The first-run guide is inside that rule
+ * too: it replaces the content area and nothing else, so setting the application
+ * up happens in the application rather than in front of it.
  */
 export default function App() {
   const status = useHarness((state) => state.status)
   const environment = useHarness((state) => state.environment)
+  const inspect = useHarness((state) => state.inspect)
   const refreshRemote = useRemote((state) => state.refresh)
+  const stage = useOnboarding((state) => state.stage)
+  const consider = useOnboarding((state) => state.consider)
   const origin = status.phase === 'ready' ? status.origin : null
 
   // Which harness the user asked to look away from, rather than a bare boolean.
@@ -44,15 +51,30 @@ export default function App() {
     [origin],
   )
 
-  // The window was created hidden. Reveal it once there is something in it.
+  // The one look at the machine, owned here rather than by a pane, because two
+  // things now depend on the answer: the console shows it, and the guide exists
+  // or does not because of it. Settled on both paths — `inspect` is allowed to
+  // reject, and a rejected probe still has to let the window open.
   useEffect(() => {
+    const settle = () => consider(useHarness.getState().environment)
+    void inspect().then(settle, settle)
+  }, [inspect, consider])
+
+  // The window was created hidden. Reveal it once there is something in it —
+  // which now means after the probe has settled, so the first painted frame is
+  // either the guide or the workspace and never one replaced by the other. Rust
+  // shows the window on a deadline regardless, so a probe that never returns
+  // costs a few seconds rather than a window that never appears.
+  useEffect(() => {
+    if (stage === 'unknown') return
+
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
         void getCurrentWindow().show()
       })
     })
     return () => cancelAnimationFrame(frame)
-  }, [])
+  }, [stage])
 
   useEffect(() => {
     const pending = subscribeToHarness()
@@ -110,13 +132,21 @@ export default function App() {
         }
       />
 
-      <div className="relative flex min-h-0 flex-1">
-        {origin && <HarnessFrame origin={origin} hidden={showPanel} />}
-        {/* Hidden rather than unmounted, for the same reason the frame is: a
-            search someone typed and a pairing code on screen must survive a
-            glance at the harness. */}
-        <Workbench hidden={!showPanel} view={view} onSelect={show} />
-      </div>
+      {stage === 'guiding' ? (
+        // Unmounted, not hidden. There is nothing behind the guide yet worth
+        // preserving — no harness running, no search typed — and mounting the
+        // workbench underneath it would start the panes off answering questions
+        // about a machine the user is still setting up.
+        <Onboarding />
+      ) : (
+        <div className="relative flex min-h-0 flex-1">
+          {origin && <HarnessFrame origin={origin} hidden={showPanel} />}
+          {/* Hidden rather than unmounted, for the same reason the frame is: a
+              search someone typed and a pairing code on screen must survive a
+              glance at the harness. */}
+          <Workbench hidden={!showPanel} view={view} onSelect={show} />
+        </div>
+      )}
 
       <StatusBar status={status} environment={environment} onOpenUpdate={() => show('about')} />
 

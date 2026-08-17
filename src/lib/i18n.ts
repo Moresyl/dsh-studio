@@ -10,6 +10,8 @@ const en = {
   'section.environment': 'Environment',
   'section.service': 'Service',
   'section.runtimes': 'Node runtimes',
+  'section.agent': 'Agent',
+  'section.advanced': 'Advanced',
 
   'status.stopped': 'Not running',
   'status.starting': 'Starting the harness',
@@ -215,6 +217,35 @@ const en = {
   'theme.light': 'Light',
   'theme.dark': 'Dark',
 
+  'preset.current': 'In use',
+  'preset.yours': 'Yours',
+  'preset.failed': 'That agent could not be saved: {reason}',
+
+  'guide.welcome': 'Welcome',
+  'guide.lead': 'Three steps, and this window is a workspace.',
+  'guide.skip': 'Skip setup',
+  'guide.back': 'Back',
+  'guide.next': 'Next',
+  'guide.step.runtime': 'Runtime',
+  'guide.step.agent': 'Agent',
+  'guide.step.session': 'First session',
+  'guide.runtime.title': 'What it needs to run',
+  'guide.runtime.body':
+    'The harness is a Node program, so it needs a Node runtime and its own packages. Whatever is missing installs from here — there is no second installer to get through.',
+  'guide.runtime.blocked': 'Install what is missing above to carry on.',
+  'guide.agent.title': 'How the agent should work',
+  'guide.agent.body':
+    'Every new session starts as one of these. It can be changed whenever you like, and changing it leaves sessions that are already open alone.',
+  'guide.agent.models':
+    'Which model each of them talks to is the harness’s own setting, on its Models page.',
+  'guide.agent.empty': 'These ship with the harness, so they appear once it is installed.',
+  'guide.session.title': 'Open the first session',
+  'guide.session.body':
+    'Starting the harness hands the window over to it. Nothing from this guide goes away — the checks are on the console, and the agent can be changed there too.',
+  'guide.session.begin': 'Start and open',
+  'guide.session.open': 'Open the harness',
+  'guide.session.workspace': 'Working directory',
+
   'dialog.cancel': 'Cancel',
 } as const
 
@@ -224,6 +255,8 @@ const zh: Record<MessageKey, string> = {
   'section.environment': '运行环境',
   'section.service': '服务',
   'section.runtimes': 'Node 运行时',
+  'section.agent': '智能体',
+  'section.advanced': '进阶',
 
   'status.stopped': '未运行',
   'status.starting': '正在启动',
@@ -418,6 +451,34 @@ const zh: Record<MessageKey, string> = {
   'theme.system': '跟随系统',
   'theme.light': '浅色',
   'theme.dark': '深色',
+
+  'preset.current': '当前',
+  'preset.yours': '自建',
+  'preset.failed': '这个智能体没能保存下来：{reason}',
+
+  'guide.welcome': '欢迎',
+  'guide.lead': '三步之后，这个窗口就是工作台。',
+  'guide.skip': '跳过引导',
+  'guide.back': '上一步',
+  'guide.next': '下一步',
+  'guide.step.runtime': '运行环境',
+  'guide.step.agent': '智能体',
+  'guide.step.session': '第一个会话',
+  'guide.runtime.title': '运行需要的东西',
+  'guide.runtime.body':
+    'Harness 是一个 Node 程序，需要 Node 运行时和它自己的依赖包。缺什么都在这里装好，不用再去过一遍别的安装器。',
+  'guide.runtime.blocked': '把上面缺的装好才能继续。',
+  'guide.agent.title': '智能体怎么干活',
+  'guide.agent.body':
+    '每个新会话都以其中一种方式启动。随时可以改，改动只影响之后新建的会话，已经打开的不受影响。',
+  'guide.agent.models': '它们各自连哪个模型，是 Harness 自己的设置，在它的 Models 页面里。',
+  'guide.agent.empty': '这些由 Harness 自带，装好之后就会出现在这里。',
+  'guide.session.title': '打开第一个会话',
+  'guide.session.body':
+    '启动 Harness 之后，窗口就交给它。引导里的东西一样都没少——检测项在控制台上，智能体也能在那里改。',
+  'guide.session.begin': '启动并打开',
+  'guide.session.open': '打开 Harness',
+  'guide.session.workspace': '工作目录',
 
   'dialog.cancel': '取消',
 }

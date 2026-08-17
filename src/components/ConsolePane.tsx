@@ -1,31 +1,16 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import {
-  Check,
-  Copy,
-  Download,
-  ExternalLink,
-  Loader2,
-  RotateCw,
-  Square,
-  Terminal,
-} from 'lucide-react'
+import { useState, type ReactNode } from 'react'
+import { ChevronRight, Copy, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
 import { Ambient } from '@/components/Ambient'
 import { BrandMark } from '@/components/BrandMark'
 import { Button } from '@/components/Button'
-import { CheckList, type CheckItem } from '@/components/CheckList'
+import { EnvironmentChecks, EnvironmentProgress } from '@/components/Environment'
 import { LogConsole } from '@/components/LogConsole'
+import { PresetPicker } from '@/components/PresetPicker'
 import { StatusDot } from '@/components/StatusDot'
-import { megabytes } from '@/lib/format'
 import { t } from '@/lib/i18n'
-import {
-  formatVersion,
-  isAtLeast,
-  type Environment,
-  type NodeInstallation,
-  type NodeProgress,
-} from '@/lib/ipc'
+import { formatVersion, isAtLeast, type NodeInstallation, type NodeVersion } from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
 import { useHarness } from '@/state/harness'
 import { contextMenu } from '@/state/menu'
@@ -40,12 +25,14 @@ import { contextMenu } from '@/state/menu'
  * the other — and it is the reason the window looks occupied at 1360px instead
  * of holding a small card in the middle of a lot of nothing.
  *
- * Inside the rail the sections run static-first — environment, then the
- * runtimes it chose between, then the service once there is one — so that a
- * section appearing pushes nothing that was already being read. The action sits
- * on the bottom edge whatever is above it, which is where a pane's primary
- * button belongs and what turns the leftover height into margin instead of a
- * hole.
+ * Inside the rail the sections run static-first — what the machine has, then
+ * what it will run as — so that a section appearing pushes nothing that was
+ * already being read. Everything that is a diagnostic rather than a decision is
+ * behind one fold, closed until it is asked for: the runtimes this chose between
+ * and the address it ended up on are worth having, and neither is worth the room
+ * it takes on a rail somebody is reading for the first time. The action sits on
+ * the bottom edge whatever is above it, which is where a pane's primary button
+ * belongs and what turns the leftover height into margin instead of a hole.
  */
 export function ConsolePane() {
   const {
@@ -54,26 +41,14 @@ export function ConsolePane() {
     lines,
     busy,
     installing,
-    installProgress,
     provisioningNode,
-    nodeProgress,
     error,
     inspect,
     start,
     stop,
-    install,
-    provisionNode,
     clear,
   } = useHarness()
 
-  useEffect(() => {
-    void inspect()
-  }, [inspect])
-
-  const checks = useMemo(
-    () => buildChecks({ environment, installing, install, provisioningNode, provisionNode }),
-    [environment, installing, install, provisioningNode, provisionNode],
-  )
   const runnable = environment !== null && environment.node !== null && environment.harnessInstalled
   const working = installing || provisioningNode
   const starting = busy || status.phase === 'starting' || status.phase === 'restarting'
@@ -113,31 +88,41 @@ export function ConsolePane() {
               </Button>
             }
           >
-            <CheckList items={checks} />
+            <EnvironmentChecks />
           </Section>
 
-          {/* Only worth a section when there was a choice to make. With one
-              runtime installed the check row above has already said everything
-              this list would repeat. */}
-          {runtimes.length > 1 && environment && (
-            <Section title={t('section.runtimes')}>
-              <RuntimeList
-                runtimes={runtimes}
-                activePath={environment.node?.path ?? null}
-                minimum={environment.minimumNode}
-              />
-            </Section>
+          {/* A decision and not a diagnostic, so it stays out on the rail: the
+              guide asks it once on a first run, and this is where it is asked
+              again afterwards. */}
+          <Section title={t('section.agent')}>
+            <PresetPicker />
+          </Section>
+
+          {/* Nothing in here is needed to use the app, and both of them only
+              exist some of the time — one runtime installed makes the list a
+              repeat of the check above it, and there is no address until
+              something is serving. A fold that is empty is not offered at all. */}
+          {(runtimes.length > 1 || running) && (
+            <Advanced>
+              {runtimes.length > 1 && environment && (
+                <Section title={t('section.runtimes')}>
+                  <RuntimeList
+                    runtimes={runtimes}
+                    activePath={environment.node?.path ?? null}
+                    minimum={environment.minimumNode}
+                  />
+                </Section>
+              )}
+
+              {status.phase === 'ready' && (
+                <Section title={t('section.service')}>
+                  <ServiceFacts origin={status.origin} pid={status.pid} />
+                </Section>
+              )}
+            </Advanced>
           )}
 
-          {status.phase === 'ready' && (
-            <Section title={t('section.service')}>
-              <ServiceFacts origin={status.origin} pid={status.pid} />
-            </Section>
-          )}
-
-          {provisioningNode && <NodeInstallProgress progress={nodeProgress} />}
-
-          {installing && <InstallProgress packages={installProgress} />}
+          <EnvironmentProgress />
 
           <div className="mt-auto flex flex-col gap-2">
             {running ? (
@@ -202,6 +187,46 @@ function Section({
         {action && <div className="ml-auto">{action}</div>}
       </div>
       {children}
+    </section>
+  )
+}
+
+/**
+ * The fold the diagnostics live behind.
+ *
+ * Closed to begin with, and the point of it is what it replaces: not a second
+ * mode with a switch somewhere else, but one row on the rail that says there is
+ * more and opens it where it stands. Whoever wants the address or the runtime
+ * list is one click from it and can see, before clicking, that it is there.
+ *
+ * Open is remembered for as long as the window is, and no longer. Someone who
+ * opened it to read a port number has not asked for it open every morning.
+ */
+function Advanced({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <section className="flex flex-col gap-2">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="group flex h-5 cursor-pointer items-center gap-1 text-left"
+      >
+        <ChevronRight
+          size={12}
+          strokeWidth={2.6}
+          aria-hidden="true"
+          className={`shrink-0 text-faint transition-transform duration-150 ease-[var(--ease-out-soft)] group-hover:text-muted ${open ? 'rotate-90' : ''}`}
+        />
+        <span className="caption transition-colors group-hover:text-muted">
+          {t('section.advanced')}
+        </span>
+      </button>
+
+      {/* Unmounted rather than hidden. There is nothing in here holding state
+          worth keeping — both children read what they show from the store. */}
+      {open && <div className="flex animate-rise flex-col gap-4">{children}</div>}
     </section>
   )
 }
@@ -291,7 +316,7 @@ function RuntimeList({
 }: {
   runtimes: NodeInstallation[]
   activePath: string | null
-  minimum: Environment['minimumNode']
+  minimum: NodeVersion
 }) {
   return (
     <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
@@ -330,175 +355,4 @@ function RuntimeList({
       })}
     </ul>
   )
-}
-
-/**
- * What an install has done so far.
- *
- * A first install is several minutes of npm, and minutes of an unmoving spinner
- * is where people decide the app is broken. There is no percentage to show —
- * npm does not know a total until it finishes — so this shows the one true
- * thing available, a count that climbs, and says plainly that it will be a
- * while rather than letting someone guess.
- */
-function InstallProgress({ packages }: { packages: number }) {
-  return (
-    <div className="rounded-panel border border-line bg-canvas-deep/50 px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        <Loader2 size={13} className="shrink-0 animate-spin text-brand" />
-        <span className="text-[12.5px] text-text">{t('install.working')}</span>
-        {packages > 0 && (
-          <span className="ml-auto font-mono text-[11.5px] tabular-nums text-muted">
-            {t('install.progress', { count: packages })}
-          </span>
-        )}
-      </div>
-      <p className="mt-1.5 pl-[21px] text-[11.5px] text-faint">{t('install.slow')}</p>
-    </div>
-  )
-}
-
-/**
- * What the Node install is doing, and how much of it is left.
- *
- * A download has a real total, unlike npm, so this is the one place in the pane
- * that earns a bar with a percentage in it. The line above the bar matters just
- * as much: resolving, verifying and unpacking have no bytes to count, and
- * without a name they are indistinguishable from a bar that has stopped.
- *
- * The note underneath is there for every run, not just the first. Software that
- * downloads a language runtime on someone's behalf should say where it put it
- * before it is asked.
- */
-function NodeInstallProgress({ progress }: { progress: NodeProgress | null }) {
-  const done = progress?.phase === 'installed'
-  const bytes = progress?.phase === 'downloading' ? progress : null
-  const fraction = bytes && bytes.total ? Math.min(bytes.received / bytes.total, 1) : null
-
-  return (
-    <div className="rounded-panel border border-line bg-canvas-deep/50 px-3 py-2.5">
-      <div className="flex items-center gap-2">
-        {done ? (
-          <Check size={13} strokeWidth={2.6} className="shrink-0 text-ok" aria-hidden="true" />
-        ) : (
-          <Loader2 size={13} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
-        )}
-        <span className="truncate text-[12.5px] text-text">{phaseText(progress)}</span>
-        {bytes && (
-          <span className="ml-auto shrink-0 font-mono text-[11.5px] text-muted tabular-nums">
-            {bytes.total
-              ? `${megabytes(bytes.received)} / ${megabytes(bytes.total)}`
-              : megabytes(bytes.received)}
-          </span>
-        )}
-      </div>
-
-      <div
-        className="mt-2 ml-[21px] h-[3px] overflow-hidden rounded-full bg-line-strong"
-        role="progressbar"
-        aria-valuenow={fraction === null ? undefined : Math.round(fraction * 100)}
-      >
-        <div
-          className={
-            fraction === null
-              ? 'h-full w-1/4 animate-drift rounded-full bg-brand'
-              : 'h-full rounded-full bg-brand transition-[width] duration-200 ease-[var(--ease-out-soft)]'
-          }
-          style={fraction === null ? undefined : { width: `${fraction * 100}%` }}
-        />
-      </div>
-
-      <p className="mt-1.5 ml-[21px] text-[11.5px] text-faint">{t('node.explain')}</p>
-    </div>
-  )
-}
-
-/** The phase, said in words, with the release it is about. */
-function phaseText(progress: NodeProgress | null): string {
-  switch (progress?.phase) {
-    // One line for both: a release has been settled on and its bytes are what
-    // happens next, which is the same sentence either way.
-    case 'chosen':
-    case 'downloading':
-      return t('node.downloading', { version: progress.version })
-    case 'verifying':
-      return t('node.verifying')
-    case 'extracting':
-      return t('node.extracting', { version: progress.version })
-    case 'installed':
-      return t('node.installed', { version: progress.version })
-    // `resolving`, and the moment before the first report arrives.
-    default:
-      return t('node.resolving')
-  }
-}
-
-/** The report, plus the two fixes the rows are allowed to offer. */
-interface CheckContext {
-  environment: Environment | null
-  installing: boolean
-  install: () => Promise<void>
-  provisioningNode: boolean
-  provisionNode: () => Promise<void>
-}
-
-/**
- * Turn the environment report into the rows the list shows.
- *
- * Only things that can be wrong. The workspace is neither a check nor something
- * anyone acts on from here, so it reports itself from the status bar instead.
- */
-function buildChecks({
-  environment,
-  installing,
-  install,
-  provisioningNode,
-  provisionNode,
-}: CheckContext): CheckItem[] {
-  const node = environment?.node ?? null
-  const minimum = environment ? formatVersion(environment.minimumNode) : ''
-  const harnessInstalled = environment?.harnessInstalled ?? false
-
-  return [
-    {
-      key: 'node',
-      label: t('check.node'),
-      value: node
-        ? t('check.node.found', {
-            version: formatVersion(node.version),
-            source: t(`source.${node.source}`),
-          })
-        : t('check.node.missing', { minimum }),
-      title: node?.path,
-      state: environment === null ? 'neutral' : node ? 'ok' : 'missing',
-      // The row that says something is missing carries the thing that fixes it,
-      // and for Node that is a runtime this app fetches into its own directory —
-      // not a link to a download page and a second installer to get through.
-      action:
-        environment !== null && node === null
-          ? {
-              label: provisioningNode ? t('action.installing') : t('action.getNode'),
-              icon: Download,
-              busy: provisioningNode,
-              run: () => void provisionNode(),
-            }
-          : undefined,
-    },
-    {
-      key: 'harness',
-      label: t('check.harness'),
-      value: harnessInstalled ? t('check.harness.installed') : t('check.harness.missing'),
-      title: environment?.harnessEntry,
-      state: environment === null ? 'neutral' : harnessInstalled ? 'ok' : 'missing',
-      action:
-        environment !== null && !harnessInstalled && node !== null
-          ? {
-              label: installing ? t('action.installing') : t('action.install'),
-              icon: Download,
-              busy: installing,
-              run: () => void install(),
-            }
-          : undefined,
-    },
-  ]
 }
