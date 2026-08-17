@@ -79,10 +79,12 @@ that mysteriously did nothing.
 **Reaches your phone without putting the agent on the network.**
 Remote access is off until you open it, and opening it does not move the
 service — `dsh` stays bound to loopback, which is not configurable. What opens is
-a separate gateway, bound to one LAN address, holding a 128-bit token minted for
-that session. Pairing is a QR code: scan it, the token lands in a cookie, and the
-phone is in. Everything after that is spliced straight through to the harness.
-Close the door and the token dies with it; the next one is a different secret.
+a separate gateway, bound to one LAN address. Pairing is a QR code, and the code
+inside it is good for one device and two minutes: scan it and that phone walks
+away with a credential of its own, which is what every request after it carries.
+Everything from there is spliced straight through to the harness. Paired devices
+are listed on the pane, and forgetting one revokes its credential and drops the
+connection it already had. Close the door and all of them die with it.
 
 [Job Object]: https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects
 
@@ -103,7 +105,7 @@ flowchart LR
   subgraph app["DSH Studio — one process"]
     ui["WebView<br/>React shell UI"]
     sup["Rust supervisor<br/>backoff · readiness · health"]
-    gw["remote gateway<br/>one LAN address · session token"]
+    gw["remote gateway<br/>one LAN address · per-device keys"]
     ui <-->|Tauri IPC| sup
     ui <-->|Tauri IPC| gw
   end
@@ -121,7 +123,7 @@ flowchart LR
   ui -.->|iframe loads the origin| dsh
   sup -.->|"HTTP probe every 10s"| dsh
   phone -.->|"paired by QR, then cookie"| gw
-  gw ==>|"spliced, once the token checks out"| dsh
+  gw ==>|"spliced, once the credential checks out"| dsh
 ```
 
 The startup sequence is worth spelling out, because every step exists to remove
@@ -172,7 +174,7 @@ about being unfinished.
 | Process-tree reclamation (Windows / Unix)    | ✅                                                                 |
 | Harness hosting, log console, English + 中文 | ✅                                                                 |
 | Plugin marketplace — search, install, remove | ✅                                                                 |
-| Remote access from a phone, paired by QR     | ✅                                                                 |
+| Remote access, single-use QR, revocable keys | ✅                                                                 |
 | Update notice, checked on a schedule         | ✅                                                                 |
 | Verified on Windows 11                       | ✅                                                                 |
 | macOS / Linux rendering                      | ⏳ not yet run                                                     |
@@ -204,8 +206,9 @@ when the closing was not graceful.
 **The service stays on loopback; reach is a separate, authenticated door.**
 Binding an agent that can run shell commands to a LAN interface is not something
 to do by default, and not something to do without a credential. Remote access is
-off until you turn it on, and when you do, a gateway with a per-session token
-proxies to a service that never stopped being loopback-only.
+off until you turn it on, and when you do, a gateway holding one credential per
+paired device proxies to a service that never stopped being loopback-only. Any
+one of those credentials can be taken back on its own, mid-connection.
 
 ## Requirements
 
@@ -235,7 +238,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 ```
 src/                       React 19 + Tailwind 4 shell UI
 src-tauri/src/harness/     supervisor, readiness parsing, health probe, install
-src-tauri/src/remote/      LAN gateway, session token, QR, address selection
+src-tauri/src/remote/      LAN gateway, pairing codes, QR, address selection
 src-tauri/src/plugins/     registry search, profile inspection, install/remove
 src-tauri/crates/
   node-runtime/            find a usable Node on this machine
@@ -282,9 +285,10 @@ worth reporting.
 **How do I use it from my phone?**
 Open the Remote pane, press Open access, and scan the code with the phone's
 camera. Both devices have to be on the same network — there is no relay and no
-account, so nothing about the pairing leaves the room. The link in the code
-carries the session's secret, which is why the pane offers to copy it rather
-than print it: paste it into a chat and you have handed over the door key.
+account, so nothing about the pairing leaves the room. The code is good once and
+for two minutes; the phone that redeems it gets a key of its own, and the pane
+lists it afterwards, so that key can be taken back without disturbing anything
+else that paired.
 
 **Can I install any npm package as a plugin?**
 You can install any package, but only one that declares a profile patch in its
@@ -302,8 +306,8 @@ Everything else stays where it is. The service is bound to loopback and that is
 not a setting — an agent that can run shell commands has no business being
 reachable by default. Remote access does not change it: the service stays on
 loopback, and what listens on the network is a gateway that will not forward a
-byte without the session's token. It is off until you switch it on, and it goes
-off again the moment the harness stops. What the harness itself does with your
+byte without a credential it minted itself. It is off until you switch it on,
+and it goes off again the moment the harness stops. What the harness itself does with your
 API keys is upstream's business, not this project's.
 
 ## Contributing

@@ -95,15 +95,30 @@ export interface QrMatrix {
   modules: boolean[]
 }
 
+/** A phone that has paired and has not been forgotten. */
+export interface RemoteDevice {
+  /** Names the device to `remoteForget`. A handle, not a secret. */
+  id: string
+  /** What it called itself, or null when it said nothing useful. */
+  label: string | null
+  pairedSecondsAgo: number
+  lastSeenSecondsAgo: number
+}
+
 export interface RemoteStatus {
   open: boolean
   /** Addresses this machine could be reached on, open or not. */
   addresses: string[]
-  /** Where the harness is reachable, without the secret in it. */
+  /** Where the harness is reachable, without any secret in it. */
   url: string | null
   /** The one URL that pairs a device. Never logged, never persisted. */
   pairingUrl: string | null
   qr: QrMatrix | null
+  /** Seconds the code on screen has left; null once there is no live one. */
+  codeSecondsLeft: number | null
+  /** How long a fresh code gets, so the countdown can draw what is left of it. */
+  codeLifetimeSeconds: number
+  devices: RemoteDevice[]
   active: number
   served: number
   refused: number
@@ -118,6 +133,12 @@ export const remoteStatus = (): Promise<RemoteStatus> => invoke('remote_status')
 export const remoteOpen = (): Promise<RemoteStatus> => invoke('remote_open')
 
 export const remoteClose = (): Promise<RemoteStatus> => invoke('remote_close')
+
+/** Put a new pairing code on screen. Paired devices are untouched. */
+export const remoteRenew = (): Promise<RemoteStatus> => invoke('remote_renew')
+
+/** Forget one device, ending anything it has open. */
+export const remoteForget = (id: string): Promise<RemoteStatus> => invoke('remote_forget', { id })
 
 /**
  * Subscribe to connection changes.

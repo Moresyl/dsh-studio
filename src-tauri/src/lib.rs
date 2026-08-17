@@ -66,6 +66,8 @@ pub fn run() {
             remote::commands::remote_status,
             remote::commands::remote_open,
             remote::commands::remote_close,
+            remote::commands::remote_renew,
+            remote::commands::remote_forget,
             plugins::commands::plugin_state,
             plugins::commands::plugin_search,
             plugins::commands::plugin_detail,

@@ -22,6 +22,10 @@ interface RemoteStore {
   refresh: () => Promise<void>
   open: () => Promise<void>
   close: () => Promise<void>
+  /** Put a new pairing code on screen after the last one ran out. */
+  renew: () => Promise<void>
+  /** Forget one paired device. */
+  forget: (id: string) => Promise<void>
 }
 
 export const useRemote = create<RemoteStore>((set, get) => ({
@@ -57,6 +61,27 @@ export const useRemote = create<RemoteStore>((set, get) => ({
       set({ error: describe(cause) })
     } finally {
       set({ busy: false })
+    }
+  },
+
+  // Neither of these takes `busy`: it drives the open/close button, and a
+  // disabled Close while a code is being replaced would be a lie about which
+  // request is in flight.
+  renew: async () => {
+    set({ error: null })
+    try {
+      set({ status: await ipc.remoteRenew() })
+    } catch (cause) {
+      set({ error: describe(cause) })
+    }
+  },
+
+  forget: async (id) => {
+    set({ error: null })
+    try {
+      set({ status: await ipc.remoteForget(id) })
+    } catch (cause) {
+      set({ error: describe(cause) })
     }
   },
 }))

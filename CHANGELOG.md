@@ -59,6 +59,23 @@ pre-1.0 caveat that anything may still move.
 
 ### Changed
 
+- **Remote access pairs with devices instead of handing out one key.** The QR
+  code used to carry a secret that lasted as long as the session and worked for
+  anyone who had ever seen it. It now carries a pairing code that the first
+  device to use it spends, and that lapses two minutes after it appears — and
+  what that device keeps afterwards is a credential of its own. The pane shows
+  the code draining and puts up a new one on request. Below it, every phone that
+  paired is listed with when it paired and when it was last heard from, and
+  forgetting one revokes its credential and drops what it already had open: a
+  revoke button that leaves a socket streaming has not revoked anything.
+- **`SECURITY.md` says why the LAN gateway is not TLS.** Any certificate this
+  project could ship would be self-signed, over an address that changes with the
+  network and a port the kernel picks fresh each session — so it would put a
+  full-page browser warning in front of every pairing, every time, because the
+  exception a user grants never applies to the next origin. Teaching that click
+  is worth more to an attacker than the encryption is worth to you, so the gap
+  is closed from the other side, and the part that stays open is written down
+  rather than left implied.
 - **The browser's reflexes are gone.** F5 no longer throws the application away
   and rebuilds it, Ctrl+P no longer offers to print the window, Ctrl+scroll no
   longer rescales the whole interface, a dropped file no longer replaces the app

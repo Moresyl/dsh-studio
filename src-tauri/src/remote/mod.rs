@@ -7,17 +7,22 @@
 //! it off and the listener is gone along with the secret; the harness never
 //! knew either way.
 //!
-//! Three things follow from that shape, and they are the reason for it:
+//! Four things follow from that shape, and they are the reason for it:
 //!
-//! - The secret lives in memory for exactly as long as the door is open. There
-//!   is no stored password to leak, reuse, or forget to change.
+//! - Every secret lives in memory for exactly as long as the door is open.
+//!   There is no stored password to leak, reuse, or forget to change.
 //! - The listener is bound to a single address, not to every interface, so a
 //!   VPN or a hypervisor's virtual switch does not quietly become a second way
 //!   in.
 //! - Closing the door drops the sender every task is waiting on, so in-flight
 //!   connections end with it rather than outliving the setting that allowed
 //!   them.
+//! - What the QR symbol carries is not what a paired phone keeps. The code on
+//!   screen is good for two minutes and for one device; each device that uses
+//!   it gets a credential of its own, which can be revoked by itself. See
+//!   [`access`] for why those are two different things.
 
+pub mod access;
 pub mod commands;
 pub mod gateway;
 pub mod lan;
@@ -32,11 +37,10 @@ use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 
 use crate::error::{Error, Result};
+use access::{Access, DeviceView, CODE_LIFETIME};
 use gateway::Counters;
 
-/// 128 bits from the operating system. Long enough that guessing it over a
-/// network is not a strategy, short enough to stay in a small QR symbol.
-const TOKEN_BYTES: usize = 16;
+const POISONED: &str = "remote session poisoned";
 
 /// What the remote panel renders.
 #[derive(Debug, Serialize)]
@@ -46,12 +50,20 @@ pub struct RemoteStatus {
     /// Addresses this machine could be reached on. Present whether or not the
     /// door is open, so the panel can say what would happen before it happens.
     pub addresses: Vec<String>,
-    /// Where the harness is reachable, without the secret in it.
+    /// Where the harness is reachable, without any secret in it.
     pub url: Option<String>,
-    /// The one URL that pairs a device, secret included. Never logged.
+    /// The one URL that pairs a device, code included. Never logged.
     pub pairing_url: Option<String>,
     /// The pairing URL as a module grid, for the panel to draw.
     pub qr: Option<qr::Matrix>,
+    /// Seconds the code on screen has left, or `None` when there is no live one
+    /// — which is also when `qr` and `pairing_url` are absent.
+    pub code_seconds_left: Option<u32>,
+    /// How long a code gets. Sent rather than duplicated in the panel, which
+    /// needs it to draw the part of the life that is left.
+    pub code_lifetime_seconds: u32,
+    /// Devices that have paired and have not been forgotten.
+    pub devices: Vec<DeviceView>,
     pub active: u32,
     pub served: u64,
     pub refused: u64,
@@ -59,7 +71,7 @@ pub struct RemoteStatus {
 
 /// One open door, or none.
 struct Session {
-    token: Arc<String>,
+    access: Arc<Access>,
     host: Ipv4Addr,
     port: u16,
     counters: Arc<Counters>,
@@ -95,16 +107,14 @@ impl Remote {
     }
 
     pub fn is_open(&self) -> bool {
-        self.session
-            .lock()
-            .expect("remote session poisoned")
-            .is_some()
+        self.session.lock().expect(POISONED).is_some()
     }
 
     /// Open the door in front of a harness already serving at `origin`.
     ///
-    /// Calling this twice returns the door that is already open, secret and all,
-    /// rather than rotating it — the QR code on screen has to keep working.
+    /// Calling this twice returns the door that is already open, credentials and
+    /// all, rather than replacing it — the phones already paired through it have
+    /// to keep working.
     pub async fn open(&self, origin: &str) -> Result<RemoteStatus> {
         if self.is_open() {
             return Ok(self.status());
@@ -117,13 +127,13 @@ impl Remote {
             .map_err(Error::RemoteBind)?;
         let port = listener.local_addr().map_err(Error::RemoteBind)?.port();
 
-        let token = Arc::new(token()?);
+        let access = Arc::new(Access::open()?);
         let counters = Arc::new(Counters::default());
         let shutdown = broadcast::channel::<()>(1).0;
 
         tokio::spawn(gateway::serve(
             listener,
-            Arc::clone(&token),
+            Arc::clone(&access),
             upstream,
             Arc::clone(&counters),
             // A receiver: the session below holds the only sender, so letting
@@ -135,8 +145,8 @@ impl Remote {
         // Storing replaces whatever was there, and dropping the old session
         // shuts its tasks down — so even the race two simultaneous callers could
         // win leaves exactly one door open.
-        *self.session.lock().expect("remote session poisoned") = Some(Session {
-            token,
+        *self.session.lock().expect(POISONED) = Some(Session {
+            access,
             host,
             port,
             counters,
@@ -149,14 +159,35 @@ impl Remote {
 
     /// Close the door. Safe to call when it is already closed.
     pub fn close(&self) {
-        let previous = self.session.lock().expect("remote session poisoned").take();
+        let previous = self.session.lock().expect(POISONED).take();
         if previous.is_some() {
             let _ = self.changed.send(());
         }
     }
 
+    /// Put a new pairing code on screen, without disturbing the devices that
+    /// paired through the last one.
+    pub fn renew(&self) -> Result<RemoteStatus> {
+        if let Some(access) = self.access() {
+            access.renew()?;
+            let _ = self.changed.send(());
+        }
+        Ok(self.status())
+    }
+
+    /// Forget one device: its next request is refused, and anything it has open
+    /// right now ends.
+    pub fn forget(&self, id: &str) -> RemoteStatus {
+        if let Some(access) = self.access() {
+            if access.forget(id) {
+                let _ = self.changed.send(());
+            }
+        }
+        self.status()
+    }
+
     pub fn status(&self) -> RemoteStatus {
-        let guard = self.session.lock().expect("remote session poisoned");
+        let guard = self.session.lock().expect(POISONED);
 
         let Some(session) = guard.as_ref() else {
             return RemoteStatus {
@@ -168,6 +199,9 @@ impl Remote {
                 url: None,
                 pairing_url: None,
                 qr: None,
+                code_seconds_left: None,
+                code_lifetime_seconds: CODE_LIFETIME.as_secs() as u32,
+                devices: Vec::new(),
                 active: 0,
                 served: 0,
                 refused: 0,
@@ -175,34 +209,36 @@ impl Remote {
         };
 
         let url = format!("http://{}:{}/", session.host, session.port);
-        let pairing = format!("{url}?k={}", session.token);
+        let live = session.access.pairing();
+        let pairing = live.as_ref().map(|code| format!("{url}?k={}", code.code));
 
         RemoteStatus {
             open: true,
             addresses: vec![session.host.to_string()],
-            qr: qr::encode(&pairing),
+            qr: pairing.as_deref().and_then(qr::encode),
+            code_seconds_left: live.as_ref().map(|code| code.seconds_left),
+            code_lifetime_seconds: CODE_LIFETIME.as_secs() as u32,
+            pairing_url: pairing,
             url: Some(url),
-            pairing_url: Some(pairing),
+            devices: session.access.devices(),
             active: session.counters.active.load(Ordering::Relaxed),
             served: session.counters.served.load(Ordering::Relaxed),
             refused: session.counters.refused.load(Ordering::Relaxed),
         }
     }
-}
 
-/// A fresh pairing secret, as lowercase hex.
-fn token() -> Result<String> {
-    let mut bytes = [0u8; TOKEN_BYTES];
-    // No fallback on purpose. A secret from a PRNG this code seeded itself
-    // would be worse than refusing to open the door.
-    getrandom::fill(&mut bytes).map_err(|_| Error::NoEntropy)?;
-
-    let mut hex = String::with_capacity(TOKEN_BYTES * 2);
-    for byte in bytes {
-        use std::fmt::Write;
-        let _ = write!(hex, "{byte:02x}");
+    /// The credentials of the open door, if there is one.
+    ///
+    /// Handed out as an `Arc` rather than worked on under the lock, because
+    /// every caller goes on to read [`Self::status`] — which takes the same
+    /// lock, and would deadlock on a guard still held.
+    fn access(&self) -> Option<Arc<Access>> {
+        self.session
+            .lock()
+            .expect(POISONED)
+            .as_ref()
+            .map(|session| Arc::clone(&session.access))
     }
-    Ok(hex)
 }
 
 /// The loopback socket behind a serving origin.
@@ -232,17 +268,7 @@ fn upstream_from(origin: &str) -> Result<SocketAddr> {
 
 #[cfg(test)]
 mod tests {
-    use super::{token, upstream_from, Remote};
-
-    #[test]
-    fn a_token_is_128_bits_of_hex_and_never_repeats() {
-        let first = token().expect("entropy");
-        let second = token().expect("entropy");
-
-        assert_eq!(first.len(), 32);
-        assert!(first.chars().all(|character| character.is_ascii_hexdigit()));
-        assert_ne!(first, second);
-    }
+    use super::{upstream_from, Remote};
 
     #[test]
     fn reads_the_loopback_socket_out_of_a_serving_origin() {
@@ -264,6 +290,8 @@ mod tests {
         assert!(!status.open);
         assert!(status.pairing_url.is_none());
         assert!(status.qr.is_none());
+        assert!(status.code_seconds_left.is_none());
+        assert!(status.devices.is_empty());
         assert_eq!(status.active, 0);
     }
 
@@ -272,6 +300,18 @@ mod tests {
         let remote = Remote::new();
         remote.close();
         remote.close();
+        assert!(!remote.is_open());
+    }
+
+    /// The panel can ask for either of these at any time — including while the
+    /// door is shut, because a click can always land after a close.
+    #[test]
+    fn renewing_and_forgetting_on_a_closed_door_do_nothing() {
+        let remote = Remote::new();
+
+        let renewed = remote.renew().expect("not an error");
+        assert!(renewed.code_seconds_left.is_none());
+        assert!(remote.forget("whatever").devices.is_empty());
         assert!(!remote.is_open());
     }
 
