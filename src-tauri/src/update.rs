@@ -1,10 +1,14 @@
 //! Whether a newer build of this shell has been published.
 //!
-//! Checking is something the user asks for, not something that happens quietly
-//! at startup: an app that phones home on launch has made a decision on the
-//! user's behalf about what their machine tells the internet. Nothing here
-//! downloads or installs anything either — it reads a version number and hands
-//! over a link, and the user decides.
+//! The window runs this a few seconds after launch and every few hours after
+//! that, because a fix nobody hears about is a fix nobody has. It is worth being
+//! exact about what that costs, since an app that phones home has made a
+//! decision on the user's behalf: one GET to a public release feed, no account,
+//! no identifier, and nothing about the machine beyond the user agent the
+//! runtime sends.
+//!
+//! Nothing is downloaded and nothing is installed. This reads a version number
+//! and hands over a link; taking the update stays the user's decision.
 
 use std::path::Path;
 use std::time::Duration;

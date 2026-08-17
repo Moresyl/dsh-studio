@@ -9,6 +9,27 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Added
+
+- **A new release announces itself.** The window asks the release feed a few
+  seconds after launch and every six hours after that, and a published version
+  newer than the running one appears as a notice in the bottom-left corner: one
+  line, a click to read the release, and a dismiss button. Dismissal is per
+  version and survives a restart, so saying "not now" to 0.3.0 stays said until
+  0.4.0 exists. Nothing is downloaded and nothing is installed. The About item
+  in the nav rail also carries a dot for as long as the newer version is
+  available, so the notice is not the only way back to it.
+
+### Changed
+
+- **The service address left the status bar.** A desktop application that prints
+  `127.0.0.1:52418` along its bottom edge is telling on itself. The address is a
+  fact about the plumbing, so it now lives only in the console's service
+  section, where it still opens in a browser on click and copies on right-click.
+- The update check is shared between the status bar and the About pane rather
+  than run twice, and a failed check no longer writes to the harness log — a
+  laptop on a train is not an event worth reporting.
+
 ## [0.2.0] — 2026-08-16
 
 Two features that change what the shell is for: it now extends the harness, and

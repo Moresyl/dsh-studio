@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Download, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
@@ -188,13 +188,27 @@ function Section({
 /**
  * The live service, in the two facts anyone asks for.
  *
- * The address is also in the status bar, and deliberately so — the bar is what
- * you glance at, this is where you are already looking when you are deciding
- * whether to stop it. The process id is here only: it is what you need when the
- * answer is to go and look at the thing in a task manager, and there is no room
- * for it in a status bar that must stay legible at a glance.
+ * This is the only place the address appears, and the right one: it is a fact
+ * about the plumbing, and this is the panel where the plumbing is. A click opens
+ * it in the user's own browser — the harness is a web service and sometimes the
+ * right window for it is not this one — and a right-click copies it, because the
+ * other half of the time it is being pasted into a terminal. The process id is
+ * what you need when the answer is to go and look at the thing in a task
+ * manager.
  */
 function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
+  const [copied, setCopied] = useState(false)
+
+  // The webview's own clipboard rather than a plugin: this document is served
+  // from localhost, a secure context on every platform we ship, and a click is
+  // the user gesture the API asks for.
+  const copy = () => {
+    void navigator.clipboard.writeText(origin).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1200)
+    })
+  }
+
   return (
     <dl className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
       <div className="flex h-[30px] items-center gap-2 px-2.5">
@@ -202,11 +216,17 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
         <dd className="ml-auto min-w-0">
           <button
             type="button"
-            title={t('statusbar.open')}
+            title={`${t('statusbar.open')} · ${t('statusbar.copy')}`}
             onClick={() => void openUrl(origin)}
+            onContextMenu={(event) => {
+              event.preventDefault()
+              copy()
+            }}
             className="flex items-center gap-1.5 font-mono text-[11.5px] text-text tabular-nums transition-colors duration-100 hover:text-brand"
           >
-            <span className="truncate">{origin.replace(/^https?:\/\//, '')}</span>
+            <span className="truncate">
+              {copied ? t('statusbar.copied') : origin.replace(/^https?:\/\//, '')}
+            </span>
             <ExternalLink size={11} strokeWidth={2.2} className="shrink-0 text-faint" />
           </button>
         </dd>

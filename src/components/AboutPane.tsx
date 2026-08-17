@@ -8,7 +8,8 @@ import { PaneHeader } from '@/components/PaneHeader'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
-import type { About, Release } from '@/lib/ipc'
+import type { About } from '@/lib/ipc'
+import { useUpdate } from '@/state/update'
 
 /** Where this build comes from. Our own repository, and the only link here. */
 const SOURCE = 'https://github.com/Moresyl/dsh-studio'
@@ -22,16 +23,19 @@ const SOURCE = 'https://github.com/Moresyl/dsh-studio'
  * support thread — each one opens in the file manager, because the next step
  * after learning a path is always going to look at it.
  *
- * The update check is a button and never a startup task. An app that contacts a
- * server the moment it opens has made a decision on the user's behalf about what
- * their machine tells the internet, and nothing here is urgent enough to earn
- * that. Nothing is downloaded either — this reads a version and offers a link.
+ * The update state is shared with the status bar rather than fetched again here.
+ * Two panels asking the same question of the same feed is how an app ends up
+ * telling a user two different things about which version they are on. Nothing
+ * is downloaded either — this reads a version and offers a link.
  */
 export function AboutPane() {
   const [about, setAbout] = useState<About | null>(null)
-  const [release, setRelease] = useState<Release | null>(null)
-  const [checking, setChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const release = useUpdate((state) => state.release)
+  const checking = useUpdate((state) => state.checking)
+  const checkFailure = useUpdate((state) => state.error)
+  const check = useUpdate((state) => state.check)
 
   useEffect(() => {
     void ipc
@@ -39,18 +43,6 @@ export function AboutPane() {
       .then(setAbout)
       .catch((cause: unknown) => setError(describe(cause)))
   }, [])
-
-  const check = async () => {
-    setChecking(true)
-    setError(null)
-    try {
-      setRelease(await ipc.checkUpdate())
-    } catch (cause) {
-      setError(describe(cause))
-    } finally {
-      setChecking(false)
-    }
-  }
 
   const reveal = (path: string) => {
     void revealItemInDir(path).catch((cause: unknown) => setError(describe(cause)))
@@ -111,9 +103,9 @@ export function AboutPane() {
             </div>
           )}
 
-          {error && (
+          {(error ?? checkFailure) && (
             <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
-              {error}
+              {error ?? checkFailure}
             </p>
           )}
 

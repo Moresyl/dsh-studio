@@ -64,10 +64,22 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: DSH Studio v__VERSION__
+          # Deliberately not a feature list. This body is written once and used
+          # by every future tag, so anything version-specific here would be a
+          # lie by the release after next. What changed lives in the changelog,
+          # which is edited in the same commit that raises the version.
           releaseBody: |
-            Download the installer for your platform from the assets below.
+            What changed in this version is in the
+            [changelog](https://github.com/Moresyl/dsh-studio/blob/v__VERSION__/CHANGELOG.md)
+            ([中文](https://github.com/Moresyl/dsh-studio/blob/v__VERSION__/CHANGELOG.zh-CN.md)).
 
-            macOS builds are currently unsigned. On first launch, use the system security settings to approve the app.
+            ### Downloads
+
+            Pick the installer for your platform from the assets below — Windows
+            x64, Linux x64, and macOS for both Apple Silicon and Intel.
+
+            macOS builds are currently unsigned. On first launch, use the system
+            security settings to approve the app.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

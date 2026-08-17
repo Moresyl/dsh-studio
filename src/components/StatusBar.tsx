@@ -1,20 +1,24 @@
-import { useState, type ReactNode } from 'react'
-import { FolderOpen } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { ArrowUpCircle, FolderOpen, X } from 'lucide-react'
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { StatusDot } from '@/components/StatusDot'
 import { t } from '@/lib/i18n'
 import { formatVersion, type Environment, type Status } from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
+import { isAnnounceable, useUpdate } from '@/state/update'
 
 /**
  * The strip along the bottom of the window.
  *
  * Everything on it is a readout that stays true for as long as the app is open:
- * what the harness is doing, where it is serving, what it is running on. That is
- * what a status bar is for, and it is why the address moved here out of the
- * title bar — a live figure belongs in the place a user learns to glance at,
- * not in a badge floating next to the application name.
+ * what the harness is doing, what it is running on, and where its files land.
+ *
+ * The one thing deliberately absent is the service address. A desktop
+ * application that prints `127.0.0.1:52418` along its bottom edge is telling on
+ * itself — it says the window is a browser wearing a coat, and it hands the user
+ * a number they have no use for. The address is a fact about the plumbing, so it
+ * lives in the control panel with the rest of the plumbing.
  *
  * Nothing here is the only way to do anything. Every segment is a shortcut to
  * something the panel also offers.
@@ -25,7 +29,6 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ status, environment }: StatusBarProps) {
-  const origin = status.phase === 'ready' ? status.origin : null
   const node = environment?.node ?? null
 
   return (
@@ -35,7 +38,7 @@ export function StatusBar({ status, environment }: StatusBarProps) {
         {labelOf(status)}
       </Segment>
 
-      {origin && <AddressSegment origin={origin} />}
+      <UpdateNotice />
 
       <div className="flex-1" />
 
@@ -62,46 +65,59 @@ export function StatusBar({ status, environment }: StatusBarProps) {
 }
 
 /**
- * The address, with the two things anyone ever wants to do with one.
+ * A new version, said once and quietly.
  *
- * A click opens it in the user's own browser — the harness is a web service and
- * sometimes the right window for it is not this one. A right-click copies it,
- * because the other half of the time it is being pasted into a terminal.
+ * The status bar is the right place for this and a modal is the wrong one: an
+ * update is news, not an interruption, and the corner of the window is where a
+ * desktop application has always been allowed to mention news. It reads as a
+ * link because it is one — the click opens the release page, and nothing is
+ * downloaded or installed behind anybody's back.
+ *
+ * The dismiss button is the point of the whole design. Without it this is an
+ * advertisement that reappears every launch; with it, the answer is remembered
+ * and the notice stays gone until there is genuinely something else to say.
  */
-function AddressSegment({ origin }: { origin: string }) {
-  const [copied, setCopied] = useState(false)
+function UpdateNotice() {
+  const release = useUpdate((state) => state.release)
+  const announce = useUpdate(isAnnounceable)
+  const dismiss = useUpdate((state) => state.dismiss)
 
-  // The webview's own clipboard rather than a plugin: this runs on localhost,
-  // which is a secure context on every platform we ship, and a click is the
-  // user gesture the API asks for.
-  const copy = () => {
-    void navigator.clipboard.writeText(origin).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1200)
-    })
-  }
+  if (!announce || !release) return null
 
   return (
-    <Segment
-      title={`${t('statusbar.open')} · ${t('statusbar.copy')}`}
-      onClick={() => void openUrl(origin)}
-      onContextMenu={copy}
-    >
-      <span className="font-mono tabular-nums">
-        {copied ? t('statusbar.copied') : origin.replace(/^https?:\/\//, '')}
-      </span>
-    </Segment>
+    <div className="flex items-center self-center ml-1.5 animate-rise">
+      <button
+        type="button"
+        title={t('update.view')}
+        onClick={() => void openUrl(release.url)}
+        className="flex h-[19px] items-center gap-1.5 rounded-l-control bg-brand/12 pr-1.5 pl-2 text-brand transition-colors duration-100 hover:bg-brand/20"
+      >
+        <ArrowUpCircle size={12} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />
+        <span className="whitespace-nowrap">
+          {t('update.available', { version: release.version })}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        title={t('update.dismiss')}
+        aria-label={t('update.dismiss')}
+        onClick={dismiss}
+        className="flex h-[19px] w-[19px] items-center justify-center rounded-r-control bg-brand/12 text-brand/70 transition-colors duration-100 hover:bg-brand/20 hover:text-brand"
+      >
+        <X size={11} strokeWidth={2.4} aria-hidden="true" />
+      </button>
+    </div>
   )
 }
 
 interface SegmentProps {
   title: string
   onClick?: () => void
-  onContextMenu?: () => void
   children: ReactNode
 }
 
-function Segment({ title, onClick, onContextMenu, children }: SegmentProps) {
+function Segment({ title, onClick, children }: SegmentProps) {
   const className = 'flex items-center gap-1.5 px-2.5 whitespace-nowrap'
 
   if (!onClick) {
@@ -117,10 +133,6 @@ function Segment({ title, onClick, onContextMenu, children }: SegmentProps) {
       type="button"
       title={title}
       onClick={onClick}
-      onContextMenu={(event) => {
-        event.preventDefault()
-        onContextMenu?.()
-      }}
       className={`${className} transition-colors duration-100 hover:bg-surface-2 hover:text-text`}
     >
       {children}

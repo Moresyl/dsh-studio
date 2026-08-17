@@ -146,6 +146,10 @@ const en = {
   'about.source': 'Source code',
   'about.license': 'MIT licensed',
   'about.paths': 'Locations',
+
+  'update.available': 'Update {version}',
+  'update.view': 'See what changed in this release',
+  'update.dismiss': 'Not now',
 } as const
 
 export type MessageKey = keyof typeof en
@@ -284,6 +288,10 @@ const zh: Record<MessageKey, string> = {
   'about.source': '源代码',
   'about.license': 'MIT 许可证',
   'about.paths': '目录位置',
+
+  'update.available': '新版本 {version}',
+  'update.view': '查看这个版本改了什么',
+  'update.dismiss': '暂不提醒',
 }
 
 const dictionaries = { en, zh }

@@ -7,6 +7,7 @@ import { TitleBar } from '@/components/TitleBar'
 import { Workbench } from '@/components/Workbench'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { subscribeToRemote, useRemote } from '@/state/remote'
+import { watchForUpdates } from '@/state/update'
 
 /**
  * The window: a title bar, a status bar, and whichever view is between them.
@@ -55,6 +56,11 @@ export default function App() {
       void pending.then((unlisten) => unlisten())
     }
   }, [refreshRemote])
+
+  // Also here rather than in the status bar that shows the result: the check
+  // should keep its schedule while the user is reading a pane, and a component
+  // that unmounts must not be able to take the schedule down with it.
+  useEffect(() => watchForUpdates(), [])
 
   // With nothing serving there is nothing else to show.
   const showPanel = origin === null || panelFor === origin

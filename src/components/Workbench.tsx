@@ -9,6 +9,7 @@ import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
 import { usePlugins } from '@/state/plugins'
 import { useRemote } from '@/state/remote'
+import { useUpdate } from '@/state/update'
 
 type View = 'console' | 'plugins' | 'remote' | 'about'
 
@@ -37,6 +38,10 @@ export function Workbench({ hidden }: { hidden: boolean }) {
   const [view, setView] = useState<View>('console')
 
   const remoteOpen = useRemote((state) => state.status?.open ?? false)
+  // Deliberately not the status bar's rule: that notice can be waved away, and
+  // this dot is then the only thing left pointing at where the release is. A
+  // rail badge is not an interruption, so it stays until the update is taken.
+  const updatable = useUpdate((state) => state.release?.newer ?? false)
   const refreshPlugins = usePlugins((state) => state.refresh)
   const installed = usePlugins(
     (state) => state.profile?.plugins.filter((plugin) => !plugin.builtin).length ?? 0,
@@ -66,6 +71,8 @@ export function Workbench({ hidden }: { hidden: boolean }) {
                 <LiveDot />
               ) : entry.id === 'plugins' && installed > 0 ? (
                 <Count value={installed} />
+              ) : entry.id === 'about' && updatable ? (
+                <NewsDot />
               ) : undefined
             }
           />
@@ -131,6 +138,16 @@ function LiveDot() {
     <span
       aria-hidden="true"
       className="block size-[6px] rounded-full bg-ok shadow-[0_0_5px_var(--color-ok)]"
+    />
+  )
+}
+
+/** There is a release to read. Brand colour, because it is news and not a fault. */
+function NewsDot() {
+  return (
+    <span
+      aria-hidden="true"
+      className="block size-[6px] rounded-full bg-brand shadow-[0_0_5px_var(--color-brand)]"
     />
   )
 }

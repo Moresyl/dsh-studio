@@ -173,7 +173,7 @@ about being unfinished.
 | Harness hosting, log console, English + 中文 | ✅                                                                 |
 | Plugin marketplace — search, install, remove | ✅                                                                 |
 | Remote access from a phone, paired by QR     | ✅                                                                 |
-| Update check from inside the window          | ✅                                                                 |
+| Update notice, checked on a schedule         | ✅                                                                 |
 | Verified on Windows 11                       | ✅                                                                 |
 | macOS / Linux rendering                      | ⏳ not yet run                                                     |
 | Bundled Node runtime (no system Node needed) | ⏳ planned                                                         |
@@ -292,13 +292,18 @@ you install. Plugins land in the harness's own profile through its own plugin
 command, so what the shell installs is exactly what the harness would have.
 
 **Is my data sent anywhere?**
-Not by this shell. The service itself is bound to loopback and that is not a
-setting — an agent that can run shell commands has no business being reachable
-by default. Remote access does not change that: the service stays on loopback,
-and what listens on the network is a gateway that will not forward a byte
-without the session's token. It is off until you switch it on, and it goes off
-again the moment the harness stops. What the harness itself does with your API
-keys is upstream's business, not this project's.
+The shell makes exactly one request you did not ask for: a GET to this
+repository's public release feed, shortly after launch and every six hours
+after, to find out whether there is a newer version. No account, no identifier,
+nothing about your machine. That is the whole list.
+
+Everything else stays where it is. The service is bound to loopback and that is
+not a setting — an agent that can run shell commands has no business being
+reachable by default. Remote access does not change it: the service stays on
+loopback, and what listens on the network is a gateway that will not forward a
+byte without the session's token. It is off until you switch it on, and it goes
+off again the moment the harness stops. What the harness itself does with your
+API keys is upstream's business, not this project's.
 
 ## Contributing
 
