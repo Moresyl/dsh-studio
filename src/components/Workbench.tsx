@@ -122,7 +122,7 @@ function RailItem({ icon: Icon, label, hint, active, badge, onClick }: RailItemP
   return (
     <button
       type="button"
-      title={hint}
+      data-hint={hint}
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
       className={[

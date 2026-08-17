@@ -162,7 +162,7 @@ function ControlButton({ label, danger, onClick, children }: ControlButtonProps)
     <button
       type="button"
       aria-label={label}
-      title={label}
+      data-hint={label}
       onClick={onClick}
       className={[
         'grid w-[46px] place-items-center text-muted transition-colors duration-100',

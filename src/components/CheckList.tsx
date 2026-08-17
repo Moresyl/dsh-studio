@@ -58,7 +58,7 @@ export function CheckList({ items }: { items: CheckItem[] }) {
 
             <span
               className="ml-auto truncate text-right font-mono text-[11.5px] text-muted"
-              title={item.title ?? item.value}
+              data-hint={item.title ?? item.value}
             >
               {item.value}
             </span>

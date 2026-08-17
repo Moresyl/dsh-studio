@@ -102,7 +102,7 @@ export function PluginMarket() {
       <PaneHeader
         title={t('plugins.title')}
         subtitle={t('plugins.subtitle', { profile: profile?.profile ?? '' })}
-        subtitleTitle={profile?.profileDir}
+        subtitleHint={profile?.profileDir}
       >
         <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
           <TabButton
@@ -163,7 +163,7 @@ export function PluginMarket() {
               {query !== '' && !searching && (
                 <button
                   type="button"
-                  title={t('plugins.clearSearch')}
+                  data-hint={t('plugins.clearSearch')}
                   aria-label={t('plugins.clearSearch')}
                   onClick={() => {
                     setQuery('')
@@ -407,7 +407,7 @@ function Installed({ plugins, initialized, working, onRemove }: InstalledProps) 
         <li
           key={plugin.name}
           className="flex items-center gap-3 border-b border-line px-4 py-2.5"
-          title={plugin.name}
+          data-hint={plugin.name}
         >
           <Tile muted={plugin.builtin} />
 
@@ -599,7 +599,7 @@ function Link({ href }: { href: string }) {
   return (
     <button
       type="button"
-      title={target}
+      data-hint={target}
       onClick={() => void openUrl(target)}
       className="inline-flex max-w-full items-center gap-1 transition-colors duration-100 hover:text-brand"
     >

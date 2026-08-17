@@ -34,7 +34,7 @@ export function StatusBar({ status, environment }: StatusBarProps) {
 
   return (
     <footer className="chrome relative z-20 flex h-[26px] shrink-0 items-stretch border-t border-line text-[11px] text-muted select-none">
-      <Segment title={labelOf(status)}>
+      <Segment hint={labelOf(status)}>
         <StatusDot tone={toneOf(status)} size={7} />
         {labelOf(status)}
       </Segment>
@@ -45,7 +45,7 @@ export function StatusBar({ status, environment }: StatusBarProps) {
 
       {node && (
         <Segment
-          title={node.path}
+          hint={node.path}
           onContextMenu={contextMenu([
             {
               label: t('menu.copyPath'),
@@ -68,7 +68,7 @@ export function StatusBar({ status, environment }: StatusBarProps) {
         // The workspace is where the agent's files land, so the segment that
         // names it is also the way to go and look at them.
         <Segment
-          title={`${environment.workspace}\n${t('statusbar.reveal')}`}
+          hint={`${environment.workspace}\n${t('statusbar.reveal')}`}
           onClick={() => void revealItemInDir(environment.workspace)}
           onContextMenu={contextMenu([
             {
@@ -115,7 +115,7 @@ function UpdateNotice() {
     <div className="flex items-center self-center ml-1.5 animate-rise">
       <button
         type="button"
-        title={t('update.view')}
+        data-hint={t('update.view')}
         onClick={() => void openUrl(release.url)}
         className="flex h-[19px] items-center gap-1.5 rounded-l-control bg-brand/12 pr-1.5 pl-2 text-brand transition-colors duration-100 hover:bg-brand/20"
       >
@@ -127,7 +127,7 @@ function UpdateNotice() {
 
       <button
         type="button"
-        title={t('update.dismiss')}
+        data-hint={t('update.dismiss')}
         aria-label={t('update.dismiss')}
         onClick={dismiss}
         className="flex h-[19px] w-[19px] items-center justify-center rounded-r-control bg-brand/12 text-brand/70 transition-colors duration-100 hover:bg-brand/20 hover:text-brand"
@@ -139,18 +139,19 @@ function UpdateNotice() {
 }
 
 interface SegmentProps {
-  title: string
+  /** What the segment says when it is pointed at — often the full path. */
+  hint: string
   onClick?: () => void
   onContextMenu?: (event: MouseEvent) => void
   children: ReactNode
 }
 
-function Segment({ title, onClick, onContextMenu, children }: SegmentProps) {
+function Segment({ hint, onClick, onContextMenu, children }: SegmentProps) {
   const className = 'flex items-center gap-1.5 px-2.5 whitespace-nowrap'
 
   if (!onClick) {
     return (
-      <div className={className} title={title} onContextMenu={onContextMenu}>
+      <div className={className} data-hint={hint} onContextMenu={onContextMenu}>
         {children}
       </div>
     )
@@ -159,7 +160,10 @@ function Segment({ title, onClick, onContextMenu, children }: SegmentProps) {
   return (
     <button
       type="button"
-      title={title}
+      data-hint={hint}
+      // The visible label is shortened to fit the strip, so the full one has to
+      // reach a reader some other way than by being drawn.
+      aria-label={hint}
       onClick={onClick}
       onContextMenu={onContextMenu}
       className={`${className} transition-colors duration-100 hover:bg-surface-2 hover:text-text`}

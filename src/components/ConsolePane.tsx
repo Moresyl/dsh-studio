@@ -218,7 +218,7 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
         <dd className="ml-auto min-w-0">
           <button
             type="button"
-            title={t('statusbar.open')}
+            data-hint={t('statusbar.open')}
             onClick={() => void openUrl(origin)}
             onContextMenu={contextMenu([
               {
@@ -283,7 +283,7 @@ function RuntimeList({
         return (
           <li
             key={runtime.path}
-            title={runtime.path}
+            data-hint={runtime.path}
             className="flex h-[30px] items-center gap-2 px-2.5"
           >
             <span

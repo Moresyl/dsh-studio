@@ -154,7 +154,7 @@ function PathRow({ label, path, onReveal }: PathRowProps) {
         {path ? (
           <button
             type="button"
-            title={`${path}\n${t('statusbar.reveal')}`}
+            data-hint={`${path}\n${t('statusbar.reveal')}`}
             onClick={() => onReveal(path)}
             onContextMenu={contextMenu([
               { label: t('statusbar.reveal'), icon: FolderOpen, run: () => onReveal(path) },

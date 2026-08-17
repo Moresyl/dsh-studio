@@ -6,6 +6,7 @@ import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
+import { Tooltip } from '@/components/Tooltip'
 import { Workbench, VIEWS, type View } from '@/components/Workbench'
 import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
@@ -122,6 +123,7 @@ export default function App() {
           the dialog because a right-click inside a dialog still gets a menu. */}
       <Dialog />
       <ContextMenu />
+      <Tooltip />
     </div>
   )
 }

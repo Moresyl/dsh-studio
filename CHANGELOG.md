@@ -37,6 +37,14 @@ pre-1.0 caveat that anything may still move.
   close on Escape, and the click that dismisses one does not also press what was
   underneath it.
 
+- **Tooltips the app draws.** `title` is the browser's: it waits a full second,
+  arrives in Edge's shape rather than this window's, cannot hold a second line
+  without looking like an accident, and lingers after a click has already moved
+  the interface on. The replacement appears after a short rest and then
+  instantly for as long as someone is reading labels, sits above what it
+  explains, flips below it at the top of the window, and goes the moment
+  anything happens. A control reached by Tab gets one too.
+
 - **A question before anything is removed.** Removing a plugin now asks first,
   in a panel the app drew — not the webview's `confirm()` box, which arrives in
   the browser's shape with the page's address printed above its buttons and is
