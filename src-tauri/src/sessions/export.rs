@@ -338,7 +338,10 @@ fn grouped(value: u64) -> String {
 }
 
 /// A moment, written so it means the same thing on every machine that reads it.
-fn stamp(millis: i64) -> String {
+///
+/// Public because the diagnostic report dates itself with it, and for the same
+/// reason a session is dated with it: both are documents that leave this machine.
+pub fn stamp(millis: i64) -> String {
     let seconds = millis.div_euclid(1000);
     let (year, month, day) = civil(seconds.div_euclid(86_400));
     let (hour, minute, second) = wall(seconds);

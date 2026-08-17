@@ -2,6 +2,7 @@
 
 mod about;
 mod desktop;
+mod diagnostics;
 mod error;
 mod fetch;
 mod harness;
@@ -143,6 +144,8 @@ pub fn run() {
             desktop::commands::desktop_notify,
             desktop::commands::desktop_badge,
             about::app_about,
+            diagnostics::report_build,
+            diagnostics::report_save,
         ])
         .run(tauri::generate_context!())
         .expect("dsh-studio failed to start");

@@ -82,6 +82,9 @@ pub enum Error {
     Session(String),
 
     #[error("{0}")]
+    Report(String),
+
+    #[error("{0}")]
     Startup(String),
 
     #[error("{0}")]

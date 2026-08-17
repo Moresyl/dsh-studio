@@ -419,6 +419,14 @@ const en = {
   'about.source': 'Source code',
   'about.license': 'MIT licensed',
   'about.paths': 'Locations',
+  'about.diagnostics': 'Report a problem',
+  'about.diagnosticsBody':
+    'A report of this build, the runtimes it found, the profile it is hosting and the end of the harness log — everything an issue is going to ask for. Your home directory is written as ~, and nothing about remote pairing is included.',
+  'about.reportCopy': 'Copy report',
+  'about.reportHint': 'Copy it, then paste it into the issue',
+  'about.reportSave': 'Save as file',
+  'about.reportTitle': 'Save the diagnostic report',
+  'about.reportKind': 'Markdown document',
 
   'update.available': 'Update {version}',
   'update.view': 'See what changed and install the update',
@@ -859,6 +867,14 @@ const zh: Record<MessageKey, string> = {
   'about.source': '源代码',
   'about.license': 'MIT 许可证',
   'about.paths': '目录位置',
+  'about.diagnostics': '反馈问题',
+  'about.diagnosticsBody':
+    '一份报告，包含当前版本、找到的运行时、正在托管的配置以及 harness 日志的末尾——提 issue 时会被问到的信息都在里面。其中主目录会写成 ~，也不含任何远程配对信息。',
+  'about.reportCopy': '复制报告',
+  'about.reportHint': '复制后直接粘贴到 issue 里',
+  'about.reportSave': '保存为文件',
+  'about.reportTitle': '保存诊断报告',
+  'about.reportKind': 'Markdown 文档',
 
   'update.available': '新版本 {version}',
   'update.view': '查看更新内容并安装',

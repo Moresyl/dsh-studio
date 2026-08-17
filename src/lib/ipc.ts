@@ -770,3 +770,27 @@ export interface About {
 }
 
 export const about = (): Promise<About> => invoke('app_about')
+
+/* -------------------------------------------------------------------------- */
+/* Diagnostics                                                                */
+/* -------------------------------------------------------------------------- */
+
+/** A finished report, and what to call the file it should go in. */
+export interface Report {
+  /** The name to offer, which the save dialog may well be told to override. */
+  name: string
+  text: string
+}
+
+/**
+ * Everything this shell knows about its own install, as one Markdown document.
+ *
+ * Markdown because of where it is going: an issue. The home directory is taken
+ * out of it before it arrives here, so what comes back is already safe to paste
+ * somewhere public — which is the only reason the copy button can be one click.
+ */
+export const reportBuild = (): Promise<Report> => invoke('report_build')
+
+/** The same document, put where the save dialog pointed. */
+export const reportSave = (path: string, text: string): Promise<void> =>
+  invoke('report_save', { path, text })

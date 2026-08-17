@@ -1,5 +1,16 @@
-import { useEffect, useState } from 'react'
-import { ArrowUpRight, Copy, Download, FolderOpen, Loader2, RefreshCw, Scale } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  ArrowUpRight,
+  Check,
+  Copy,
+  Download,
+  FileDown,
+  FolderOpen,
+  Loader2,
+  RefreshCw,
+  Scale,
+} from 'lucide-react'
+import { save as pickPath } from '@tauri-apps/plugin-dialog'
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { BrandMark } from '@/components/BrandMark'
@@ -29,10 +40,16 @@ const SOURCE = 'https://github.com/Moresyl/dsh-studio'
  * Two panels asking the same question of the same feed is how an app ends up
  * telling a user two different things about which version they are on. The
  * signed updater also owns the download: this pane only starts it after a click.
+ *
+ * The diagnostic report is here for the same reason the paths are. This is the
+ * pane somebody opens once something has gone wrong, and the report is every
+ * question that thread was going to ask, answered before it is sent.
  */
 export function AboutPane() {
   const [about, setAbout] = useState<About | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [building, setBuilding] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const release = useUpdate((state) => state.release)
   const checked = useUpdate((state) => state.checked)
@@ -53,6 +70,56 @@ export function AboutPane() {
   const reveal = (path: string) => {
     void revealItemInDir(path).catch((cause: unknown) => setError(describe(cause)))
   }
+
+  /**
+   * Gather the report, which is the slow half of both buttons.
+   *
+   * Slow because it asks every Node runtime on the machine for its version, so
+   * the spinner is on the button rather than nowhere — and off again before any
+   * dialog opens, since waiting on a person is not work to show progress for.
+   */
+  const build = useCallback(async () => {
+    setBuilding(true)
+    setError(null)
+    try {
+      return await ipc.reportBuild()
+    } catch (cause) {
+      setError(describe(cause))
+      return null
+    } finally {
+      setBuilding(false)
+    }
+  }, [])
+
+  const copyReport = useCallback(async () => {
+    const report = await build()
+    if (!report) return
+
+    // The webview's own clipboard rather than a plugin: this document is served
+    // from localhost, a secure context, and a click is the gesture it asks for.
+    await navigator.clipboard.writeText(report.text)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1400)
+  }, [build])
+
+  const saveReport = useCallback(async () => {
+    const report = await build()
+    if (!report) return
+
+    const path = await pickPath({
+      title: t('about.reportTitle'),
+      defaultPath: report.name,
+      filters: [{ name: t('about.reportKind'), extensions: ['md'] }],
+    })
+    // Dismissed, which is an answer rather than a failure.
+    if (!path) return
+
+    try {
+      await ipc.reportSave(path, report.text)
+    } catch (cause) {
+      setError(describe(cause))
+    }
+  }, [build])
 
   const notes = release ? notesForDisplay(release.notes) : ''
   const percent =
@@ -163,6 +230,34 @@ export function AboutPane() {
               <PathRow label={t('about.harnessDir')} path={about?.harnessDir} onReveal={reveal} />
               <PathRow label={t('about.profileDir')} path={about?.profileDir} onReveal={reveal} />
             </dl>
+          </section>
+
+          <section className="flex flex-col gap-2">
+            <h4 className="caption">{t('about.diagnostics')}</h4>
+            <div className="flex flex-col gap-3 rounded-panel border border-line bg-canvas-deep/50 px-4 py-3.5">
+              <p className="text-[12px] leading-relaxed text-muted">{t('about.diagnosticsBody')}</p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  onClick={() => void copyReport()}
+                  disabled={building}
+                  data-hint={t('about.reportHint')}
+                >
+                  {copied ? (
+                    <Check size={13} strokeWidth={2.6} className="text-ok" />
+                  ) : building ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Copy size={13} strokeWidth={2.1} />
+                  )}
+                  {copied ? t('statusbar.copied') : t('about.reportCopy')}
+                </Button>
+                <Button variant="secondary" onClick={() => void saveReport()} disabled={building}>
+                  <FileDown size={13} strokeWidth={2.2} aria-hidden="true" />
+                  {t('about.reportSave')}
+                </Button>
+              </div>
+            </div>
           </section>
 
           <div className="flex items-center gap-4 text-[11.5px] text-faint">
