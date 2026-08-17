@@ -53,7 +53,6 @@ const en = {
   'view.panel': 'Control panel',
 
   'statusbar.open': 'Open in your browser',
-  'statusbar.copy': 'right-click to copy',
   'statusbar.copied': 'Copied',
   'statusbar.reveal': 'Show in file manager',
 
@@ -93,6 +92,10 @@ const en = {
   'plugins.installed': 'Installed',
   'plugins.remove': 'Remove',
   'plugins.removing': 'Removing…',
+  'plugins.confirmRemove': 'Remove this plugin?',
+  'plugins.confirmRemoveBody':
+    'The package is uninstalled from the profile, and its layer stops loading at the next start. Nothing else in the profile is touched.',
+  'plugins.clearSearch': 'Clear search',
   'plugins.restart': 'Layers are composed at startup — restart the harness to apply a change.',
   'plugins.bootstrap':
     'No package manager on this machine. The first change installs one first, which takes a few minutes.',
@@ -150,6 +153,15 @@ const en = {
   'update.available': 'Update {version}',
   'update.view': 'See what changed in this release',
   'update.dismiss': 'Not now',
+
+  'menu.copy': 'Copy',
+  'menu.copyAll': 'Copy everything',
+  'menu.clearLog': 'Clear console',
+  'menu.copyAddress': 'Copy address',
+  'menu.copyPath': 'Copy path',
+  'menu.copyPid': 'Copy process id',
+
+  'dialog.cancel': 'Cancel',
 } as const
 
 export type MessageKey = keyof typeof en
@@ -201,7 +213,6 @@ const zh: Record<MessageKey, string> = {
   'view.panel': '控制面板',
 
   'statusbar.open': '在浏览器中打开',
-  'statusbar.copy': '右键复制',
   'statusbar.copied': '已复制',
   'statusbar.reveal': '在文件管理器中显示',
 
@@ -239,6 +250,10 @@ const zh: Record<MessageKey, string> = {
   'plugins.installed': '已安装',
   'plugins.remove': '移除',
   'plugins.removing': '移除中…',
+  'plugins.confirmRemove': '要移除这个插件吗？',
+  'plugins.confirmRemoveBody':
+    '这个扩展包会从配置中卸载，它的图层在下次启动时不再加载。配置里的其他东西不受影响。',
+  'plugins.clearSearch': '清除搜索',
   'plugins.restart': '图层在启动时组合，重启 Harness 后改动才会生效。',
   'plugins.bootstrap': '本机没有包管理器，首次改动会先安装一个，需要几分钟。',
   'plugins.declaresPatch': '声明了配置补丁',
@@ -292,6 +307,15 @@ const zh: Record<MessageKey, string> = {
   'update.available': '新版本 {version}',
   'update.view': '查看这个版本改了什么',
   'update.dismiss': '暂不提醒',
+
+  'menu.copy': '复制',
+  'menu.copyAll': '复制全部',
+  'menu.clearLog': '清空控制台',
+  'menu.copyAddress': '复制地址',
+  'menu.copyPath': '复制路径',
+  'menu.copyPid': '复制进程号',
+
+  'dialog.cancel': '取消',
 }
 
 const dictionaries = { en, zh }

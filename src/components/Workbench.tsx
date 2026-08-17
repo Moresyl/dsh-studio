@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Gauge, Info, Puzzle, Smartphone, type LucideIcon } from 'lucide-react'
 
 import { AboutPane } from '@/components/AboutPane'
@@ -7,13 +7,15 @@ import { PluginMarket } from '@/components/PluginMarket'
 import { RemotePane } from '@/components/RemotePane'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
+import { ACCELERATOR } from '@/lib/platform'
 import { usePlugins } from '@/state/plugins'
 import { useRemote } from '@/state/remote'
 import { useUpdate } from '@/state/update'
 
-type View = 'console' | 'plugins' | 'remote' | 'about'
+export type View = 'console' | 'plugins' | 'remote' | 'about'
 
-const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
+/** Rail order, which is also the order the number accelerators follow. */
+export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'console', icon: Gauge, label: 'nav.console' },
   { id: 'plugins', icon: Puzzle, label: 'nav.plugins' },
   { id: 'remote', icon: Smartphone, label: 'nav.remote' },
@@ -33,10 +35,19 @@ const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
  * door is open, a count on Plugins. Those are the two facts someone would
  * otherwise have to open a pane to check, and a nav item that answers the
  * question is worth more than one that merely leads to the answer.
+ *
+ * Which pane is showing belongs to the window rather than to this component,
+ * because the keyboard can reach a pane while the harness is the thing in front
+ * — and answering Ctrl+3 by switching a pane nobody can see would be worse than
+ * not answering it at all.
  */
-export function Workbench({ hidden }: { hidden: boolean }) {
-  const [view, setView] = useState<View>('console')
+interface WorkbenchProps {
+  hidden: boolean
+  view: View
+  onSelect: (view: View) => void
+}
 
+export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
   const remoteOpen = useRemote((state) => state.status?.open ?? false)
   // Deliberately not the status bar's rule: that notice can be waved away, and
   // this dot is then the only thing left pointing at where the release is. A
@@ -59,13 +70,16 @@ export function Workbench({ hidden }: { hidden: boolean }) {
         aria-label={t('view.panel')}
         className="chrome relative z-10 flex w-[62px] shrink-0 flex-col items-center gap-0.5 border-r border-line py-2"
       >
-        {VIEWS.map((entry) => (
+        {VIEWS.map((entry, index) => (
           <RailItem
             key={entry.id}
             icon={entry.icon}
             label={t(entry.label)}
+            // The tooltip is where a desktop app teaches its accelerators, and
+            // the only place someone finds out these exist.
+            hint={`${t(entry.label)}  ${ACCELERATOR}${index + 1}`}
             active={view === entry.id}
-            onClick={() => setView(entry.id)}
+            onClick={() => onSelect(entry.id)}
             badge={
               entry.id === 'remote' && remoteOpen ? (
                 <LiveDot />
@@ -97,15 +111,18 @@ export function Workbench({ hidden }: { hidden: boolean }) {
 interface RailItemProps {
   icon: LucideIcon
   label: string
+  /** The tooltip: the same name, plus the keystroke that gets here. */
+  hint: string
   active: boolean
   badge?: ReactNode
   onClick: () => void
 }
 
-function RailItem({ icon: Icon, label, active, badge, onClick }: RailItemProps) {
+function RailItem({ icon: Icon, label, hint, active, badge, onClick }: RailItemProps) {
   return (
     <button
       type="button"
+      title={hint}
       aria-current={active ? 'page' : undefined}
       onClick={onClick}
       className={[

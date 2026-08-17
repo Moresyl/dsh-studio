@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
+import { ContextMenu } from '@/components/ContextMenu'
+import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
-import { Workbench } from '@/components/Workbench'
+import { Workbench, VIEWS, type View } from '@/components/Workbench'
+import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { watchForUpdates } from '@/state/update'
@@ -28,6 +31,17 @@ export default function App() {
   // without an effect having to reach in and reset a flag — and a restart, which
   // lands on a fresh port, is a new origin and so gets the same treatment.
   const [panelFor, setPanelFor] = useState<string | null>(null)
+  const [view, setView] = useState<View>('console')
+
+  // Showing a pane always means putting it in front. Anything else answers a
+  // keystroke by changing something the user cannot see.
+  const show = useCallback(
+    (next: View) => {
+      setView(next)
+      setPanelFor(origin)
+    },
+    [origin],
+  )
 
   // The window was created hidden. Reveal it once there is something in it.
   useEffect(() => {
@@ -62,6 +76,24 @@ export default function App() {
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
 
+  // Ctrl+1 through Ctrl+4, in rail order. Every application with a fixed set of
+  // views has these, and a user who tries one and gets nothing has just learned
+  // that this is not one of those applications.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
+      // A modal is a question, and the rest of the window is not answering it.
+      if (useDialog.getState().pending) return
+      const wanted = VIEWS[Number(event.key) - 1]
+      if (!wanted) return
+      event.preventDefault()
+      show(wanted.id)
+    }
+
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [show])
+
   // With nothing serving there is nothing else to show.
   const showPanel = origin === null || panelFor === origin
 
@@ -80,10 +112,16 @@ export default function App() {
         {/* Hidden rather than unmounted, for the same reason the frame is: a
             search someone typed and a pairing code on screen must survive a
             glance at the harness. */}
-        <Workbench hidden={!showPanel} />
+        <Workbench hidden={!showPanel} view={view} onSelect={show} />
       </div>
 
       <StatusBar status={status} environment={environment} />
+
+      {/* Last, and outside the layout: both are positioned against the window
+          and have to be able to cover anything in it. The menu is mounted after
+          the dialog because a right-click inside a dialog still gets a menu. */}
+      <Dialog />
+      <ContextMenu />
     </div>
   )
 }

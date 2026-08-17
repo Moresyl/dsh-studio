@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Download, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
+import { Copy, Download, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
 import { Ambient } from '@/components/Ambient'
@@ -12,6 +12,7 @@ import { t } from '@/lib/i18n'
 import { formatVersion, isAtLeast, type Environment, type NodeInstallation } from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
 import { useHarness } from '@/state/harness'
+import { contextMenu } from '@/state/menu'
 
 /** Where someone without Node goes to get one. */
 const NODE_DOWNLOADS = 'https://nodejs.org/en/download'
@@ -46,6 +47,7 @@ export function ConsolePane() {
     start,
     stop,
     install,
+    clear,
   } = useHarness()
 
   useEffect(() => {
@@ -159,7 +161,7 @@ export function ConsolePane() {
         </div>
       </aside>
 
-      <LogConsole lines={lines} />
+      <LogConsole lines={lines} onClear={clear} />
     </div>
   )
 }
@@ -191,10 +193,10 @@ function Section({
  * This is the only place the address appears, and the right one: it is a fact
  * about the plumbing, and this is the panel where the plumbing is. A click opens
  * it in the user's own browser — the harness is a web service and sometimes the
- * right window for it is not this one — and a right-click copies it, because the
- * other half of the time it is being pasted into a terminal. The process id is
- * what you need when the answer is to go and look at the thing in a task
- * manager.
+ * right window for it is not this one — and a right-click offers to copy it,
+ * because the other half of the time it is being pasted into a terminal. The
+ * process id is what you need when the answer is to go and look at the thing in
+ * a task manager, so it copies too.
  */
 function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
   const [copied, setCopied] = useState(false)
@@ -202,8 +204,8 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
   // The webview's own clipboard rather than a plugin: this document is served
   // from localhost, a secure context on every platform we ship, and a click is
   // the user gesture the API asks for.
-  const copy = () => {
-    void navigator.clipboard.writeText(origin).then(() => {
+  const copy = (value: string) => {
+    void navigator.clipboard.writeText(value).then(() => {
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1200)
     })
@@ -216,12 +218,20 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
         <dd className="ml-auto min-w-0">
           <button
             type="button"
-            title={`${t('statusbar.open')} · ${t('statusbar.copy')}`}
+            title={t('statusbar.open')}
             onClick={() => void openUrl(origin)}
-            onContextMenu={(event) => {
-              event.preventDefault()
-              copy()
-            }}
+            onContextMenu={contextMenu([
+              {
+                label: t('statusbar.open'),
+                icon: ExternalLink,
+                run: () => void openUrl(origin),
+              },
+              {
+                label: t('menu.copyAddress'),
+                icon: Copy,
+                run: () => copy(origin),
+              },
+            ])}
             className="flex items-center gap-1.5 font-mono text-[11.5px] text-text tabular-nums transition-colors duration-100 hover:text-brand"
           >
             <span className="truncate">
@@ -234,7 +244,14 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
 
       <div className="flex h-[30px] items-center gap-2 px-2.5">
         <dt className="shrink-0 text-[12px] text-muted">{t('service.process')}</dt>
-        <dd className="ml-auto font-mono text-[11.5px] text-text tabular-nums">{pid}</dd>
+        <dd
+          onContextMenu={contextMenu([
+            { label: t('menu.copyPid'), icon: Copy, run: () => copy(String(pid)) },
+          ])}
+          className="ml-auto font-mono text-[11.5px] text-text tabular-nums"
+        >
+          {pid}
+        </dd>
       </div>
     </dl>
   )

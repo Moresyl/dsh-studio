@@ -178,7 +178,8 @@ about being unfinished.
 | macOS / Linux rendering                      | ⏳ not yet run                                                     |
 | Bundled Node runtime (no system Node needed) | ⏳ planned                                                         |
 | Tray icon, close-to-tray while serving       | ✅                                                                 |
-| Native context menus, silent self-update     | ⏳ planned                                                         |
+| Native context menus, saved window bounds    | ✅                                                                 |
+| Silent self-update                           | ⏳ planned                                                         |
 | Packaged releases                            | ✅ automated for Windows, Linux, and macOS (Intel + Apple Silicon) |
 
 ## Design notes

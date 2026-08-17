@@ -40,6 +40,8 @@ interface HarnessStore {
   start: () => Promise<void>
   stop: () => Promise<void>
   install: () => Promise<void>
+  /** Empty the visible scrollback. The supervisor's own ring is untouched. */
+  clear: () => void
   /** Apply one event from the Rust side. */
   apply: (event: HarnessEvent) => void
 }
@@ -98,6 +100,10 @@ export const useHarness = create<HarnessStore>((set, get) => ({
       set({ installing: false })
     }
   },
+
+  // Only what is on screen: asking the supervisor to forget its buffer would
+  // throw away the evidence of a crash for everyone, including a later report.
+  clear: () => set({ lines: [] }),
 
   apply: (event) => {
     if (event.kind === 'log') {

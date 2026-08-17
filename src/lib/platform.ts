@@ -17,3 +17,11 @@ export const isLinux = !isMac && !isWindows
  * leave for them.
  */
 export const drawsWindowControls = !isMac
+
+/**
+ * How this platform writes the modifier that shortcuts hang off.
+ *
+ * Spelled the way the platform spells it, because a tooltip that says "Ctrl" on
+ * a Mac is a tooltip written by someone who has never used one.
+ */
+export const ACCELERATOR = isMac ? '⌘' : 'Ctrl+'

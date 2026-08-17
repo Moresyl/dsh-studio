@@ -5,9 +5,18 @@
 //! preferences: each platform has one arrangement that reads as native, and
 //! picking the wrong one is what makes a cross-platform app feel ported.
 
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use tauri::{Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use serde::{Deserialize, Serialize};
+use tauri::{
+    Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewUrl, WebviewWindow,
+    WebviewWindowBuilder, WindowEvent,
+};
+
+use crate::paths;
 
 /// Label every other module uses to find the window.
 pub const MAIN_LABEL: &str = "main";
@@ -21,6 +30,13 @@ const MIN_HEIGHT: f64 = 620.0;
 
 /// How long the frontend gets to reveal the window before Rust does it anyway.
 const REVEAL_DEADLINE: Duration = Duration::from_secs(4);
+
+/// How long a drag or a resize has to stop before the result is written down.
+///
+/// A resize is hundreds of events. This is the pause that turns them into one
+/// file write, and it is short enough that a window closed straight after being
+/// moved has still recorded where it went.
+const SETTLE: Duration = Duration::from_millis(600);
 
 /// Create the main window, hidden.
 ///
@@ -48,6 +64,11 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
 
     let window = builder.build()?;
 
+    // While it is still hidden, so the window is only ever seen where the user
+    // left it — never centred first and then jumping.
+    restore(&window);
+    remember(&window);
+
     // Hiding the window until the frontend paints is only a safe trade if a
     // frontend that never paints still leaves something on screen to report the
     // problem in. Otherwise the app would simply appear not to launch.
@@ -69,4 +90,165 @@ pub fn reveal<R: tauri::Runtime>(window: &WebviewWindow<R>) {
     let _ = window.show();
     let _ = window.unminimize();
     let _ = window.set_focus();
+}
+
+/// Where the window was and how big, in physical pixels.
+///
+/// Physical rather than logical because that is what both the window and the
+/// monitor list report, and comparing the two is the whole point: a position
+/// saved on a second monitor has to be recognisable as off-screen once that
+/// monitor is gone.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+struct Placement {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    maximized: bool,
+}
+
+fn placement_file() -> PathBuf {
+    paths::app_data_dir().join("window.json")
+}
+
+/// Put the window back where it was left.
+///
+/// Everything here is best effort by design. A window that opens centred is a
+/// minor disappointment; an application that refuses to start because it could
+/// not read a convenience file is a bug.
+fn restore<R: Runtime>(window: &WebviewWindow<R>) {
+    let Some(placement) = read_placement() else {
+        return;
+    };
+
+    // A window restored onto a monitor that is no longer there is a window the
+    // user cannot reach. The centred default is the safe answer.
+    if on_screen(window, &placement) {
+        let _ = window.set_position(PhysicalPosition::new(placement.x, placement.y));
+        let _ = window.set_size(PhysicalSize::new(placement.width, placement.height));
+    }
+
+    if placement.maximized {
+        let _ = window.maximize();
+    }
+}
+
+/// Keep writing down where the window is for as long as it is open.
+///
+/// A maximized window records only that it was maximized: its size is the
+/// screen's, and restoring that as the un-maximized size would leave someone who
+/// un-maximizes with a window that fills the display anyway.
+fn remember<R: Runtime>(window: &WebviewWindow<R>) {
+    let Some(initial) = current_placement(window) else {
+        return;
+    };
+
+    let tracker = Arc::new(Tracker {
+        latest: Mutex::new(initial),
+        scheduled: AtomicBool::new(false),
+    });
+    let watched = window.clone();
+
+    window.on_window_event(move |event| {
+        if !matches!(event, WindowEvent::Moved(_) | WindowEvent::Resized(_)) {
+            return;
+        }
+        // Minimizing is a resize to something that is not a window shape.
+        if watched.is_minimized().unwrap_or(false) {
+            return;
+        }
+
+        let maximized = watched.is_maximized().unwrap_or(false);
+        // Poisoned only if a previous handler panicked while holding it, and
+        // then the recorded position is the least of the problems.
+        let Ok(mut latest) = tracker.latest.lock() else {
+            return;
+        };
+        latest.maximized = maximized;
+        if !maximized {
+            if let Some(fresh) = current_placement(&watched) {
+                *latest = Placement {
+                    maximized: false,
+                    ..fresh
+                };
+            }
+        }
+        drop(latest);
+
+        // One write per gesture rather than one per event: whoever gets here
+        // first books the flush, and everyone else has already updated the value
+        // that flush will read.
+        if tracker.scheduled.swap(true, Ordering::SeqCst) {
+            return;
+        }
+        let pending = Arc::clone(&tracker);
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(SETTLE).await;
+            pending.scheduled.store(false, Ordering::SeqCst);
+            if let Ok(latest) = pending.latest.lock() {
+                write_placement(&latest);
+            }
+        });
+    });
+}
+
+struct Tracker {
+    latest: Mutex<Placement>,
+    /// Whether a write is already queued for the gesture in progress.
+    scheduled: AtomicBool,
+}
+
+fn current_placement<R: Runtime>(window: &WebviewWindow<R>) -> Option<Placement> {
+    let position = window.outer_position().ok()?;
+    let size = window.inner_size().ok()?;
+
+    Some(Placement {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+        maximized: window.is_maximized().unwrap_or(false),
+    })
+}
+
+/// Whether the strip the window is dragged by lands on a monitor that exists.
+///
+/// The test is the top edge and not the whole rectangle: a window may hang off
+/// the bottom or the side of a display and still be perfectly usable, but one
+/// whose title bar is off-screen cannot be moved back.
+fn on_screen<R: Runtime>(window: &WebviewWindow<R>, placement: &Placement) -> bool {
+    let Ok(monitors) = window.available_monitors() else {
+        return false;
+    };
+
+    let grip_x = placement.x + i32::try_from(placement.width / 2).unwrap_or(0);
+    let grip_y = placement.y + TITLE_BAR_DEPTH;
+
+    monitors.iter().any(|monitor| {
+        let origin = monitor.position();
+        let size = monitor.size();
+        let right = origin.x + i32::try_from(size.width).unwrap_or(i32::MAX);
+        let bottom = origin.y + i32::try_from(size.height).unwrap_or(i32::MAX);
+
+        (origin.x..right).contains(&grip_x) && (origin.y..bottom).contains(&grip_y)
+    })
+}
+
+/// Physical pixels into the window where the drag strip is, at 100% scaling.
+const TITLE_BAR_DEPTH: i32 = 18;
+
+/// No file on the first launch, and a corrupt one is no worse than none.
+fn read_placement() -> Option<Placement> {
+    let raw = std::fs::read(placement_file()).ok()?;
+    serde_json::from_slice(&raw).ok()
+}
+
+fn write_placement(placement: &Placement) {
+    let path = placement_file();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(raw) = serde_json::to_vec(placement) {
+        let _ = std::fs::write(path, raw);
+    }
 }

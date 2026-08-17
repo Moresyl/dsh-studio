@@ -4,6 +4,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { BrandMark } from '@/components/BrandMark'
 import { t } from '@/lib/i18n'
 import { drawsWindowControls, isMac } from '@/lib/platform'
+import { contextMenu, SEPARATOR } from '@/state/menu'
 
 /** Width the macOS traffic lights need before the title may start. */
 const TRAFFIC_LIGHT_INSET = 78
@@ -50,9 +51,25 @@ export function TitleBar({ serving, panelOpen, onTogglePanel }: TitleBarProps) {
     }
   }, [appWindow])
 
+  // The menu a title bar answers a right-click with. Turning the decorations
+  // off took the system's own away, and a title bar that does nothing when
+  // right-clicked is one of the small absences that add up to "this is a web
+  // page in a frame". Only where this app draws the chrome: macOS keeps its own
+  // title bar, and has no window menu to imitate.
+  const windowMenu = contextMenu(() => [
+    { label: t('window.minimize'), run: () => void appWindow.minimize() },
+    {
+      label: maximized ? t('window.restore') : t('window.maximize'),
+      run: () => void appWindow.toggleMaximize(),
+    },
+    SEPARATOR,
+    { label: serving ? t('window.hide') : t('window.close'), run: () => void appWindow.close() },
+  ])
+
   return (
     <header
       data-tauri-drag-region
+      onContextMenu={drawsWindowControls ? windowMenu : undefined}
       className="chrome relative z-20 flex h-9 shrink-0 items-center border-b border-line select-none"
       style={isMac ? { paddingLeft: TRAFFIC_LIGHT_INSET } : undefined}
     >

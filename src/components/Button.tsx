@@ -1,8 +1,8 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ComponentPropsWithRef, ReactNode } from 'react'
 
-type Variant = 'primary' | 'secondary' | 'ghost'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends ComponentPropsWithRef<'button'> {
   variant?: Variant
   children: ReactNode
 }
@@ -24,6 +24,10 @@ const VARIANT: Record<Variant, string> = {
   secondary:
     'border border-line-strong bg-surface-2 text-text hover:border-line-strong hover:brightness-[1.15] active:brightness-95',
   ghost: 'px-2 text-muted hover:bg-surface-2 hover:text-text',
+  // Filled, like the primary, because the button that removes something should
+  // be as easy to aim at as the one that keeps it — the safety is in the
+  // question above it, not in making the answer hard to hit.
+  danger: 'bg-danger text-[#2b0a11] hover:brightness-[1.08] active:brightness-95',
 }
 
 export function Button({ variant = 'primary', className, children, ...rest }: ButtonProps) {

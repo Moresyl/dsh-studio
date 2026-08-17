@@ -1,11 +1,12 @@
-import type { ReactNode } from 'react'
-import { ArrowUpCircle, FolderOpen, X } from 'lucide-react'
+import type { MouseEvent, ReactNode } from 'react'
+import { ArrowUpCircle, Copy, FolderOpen, X } from 'lucide-react'
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { StatusDot } from '@/components/StatusDot'
 import { t } from '@/lib/i18n'
 import { formatVersion, type Environment, type Status } from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
+import { contextMenu } from '@/state/menu'
 import { isAnnounceable, useUpdate } from '@/state/update'
 
 /**
@@ -43,7 +44,21 @@ export function StatusBar({ status, environment }: StatusBarProps) {
       <div className="flex-1" />
 
       {node && (
-        <Segment title={node.path}>
+        <Segment
+          title={node.path}
+          onContextMenu={contextMenu([
+            {
+              label: t('menu.copyPath'),
+              icon: Copy,
+              run: () => void navigator.clipboard.writeText(node.path),
+            },
+            {
+              label: t('statusbar.reveal'),
+              icon: FolderOpen,
+              run: () => void revealItemInDir(node.path),
+            },
+          ])}
+        >
           Node {formatVersion(node.version)}
           <span className="text-faint">· {t(`source.${node.source}`)}</span>
         </Segment>
@@ -55,6 +70,18 @@ export function StatusBar({ status, environment }: StatusBarProps) {
         <Segment
           title={`${environment.workspace}\n${t('statusbar.reveal')}`}
           onClick={() => void revealItemInDir(environment.workspace)}
+          onContextMenu={contextMenu([
+            {
+              label: t('statusbar.reveal'),
+              icon: FolderOpen,
+              run: () => void revealItemInDir(environment.workspace),
+            },
+            {
+              label: t('menu.copyPath'),
+              icon: Copy,
+              run: () => void navigator.clipboard.writeText(environment.workspace),
+            },
+          ])}
         >
           <FolderOpen size={11} strokeWidth={2} className="shrink-0 text-faint" />
           <span className="max-w-[22rem] truncate">{tail(environment.workspace)}</span>
@@ -114,15 +141,16 @@ function UpdateNotice() {
 interface SegmentProps {
   title: string
   onClick?: () => void
+  onContextMenu?: (event: MouseEvent) => void
   children: ReactNode
 }
 
-function Segment({ title, onClick, children }: SegmentProps) {
+function Segment({ title, onClick, onContextMenu, children }: SegmentProps) {
   const className = 'flex items-center gap-1.5 px-2.5 whitespace-nowrap'
 
   if (!onClick) {
     return (
-      <div className={className} title={title}>
+      <div className={className} title={title} onContextMenu={onContextMenu}>
         {children}
       </div>
     )
@@ -133,6 +161,7 @@ function Segment({ title, onClick, children }: SegmentProps) {
       type="button"
       title={title}
       onClick={onClick}
+      onContextMenu={onContextMenu}
       className={`${className} transition-colors duration-100 hover:bg-surface-2 hover:text-text`}
     >
       {children}

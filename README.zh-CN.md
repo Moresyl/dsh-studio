@@ -160,7 +160,8 @@ flowchart LR
 | macOS / Linux 渲染                 | ⏳ 尚未验证                                                   |
 | 内置 Node runtime（无需系统 Node） | ⏳ 计划中                                                     |
 | 托盘图标、运行中关闭到托盘         | ✅                                                            |
-| 原生右键菜单、静默自更新           | ⏳ 计划中                                                     |
+| 原生右键菜单、窗口位置记忆         | ✅                                                            |
+| 静默自更新                         | ⏳ 计划中                                                     |
 | 打包发布                           | ✅ 自动构建 Windows、Linux、macOS Intel 与 Apple Silicon 版本 |
 
 ## 设计取舍

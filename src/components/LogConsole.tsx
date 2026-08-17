@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { TerminalSquare } from 'lucide-react'
+import { ClipboardCopy, Copy, Eraser, TerminalSquare } from 'lucide-react'
 
 import { t } from '@/lib/i18n'
 import type { LogLine } from '@/lib/ipc'
+import { contextMenu, selectedText } from '@/state/menu'
 
 /**
  * Raw harness output, as a pane rather than a disclosure.
@@ -15,8 +16,12 @@ import type { LogLine } from '@/lib/ipc'
  * It follows the tail while the reader is already at the bottom, and stops
  * following the moment they scroll up — so reading an error is not a fight with
  * incoming lines.
+ *
+ * What people do with a log is paste it somewhere, so the right-click menu is
+ * the pane's real interface: copy what is highlighted, copy the lot, or wipe
+ * the screen before reproducing something.
  */
-export function LogConsole({ lines }: { lines: LogLine[] }) {
+export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () => void }) {
   const viewport = useRef<HTMLDivElement>(null)
   const following = useRef(true)
 
@@ -47,6 +52,34 @@ export function LogConsole({ lines }: { lines: LogLine[] }) {
       <div
         ref={viewport}
         onScroll={onScroll}
+        // Built at the click and not at the render, because whether there is a
+        // selection to copy is only true or false at the moment of asking.
+        onContextMenu={contextMenu(() => {
+          const selection = selectedText()
+          return [
+            {
+              label: t('menu.copy'),
+              icon: Copy,
+              // Greyed rather than absent, so the menu does not change shape
+              // between one right-click and the next.
+              disabled: selection.length === 0,
+              run: () => void navigator.clipboard.writeText(selection),
+            },
+            {
+              label: t('menu.copyAll'),
+              icon: ClipboardCopy,
+              disabled: lines.length === 0,
+              run: () =>
+                void navigator.clipboard.writeText(lines.map((entry) => entry.line).join('\n')),
+            },
+            {
+              label: t('menu.clearLog'),
+              icon: Eraser,
+              disabled: lines.length === 0,
+              run: onClear,
+            },
+          ]
+        })}
         className="selectable min-h-0 flex-1 overflow-y-auto px-3 py-2 font-mono text-[11.5px] leading-[1.65]"
       >
         {lines.length === 0 ? (

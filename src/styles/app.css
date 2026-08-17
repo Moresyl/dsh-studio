@@ -66,6 +66,31 @@
   }
 
   --animate-rise: rise 0.22s var(--ease-out-soft) both;
+
+  /* A dialog arrives from slightly behind the glass. Faster than the panes,
+     because it is answering a click that has already happened. */
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 6px, 0) scale(0.975);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  --animate-pop: pop 0.16s var(--ease-out-soft) both;
+  --animate-fade: fade 0.14s linear both;
 }
 
 /*
@@ -127,10 +152,37 @@
     cursor: text;
   }
 
+  /* The browser's own selection is a saturated blue that belongs to no palette
+     here, and it is the one colour a user sees that the app did not choose. */
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-brand) 34%, transparent);
+    color: var(--color-text);
+  }
+
+  /* A drag that started on a control and ended somewhere else is not a
+     gesture — it is a slip, and a webview answers it by dragging the element.
+     Text opts back in through `.selectable`, which is also what may be dragged. */
+  img,
+  svg,
+  button {
+    -webkit-user-drag: none;
+  }
+
   :focus-visible {
     outline: 2px solid var(--color-brand);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  /* A search field in a webview comes with the browser's own clear button and
+     magnifier: grey, undersized, drawn by Edge, and the only control in the
+     window this app did not draw. The field keeps its type — it is a search
+     field, and the assistive technologies should be told so — and loses the
+     furniture. */
+  input[type='search']::-webkit-search-cancel-button,
+  input[type='search']::-webkit-search-decoration,
+  input[type='search']::-webkit-search-results-button {
+    display: none;
   }
 
   /* Thin, unobtrusive, and always the same width — a scrollbar that grows on

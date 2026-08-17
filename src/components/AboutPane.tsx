@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, FolderOpen, Loader2, RefreshCw, Scale } from 'lucide-react'
+import { ArrowUpRight, Copy, FolderOpen, Loader2, RefreshCw, Scale } from 'lucide-react'
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { BrandMark } from '@/components/BrandMark'
@@ -9,6 +9,7 @@ import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import type { About } from '@/lib/ipc'
+import { contextMenu } from '@/state/menu'
 import { useUpdate } from '@/state/update'
 
 /** Where this build comes from. Our own repository, and the only link here. */
@@ -155,6 +156,14 @@ function PathRow({ label, path, onReveal }: PathRowProps) {
             type="button"
             title={`${path}\n${t('statusbar.reveal')}`}
             onClick={() => onReveal(path)}
+            onContextMenu={contextMenu([
+              { label: t('statusbar.reveal'), icon: FolderOpen, run: () => onReveal(path) },
+              {
+                label: t('menu.copyPath'),
+                icon: Copy,
+                run: () => void navigator.clipboard.writeText(path),
+              },
+            ])}
             className="flex max-w-full items-center gap-1.5 font-mono text-[11.5px] text-muted transition-colors duration-100 hover:text-brand"
           >
             <FolderOpen size={11} strokeWidth={2} className="shrink-0 text-faint" />

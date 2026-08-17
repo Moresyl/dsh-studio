@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   Check,
   Download,
@@ -10,6 +10,7 @@ import {
   Search,
   Trash2,
   TriangleAlert,
+  X,
 } from 'lucide-react'
 import { openUrl } from '@tauri-apps/plugin-opener'
 
@@ -17,6 +18,7 @@ import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { t } from '@/lib/i18n'
 import type { InstalledPlugin, PluginDetail, PluginListing } from '@/lib/ipc'
+import { ask } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
 import { isInstalled, usePlugins } from '@/state/plugins'
 
@@ -59,6 +61,23 @@ export function PluginMarket() {
 
   const [tab, setTab] = useState<Tab>('discover')
   const [query, setQuery] = useState('')
+  const field = useRef<HTMLInputElement>(null)
+
+  // Asked here rather than at each button: both lists remove a plugin the same
+  // way, and a question whose wording depends on which list you happened to be
+  // looking at is a question with two answers.
+  const confirmRemove = useCallback(
+    async (name: string) => {
+      const taken = await ask({
+        title: t('plugins.confirmRemove'),
+        body: t('plugins.confirmRemoveBody'),
+        subject: name,
+        confirm: t('plugins.remove'),
+      })
+      if (taken) await remove(name)
+    },
+    [remove],
+  )
 
   // The package manager talks while it works, and it talks through the
   // supervisor's log — so the tail of that log is this pane's progress bar.
@@ -114,9 +133,18 @@ export function PluginMarket() {
                 aria-hidden="true"
               />
               <input
+                ref={field}
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                // Escape empties a search field on every platform, and does it
+                // without taking the caret out of the field.
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && query !== '') {
+                    event.stopPropagation()
+                    setQuery('')
+                  }
+                }}
                 placeholder={t('plugins.search')}
                 spellCheck={false}
                 autoComplete="off"
@@ -128,6 +156,23 @@ export function PluginMarket() {
                   className="shrink-0 animate-spin text-faint"
                   aria-hidden="true"
                 />
+              )}
+              {/* The browser's own clear button is hidden, so here is one that
+                  matches the rest of the window — and clearing puts the caret
+                  back where the typing was. */}
+              {query !== '' && !searching && (
+                <button
+                  type="button"
+                  title={t('plugins.clearSearch')}
+                  aria-label={t('plugins.clearSearch')}
+                  onClick={() => {
+                    setQuery('')
+                    field.current?.focus()
+                  }}
+                  className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
+                >
+                  <X size={11} strokeWidth={2.4} aria-hidden="true" />
+                </button>
               )}
             </div>
           )}
@@ -161,7 +206,7 @@ export function PluginMarket() {
                 plugins={installed}
                 initialized={profile?.initialized ?? false}
                 working={working}
-                onRemove={(name) => void remove(name)}
+                onRemove={(name) => void confirmRemove(name)}
               />
             )}
           </div>
@@ -187,7 +232,7 @@ export function PluginMarket() {
             installed={selected !== null && isInstalled(profile, selected)}
             working={working}
             onInstall={(spec) => void add(spec)}
-            onRemove={(name) => void remove(name)}
+            onRemove={(name) => void confirmRemove(name)}
           />
         )}
       </div>

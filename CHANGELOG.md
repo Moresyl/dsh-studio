@@ -20,8 +20,49 @@ pre-1.0 caveat that anything may still move.
   in the nav rail also carries a dot for as long as the newer version is
   available, so the notice is not the only way back to it.
 
+- **The window opens where you left it.** Position, size, and whether it was
+  maximised are written a moment after you stop dragging, and restored while the
+  window is still hidden — so it is never seen in the centre of the screen first
+  and then jumping. A position saved on a monitor that is no longer attached is
+  ignored rather than restored somewhere you cannot reach.
+
+- **Right-click menus, everywhere there is something to do.** The log console
+  offers copy, copy everything, and clear; the service address offers open and
+  copy; the process id, the workspace, the Node path, and each path in About
+  offer copy and reveal; and the title bar answers with the window menu that
+  disappeared along with the system's decorations — minimise, maximise, close.
+  They are drawn by the app rather than handed to the system: a Win32 menu
+  arrives in the desktop's theme and visibly belongs to another program. They
+  open under the pointer, flip at the window's edge, follow the arrow keys,
+  close on Escape, and the click that dismisses one does not also press what was
+  underneath it.
+
+- **A question before anything is removed.** Removing a plugin now asks first,
+  in a panel the app drew — not the webview's `confirm()` box, which arrives in
+  the browser's shape with the page's address printed above its buttons and is
+  the loudest thing in a desktop window that says "this is a web page". Enter
+  answers it, Escape and the dimmed area behind it say no, Tab stays inside, and
+  the caret goes back where it was.
+
+- **Ctrl+1 to Ctrl+4** switch to console, plugins, remote, and about — and bring
+  the panel forward if the harness was covering it, because a shortcut that
+  changes something you cannot see is worse than no shortcut. Each rail button
+  names its own key on hover (⌘ on macOS).
+
 ### Changed
 
+- **The browser's reflexes are gone.** F5 no longer throws the application away
+  and rebuilds it, Ctrl+P no longer offers to print the window, Ctrl+scroll no
+  longer rescales the whole interface, a dropped file no longer replaces the app
+  with whatever was dropped, and Ctrl+F, Ctrl+S, Ctrl+U and the rest now do what
+  they do in every other desktop program: nothing. Inside a text field the
+  shortcuts that belong to text still work.
+- Selected text is tinted with the app's own accent instead of the system blue,
+  and buttons and icons can no longer be dragged out of the window as images.
+- The registry search field lost the browser's own clear button — grey,
+  undersized, and the only control in the window this app did not draw — and
+  gained one that matches the rest of it. Escape empties the field without
+  taking the caret out of it.
 - **The service address left the status bar.** A desktop application that prints
   `127.0.0.1:52418` along its bottom edge is telling on itself. The address is a
   fact about the plumbing, so it now lives only in the console's service
