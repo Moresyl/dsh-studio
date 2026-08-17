@@ -1,0 +1,12 @@
+# pnpm writes this, and reformatting it would produce a diff against the file the
+# package manager expects to own.
+pnpm-lock.yaml
+
+# Package manifests written by packaging/generate.mjs. Formatting them here would
+# fight the generator: the next run puts its own shape back, and the diff after a
+# release would be noise on top of the three lines that actually changed.
+bucket/
+packaging/winget/
+packaging/homebrew/
+packaging/aur/
+packaging/flathub/

@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DSH Studio — a desktop shell for DeepSeek Harness</title>
+    <meta
+      name="description"
+      content="A native desktop app that installs, supervises and contains DeepSeek Harness. Windows, macOS and Linux, under four megabytes, MIT licensed."
+    />
+    <link rel="icon" href="assets/brand/icon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="alternate" hreflang="zh-Hans" href="zh.html" />
+    <link rel="alternate" hreflang="en" href="index.html" />
+    <meta property="og:title" content="DSH Studio" />
+    <meta
+      property="og:description"
+      content="A native desktop shell for DeepSeek Harness. Installs it, keeps it alive, and takes every process with it when the window closes."
+    />
+    <meta property="og:type" content="website" />
+  </head>
+
+  <body>
+    <div class="shell">
+      <header class="masthead">
+        <a class="wordmark" href="index.html">
+          <img src="assets/brand/icon.svg" alt="" />
+          DSH Studio
+        </a>
+        <nav>
+          <a href="#download">Download</a>
+          <a href="#features">What it does</a>
+          <a href="#verify">Verify</a>
+          <a href="https://github.com/Moresyl/dsh-studio">Source</a>
+          <a href="zh.html" lang="zh-Hans">中文</a>
+        </nav>
+      </header>
+
+      <main>
+        <div class="hero">
+          <div>
+            <span class="eyebrow">
+              <span class="pip"></span>
+              <span data-version>Latest release</span>
+            </span>
+
+            <h1>DeepSeek Harness, in a window that <em>cleans up after itself</em>.</h1>
+
+            <p class="lede">
+              A native desktop shell — Rust and a system WebView, not a bundled browser. It installs
+              the harness for you, restarts it when it dies, and takes every process it started with
+              it when you close the window.
+            </p>
+
+            <div class="actions">
+              <a
+                class="button primary"
+                href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                data-hero-download
+              >
+                Download
+                <!-- Empty until the real figure arrives; a wrong number is worse
+                     than none, and CSS hides the span while it has nothing in it. -->
+                <span class="note"></span>
+              </a>
+              <a class="button quiet" href="#download">All platforms</a>
+            </div>
+
+            <dl class="facts">
+              <div>
+                <dt>Installer</dt>
+                <dd data-installer-size>under 4 MB</dd>
+              </div>
+              <div>
+                <dt>Platforms</dt>
+                <dd>Windows · macOS · Linux</dd>
+              </div>
+              <div>
+                <dt>Licence</dt>
+                <dd>MIT</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!--
+            Not a screenshot. Rebuilt from the same design tokens the app itself
+            is styled with, which keeps it sharp on any display, costs a few
+            kilobytes instead of a few hundred, and cannot leak the home
+            directory of whoever happened to take the picture.
+          -->
+          <div class="window" aria-hidden="true">
+            <div class="titlebar">
+              <img src="assets/brand/icon.svg" alt="" />
+              DSH Studio
+              <span class="buttons"><span>—</span><span>▢</span><span>✕</span></span>
+            </div>
+            <div class="body">
+              <div style="text-align: center">
+                <span class="status"><span class="pip"></span>Ready to start</span>
+              </div>
+              <div class="rows">
+                <div class="row">
+                  <span class="tick">✓</span> Node.js runtime
+                  <span class="value ok">v22.14.0</span>
+                </div>
+                <div class="row">
+                  <span class="tick">✓</span> DeepSeek Harness
+                  <span class="value ok">installed</span>
+                </div>
+                <div class="row">
+                  <span class="tick">✓</span> Working directory
+                  <span class="value">~/projects/atlas</span>
+                </div>
+              </div>
+              <div class="cta">Start harness</div>
+              <p class="footnote">127.0.0.1:52731 — port assigned by the kernel</p>
+            </div>
+          </div>
+        </div>
+
+        <section id="features">
+          <div class="section-head">
+            <h2>What the shell actually does</h2>
+            <p>
+              The harness is a command-line tool that can run shell commands on your machine. Most
+              of the work here is in treating that seriously: supervising it, containing it, and
+              keeping it off the network.
+            </p>
+          </div>
+
+          <div class="grid">
+            <article class="card">
+              <h3><span class="kicker">Supervision</span>Restarts before you notice</h3>
+              <p>
+                A crashed harness comes back with an increasing backoff rather than a tight loop.
+                The shell also probes it over HTTP every ten seconds and recycles the process after
+                three consecutive misses — a hung server and a dead one look the same from the
+                outside.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">Containment</span>Nothing outlives the window</h3>
+              <p>
+                Every child joins a Windows job object, or a POSIX process group. Closing the shell
+                reclaims the whole tree, including the grandchildren that a plain kill would orphan
+                and leave holding a port.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">Exposure</span>Loopback, on a port nobody chose</h3>
+              <p>
+                The harness starts with <code>--port 0</code> and the shell reads back whatever the
+                kernel assigned. It binds <code>127.0.0.1</code> and nothing else. Neither is
+                configurable, on purpose — this is a process that runs shell commands.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">Setup</span>No prerequisites to read about</h3>
+              <p>
+                No Node.js on the machine? The shell fetches a runtime for it, verifies it and keeps
+                it beside the app. Then it installs the harness itself. A first run is a button, not
+                a page of instructions.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">Plugins</span>A marketplace, in the window</h3>
+              <p>
+                Search the npm registry, read what a plugin does, install it, and turn it on or off
+                again — without a terminal and without restarting the harness by hand.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">Handoff</span>Your phone, paired by QR code</h3>
+              <p>
+                Point a camera at the window and carry the session to your phone over your own
+                network. Pairing codes are one-use and expire in two minutes, and the harness itself
+                never leaves loopback — a separate gateway is what listens on the LAN.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section id="download">
+          <div class="section-head">
+            <h2>Download</h2>
+            <p>
+              Version <strong data-version>latest</strong
+              ><span data-published-wrap hidden>, released <span data-published></span></span>.
+              Sizes below are read from the release itself.
+            </p>
+            <p class="mirror-note" data-api-notice hidden>
+              GitHub's API did not answer, so the links below go to the releases page and the sizes
+              are approximate. Everything still downloads.
+            </p>
+          </div>
+
+          <div class="platforms">
+            <div class="platform" data-platform="windows">
+              <div>
+                <h3>Windows <span class="detected" data-detected hidden>your machine</span></h3>
+                <p>
+                  Windows 10 1809 or newer, 64-bit. Uses the WebView2 runtime Windows already ships.
+                </p>
+              </div>
+              <div class="files">
+                <a
+                  class="file"
+                  data-file="win-nsis"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Installer <span class="size">.exe</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="win-msi"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  MSI <span class="size">.msi</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="platform" data-platform="mac">
+              <div>
+                <h3>macOS <span class="detected" data-detected hidden>your machine</span></h3>
+                <p>
+                  macOS 11 Big Sur or newer. Take the Apple silicon build for any Mac sold since
+                  2020.
+                </p>
+              </div>
+              <div class="files">
+                <a
+                  class="file"
+                  data-file="mac-arm"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Apple silicon <span class="size">.dmg</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="mac-intel"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Intel <span class="size">.dmg</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="platform" data-platform="linux">
+              <div>
+                <h3>Linux <span class="detected" data-detected hidden>your machine</span></h3>
+                <p>
+                  x86-64. The AppImage runs on anything and needs nothing installed, which is why it
+                  is twenty times the size — it carries its own WebKitGTK. The .deb and .rpm use the
+                  one your distribution ships.
+                </p>
+              </div>
+              <div class="files">
+                <a
+                  class="file"
+                  data-file="linux-appimage"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  AppImage <span class="size">.AppImage</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="linux-deb"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Debian <span class="size">.deb</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="linux-rpm"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Fedora <span class="size">.rpm</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <p class="mirror-note">
+            Downloads are served by GitHub. If they are slow or blocked where you are, see the
+            <a href="https://github.com/Moresyl/dsh-studio/blob/main/packaging/MIRRORS.md"
+              >mirror list</a
+            >.
+          </p>
+        </section>
+
+        <section id="package-managers">
+          <div class="section-head">
+            <h2>Or let a package manager do it</h2>
+            <p>
+              Installed this way, updates arrive with everything else you upgrade. Each channel
+              below says plainly whether it is live yet — the ones that need a submission to an
+              outside registry are marked, rather than printed as a command that would fail.
+            </p>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Package manager">
+            <button
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="install-command"
+              data-for="windows"
+              data-command="scoop bucket add dsh https://github.com/Moresyl/dsh-studio
+scoop install dsh-studio"
+            >
+              Scoop
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="windows"
+              data-command="winget install Moresyl.DSHStudio"
+            >
+              winget
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="mac"
+              data-command="brew tap moresyl/dsh https://github.com/Moresyl/homebrew-dsh
+brew install --cask dsh-studio"
+            >
+              Homebrew
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="linux"
+              data-command="yay -S dsh-studio-bin"
+            >
+              AUR
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="linux"
+              data-command="flatpak install flathub io.github.moresyl.dshstudio"
+            >
+              Flathub
+            </button>
+          </div>
+
+          <div class="command">
+            <!-- Plain here, sigils added by the script: this is what a visitor
+                 with JavaScript off sees, and it is still a copyable command. -->
+            <pre id="install-command" role="tabpanel" tabindex="0" data-command-output>
+scoop bucket add dsh https://github.com/Moresyl/dsh-studio
+scoop install dsh-studio</pre>
+            <button type="button" data-copy data-copied="Copied" data-copy-failed="Press Ctrl+C">
+              Copy
+            </button>
+          </div>
+
+          <div class="channels">
+            <div class="channel">
+              <span class="state live">live</span>
+              <strong>Scoop</strong>
+              <span>This repository is the bucket, so it works the moment a release exists.</span>
+            </div>
+            <div class="channel">
+              <span class="state pending">ready to submit</span>
+              <strong>winget</strong>
+              <span
+                >Manifest in
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/winget"
+                  >packaging/winget</a
+                >, passing <code>winget validate</code>, pending a pull request to
+                microsoft/winget-pkgs.</span
+              >
+            </div>
+            <div class="channel">
+              <span class="state pending">needs a tap</span>
+              <strong>Homebrew Cask</strong>
+              <span
+                >Cask in
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/homebrew"
+                  >packaging/homebrew</a
+                >. A cask has to live in its own <code>homebrew-*</code> repository.</span
+              >
+            </div>
+            <div class="channel">
+              <span class="state pending">not yet published</span>
+              <strong>AUR</strong>
+              <span
+                >PKGBUILD in
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/aur"
+                  >packaging/aur</a
+                >, pending an upload to aur.archlinux.org.</span
+              >
+            </div>
+            <div class="channel">
+              <span class="state pending">unbuilt</span>
+              <strong>Flathub</strong>
+              <span
+                >Manifest in
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/flathub"
+                  >packaging/flathub</a
+                >. Written but never built: a sandboxed app that runs your shell commands needs a
+                careful look first.</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <section id="verify">
+          <div class="section-head">
+            <h2>Check what you downloaded</h2>
+            <p>
+              Worth doing for anything that runs shell commands on your behalf, and doubly so for a
+              file that came through a mirror.
+            </p>
+          </div>
+
+          <div class="verify">
+            <article class="card">
+              <h3>Compare the checksum</h3>
+              <p>
+                Every release carries a
+                <a data-checksums href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                  >SHA256SUMS.txt</a
+                >
+                covering every file on it, written by the same workflow that built them.
+              </p>
+              <pre>sha256sum -c SHA256SUMS.txt --ignore-missing</pre>
+              <!-- Wildcarded on the version segment, which the real filenames
+                   carry: DSH.Studio_0.4.0_x64-setup.exe. Get-FileHash globs, so
+                   this is a command that works rather than one that reads well. -->
+              <pre>Get-FileHash .\DSH.Studio_*_x64-setup.exe</pre>
+            </article>
+
+            <article class="card">
+              <h3>Updates are signed</h3>
+              <p>
+                Each installer and archive ships beside a detached signature. The app verifies it
+                against a public key compiled into the binary before it will apply an update, so a
+                tampered file is refused rather than installed.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3>Built where you can watch</h3>
+              <p>
+                Installers are produced by a public GitHub Actions workflow from a tagged commit —
+                not uploaded from anyone's laptop. The
+                <a
+                  href="https://github.com/Moresyl/dsh-studio/blob/main/.github/workflows/release.yml"
+                  >workflow file</a
+                >
+                and every run's log are readable.
+              </p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div class="links">
+          <a href="https://github.com/Moresyl/dsh-studio">Source</a>
+          <a href="https://github.com/Moresyl/dsh-studio/releases">Releases</a>
+          <a href="https://github.com/Moresyl/dsh-studio/issues">Report a problem</a>
+          <a href="https://github.com/Moresyl/dsh-studio/blob/main/CONTRIBUTING.md">Contributing</a>
+          <a href="zh.html" lang="zh-Hans">中文</a>
+        </div>
+        <p>
+          MIT licensed. DSH Studio is an independent desktop shell for DeepSeek Harness and is not
+          affiliated with DeepSeek.
+        </p>
+      </footer>
+    </div>
+
+    <script type="module" src="download.js"></script>
+  </body>
+</html>

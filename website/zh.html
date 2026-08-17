@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DSH Studio — DeepSeek Harness 的桌面外壳</title>
+    <meta
+      name="description"
+      content="一个原生桌面应用，负责安装、守护并隔离 DeepSeek Harness。支持 Windows、macOS 与 Linux，安装包不到 4 MB，MIT 许可。"
+    />
+    <link rel="icon" href="assets/brand/icon.svg" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="alternate" hreflang="en" href="index.html" />
+    <link rel="alternate" hreflang="zh-Hans" href="zh.html" />
+    <meta property="og:title" content="DSH Studio" />
+    <meta
+      property="og:description"
+      content="DeepSeek Harness 的原生桌面外壳：帮你装好、守着它别死、关窗时把它拉起来的每个进程一并收走。"
+    />
+    <meta property="og:type" content="website" />
+  </head>
+
+  <body>
+    <div class="shell">
+      <header class="masthead">
+        <a class="wordmark" href="zh.html">
+          <img src="assets/brand/icon.svg" alt="" />
+          DSH Studio
+        </a>
+        <nav>
+          <a href="#download">下载</a>
+          <a href="#features">它做什么</a>
+          <a href="#verify">校验</a>
+          <a href="https://github.com/Moresyl/dsh-studio">源码</a>
+          <a href="index.html" lang="en">English</a>
+        </nav>
+      </header>
+
+      <main>
+        <div class="hero">
+          <div>
+            <span class="eyebrow">
+              <span class="pip"></span>
+              <span data-version>最新版本</span>
+            </span>
+
+            <h1>DeepSeek Harness，装在一个<em>会自己善后</em>的窗口里。</h1>
+
+            <p class="lede">
+              原生桌面外壳 —— Rust 加系统自带的 WebView，不打包一整个浏览器。它替你把 harness
+              装好，进程挂了自动拉回来，窗口一关，它启动的每个进程都跟着走。
+            </p>
+
+            <div class="actions">
+              <a
+                class="button primary"
+                href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                data-hero-download
+              >
+                下载
+                <!-- 真实体积到位前保持为空：写错的数字比没有数字更糟，
+                     CSS 会在它没有内容时把这个 span 隐藏掉。 -->
+                <span class="note"></span>
+              </a>
+              <a class="button quiet" href="#download">全部平台</a>
+            </div>
+
+            <dl class="facts">
+              <div>
+                <dt>安装包</dt>
+                <dd data-installer-size>不到 4 MB</dd>
+              </div>
+              <div>
+                <dt>平台</dt>
+                <dd>Windows · macOS · Linux</dd>
+              </div>
+              <div>
+                <dt>许可</dt>
+                <dd>MIT</dd>
+              </div>
+            </dl>
+          </div>
+
+          <!--
+            这不是截图，而是用应用自身那套设计变量重新搭出来的：任何分辨率下都清晰，
+            体积只有几 KB 而不是几百 KB，也不会把截图者的用户目录路径泄出去。
+          -->
+          <div class="window" aria-hidden="true">
+            <div class="titlebar">
+              <img src="assets/brand/icon.svg" alt="" />
+              DSH Studio
+              <span class="buttons"><span>—</span><span>▢</span><span>✕</span></span>
+            </div>
+            <div class="body">
+              <div style="text-align: center">
+                <span class="status"><span class="pip"></span>准备就绪</span>
+              </div>
+              <div class="rows">
+                <div class="row">
+                  <span class="tick">✓</span> Node.js 运行时
+                  <span class="value ok">v22.14.0</span>
+                </div>
+                <div class="row">
+                  <span class="tick">✓</span> DeepSeek Harness
+                  <span class="value ok">已安装</span>
+                </div>
+                <div class="row">
+                  <span class="tick">✓</span> 工作目录
+                  <span class="value">~/projects/atlas</span>
+                </div>
+              </div>
+              <div class="cta">启动 harness</div>
+              <p class="footnote">127.0.0.1:52731 —— 端口由内核分配</p>
+            </div>
+          </div>
+        </div>
+
+        <section id="features">
+          <div class="section-head">
+            <h2>这个外壳到底做了什么</h2>
+            <p>
+              harness 是一个能在你机器上执行 shell
+              命令的命令行工具。这里大部分工作，都是在认真对待这件事：守着它、
+              把它圈住、不让它上网。
+            </p>
+          </div>
+
+          <div class="grid">
+            <article class="card">
+              <h3><span class="kicker">进程守护</span>你还没察觉，它已经重启完了</h3>
+              <p>
+                harness 崩溃后会带着递增退避重新拉起，而不是原地死循环。外壳每 10 秒还会通过 HTTP
+                探一次活，连续三次没反应就回收重开 ——
+                从外面看，卡死的服务和已经死掉的服务长得一模一样。
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">进程隔离</span>没有任何进程能活过窗口</h3>
+              <p>
+                每个子进程都会被加入 Windows 的 job object，或者 POSIX
+                的进程组。关掉外壳会把整棵树一起收走， 包括那些用普通 kill
+                会被丢成孤儿、还占着端口的孙子进程。
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">对外暴露</span>只听回环，端口谁都没挑</h3>
+              <p>
+                harness 以 <code>--port 0</code> 启动，外壳再把内核分配的端口读回来。它只绑
+                <code>127.0.0.1</code>，别的都不绑。这两点都刻意不做成可配置项 —— 毕竟这是一个会执行
+                shell 命令的进程。
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">开箱</span>没有前置条件要你先去读</h3>
+              <p>
+                机器上没有 Node.js？外壳会替你取一份运行时、校验好、放在应用旁边，然后再把 harness
+                本身装上。第一次启动只是按一个按钮，不是读一页说明。
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">插件</span>市场就在窗口里</h3>
+              <p>
+                搜 npm registry、看清楚这个插件干什么、装上、随时开关 ——
+                不用开终端，也不用自己手动重启 harness。
+              </p>
+            </article>
+
+            <article class="card">
+              <h3><span class="kicker">接管</span>扫码把会话交给手机</h3>
+              <p>
+                对着窗口扫一下，就能在自己的网络里用手机接着往下做。配对码一次性、两分钟过期，而
+                harness 本身始终不离开回环 —— 在局域网上监听的是另一个独立网关。
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section id="download">
+          <div class="section-head">
+            <h2>下载</h2>
+            <p>
+              版本 <strong data-version>最新</strong
+              ><span data-published-wrap hidden>，发布于 <span data-published></span></span
+              >。下方体积直接读自该版本的产物。
+            </p>
+            <p class="mirror-note" data-api-notice hidden>
+              GitHub API 没有响应，因此下方链接指向 Releases 页面、体积为估算值。下载本身不受影响。
+            </p>
+          </div>
+
+          <div class="platforms">
+            <div class="platform" data-platform="windows">
+              <div>
+                <h3>Windows <span class="detected" data-detected hidden>你的机器</span></h3>
+                <p>Windows 10 1809 及以上，64 位。用系统自带的 WebView2 运行时。</p>
+              </div>
+              <div class="files">
+                <a
+                  class="file"
+                  data-file="win-nsis"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  安装程序 <span class="size">.exe</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="win-msi"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  MSI <span class="size">.msi</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="platform" data-platform="mac">
+              <div>
+                <h3>macOS <span class="detected" data-detected hidden>你的机器</span></h3>
+                <p>macOS 11 Big Sur 及以上。2020 年之后买的 Mac 都选 Apple 芯片版。</p>
+              </div>
+              <div class="files">
+                <a
+                  class="file"
+                  data-file="mac-arm"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Apple 芯片 <span class="size">.dmg</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="mac-intel"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Intel <span class="size">.dmg</span>
+                </a>
+              </div>
+            </div>
+
+            <div class="platform" data-platform="linux">
+              <div>
+                <h3>Linux <span class="detected" data-detected hidden>你的机器</span></h3>
+                <p>
+                  x86-64。AppImage 到哪儿都能跑、不用装任何东西，代价是体积大二十倍 —— 它把自己那份
+                  WebKitGTK 一起带上了。.deb 和 .rpm 用的是发行版自带的那份。
+                </p>
+              </div>
+              <div class="files">
+                <a
+                  class="file"
+                  data-file="linux-appimage"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  AppImage <span class="size">.AppImage</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="linux-deb"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Debian <span class="size">.deb</span>
+                </a>
+                <a
+                  class="file"
+                  data-file="linux-rpm"
+                  aria-disabled="true"
+                  href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                >
+                  Fedora <span class="size">.rpm</span>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <p class="mirror-note">
+            下载由 GitHub 提供。国内直连偏慢或不通时，可参考
+            <a href="https://github.com/Moresyl/dsh-studio/blob/main/packaging/MIRRORS.md"
+              >镜像清单</a
+            >
+            —— 走镜像时请务必按下面的方法核对校验和。
+          </p>
+        </section>
+
+        <section id="package-managers">
+          <div class="section-head">
+            <h2>也可以交给包管理器</h2>
+            <p>
+              这样装的话，以后升级就跟着你平时的更新一起来了。下面每个渠道都写清楚了当前是否已经可用
+              —— 需要向外部仓库提交审核的那几个会明确标出，而不是印一条跑不通的命令给你。
+            </p>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="包管理器">
+            <button
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="install-command"
+              data-for="windows"
+              data-command="scoop bucket add dsh https://github.com/Moresyl/dsh-studio
+scoop install dsh-studio"
+            >
+              Scoop
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="windows"
+              data-command="winget install Moresyl.DSHStudio"
+            >
+              winget
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="mac"
+              data-command="brew tap moresyl/dsh https://github.com/Moresyl/homebrew-dsh
+brew install --cask dsh-studio"
+            >
+              Homebrew
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="linux"
+              data-command="yay -S dsh-studio-bin"
+            >
+              AUR
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="install-command"
+              data-for="linux"
+              data-command="flatpak install flathub io.github.moresyl.dshstudio"
+            >
+              Flathub
+            </button>
+          </div>
+
+          <div class="command">
+            <!-- 这里是纯文本，提示符由脚本补上：关掉 JavaScript 的访客看到的就是这行，
+                 而且它本身就是可以直接复制执行的命令。 -->
+            <pre id="install-command" role="tabpanel" tabindex="0" data-command-output>
+scoop bucket add dsh https://github.com/Moresyl/dsh-studio
+scoop install dsh-studio</pre>
+            <button type="button" data-copy data-copied="已复制" data-copy-failed="请按 Ctrl+C">
+              复制
+            </button>
+          </div>
+
+          <div class="channels">
+            <div class="channel">
+              <span class="state live">已可用</span>
+              <strong>Scoop</strong>
+              <span>本仓库自己就是 bucket，所以只要有一个 release 就能用。</span>
+            </div>
+            <div class="channel">
+              <span class="state pending">待提交</span>
+              <strong>winget</strong>
+              <span
+                >清单在
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/winget"
+                  >packaging/winget</a
+                >， 已通过 <code>winget validate</code>，等待向 microsoft/winget-pkgs 提 PR。</span
+              >
+            </div>
+            <div class="channel">
+              <span class="state pending">需建 tap</span>
+              <strong>Homebrew Cask</strong>
+              <span
+                >cask 在
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/homebrew"
+                  >packaging/homebrew</a
+                >。 Homebrew 要求 cask 放在单独的 <code>homebrew-*</code> 仓库里。</span
+              >
+            </div>
+            <div class="channel">
+              <span class="state pending">尚未发布</span>
+              <strong>AUR</strong>
+              <span
+                >PKGBUILD 在
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/aur"
+                  >packaging/aur</a
+                >， 待上传到 aur.archlinux.org。</span
+              >
+            </div>
+            <div class="channel">
+              <span class="state pending">未构建</span>
+              <strong>Flathub</strong>
+              <span
+                >清单在
+                <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/flathub"
+                  >packaging/flathub</a
+                >。 写好了但从未构建过：一个要替你执行 shell
+                命令的应用装进沙箱，需要先仔细验证。</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <section id="verify">
+          <div class="section-head">
+            <h2>核对你下到的文件</h2>
+            <p>
+              对任何会代你执行 shell 命令的软件，这一步都值得做；如果文件是从镜像拿的，更值得做。
+            </p>
+          </div>
+
+          <div class="verify">
+            <article class="card">
+              <h3>核对校验和</h3>
+              <p>
+                每个 release 都带一份
+                <a data-checksums href="https://github.com/Moresyl/dsh-studio/releases/latest"
+                  >SHA256SUMS.txt</a
+                >， 覆盖该版本的所有文件，由构建它们的同一条流水线写出。
+              </p>
+              <pre>sha256sum -c SHA256SUMS.txt --ignore-missing</pre>
+              <!-- 版本号那一段用通配符：真实文件名是 DSH.Studio_0.4.0_x64-setup.exe。
+                   Get-FileHash 支持通配，所以这条命令是能直接跑通的，而不只是好看。 -->
+              <pre>Get-FileHash .\DSH.Studio_*_x64-setup.exe</pre>
+            </article>
+
+            <article class="card">
+              <h3>更新包带签名</h3>
+              <p>
+                每个安装包和归档旁边都有一份分离签名。应用会用编译进二进制的公钥先验签再决定是否升级，
+                被改过的文件会被拒掉而不是装上。
+              </p>
+            </article>
+
+            <article class="card">
+              <h3>构建过程你能看</h3>
+              <p>
+                安装包由公开的 GitHub Actions 流水线从打了 tag
+                的提交产出，不是谁从自己笔记本上传的。
+                <a
+                  href="https://github.com/Moresyl/dsh-studio/blob/main/.github/workflows/release.yml"
+                  >流水线文件</a
+                >
+                和每一次运行的日志都可以查。
+              </p>
+            </article>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <div class="links">
+          <a href="https://github.com/Moresyl/dsh-studio">源码</a>
+          <a href="https://github.com/Moresyl/dsh-studio/releases">版本</a>
+          <a href="https://github.com/Moresyl/dsh-studio/issues">反馈问题</a>
+          <a href="https://github.com/Moresyl/dsh-studio/blob/main/CONTRIBUTING.md">参与贡献</a>
+          <a href="index.html" lang="en">English</a>
+        </div>
+        <p>MIT 许可。DSH Studio 是 DeepSeek Harness 的独立第三方桌面外壳，与 DeepSeek 官方无关。</p>
+      </footer>
+    </div>
+
+    <script type="module" src="download.js"></script>
+  </body>
+</html>

@@ -25,6 +25,9 @@ export default defineConfig({
         // Editing prose reloaded the running app, which is worse than useless
         // mid-install: it throws away the console you were reading.
         '**/docs/**',
+        // The download page is its own static site, deployed by its own
+        // workflow. It shares nothing with this bundle but a palette.
+        '**/website/**',
         '**/.workflow/**',
         '**/*.md',
       ],

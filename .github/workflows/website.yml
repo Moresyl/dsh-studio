@@ -1,0 +1,86 @@
+name: Website
+
+# The download page is a static site of four files, deployed on its own. It is
+# not part of the application bundle and shares nothing with it but a palette, so
+# a copy edit does not rebuild three desktop installers.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - 'assets/brand/**'
+      - '.github/workflows/website.yml'
+  # So the page can be republished after a release without an empty commit: it
+  # reads the current version from the GitHub API at load time, but the fallback
+  # text baked into the markup is only as fresh as the last deploy.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time, and let a newer push finish rather than the older one:
+# with a static site there is nothing to lose by abandoning a run in flight.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Pages
+    runs-on: ubuntu-22.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble the site
+        run: |
+          mkdir -p site
+          cp website/*.html website/*.css website/*.js site/
+
+          # The brand mark has one source of truth at the repository root, and
+          # the page references it as assets/brand/icon.svg. Copied at publish
+          # time rather than committed twice, which is why website/assets/ is
+          # ignored: a second copy is a second thing to keep in step.
+          mkdir -p site/assets/brand
+          cp assets/brand/icon.svg site/assets/brand/
+
+          # Not the screenshots. They are stale, and they were taken in a home
+          # directory whose name is nobody's business.
+
+          # GitHub Pages runs the published directory through Jekyll unless told
+          # not to, which strips files beginning with an underscore.
+          touch site/.nojekyll
+
+      - name: Check for dead internal links
+        run: |
+          # Cheap, and it catches the failure this page is actually prone to:
+          # the two language versions point at each other and at a handful of
+          # in-repo paths, and a rename breaks one silently.
+          status=0
+          for file in site/*.html; do
+            # Local hrefs only — anything with a scheme or a fragment is out of
+            # scope here, and checking external links would make the deploy
+            # depend on five other services being up.
+            grep -o 'href="[^"#:]*"' "$file" | sed 's/href="//;s/"$//' | sort -u |
+              while read -r link; do
+                [ -z "$link" ] && continue
+                if [ ! -e "site/$link" ]; then
+                  echo "::error file=website/$(basename "$file")::missing target: $link"
+                  exit 1
+                fi
+              done || status=1
+          done
+          exit $status
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deploy
+        uses: actions/deploy-pages@v4

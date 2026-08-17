@@ -1,0 +1,838 @@
+/*
+ * The download page.
+ *
+ * Every colour here is lifted from src/styles/app.css rather than picked again,
+ * because the page and the window are one product and a visitor who downloads
+ * from here should recognise what opens. The palette is committed to dark for
+ * the same reason: the app is designed around the dark surface, and a site that
+ * flips to white is a site advertising something else.
+ *
+ * No webfont. The pitch on this page is a ten-megabyte download, and opening it
+ * with 200 KB of font over a link that may not reach the CDN at all would argue
+ * against the product. The system stack is the app's own, which is what makes
+ * the recreated panel below read as the real thing.
+ */
+
+:root {
+  --ground: #07090f;
+  --panel: #12161f;
+  --raised: #1b2029;
+  --line: #ffffff14;
+  --line-strong: #ffffff29;
+
+  --ink: #e7eaf1;
+  --muted: #98a0b2;
+  --faint: #6a7288;
+
+  --accent: #6e9bff;
+  --cyan: #7ff3ff;
+  --violet: #a98cff;
+  --ok: #46d9a2;
+  --on-accent: #07101f;
+
+  --radius-panel: 8px;
+  --radius-control: 5px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', system-ui,
+    'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
+  --mono:
+    'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* One glow behind the fold, sized to the hero rather than the viewport so it
+   does not follow the reader down the page. */
+body::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 700px;
+  background:
+    radial-gradient(60% 70% at 22% 0%, #2a3f8266 0%, transparent 70%),
+    radial-gradient(45% 55% at 88% 8%, #a98cff24 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  text-wrap: balance;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+/* The negative tracking above is for Latin display type. Han glyphs already sit
+   on a full-width grid, and pulling them together only crowds them. */
+:lang(zh-Hans) h1,
+:lang(zh-Hans) h2,
+:lang(zh-Hans) h3 {
+  letter-spacing: 0;
+}
+
+code,
+kbd,
+.mono {
+  font-family: var(--mono);
+  font-variant-ligatures: none;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 0 0;
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-right: auto;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.wordmark img {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.masthead nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.masthead nav a {
+  text-decoration: none;
+  transition: color 0.12s var(--ease);
+}
+
+.masthead nav a:hover {
+  color: var(--ink);
+}
+
+/* ---------- hero ---------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+  gap: 56px;
+  align-items: center;
+  padding: 64px 0 68px;
+}
+
+/* No text-transform here, unlike the other small labels on the page: the only
+   thing in it is a version string, and `v0.4.0` is not spelled `V0.4.0`. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #ffffff08;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+.eyebrow .pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px #46d9a229;
+}
+
+.hero h1 {
+  font-size: clamp(34px, 5vw, 52px);
+  line-height: 1.08;
+}
+
+.hero h1 em {
+  font-style: normal;
+  background: linear-gradient(96deg, var(--cyan), var(--accent) 55%, var(--violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.lede {
+  margin: 20px 0 0;
+  max-width: 52ch;
+  font-size: 16.5px;
+  color: var(--muted);
+}
+
+/* ---------- the command line ---------- */
+
+.command {
+  display: flex;
+  align-items: stretch;
+  margin: 12px 0 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-panel);
+  background: #0000004d;
+  overflow: hidden;
+}
+
+.command pre {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.command .sigil {
+  color: var(--accent);
+  user-select: none;
+}
+
+.command button {
+  flex: none;
+  border: 0;
+  border-left: 1px solid var(--line);
+  padding: 0 14px;
+  background: #ffffff08;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    background 0.12s var(--ease),
+    color 0.12s var(--ease);
+}
+
+.command button:hover {
+  background: #ffffff12;
+  color: var(--ink);
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tabs button {
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: 5px 11px;
+  background: none;
+  color: var(--faint);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s var(--ease);
+}
+
+.tabs button:hover {
+  color: var(--ink);
+}
+
+.tabs button[aria-selected='true'] {
+  border-color: var(--line-strong);
+  background: var(--raised);
+  color: var(--ink);
+}
+
+/* ---------- buttons ---------- */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 0;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.12s var(--ease);
+}
+
+.button.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button.primary:hover {
+  filter: brightness(1.08);
+}
+
+.button.quiet {
+  border-color: var(--line-strong);
+  background: #ffffff08;
+  color: var(--ink);
+}
+
+.button.quiet:hover {
+  background: #ffffff12;
+}
+
+.button .note {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+/* Keeps the flex gap from leaving a trailing space while the size is unknown. */
+.button .note:empty {
+  display: none;
+}
+
+/* ---------- the three facts under the buttons ---------- */
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 36px;
+  margin: 36px 0 0;
+  padding: 20px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.facts div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.facts dt {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.facts dd {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+/* ---------- the recreated panel ---------- */
+
+/* Not a screenshot. The same tokens, the same 30px control height and the same
+   check rows the window draws, rebuilt in markup — which stays sharp on any
+   display, weighs nothing, and cannot leak the path of whoever took the picture. */
+.window {
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel), #0d1119);
+  box-shadow:
+    0 1px 2px #00000045,
+    0 24px 60px -30px #000000d9;
+  overflow: hidden;
+}
+
+.window .titlebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #ffffff06;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.window .titlebar img {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+}
+
+.window .titlebar .buttons {
+  display: flex;
+  gap: 14px;
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.window .body {
+  padding: 22px 18px 20px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 auto 18px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #ffffff08;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.status .pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.rows {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: #ffffff05;
+  overflow: hidden;
+}
+
+.rows .row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  font-size: 13px;
+}
+
+.rows .row + .row {
+  border-top: 1px solid var(--line);
+}
+
+.rows .row .tick {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #46d9a21f;
+  color: var(--ok);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.rows .row .value {
+  margin-left: auto;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.rows .row .value.ok {
+  color: var(--ok);
+}
+
+.window .cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 30px;
+  margin: 16px 0 0;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.window .footnote {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+/* ---------- sections ---------- */
+
+section {
+  padding: 64px 0;
+  border-top: 1px solid var(--line);
+}
+
+.section-head {
+  max-width: 60ch;
+  margin-bottom: 36px;
+}
+
+.section-head h2 {
+  font-size: clamp(24px, 3vw, 30px);
+}
+
+.section-head p {
+  margin: 12px 0 0;
+  color: var(--muted);
+}
+
+/* `min(288px, 100%)` rather than a bare 288px: a track minimum wider than the
+   column it sits in cannot shrink, and the whole page starts scrolling sideways
+   below about 340px. The min() lets the track give up its floor when it has to. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(288px, 100%), 1fr));
+  gap: 16px;
+}
+
+.card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+  transition:
+    border-color 0.15s var(--ease),
+    transform 0.15s var(--ease);
+}
+
+.card:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+}
+
+.card h3 {
+  font-size: 15px;
+}
+
+.card p {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.card .kicker {
+  display: block;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card p a,
+.section-head a {
+  color: var(--accent);
+}
+
+/* Inline code in prose. Sized in em so it tracks whatever it sits inside
+   rather than needing a rule per context. */
+.card code,
+.channel code,
+.lede code {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #ffffff0d;
+  font-size: 0.88em;
+  color: var(--ink);
+}
+
+/* ---------- the download table ---------- */
+
+.platforms {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.platform {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 20px;
+}
+
+.platform + .platform {
+  border-top: 1px solid var(--line);
+}
+
+.platform h3 {
+  font-size: 14.5px;
+}
+
+.platform p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--faint);
+}
+
+.platform .files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.file {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  padding: 6px 11px;
+  background: #ffffff08;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.12s var(--ease);
+}
+
+.file:hover {
+  background: #ffffff14;
+  border-color: var(--accent);
+}
+
+.file .size {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.file[aria-disabled='true'] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.mirror-note {
+  margin: 16px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.mirror-note a {
+  color: var(--accent);
+}
+
+/* The badge marking the row matching the visitor's own machine. Deliberately
+   quiet: it is a hint, and the detection behind it is a guess. */
+.detected {
+  margin-left: 8px;
+  padding: 2px 7px;
+  border: 1px solid #6e9bff3d;
+  border-radius: 999px;
+  background: #6e9bff1a;
+  font-size: 10.5px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  vertical-align: 1px;
+}
+
+/* ---------- package manager channels ---------- */
+
+.channels {
+  display: grid;
+  gap: 1px;
+  margin: 24px 0 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--line);
+  overflow: hidden;
+}
+
+.channel {
+  display: grid;
+  grid-template-columns: 116px 118px minmax(0, 1fr);
+  gap: 16px;
+  align-items: baseline;
+  padding: 13px 18px;
+  background: var(--panel);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.channel a {
+  color: var(--accent);
+}
+
+/* Reads at a glance which of these a visitor can actually run today. Both
+   states carry a word as well as a colour, so the distinction survives a
+   colour-blind reader and a black-and-white print alike. */
+.state {
+  justify-self: start;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.state.live {
+  border-color: #46d9a23d;
+  background: #46d9a21a;
+  color: var(--ok);
+}
+
+.state.pending {
+  border-color: var(--line-strong);
+  background: #ffffff0a;
+  color: var(--faint);
+}
+
+@media (max-width: 700px) {
+  .channel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+}
+
+/* ---------- verification ---------- */
+
+.verify {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+  gap: 16px;
+}
+
+/* Wrapped rather than scrolled, unlike the command block up the page. These are
+   three columns wide, so a long checksum command does not fit on one line in any
+   of them — and a command with its tail hidden behind a scrollbar nobody notices
+   is worse than one that takes two lines. */
+.verify pre {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: #0000004d;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- footer ---------- */
+
+footer {
+  padding: 40px 0 56px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--faint);
+}
+
+footer .links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+footer a {
+  text-decoration: none;
+}
+
+footer a:hover {
+  color: var(--ink);
+}
+
+/* ---------- narrow ---------- */
+
+/* Five nav links and a wordmark do not fit on one line on a phone, and the
+   masthead is what pushes the whole page into a sideways scroll when they try. */
+@media (max-width: 640px) {
+  .masthead {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    padding-top: 18px;
+  }
+
+  .masthead nav {
+    gap: 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 44px;
+    padding: 48px 0 64px;
+  }
+
+  .platform {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .platform .files {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}

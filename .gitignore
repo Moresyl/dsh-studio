@@ -11,6 +11,11 @@ src-tauri/gen/
 # Runtime artifacts staged for packaging
 src-tauri/runtime-cache/
 
+# The download page reuses the application's brand mark rather than keeping a
+# second copy of it. The deploy workflow copies assets/ in at publish time; this
+# is where a copy lands when the page is served locally to look at.
+website/assets/
+
 # Written by the release workflow on Windows runners, and only there. It names
 # one Azure signing account, which belongs to whoever cuts the release rather
 # than to this repository — and committing it would make every local Windows

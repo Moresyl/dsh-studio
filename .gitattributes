@@ -1,0 +1,26 @@
+# This machine has core.autocrlf=true, so without these rules a Windows checkout
+# holds CRLF. For most of the repository that is harmless. For the files below it
+# is not, and the failure is remote: the publishing steps in packaging/README.md
+# copy files out of this working tree into other repositories, where a stray \r
+# turns into `bash: $'\r': command not found` on somebody else's machine.
+#
+# packaging/generate.mjs already normalises its output to LF for this reason.
+# These rules keep git from putting it back.
+
+* text=auto
+
+# Read by bash, ruby and makepkg on Linux and macOS.
+packaging/aur/PKGBUILD   text eol=lf
+packaging/aur/.SRCINFO   text eol=lf
+*.rb                     text eol=lf
+*.sh                     text eol=lf
+
+# The Flatpak manifest carries a shell script inside a YAML block scalar, and
+# workflow `run:` blocks are shell too.
+*.yml                    text eol=lf
+*.yaml                   text eol=lf
+
+# Binary, so never touched.
+*.png binary
+*.ico binary
+*.icns binary
