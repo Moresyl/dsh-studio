@@ -480,6 +480,13 @@ export interface Tokens {
   cacheWrite: number
 }
 
+/** What one model was asked for inside one session. */
+export interface Spend {
+  /** Empty when the log never named one. */
+  model: string
+  tokens: Tokens
+}
+
 /** A session, as much of it as fits in a list. */
 export interface SessionCard {
   id: string
@@ -491,6 +498,8 @@ export interface SessionCard {
   turns: number
   models: string[]
   tokens: Tokens
+  /** The same spend, split by which model did it. Always sums back to `tokens`. */
+  byModel: Spend[]
   /** Opened by an agent for its own work rather than by a person. */
   delegated: boolean
   bytes: number

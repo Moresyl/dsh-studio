@@ -95,6 +95,20 @@ impl Tokens {
     }
 }
 
+/// What one model was asked for, inside one session.
+///
+/// A session is rarely one model's work — a plan drafted by a reasoner and
+/// carried out by a cheaper one is the usual shape, and the two are not billed
+/// alike. A total that hides which of them did the spending cannot answer the
+/// only question a bill is read for.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Spend {
+    /// Empty when the log never named one, which older logs sometimes do not.
+    pub model: String,
+    pub tokens: Tokens,
+}
+
 /// A session, as much of it as fits in a list.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -113,6 +127,9 @@ pub struct Card {
     pub turns: u32,
     pub models: Vec<String>,
     pub tokens: Tokens,
+    /// The same spend as `tokens`, split by which model did it. Always sums
+    /// back to `tokens`, so a view built on either one agrees with the other.
+    pub by_model: Vec<Spend>,
     /// Opened by an agent for its own work rather than by a person.
     pub delegated: bool,
     /// Size on disk, compressed as the harness stores it.
@@ -467,6 +484,7 @@ mod tests {
                 turns: 0,
                 models: Vec::new(),
                 tokens: Tokens::default(),
+                by_model: Vec::new(),
                 delegated: false,
                 bytes: 0,
             },

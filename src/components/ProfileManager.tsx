@@ -30,6 +30,7 @@ import {
 import { open as pickFile, save as pickPath } from '@tauri-apps/plugin-dialog'
 
 import { Button } from '@/components/Button'
+import { TabButton } from '@/components/TabButton'
 import { t } from '@/lib/i18n'
 import type { Comparison, Difference, Profile, Standing } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
@@ -846,32 +847,6 @@ function NameForm({ form, busy, onCancel, onSubmit }: NameFormProps) {
 }
 
 /* -------------------------------------------------------------------------- */
-
-function TabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={active ? undefined : onClick}
-      className={[
-        'h-[22px] rounded-[3px] px-2.5 text-[11.5px] transition-colors duration-100',
-        active
-          ? 'cursor-default bg-surface-2 text-text shadow-panel'
-          : 'text-faint hover:bg-surface-2/60 hover:text-text',
-      ].join(' ')}
-    >
-      {label}
-    </button>
-  )
-}
 
 function Badge({ children }: { children: ReactNode }) {
   return (

@@ -15,6 +15,7 @@ import {
 import { PaneHeader } from '@/components/PaneHeader'
 import { PluginDialog } from '@/components/PluginDialog'
 import { Switch } from '@/components/Switch'
+import { TabButton } from '@/components/TabButton'
 import { count, day } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { InstalledPlugin, PluginListing } from '@/lib/ipc'
@@ -466,32 +467,6 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
 }
 
 /* -------------------------------------------------------------------------- */
-
-function TabButton({
-  label,
-  active,
-  onClick,
-}: {
-  label: string
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={active ? undefined : onClick}
-      className={[
-        'h-[22px] rounded-[3px] px-2.5 text-[11.5px] transition-colors duration-100',
-        active
-          ? 'cursor-default bg-surface-2 text-text shadow-panel'
-          : 'text-faint hover:bg-surface-2/60 hover:text-text',
-      ].join(' ')}
-    >
-      {label}
-    </button>
-  )
-}
 
 function Tile({ muted = false }: { muted?: boolean }) {
   return (

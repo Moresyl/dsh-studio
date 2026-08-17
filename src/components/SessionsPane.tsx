@@ -17,7 +17,10 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/Button'
+import { Empty } from '@/components/Empty'
 import { PaneHeader } from '@/components/PaneHeader'
+import { TabButton } from '@/components/TabButton'
+import { UsageReport } from '@/components/UsageReport'
 import { count, day } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
@@ -102,6 +105,10 @@ export function SessionsPane() {
   const [query, setQuery] = useState('')
   /** The line an opened session should land on, when a quote is what opened it. */
   const [anchor, setAnchor] = useState<number | null>(null)
+  // The statement is a second reading of the same shelf, not a seventh pane in
+  // the rail: nobody goes looking for "usage" without a session in mind, and a
+  // rail that grows an entry per question stops being a rail.
+  const [tab, setTab] = useState<'list' | 'usage'>('list')
 
   useEffect(() => {
     void refresh()
@@ -144,7 +151,23 @@ export function SessionsPane() {
 
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col bg-canvas">
-      <PaneHeader title={t('sessions.title')} subtitle={t('sessions.subtitle')}>
+      <PaneHeader
+        title={t('sessions.title')}
+        subtitle={tab === 'list' ? t('sessions.subtitle') : t('usage.subtitle')}
+      >
+        <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
+          <TabButton
+            label={t('sessions.tab.list')}
+            active={tab === 'list'}
+            onClick={() => setTab('list')}
+          />
+          <TabButton
+            label={t('sessions.tab.usage')}
+            active={tab === 'usage'}
+            onClick={() => setTab('usage')}
+          />
+        </div>
+
         <Button
           variant="secondary"
           onClick={() => void refresh()}
@@ -160,99 +183,110 @@ export function SessionsPane() {
         </Button>
       </PaneHeader>
 
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
-        <Search size={14} strokeWidth={2.1} className="shrink-0 text-faint" aria-hidden="true" />
-        <input
-          ref={field}
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape' && query !== '') {
-              event.stopPropagation()
-              setQuery('')
-            }
-          }}
-          placeholder={t('sessions.search')}
-          spellCheck={false}
-          autoComplete="off"
-          className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
-        />
-        {searching && (
-          <Loader2 size={13} className="shrink-0 animate-spin text-faint" aria-hidden="true" />
-        )}
-        {query !== '' && !searching && (
-          <button
-            type="button"
-            data-hint={t('action.clearSearch')}
-            aria-label={t('action.clearSearch')}
-            onClick={() => {
-              setQuery('')
-              field.current?.focus()
-            }}
-            className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
-          >
-            <X size={11} strokeWidth={2.4} aria-hidden="true" />
-          </button>
-        )}
-
-        <span aria-hidden="true" className="h-4 w-px shrink-0 bg-line" />
-
-        <Filter project={project} reach={reach} onPick={(picked) => void narrow(picked)} />
-      </div>
-
-      {listed.length > 0 && <Totals cards={listed} hits={hits} />}
-
-      {error && (
-        <div className="flex shrink-0 items-start gap-2 border-b border-danger/25 bg-danger/10 px-4 py-2">
-          <TriangleAlert
-            size={13}
-            strokeWidth={2.1}
-            className="mt-[2px] shrink-0 text-danger"
-            aria-hidden="true"
-          />
-          <p className="selectable text-[11.5px] leading-relaxed text-muted">{error}</p>
-        </div>
-      )}
-
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {hits ? (
-          hits.length === 0 ? (
-            <Empty
-              icon={Search}
-              message={
-                searching ? t('sessions.scanning') : t('sessions.noResults', { query: asked })
-              }
-              hint={searching ? undefined : t('sessions.noResultsHint')}
+      {tab === 'usage' ? (
+        <UsageReport cards={listed} onOpen={(id) => show(id, null)} />
+      ) : (
+        <>
+          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
+            <Search
+              size={14}
+              strokeWidth={2.1}
+              className="shrink-0 text-faint"
+              aria-hidden="true"
             />
-          ) : (
-            <ul>
-              {hits.map((hit) => (
-                <Entry
-                  key={hit.card.id}
-                  card={hit.card}
-                  matches={hit.matches}
-                  marks={hit.marks}
-                  onOpen={(seq) => show(hit.card.id, seq)}
+            <input
+              ref={field}
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && query !== '') {
+                  event.stopPropagation()
+                  setQuery('')
+                }
+              }}
+              placeholder={t('sessions.search')}
+              spellCheck={false}
+              autoComplete="off"
+              className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
+            />
+            {searching && (
+              <Loader2 size={13} className="shrink-0 animate-spin text-faint" aria-hidden="true" />
+            )}
+            {query !== '' && !searching && (
+              <button
+                type="button"
+                data-hint={t('action.clearSearch')}
+                aria-label={t('action.clearSearch')}
+                onClick={() => {
+                  setQuery('')
+                  field.current?.focus()
+                }}
+                className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
+              >
+                <X size={11} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            )}
+
+            <span aria-hidden="true" className="h-4 w-px shrink-0 bg-line" />
+
+            <Filter project={project} reach={reach} onPick={(picked) => void narrow(picked)} />
+          </div>
+
+          {listed.length > 0 && <Totals cards={listed} hits={hits} />}
+
+          {error && (
+            <div className="flex shrink-0 items-start gap-2 border-b border-danger/25 bg-danger/10 px-4 py-2">
+              <TriangleAlert
+                size={13}
+                strokeWidth={2.1}
+                className="mt-[2px] shrink-0 text-danger"
+                aria-hidden="true"
+              />
+              <p className="selectable text-[11.5px] leading-relaxed text-muted">{error}</p>
+            </div>
+          )}
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {hits ? (
+              hits.length === 0 ? (
+                <Empty
+                  icon={Search}
+                  message={
+                    searching ? t('sessions.scanning') : t('sessions.noResults', { query: asked })
+                  }
+                  hint={searching ? undefined : t('sessions.noResultsHint')}
                 />
-              ))}
-            </ul>
-          )
-        ) : listed.length === 0 ? (
-          <Empty
-            icon={scanning ? Loader2 : MessagesSquare}
-            spin={scanning}
-            message={scanning ? t('sessions.scanning') : t('sessions.empty')}
-            hint={scanning ? undefined : t('sessions.emptyHint')}
-          />
-        ) : (
-          <ul>
-            {listed.map((card) => (
-              <Entry key={card.id} card={card} onOpen={() => show(card.id, null)} />
-            ))}
-          </ul>
-        )}
-      </div>
+              ) : (
+                <ul>
+                  {hits.map((hit) => (
+                    <Entry
+                      key={hit.card.id}
+                      card={hit.card}
+                      matches={hit.matches}
+                      marks={hit.marks}
+                      onOpen={(seq) => show(hit.card.id, seq)}
+                    />
+                  ))}
+                </ul>
+              )
+            ) : listed.length === 0 ? (
+              <Empty
+                icon={scanning ? Loader2 : MessagesSquare}
+                spin={scanning}
+                message={scanning ? t('sessions.scanning') : t('sessions.empty')}
+                hint={scanning ? undefined : t('sessions.emptyHint')}
+              />
+            ) : (
+              <ul>
+                {listed.map((card) => (
+                  <Entry key={card.id} card={card} onOpen={() => show(card.id, null)} />
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
     </section>
   )
 }
@@ -573,31 +607,6 @@ function Filter({
       <span className="truncate">{project ? leaf(project) : t('sessions.allProjects')}</span>
       <ChevronDown size={10} strokeWidth={2.4} className="shrink-0 opacity-55" aria-hidden="true" />
     </button>
-  )
-}
-
-function Empty({
-  icon: Icon,
-  spin,
-  message,
-  hint,
-}: {
-  icon: LucideIcon
-  spin?: boolean
-  message: string
-  hint?: string
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2.5 px-8 py-12 text-center">
-      <Icon
-        size={22}
-        strokeWidth={1.4}
-        className={`text-faint opacity-60 ${spin ? 'animate-spin' : ''}`}
-        aria-hidden="true"
-      />
-      <p className="text-[12.5px] text-muted">{message}</p>
-      {hint && <p className="max-w-[46ch] text-[11.5px] leading-relaxed text-faint">{hint}</p>}
-    </div>
   )
 }
 

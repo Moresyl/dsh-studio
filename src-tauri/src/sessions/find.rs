@@ -226,6 +226,7 @@ mod tests {
             turns: 1,
             models: Vec::new(),
             tokens: Default::default(),
+            by_model: Vec::new(),
             delegated: false,
             bytes: 0,
         }

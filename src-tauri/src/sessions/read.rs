@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
-use super::{Card, Line, Role, Tokens};
+use super::{Card, Line, Role, Spend, Tokens};
 
 /// How much of an opening line is kept as the name of a session.
 const TITLE: usize = 96;
@@ -54,6 +54,7 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
         turns: 0,
         models: Vec::new(),
         tokens: Tokens::default(),
+        by_model: Vec::new(),
         // Either mark is enough. A session an agent opened for itself has a
         // parent; one the harness spawned as a subagent says so; older logs
         // carry one and not always the other.
@@ -63,6 +64,10 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
 
     let mut lines = Vec::new();
     let mut meter = Meter::default();
+    // Which model the usage arriving now belongs to. A request header names it
+    // before the answer starts and the answer names it again, so by the time
+    // any usage is reported this is the model that earned it.
+    let mut speaking = String::new();
     // Names the tool that produced each result. A result carries the id of the
     // call it answers but not what was called, and that name is the most useful
     // word on the line.
@@ -110,8 +115,9 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
                     continue;
                 };
 
-                if let Some(model) = source(message).and_then(|from| from.get("model")) {
-                    note(&mut card.models, str(Some(model)));
+                if let Some(model) = some(source(message).and_then(|from| from.get("model"))) {
+                    speaking = model.to_string();
+                    note(&mut card.models, model);
                 }
 
                 push(
@@ -135,7 +141,8 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
                 }
 
                 if let Some(usage) = data.get("usage") {
-                    meter.sample(step(data), usage, &mut card.tokens);
+                    let on = bill(&mut card.by_model, &speaking);
+                    meter.sample(step(data), on, usage, &mut card.tokens, &mut card.by_model);
                 }
             }
 
@@ -161,7 +168,8 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
                 };
                 if str(chunk.get("type")) == "usage" {
                     if let Some(usage) = chunk.get("usage") {
-                        meter.sample(step(data), usage, &mut card.tokens);
+                        let on = bill(&mut card.by_model, &speaking);
+                        meter.sample(step(data), on, usage, &mut card.tokens, &mut card.by_model);
                     }
                 }
             }
@@ -169,8 +177,10 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
             // What was asked for, which is not always what answered — a request
             // that failed still names the model it was going to.
             "request/header" => {
-                if let Some(config) = data.get("header").and_then(|header| header.get("config")) {
-                    note(&mut card.models, str(config.get("model")));
+                let config = data.get("header").and_then(|header| header.get("config"));
+                if let Some(model) = some(config.and_then(|config| config.get("model"))) {
+                    speaking = model.to_string();
+                    note(&mut card.models, model);
                 }
             }
 
@@ -200,12 +210,25 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
 /// once simply adds.
 #[derive(Default)]
 struct Meter {
-    /// The last sample's step, and what it contributed.
-    last: Option<((u64, u64), Tokens)>,
+    /// The last sample's step, the bill it went on, and what it contributed.
+    last: Option<((u64, u64), usize, Tokens)>,
 }
 
 impl Meter {
-    fn sample(&mut self, at: (u64, u64), usage: &Value, into: &mut Tokens) {
+    /// Take one usage report, on the session's total and on one model's share.
+    ///
+    /// The share is undone from wherever the replaced sample went rather than
+    /// from wherever the current one is going: a step re-reported after the
+    /// model changed would otherwise credit the new model with the old one's
+    /// work, and leave the two views disagreeing.
+    fn sample(
+        &mut self,
+        at: (u64, u64),
+        on: usize,
+        usage: &Value,
+        into: &mut Tokens,
+        bills: &mut [Spend],
+    ) {
         let counted = Tokens {
             input: count(usage.get("inputTokens")),
             output: count(usage.get("outputTokens")),
@@ -213,15 +236,33 @@ impl Meter {
             cache_write: count(usage.get("cacheWriteTokens")),
         };
 
-        if let Some((was, previously)) = self.last {
+        if let Some((was, whose, previously)) = self.last {
             if was == at {
                 into.undo(&previously);
+                if let Some(bill) = bills.get_mut(whose) {
+                    bill.tokens.undo(&previously);
+                }
             }
         }
 
         into.add(&counted);
-        self.last = Some((at, counted));
+        if let Some(bill) = bills.get_mut(on) {
+            bill.tokens.add(&counted);
+        }
+        self.last = Some((at, on, counted));
     }
+}
+
+/// The bill a model's usage goes on, opened if this is the first of it.
+fn bill(bills: &mut Vec<Spend>, model: &str) -> usize {
+    if let Some(at) = bills.iter().position(|spend| spend.model == model) {
+        return at;
+    }
+    bills.push(Spend {
+        model: model.to_string(),
+        tokens: Tokens::default(),
+    });
+    bills.len() - 1
 }
 
 /// Which turn and step a usage report belongs to.
@@ -461,6 +502,75 @@ mod tests {
         assert_eq!(reading.card.tokens.input, 70);
         assert_eq!(reading.card.tokens.output, 47);
         assert_eq!(reading.card.tokens.cache_read, 100);
+    }
+
+    /// A plan drafted by one model and carried out by another is the ordinary
+    /// shape of a session, and the two are not billed at the same rate.
+    #[test]
+    fn each_model_is_billed_for_what_it_answered() {
+        let reading = read(
+            &log(&[
+                header(),
+                r#"{"type":"request/header","seq":1,"time":1,"data":{"header":{"config":{"model":"deepseek-reasoner"}}}}"#,
+                r#"{"type":"assistant/chunk","seq":2,"time":2,"data":{"turn":1,"step":0,"chunk":{"type":"usage","usage":{"inputTokens":100,"outputTokens":20}}}}"#,
+                r#"{"type":"request/header","seq":3,"time":3,"data":{"header":{"config":{"model":"deepseek-chat"}}}}"#,
+                r#"{"type":"assistant/chunk","seq":4,"time":4,"data":{"turn":2,"step":0,"chunk":{"type":"usage","usage":{"inputTokens":7,"outputTokens":3}}}}"#,
+            ]),
+            0,
+        )
+        .expect("a session");
+
+        assert_eq!(
+            reading.card.by_model,
+            vec![
+                Spend {
+                    model: "deepseek-reasoner".into(),
+                    tokens: Tokens {
+                        input: 100,
+                        output: 20,
+                        ..Tokens::default()
+                    },
+                },
+                Spend {
+                    model: "deepseek-chat".into(),
+                    tokens: Tokens {
+                        input: 7,
+                        output: 3,
+                        ..Tokens::default()
+                    },
+                },
+            ]
+        );
+    }
+
+    /// The split has to reconcile with the total under the same rule the total
+    /// follows, and a step re-reported after a switch is where it would not.
+    #[test]
+    fn a_replaced_sample_is_taken_off_the_bill_it_went_on() {
+        let reading = read(
+            &log(&[
+                header(),
+                r#"{"type":"request/header","seq":1,"time":1,"data":{"header":{"config":{"model":"deepseek-reasoner"}}}}"#,
+                r#"{"type":"assistant/chunk","seq":2,"time":2,"data":{"turn":1,"step":0,"chunk":{"type":"usage","usage":{"inputTokens":10,"outputTokens":5}}}}"#,
+                r#"{"type":"request/header","seq":3,"time":3,"data":{"header":{"config":{"model":"deepseek-chat"}}}}"#,
+                r#"{"type":"assistant/chunk","seq":4,"time":4,"data":{"turn":1,"step":0,"chunk":{"type":"usage","usage":{"inputTokens":10,"outputTokens":40}}}}"#,
+            ]),
+            0,
+        )
+        .expect("a session");
+
+        let summed = reading
+            .card
+            .by_model
+            .iter()
+            .fold(Tokens::default(), |mut total, spend| {
+                total.add(&spend.tokens);
+                total
+            });
+
+        assert_eq!(summed, reading.card.tokens);
+        assert_eq!(reading.card.by_model[0].tokens, Tokens::default());
+        assert_eq!(reading.card.by_model[1].tokens.output, 40);
     }
 
     #[test]
