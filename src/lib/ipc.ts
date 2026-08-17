@@ -563,6 +563,41 @@ export const sessionSearch = (query: string, project?: string): Promise<SessionH
 export const sessionRead = (id: string): Promise<SessionTranscript> =>
   invoke('session_read', { id })
 
+/**
+ * The three shapes a conversation can leave in.
+ *
+ * Chosen by where it is going rather than by taste: Markdown for an issue or a
+ * weekly note, HTML for a file somebody opens without any tooling at all, and
+ * JSON for whatever reads it next.
+ */
+export type SessionFormat = 'markdown' | 'html' | 'json'
+
+/** A rendered session, and what to call the file it should go in. */
+export interface SessionExport {
+  /** The name to offer, which the save dialog may well be told to override. */
+  name: string
+  text: string
+}
+
+/**
+ * Render a session, without deciding yet where it goes.
+ *
+ * The text comes back rather than being written because there are two things to
+ * do with it and only one of them is a file: pasting a conversation into an
+ * issue is the other, and it is the more common one.
+ */
+export const sessionExport = (id: string, format: SessionFormat): Promise<SessionExport> =>
+  invoke('session_export', { id, format })
+
+/**
+ * Put a rendered session where the save dialog pointed.
+ *
+ * Rust does the writing because this shell holds no filesystem permission at
+ * all — the only path it can name is the one the system's own dialog returned.
+ */
+export const sessionSave = (path: string, text: string): Promise<void> =>
+  invoke('session_save', { path, text })
+
 /* -------------------------------------------------------------------------- */
 /* Window                                                                     */
 /* -------------------------------------------------------------------------- */

@@ -19,6 +19,7 @@
 
 pub mod artifact;
 pub mod commands;
+pub mod export;
 pub mod find;
 pub mod read;
 

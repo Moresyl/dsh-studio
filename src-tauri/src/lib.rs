@@ -128,6 +128,8 @@ pub fn run() {
             sessions::commands::session_roster,
             sessions::commands::session_search,
             sessions::commands::session_read,
+            sessions::commands::session_export,
+            sessions::commands::session_save,
             startup::startup_state,
             startup::startup_autostart,
             startup::startup_shortcut,

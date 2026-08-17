@@ -2,8 +2,12 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   ArrowLeft,
   Bot,
+  Braces,
   Check,
   ChevronDown,
+  ClipboardCopy,
+  FileCode2,
+  FileOutput,
   FileText,
   Loader2,
   MessagesSquare,
@@ -24,7 +28,15 @@ import { UsageReport } from '@/components/UsageReport'
 import { count, day, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
-import type { Role, SessionCard, SessionHit, SessionLine, SessionMark, Tokens } from '@/lib/ipc'
+import type {
+  Role,
+  SessionCard,
+  SessionFormat,
+  SessionHit,
+  SessionLine,
+  SessionMark,
+  Tokens,
+} from '@/lib/ipc'
 import { SEPARATOR, useMenu, type MenuEntry } from '@/state/menu'
 import { projects, spent, useSessions } from '@/state/sessions'
 
@@ -34,6 +46,34 @@ const DEBOUNCE = 320
 /** How much of a long line is shown before the rest has to be asked for. */
 const PEEK_LINES = 8
 const PEEK_CHARS = 640
+
+/** How long an export leaves its tick behind, before the button is itself again. */
+const CONFIRM = 1600
+
+/**
+ * The formats a session can leave in, and what a save dialog calls each one.
+ *
+ * Ordered by how likely somebody is to want it. Markdown is what an issue or a
+ * weekly note takes; HTML is the one that opens on any machine with no tooling
+ * at all, which is what to send someone who does not have this app; JSON is for
+ * whatever reads it after that.
+ */
+const FORMATS: {
+  format: SessionFormat
+  icon: LucideIcon
+  save: MessageKey
+  /** What the save dialog's filter should call this sort of file. */
+  kind: MessageKey
+}[] = [
+  {
+    format: 'markdown',
+    icon: FileText,
+    save: 'sessions.saveMarkdown',
+    kind: 'sessions.kindMarkdown',
+  },
+  { format: 'html', icon: FileCode2, save: 'sessions.saveHtml', kind: 'sessions.kindHtml' },
+  { format: 'json', icon: Braces, save: 'sessions.saveJson', kind: 'sessions.kindJson' },
+]
 
 const ROLE: Record<Role, MessageKey> = {
   user: 'sessions.role.user',
@@ -232,17 +272,7 @@ export function SessionsPane() {
 
           {listed.length > 0 && <Totals cards={listed} hits={hits} />}
 
-          {error && (
-            <div className="flex shrink-0 items-start gap-2 border-b border-danger/25 bg-danger/10 px-4 py-2">
-              <TriangleAlert
-                size={13}
-                strokeWidth={2.1}
-                className="mt-[2px] shrink-0 text-danger"
-                aria-hidden="true"
-              />
-              <p className="selectable text-[11.5px] leading-relaxed text-muted">{error}</p>
-            </div>
-          )}
+          {error && <Warning message={error} />}
 
           <div className="min-h-0 flex-1 overflow-y-auto">
             {hits ? (
@@ -285,6 +315,21 @@ export function SessionsPane() {
         </>
       )}
     </section>
+  )
+}
+
+/** Something that went wrong, said in place rather than over the top of anything. */
+function Warning({ message }: { message: string }) {
+  return (
+    <div className="flex shrink-0 items-start gap-2 border-b border-danger/25 bg-danger/10 px-4 py-2">
+      <TriangleAlert
+        size={13}
+        strokeWidth={2.1}
+        className="mt-[2px] shrink-0 text-danger"
+        aria-hidden="true"
+      />
+      <p className="selectable text-[11.5px] leading-relaxed text-muted">{message}</p>
+    </div>
   )
 }
 
@@ -420,6 +465,7 @@ interface ReaderProps {
 
 /** One session, read back in full. */
 function Reader({ card, lines, anchor, onBack }: ReaderProps) {
+  const error = useSessions((state) => state.error)
   const body = useRef<HTMLDivElement>(null)
 
   // The point of a search result is the moment inside the session, so arriving
@@ -449,6 +495,8 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
         subtitle={card?.project ? leaf(card.project) : undefined}
         subtitleHint={card?.project}
       >
+        {card && <Export id={card.id} />}
+
         <Button variant="secondary" onClick={onBack}>
           <ArrowLeft size={13} strokeWidth={2.3} />
           {t('sessions.back')}
@@ -470,6 +518,8 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
         </div>
       )}
 
+      {error && <Warning message={error} />}
+
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto">
         {lines ? (
           lines.map((line, index) => (
@@ -480,6 +530,79 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
         )}
       </div>
     </section>
+  )
+}
+
+/**
+ * The session, on its way somewhere else.
+ *
+ * A conversation that only exists inside this window is one nobody else can
+ * read. The two ways out are a clipboard and a file, and they share a menu
+ * rather than taking a button each because it is the same document either way —
+ * what changes is only who reads it next.
+ */
+function Export({ id }: { id: string }) {
+  const exporting = useSessions((state) => state.exporting)
+  const copyOut = useSessions((state) => state.copyOut)
+  const saveOut = useSessions((state) => state.saveOut)
+
+  /** True for a moment after something worked, which is the whole confirmation. */
+  const [done, setDone] = useState(false)
+
+  // On a timer rather than until the next press, so a tick is never left
+  // sitting on a button whose last click is minutes behind it.
+  useEffect(() => {
+    if (!done) return
+    const timer = window.setTimeout(() => setDone(false), CONFIRM)
+    return () => window.clearTimeout(timer)
+  }, [done])
+
+  const open = (event: MouseEvent<HTMLButtonElement>) => {
+    const entries: MenuEntry[] = [
+      {
+        // Markdown and only Markdown up here: the reason to copy a session
+        // rather than save it is to paste it somewhere that renders Markdown,
+        // and HTML source in an issue comment is worse than no session at all.
+        label: t('sessions.copyMarkdown'),
+        icon: ClipboardCopy,
+        run: () => {
+          void copyOut(id, 'markdown').then((written) => setDone(written))
+        },
+      },
+      SEPARATOR,
+      ...FORMATS.map(({ format, icon, save, kind }) => ({
+        label: t(save),
+        icon,
+        run: () => {
+          void saveOut(id, format, t(kind)).then((written) => setDone(written))
+        },
+      })),
+    ]
+
+    const box = event.currentTarget.getBoundingClientRect()
+    useMenu.getState().show(box.left, box.bottom + 6, entries)
+  }
+
+  return (
+    <Button
+      variant="secondary"
+      aria-haspopup="menu"
+      disabled={exporting}
+      data-hint={t('sessions.exportHint')}
+      onClick={open}
+    >
+      {/* The label is fixed and only the mark on it changes. A button that
+          renamed itself to "Copied" would move the one beside it, and a header
+          that shifts under the pointer is how a click lands on the wrong thing. */}
+      {exporting ? (
+        <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+      ) : done ? (
+        <Check size={13} strokeWidth={2.4} className="text-ok" aria-hidden="true" />
+      ) : (
+        <FileOutput size={13} strokeWidth={2.2} aria-hidden="true" />
+      )}
+      {t('sessions.export')}
+    </Button>
   )
 }
 
