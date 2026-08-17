@@ -18,6 +18,7 @@ use tauri::{
 
 use crate::material::{self, Material};
 use crate::paths;
+use crate::startup;
 
 /// Label every other module uses to find the window.
 pub const MAIN_LABEL: &str = "main";
@@ -49,6 +50,10 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
     // behind it, and the frontend has to know which of its grounds are glass
     // before it paints the first one.
     let material = material::supported();
+    // Asked here for the same reason: the frontend reveals the window itself
+    // once it has painted, so it has to know before it paints that this launch
+    // is one nobody is watching.
+    let standby = startup::standby();
 
     let builder = WebviewWindowBuilder::new(manager, MAIN_LABEL, WebviewUrl::default())
         .title("DSH Studio")
@@ -56,7 +61,7 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .center()
         .transparent(material.is_some())
-        .initialization_script(announce(material))
+        .initialization_script(announce(material, standby))
         // Every frame and not just the top one: the shell's own document is the
         // top frame, and everything the desktop interface exists for runs below
         // it — the harness, and the plugin pages the harness frames in turn.
@@ -95,27 +100,34 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
     // Hiding the window until the frontend paints is only a safe trade if a
     // frontend that never paints still leaves something on screen to report the
     // problem in. Otherwise the app would simply appear not to launch.
-    let fallback = window.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(REVEAL_DEADLINE).await;
-        if let Ok(false) = fallback.is_visible() {
-            let _ = fallback.show();
-        }
-    });
+    //
+    // Standing by is the one launch where nothing appearing is the correct
+    // outcome, so there is no deadline to rescue: the tray is already there, and
+    // it is what the user will reach for.
+    if !standby {
+        let fallback = window.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(REVEAL_DEADLINE).await;
+            if let Ok(false) = fallback.is_visible() {
+                let _ = fallback.show();
+            }
+        });
+    }
 
     Ok(window)
 }
 
-/// Tell the frontend which material it is sitting on, before it paints.
+/// Tell the frontend what kind of window it is in, before it paints.
 ///
 /// An initialization script and not a command, because the difference matters
 /// once: the grounds a translucent window paints are not the ones an opaque
 /// window paints, and asking over IPC would mean a frame of the wrong answer
 /// before the right one arrives. This runs before the page's own scripts, so the
-/// stylesheet is already correct at the first paint.
-fn announce(material: Option<Material>) -> String {
+/// stylesheet is already correct at the first paint — and, for the same reason,
+/// a window that is meant to stay hidden is never briefly shown.
+fn announce(material: Option<Material>, standby: bool) -> String {
     let value = serde_json::to_string(&material).unwrap_or_else(|_| "null".to_string());
-    format!("window.__DSH_MATERIAL__ = {value};")
+    format!("window.__DSH_MATERIAL__ = {value};window.__DSH_STANDBY__ = {standby};")
 }
 
 /// Bring an existing window back to the front.

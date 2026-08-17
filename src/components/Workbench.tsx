@@ -4,6 +4,7 @@ import {
   History,
   Info,
   Puzzle,
+  Settings,
   Smartphone,
   SquareTerminal,
   type LucideIcon,
@@ -14,6 +15,7 @@ import { ConsolePane } from '@/components/ConsolePane'
 import { PluginMarket } from '@/components/PluginMarket'
 import { RemotePane } from '@/components/RemotePane'
 import { SessionsPane } from '@/components/SessionsPane'
+import { SettingsPane } from '@/components/SettingsPane'
 import { TerminalPane } from '@/components/TerminalPane'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
@@ -23,7 +25,7 @@ import { useRemote } from '@/state/remote'
 import { runningCount, useTerminals } from '@/state/terminals'
 import { useUpdate } from '@/state/update'
 
-export type View = 'console' | 'terminal' | 'sessions' | 'plugins' | 'remote' | 'about'
+export type View = 'console' | 'terminal' | 'sessions' | 'plugins' | 'remote' | 'about' | 'settings'
 
 /** Rail order, which is also the order the number accelerators follow. */
 export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
@@ -34,6 +36,19 @@ export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'remote', icon: Smartphone, label: 'nav.remote' },
   { id: 'about', icon: Info, label: 'nav.about' },
 ]
+
+/**
+ * Settings, which is on the rail but not in it.
+ *
+ * Kept out of `VIEWS` because that list is the numbered one, and settings is
+ * not a seventh workspace to cycle through — it is the place you go to change
+ * something and come straight back from. It gets the keystroke every desktop
+ * application gives it instead, which is the one people already try.
+ */
+export const SETTINGS = { id: 'settings' as View, icon: Settings, label: 'nav.settings' as const }
+
+/** What the tooltips and the palette print for it, on either platform. */
+export const SETTINGS_KEYS = `${ACCELERATOR},`
 
 /**
  * Everything this shell offers, behind one rail.
@@ -110,6 +125,17 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
             }
           />
         ))}
+
+        {/* Pushed to the foot and set apart by a rule, because a settings item
+            sitting in the numbered run would read as another workspace. */}
+        <span aria-hidden="true" className="mt-auto mb-1.5 h-px w-[26px] shrink-0 bg-line" />
+        <RailItem
+          icon={SETTINGS.icon}
+          label={t(SETTINGS.label)}
+          hint={`${t(SETTINGS.label)}  ${SETTINGS_KEYS}`}
+          active={view === SETTINGS.id}
+          onClick={() => onSelect(SETTINGS.id)}
+        />
       </nav>
 
       {/* Keyed so a pane switch replays the settle animation and so no pane
@@ -124,6 +150,7 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
         {view === 'plugins' && <PluginMarket />}
         {view === 'remote' && <RemotePane />}
         {view === 'about' && <AboutPane />}
+        {view === 'settings' && <SettingsPane />}
       </div>
     </div>
   )

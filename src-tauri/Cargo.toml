@@ -72,6 +72,14 @@ tauri-plugin-deep-link = "2"
 # interface — see `src/desktop/mod.rs` — rather than for the shell's own UI,
 # which has a status bar and does not need to interrupt anybody.
 tauri-plugin-notification = "2"
+# Registering a login item is three unrelated pieces of platform trivia — a
+# registry value, a launch agent, a `.desktop` file — and getting any of them
+# subtly wrong means an app that either never starts or cannot be stopped from
+# starting. See `src/startup.rs`, which is the only caller.
+tauri-plugin-autostart = "2"
+# A hotkey that works while another application has the keyboard is the one
+# thing this shell cannot ask the webview for: the key never reaches the page.
+tauri-plugin-global-shortcut = "2"
 tauri-plugin-updater = "2"
 dirs = "6"
 sys-locale = "0.3"

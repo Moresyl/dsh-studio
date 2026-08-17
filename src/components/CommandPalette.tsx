@@ -26,7 +26,7 @@ import {
 } from 'lucide-react'
 
 import { Empty } from '@/components/Empty'
-import { VIEWS, type View } from '@/components/Workbench'
+import { SETTINGS, SETTINGS_KEYS, VIEWS, type View } from '@/components/Workbench'
 import { leaf, when } from '@/lib/format'
 import { fuzzy, segments } from '@/lib/fuzzy'
 import { t, type MessageKey } from '@/lib/i18n'
@@ -175,6 +175,16 @@ function Palette({
         run: close(() => onView(view.id)),
       })
     }
+
+    // Appended rather than iterated, because it is off the numbered run.
+    all.push({
+      id: `go:${SETTINGS.id}`,
+      group: 'palette.group.go',
+      icon: SETTINGS.icon,
+      label: t(SETTINGS.label),
+      hint: SETTINGS_KEYS,
+      run: close(() => onView(SETTINGS.id)),
+    })
 
     // Offered by what the supervisor last said, not by what a click implied: a
     // palette that lists "Start" beside a harness that is already up is a

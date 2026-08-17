@@ -14,6 +14,7 @@ mod presets;
 mod profiles;
 mod remote;
 mod sessions;
+mod startup;
 mod terminal;
 mod tray;
 mod window;
@@ -51,6 +52,17 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_notification::init())
+        // The flag is the whole of what the login item is told, and it is what
+        // keeps a launch nobody asked to see from putting a window on screen —
+        // see `startup::standby`, which is the only reader.
+        .plugin(tauri_plugin_autostart::init(
+            // A launch agent rather than an AppleScript login item: the agent is
+            // a file this app owns and can withdraw, where the login item lives
+            // in a list only System Settings edits.
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![startup::STANDBY_FLAG]),
+        ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let supervisor = Supervisor::new()?;
@@ -72,6 +84,9 @@ pub fn run() {
             window::build(app.handle())?;
             tray::build(app.handle())?;
             desktop::wire(app.handle());
+            // After the tray, which is the only way back to a window this may
+            // decide to leave hidden.
+            startup::wire(app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -113,6 +128,9 @@ pub fn run() {
             sessions::commands::session_roster,
             sessions::commands::session_search,
             sessions::commands::session_read,
+            startup::startup_state,
+            startup::startup_autostart,
+            startup::startup_shortcut,
             material::window_material,
             desktop::commands::desktop_offer,
             desktop::commands::desktop_notify,

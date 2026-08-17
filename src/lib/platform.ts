@@ -33,8 +33,19 @@ declare global {
   interface Window {
     /** Published before this bundle runs; see `announce` in `window.rs`. */
     __DSH_MATERIAL__?: unknown
+    /** Likewise: whether this launch was the login item's, not a person's. */
+    __DSH_STANDBY__?: unknown
   }
 }
+
+/**
+ * Whether this launch is one nobody is watching.
+ *
+ * The login item starts the app with `--hidden`, and the window is built
+ * hidden — so the frontend, which is what reveals it once it has painted, has
+ * to know before it paints that it should not.
+ */
+export const standby = window.__DSH_STANDBY__ === true
 
 const isMaterial = (value: unknown): value is Material =>
   value === 'micaAlt' || value === 'mica' || value === 'acrylic' || value === 'vibrancy'

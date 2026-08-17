@@ -624,6 +624,34 @@ export const onDesktopLink = (handler: (link: DesktopLink) => void): Promise<Unl
   listen<DesktopLink>(LINK_CHANNEL, (message) => handler(message.payload))
 
 /* -------------------------------------------------------------------------- */
+/* Startup                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** How this machine reaches the app while its window is not in front. */
+export interface Startup {
+  /** Whether the operating system has a login item for this application. */
+  autostart: boolean
+  /** The accelerator the user chose, if any. */
+  shortcut: string | null
+  /**
+   * Whether that accelerator is registered right now. False while one is set
+   * means another program on this machine got to the combination first.
+   */
+  held: boolean
+  /** What to offer when nothing is chosen yet. */
+  suggested: string
+}
+
+export const startupState = (): Promise<Startup> => invoke('startup_state')
+
+export const startupAutostart = (enabled: boolean): Promise<Startup> =>
+  invoke('startup_autostart', { enabled })
+
+/** `null` gives up the key. Anything else is registered before it is saved. */
+export const startupShortcut = (accelerator: string | null): Promise<Startup> =>
+  invoke('startup_shortcut', { accelerator })
+
+/* -------------------------------------------------------------------------- */
 /* About                                                                      */
 /* -------------------------------------------------------------------------- */
 

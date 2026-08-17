@@ -10,7 +10,8 @@ import { ProfileManager } from '@/components/ProfileManager'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
-import { Workbench, VIEWS, type View } from '@/components/Workbench'
+import { Workbench, SETTINGS, VIEWS, type View } from '@/components/Workbench'
+import { standby } from '@/lib/platform'
 import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
@@ -77,7 +78,11 @@ export default function App() {
   // shows the window on a deadline regardless, so a probe that never returns
   // costs a few seconds rather than a window that never appears.
   useEffect(() => {
-    if (stage === 'unknown') return
+    // Except when the login item started this: nobody asked for a window, and
+    // one appearing over their work at every boot is how a tray app becomes
+    // something people uninstall. The tray icon and the global key are the two
+    // ways back, and both are already up by now.
+    if (standby || stage === 'unknown') return
 
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
@@ -121,11 +126,11 @@ export default function App() {
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
 
-  // Ctrl+K, and Ctrl+1 through Ctrl+6 in rail order. Every application with a
-  // fixed set of views has the numbers, and a user who tries one and gets
-  // nothing has just learned that this is not one of those applications. The
-  // palette is the other half of that: the keystroke for when someone knows the
-  // name of what they want and not where it lives.
+  // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, and Ctrl+comma for settings.
+  // Every application with a fixed set of views has the numbers, and a user who
+  // tries one and gets nothing has just learned that this is not one of those
+  // applications. The palette is the other half of that: the keystroke for when
+  // someone knows the name of what they want and not where it lives.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
@@ -142,6 +147,14 @@ export default function App() {
       // The palette is a modal of the same kind, and the numbers behind it would
       // switch a pane nobody can see.
       if (usePalette.getState().open) return
+
+      // The keystroke every desktop application answers with its preferences,
+      // and the reason settings is not the seventh number.
+      if (event.key === ',') {
+        event.preventDefault()
+        show(SETTINGS.id)
+        return
+      }
 
       const wanted = VIEWS[Number(event.key) - 1]
       if (!wanted) return

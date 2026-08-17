@@ -80,6 +80,9 @@ pub enum Error {
 
     #[error("{0}")]
     Session(String),
+
+    #[error("{0}")]
+    Startup(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
