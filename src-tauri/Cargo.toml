@@ -99,6 +99,7 @@ qrcodegen = "1.8"
 # and a plain piped stdio gets none of them. ConPTY on Windows, forkpty
 # elsewhere, behind one API. This is wezterm's own pty layer.
 portable-pty = "0.9"
+ruzstd = { version = "0.9", default-features = false, features = ["std"] }
 
 [target.'cfg(windows)'.dependencies]
 # Which backdrop the compositor understands is a build-number question, and it

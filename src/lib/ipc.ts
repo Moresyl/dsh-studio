@@ -466,6 +466,95 @@ export const onTerminalExit = (handler: (exit: TerminalExit) => void): Promise<U
   listen<TerminalExit>(TERMINAL_EXIT, (message) => handler(message.payload))
 
 /* -------------------------------------------------------------------------- */
+/* Session history                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** Whose a line was — see `Role` in `src-tauri/src/sessions/mod.rs`. */
+export type Role = 'user' | 'assistant' | 'tool' | 'context'
+
+/** What a session spent, kept apart because cached input is not billed as fresh. */
+export interface Tokens {
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+/** A session, as much of it as fits in a list. */
+export interface SessionCard {
+  id: string
+  /** The directory it ran in, empty when the harness recorded none. */
+  project: string
+  started: number
+  touched: number
+  title: string
+  turns: number
+  models: string[]
+  tokens: Tokens
+  /** Opened by an agent for its own work rather than by a person. */
+  delegated: boolean
+  bytes: number
+}
+
+export interface SessionLine {
+  seq: number
+  time: number
+  role: Role
+  /** What was run, on the lines that are a tool's doing. */
+  tool: string | null
+  text: string
+}
+
+export interface SessionTranscript {
+  card: SessionCard
+  lines: SessionLine[]
+}
+
+export interface Shelved {
+  cards: SessionCard[]
+  /** Sessions whose text is in memory right now, of the ones listed. */
+  loaded: number
+}
+
+/**
+ * A matching line, already cut into the three pieces that rebuild it.
+ *
+ * Sent this way rather than as an offset because the two sides do not agree on
+ * what an offset is — Rust counts bytes and JavaScript counts UTF-16 code units.
+ */
+export interface SessionMark {
+  seq: number
+  time: number
+  role: Role
+  tool: string | null
+  before: string
+  hit: string
+  after: string
+}
+
+export interface SessionHit {
+  card: SessionCard
+  /** How many lines matched, which is how well the session answered. */
+  matches: number
+  marks: SessionMark[]
+}
+
+/** Every session the harness has run on this machine, newest first. */
+export const sessionRoster = (): Promise<Shelved> => invoke('session_roster')
+
+/**
+ * The sessions a query describes, best answer first.
+ *
+ * A session answers when every term appears somewhere in it, not necessarily in
+ * one line — the file you named and the error you got are usually messages apart.
+ */
+export const sessionSearch = (query: string, project?: string): Promise<SessionHit[]> =>
+  invoke('session_search', { query, project: project ?? null })
+
+export const sessionRead = (id: string): Promise<SessionTranscript> =>
+  invoke('session_read', { id })
+
+/* -------------------------------------------------------------------------- */
 /* Window                                                                     */
 /* -------------------------------------------------------------------------- */
 

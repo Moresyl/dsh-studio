@@ -338,6 +338,17 @@
     color: var(--color-text);
   }
 
+  /* What a search matched, quoted back inside a line of its own text. The
+     browser's default is a flat yellow that belongs to no palette here, and it
+     is unreadable on the dark ground; this is the selection colour one step
+     quieter, so a line with several hits still reads as a sentence. */
+  mark {
+    background-color: color-mix(in oklab, var(--color-brand) 26%, transparent);
+    color: var(--color-text);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
   /* A drag that started on a control and ended somewhere else is not a
      gesture — it is a slip, and a webview answers it by dragging the element.
      Text opts back in through `.selectable`, which is also what may be dragged. */

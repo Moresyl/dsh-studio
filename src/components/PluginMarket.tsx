@@ -162,8 +162,8 @@ export function PluginMarket() {
             {query !== '' && !searching && (
               <button
                 type="button"
-                data-hint={t('plugins.clearSearch')}
-                aria-label={t('plugins.clearSearch')}
+                data-hint={t('action.clearSearch')}
+                aria-label={t('action.clearSearch')}
                 onClick={() => {
                   setQuery('')
                   field.current?.focus()

@@ -116,7 +116,7 @@ export default function App() {
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
 
-  // Ctrl+1 through Ctrl+5, in rail order. Every application with a fixed set of
+  // Ctrl+1 through Ctrl+6, in rail order. Every application with a fixed set of
   // views has these, and a user who tries one and gets nothing has just learned
   // that this is not one of those applications.
   useEffect(() => {

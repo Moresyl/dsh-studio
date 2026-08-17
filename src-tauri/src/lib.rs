@@ -13,6 +13,7 @@ mod plugins;
 mod presets;
 mod profiles;
 mod remote;
+mod sessions;
 mod terminal;
 mod tray;
 mod window;
@@ -62,6 +63,7 @@ pub fn run() {
             app.manage(remote);
             app.manage(Arc::new(PluginJobs::default()));
             app.manage(Arc::new(NodeJobs::default()));
+            app.manage(Arc::new(sessions::Library::default()));
             app.manage(terminal::Terminals::new()?);
             // Before `desktop::wire`, which is where a link that started the app
             // is put down for whoever asks for it first.
@@ -108,6 +110,9 @@ pub fn run() {
             terminal::commands::terminal_resize,
             terminal::commands::terminal_close,
             terminal::commands::terminal_list,
+            sessions::commands::session_roster,
+            sessions::commands::session_search,
+            sessions::commands::session_read,
             material::window_material,
             desktop::commands::desktop_offer,
             desktop::commands::desktop_notify,

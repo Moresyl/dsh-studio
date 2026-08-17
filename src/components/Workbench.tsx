@@ -1,10 +1,19 @@
 import { useEffect, type ReactNode } from 'react'
-import { Gauge, Info, Puzzle, Smartphone, SquareTerminal, type LucideIcon } from 'lucide-react'
+import {
+  Gauge,
+  History,
+  Info,
+  Puzzle,
+  Smartphone,
+  SquareTerminal,
+  type LucideIcon,
+} from 'lucide-react'
 
 import { AboutPane } from '@/components/AboutPane'
 import { ConsolePane } from '@/components/ConsolePane'
 import { PluginMarket } from '@/components/PluginMarket'
 import { RemotePane } from '@/components/RemotePane'
+import { SessionsPane } from '@/components/SessionsPane'
 import { TerminalPane } from '@/components/TerminalPane'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
@@ -14,12 +23,13 @@ import { useRemote } from '@/state/remote'
 import { runningCount, useTerminals } from '@/state/terminals'
 import { useUpdate } from '@/state/update'
 
-export type View = 'console' | 'terminal' | 'plugins' | 'remote' | 'about'
+export type View = 'console' | 'terminal' | 'sessions' | 'plugins' | 'remote' | 'about'
 
 /** Rail order, which is also the order the number accelerators follow. */
 export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'console', icon: Gauge, label: 'nav.console' },
   { id: 'terminal', icon: SquareTerminal, label: 'nav.terminal' },
+  { id: 'sessions', icon: History, label: 'nav.sessions' },
   { id: 'plugins', icon: Puzzle, label: 'nav.plugins' },
   { id: 'remote', icon: Smartphone, label: 'nav.remote' },
   { id: 'about', icon: Info, label: 'nav.about' },
@@ -110,6 +120,7 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
           <ConsolePane />
         </div>
         {view === 'terminal' && <TerminalPane />}
+        {view === 'sessions' && <SessionsPane />}
         {view === 'plugins' && <PluginMarket />}
         {view === 'remote' && <RemotePane />}
         {view === 'about' && <AboutPane />}
