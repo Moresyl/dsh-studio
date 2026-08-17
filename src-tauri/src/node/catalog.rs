@@ -180,9 +180,8 @@ async fn from_mirror(client: &Client, mirror: &str, platform: &Platform) -> Resu
         })?;
 
     let published = http::text(client, &format!("{mirror}/{version}/SHASUMS256.txt")).await?;
-    let sha256 = checksum(&published, &archive).ok_or_else(|| {
-        Error::Network(format!("{mirror} publishes no checksum for {archive}"))
-    })?;
+    let sha256 = checksum(&published, &archive)
+        .ok_or_else(|| Error::Network(format!("{mirror} publishes no checksum for {archive}")))?;
 
     Ok(Release {
         url: format!("{mirror}/{version}/{archive}"),

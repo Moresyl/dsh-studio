@@ -64,7 +64,9 @@ pub async fn text(client: &Client, url: &str) -> Result<String> {
         .timeout(METADATA_TIMEOUT)
         .send()
         .await
-        .map_err(|cause| Error::Network(format!("{url} could not be reached: {}", reason(&cause))))?;
+        .map_err(|cause| {
+            Error::Network(format!("{url} could not be reached: {}", reason(&cause)))
+        })?;
 
     let status = response.status();
     if !status.is_success() {
@@ -94,11 +96,9 @@ pub async fn download<P>(
 where
     P: FnMut(u64, Option<u64>),
 {
-    let mut response = client
-        .get(url)
-        .send()
-        .await
-        .map_err(|cause| Error::Network(format!("{url} could not be reached: {}", reason(&cause))))?;
+    let mut response = client.get(url).send().await.map_err(|cause| {
+        Error::Network(format!("{url} could not be reached: {}", reason(&cause)))
+    })?;
 
     let status = response.status();
     if !status.is_success() {

@@ -77,7 +77,10 @@ pub enum Progress {
     /// A release was chosen. The one event carrying the URL, so the log records
     /// which mirror answered — the first thing worth knowing when a download was
     /// slow or failed.
-    Chosen { version: String, url: String },
+    Chosen {
+        version: String,
+        url: String,
+    },
     /// Everything from here on repeats the version rather than expecting whoever
     /// draws it to have remembered `Chosen`. Events are delivered over a channel
     /// that is allowed to drop them under load, so a report that only makes sense
@@ -88,9 +91,15 @@ pub enum Progress {
         total: Option<u64>,
     },
     /// Comparing what arrived against the published checksum.
-    Verifying { version: String },
-    Extracting { version: String },
-    Installed { version: String },
+    Verifying {
+        version: String,
+    },
+    Extracting {
+        version: String,
+    },
+    Installed {
+        version: String,
+    },
 }
 
 impl Progress {
@@ -151,7 +160,9 @@ where
     });
 
     std::fs::create_dir_all(root).map_err(|cause| {
-        Error::NodeProvision(format!("the runtime directory could not be created: {cause}"))
+        Error::NodeProvision(format!(
+            "the runtime directory could not be created: {cause}"
+        ))
     })?;
     let download = root.join(DOWNLOAD_NAME);
     let staging = root.join(STAGING_NAME);
@@ -206,7 +217,9 @@ where
     // that the scanner would report as a runtime.
     let _ = std::fs::remove_dir_all(&destination);
     std::fs::rename(&unpacked, &destination).map_err(|cause| {
-        Error::NodeProvision(format!("the runtime could not be moved into place: {cause}"))
+        Error::NodeProvision(format!(
+            "the runtime could not be moved into place: {cause}"
+        ))
     })?;
     discard(&download, &staging);
 

@@ -29,8 +29,9 @@ fn expand(archive: &Path, staging: &Path) -> Result<()> {
         Error::NodeProvision(format!("the download is not a readable zip: {cause}"))
     })?;
 
-    zip.extract(staging)
-        .map_err(|cause| Error::NodeProvision(format!("the download could not be unpacked: {cause}")))
+    zip.extract(staging).map_err(|cause| {
+        Error::NodeProvision(format!("the download could not be unpacked: {cause}"))
+    })
 }
 
 #[cfg(not(windows))]
@@ -41,9 +42,9 @@ fn expand(archive: &Path, staging: &Path) -> Result<()> {
     // Node's tarballs contain symlinks — `bin/npm` points into
     // `lib/node_modules` — and the runtime is unusable without them, so this
     // must be `tar`'s own unpacker rather than a copy loop.
-    tar::Archive::new(decoded)
-        .unpack(staging)
-        .map_err(|cause| Error::NodeProvision(format!("the download could not be unpacked: {cause}")))
+    tar::Archive::new(decoded).unpack(staging).map_err(|cause| {
+        Error::NodeProvision(format!("the download could not be unpacked: {cause}"))
+    })
 }
 
 fn unreadable(cause: std::io::Error) -> Error {
