@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, Copy, FolderOpen, Loader2, RefreshCw, Scale } from 'lucide-react'
+import { ArrowUpRight, Copy, Download, FolderOpen, Loader2, RefreshCw, Scale } from 'lucide-react'
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { BrandMark } from '@/components/BrandMark'
@@ -9,6 +9,7 @@ import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import type { About } from '@/lib/ipc'
+import { notesForDisplay } from '@/lib/updater'
 import { contextMenu } from '@/state/menu'
 import { useUpdate } from '@/state/update'
 
@@ -26,17 +27,21 @@ const SOURCE = 'https://github.com/Moresyl/dsh-studio'
  *
  * The update state is shared with the status bar rather than fetched again here.
  * Two panels asking the same question of the same feed is how an app ends up
- * telling a user two different things about which version they are on. Nothing
- * is downloaded either — this reads a version and offers a link.
+ * telling a user two different things about which version they are on. The
+ * signed updater also owns the download: this pane only starts it after a click.
  */
 export function AboutPane() {
   const [about, setAbout] = useState<About | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const release = useUpdate((state) => state.release)
+  const checked = useUpdate((state) => state.checked)
   const checking = useUpdate((state) => state.checking)
+  const installing = useUpdate((state) => state.installing)
+  const progress = useUpdate((state) => state.progress)
   const checkFailure = useUpdate((state) => state.error)
   const check = useUpdate((state) => state.check)
+  const install = useUpdate((state) => state.install)
 
   useEffect(() => {
     void ipc
@@ -49,10 +54,16 @@ export function AboutPane() {
     void revealItemInDir(path).catch((cause: unknown) => setError(describe(cause)))
   }
 
+  const notes = release ? notesForDisplay(release.notes) : ''
+  const percent =
+    progress?.total && progress.total > 0
+      ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
+      : null
+
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col">
       <PaneHeader title={t('about.title')} subtitle={t('about.subtitle')}>
-        <Button variant="secondary" onClick={() => void check()} disabled={checking}>
+        <Button variant="secondary" onClick={() => void check()} disabled={checking || installing}>
           {checking ? (
             <>
               <Loader2 size={13} className="animate-spin" />
@@ -81,28 +92,63 @@ export function AboutPane() {
             </div>
           </div>
 
-          {release && (
-            <div
-              className={[
-                'flex items-center gap-2.5 rounded-panel border px-4 py-3 text-[12.5px]',
-                release.newer
-                  ? 'border-brand/30 bg-brand/10 text-text'
-                  : 'border-line bg-canvas-deep/50 text-muted',
-              ].join(' ')}
-            >
-              <span className="min-w-0 flex-1">
-                {release.newer
-                  ? t('about.available', { version: release.version })
-                  : t('about.current')}
-              </span>
-              {release.newer && (
-                <Button variant="primary" onClick={() => void openUrl(release.url)}>
+          {release ? (
+            <div className="flex flex-col gap-3 rounded-panel border border-brand/30 bg-brand/10 px-4 py-3 text-[12.5px] text-text">
+              <div className="flex flex-col gap-1.5">
+                <strong className="font-semibold">
+                  {t('about.available', { version: release.version })}
+                </strong>
+                {notes && (
+                  <p className="selectable max-h-[168px] overflow-y-auto whitespace-pre-line text-[12px] leading-relaxed text-muted">
+                    {notes}
+                  </p>
+                )}
+              </div>
+
+              {installing && (
+                <div className="flex flex-col gap-1.5" aria-live="polite">
+                  <div className="flex items-center justify-between text-[11px] text-muted tabular-nums">
+                    <span>
+                      {percent === 100
+                        ? t('about.installing')
+                        : percent === null
+                          ? t('about.downloading')
+                          : t('about.downloadingPercent', { percent })}
+                    </span>
+                    {percent !== null && <span>{percent}%</span>}
+                  </div>
+                  <div className="h-1 overflow-hidden rounded-full bg-canvas-deep/70">
+                    <div
+                      className={[
+                        'h-full rounded-full bg-brand transition-[width] duration-150',
+                        percent === null ? 'w-1/3 animate-pulse' : '',
+                      ].join(' ')}
+                      style={percent === null ? undefined : { width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2">
+                <Button variant="secondary" onClick={() => void openUrl(release.url)}>
                   {t('about.release')}
                   <ArrowUpRight size={13} strokeWidth={2.3} />
                 </Button>
-              )}
+                <Button variant="primary" onClick={() => void install()} disabled={installing}>
+                  {installing ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Download size={13} strokeWidth={2.3} />
+                  )}
+                  {installing ? t('about.updating') : t('about.install')}
+                </Button>
+              </div>
             </div>
-          )}
+          ) : checked ? (
+            <div className="rounded-panel border border-line bg-canvas-deep/50 px-4 py-3 text-[12.5px] text-muted">
+              {t('about.current')}
+            </div>
+          ) : null}
 
           {(error ?? checkFailure) && (
             <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">

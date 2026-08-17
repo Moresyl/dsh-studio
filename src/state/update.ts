@@ -13,8 +13,7 @@
 import { create } from 'zustand'
 
 import { describe } from '@/lib/errors'
-import * as ipc from '@/lib/ipc'
-import type { Release } from '@/lib/ipc'
+import { checkForUpdate, installUpdate, type DownloadProgress, type Release } from '@/lib/updater'
 
 const DISMISSED_KEY = 'dsh-studio:update:dismissed'
 
@@ -26,34 +25,56 @@ const RECHECK_MS = 6 * 60 * 60 * 1000
 
 interface UpdateState {
   release: Release | null
+  /** A successful check has completed, including the up-to-date result. */
+  checked: boolean
   checking: boolean
+  installing: boolean
+  progress: DownloadProgress | null
   /** Only ever set by a check the user asked for. */
   error: string | null
   /** The version already waved away, remembered across restarts. */
   dismissed: string | null
   check: (quiet?: boolean) => Promise<void>
+  install: () => Promise<void>
   dismiss: () => void
 }
 
 export const useUpdate = create<UpdateState>((set, get) => ({
   release: null,
+  checked: false,
   checking: false,
+  installing: false,
+  progress: null,
   error: null,
   dismissed: readDismissed(),
 
   /**
-   * `quiet` is for the checks nobody asked for. A laptop that is offline, or a
-   * machine with no Node yet, is not a situation to report — it is Tuesday.
+   * `quiet` is for the checks nobody asked for. A laptop that is offline is not
+   * a situation to report — it is Tuesday.
    */
   check: async (quiet = false) => {
-    if (get().checking) return
+    if (get().checking || get().installing) return
     set({ checking: true, error: null })
     try {
-      set({ release: await ipc.checkUpdate() })
+      set({ release: await checkForUpdate(), checked: true })
     } catch (cause) {
       if (!quiet) set({ error: describe(cause) })
     } finally {
       set({ checking: false })
+    }
+  },
+
+  install: async () => {
+    if (get().installing || get().checking) return
+    set({ installing: true, progress: { downloaded: 0, total: null }, error: null })
+    try {
+      const installed = await installUpdate((progress) => set({ progress }))
+      // The release can disappear between the first check and the install click.
+      if (!installed) set({ release: null, checked: true })
+    } catch (cause) {
+      set({ error: describe(cause) })
+    } finally {
+      set({ installing: false })
     }
   },
 
@@ -67,7 +88,7 @@ export const useUpdate = create<UpdateState>((set, get) => ({
 
 /** Whether there is something worth a line in the status bar. */
 export const isAnnounceable = (state: UpdateState): boolean =>
-  state.release !== null && state.release.newer && state.release.version !== state.dismissed
+  state.release !== null && state.release.version !== state.dismissed
 
 /**
  * Start checking, and keep checking.

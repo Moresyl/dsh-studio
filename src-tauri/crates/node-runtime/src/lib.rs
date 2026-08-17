@@ -9,7 +9,7 @@
 mod detect;
 mod version;
 
-pub use detect::{discover, probe, NodeInstallation, Source};
+pub use detect::{discover, plain_path, probe, NodeInstallation, Source};
 pub use version::Version;
 
 /// Lowest Node release this application will run the harness on.

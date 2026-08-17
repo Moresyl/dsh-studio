@@ -116,7 +116,7 @@ export default function App() {
         <Workbench hidden={!showPanel} view={view} onSelect={show} />
       </div>
 
-      <StatusBar status={status} environment={environment} />
+      <StatusBar status={status} environment={environment} onOpenUpdate={() => show('about')} />
 
       {/* Last, and outside the layout: both are positioned against the window
           and have to be able to cover anything in it. The menu is mounted after

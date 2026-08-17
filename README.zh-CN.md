@@ -65,6 +65,8 @@ harness 的界面加载在外壳自绘标题栏下方的一个 frame 里，
 而不是绕过它——不存在偷偷改别人配置文件的旁路。
 清单里声明了 profile 补丁的包，会成为 harness 加载的一个层；
 没声明的则如实标成「库」，而不是装完之后表现得像一个什么都没干的插件。
+装好的插件还可以只停用、不卸载——
+于是「是不是它把东西弄坏了」这个问题，代价是一次点击，而不是一次重新下载。
 
 **够得着你的手机，但不把 agent 放到网络上。**
 远程访问默认关闭；打开它也不会挪动服务——`dsh` 始终绑在回环上，而且这一点不可配置。
@@ -156,14 +158,15 @@ flowchart LR
 | Supervisor、退避重启、健康探测     | ✅                                                            |
 | 进程树回收（Windows / Unix）       | ✅                                                            |
 | harness 承载、日志控制台、中英双语 | ✅                                                            |
-| 插件市场——搜索、安装、卸载         | ✅                                                            |
+| 插件市场——安装、启用/停用、卸载    | ✅                                                            |
 | 远程访问：一次性配对码、每设备密钥 | ✅                                                            |
-| 新版本提示、定时自动检查           | ✅                                                            |
+| 签名应用内更新、定时自动检查       | ✅                                                            |
 | Windows 11 实测通过                | ✅                                                            |
 | macOS / Linux 渲染                 | ⏳ 尚未验证                                                   |
 | 内置 Node runtime（无需系统 Node） | ⏳ 计划中                                                     |
 | 托盘图标、运行中关闭到托盘         | ✅                                                            |
 | 原生右键菜单、窗口位置记忆         | ✅                                                            |
+| 深色 / 浅色，可跟随系统也可不跟随  | ✅                                                            |
 | 静默自更新                         | ⏳ 计划中                                                     |
 | 打包发布                           | ✅ 自动构建 Windows、Linux、macOS Intel 与 Apple Silicon 版本 |
 
@@ -219,7 +222,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 src/                       React 19 + Tailwind 4 外壳界面
 src-tauri/src/harness/     supervisor、就绪行解析、健康探测、安装
 src-tauri/src/remote/      局域网网关、配对码、二维码、地址选择
-src-tauri/src/plugins/     registry 搜索、profile 检查、安装与卸载
+src-tauri/src/plugins/     registry 搜索、profile 检查、安装 / 启用停用 / 卸载
 src-tauri/crates/
   node-runtime/            在本机找出一个可用的 Node
   proc-guard/              杀进程树，而且是真的杀干净

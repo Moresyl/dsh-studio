@@ -17,7 +17,9 @@
 
 pub mod commands;
 pub mod registry;
+pub mod switches;
 
+use std::collections::{BTreeSet, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
@@ -50,6 +52,10 @@ pub struct InstalledPlugin {
     /// is applied. A dependency that is installed but inactive is a plain
     /// library, which is allowed and worth showing as different.
     pub active: bool,
+    /// Installed and left installed, but taken out of the layer stack by the
+    /// user. Distinct from a plain library, which was never in it: this one can
+    /// be switched back on without a download.
+    pub disabled: bool,
     /// Part of the profile template rather than something installed here.
     /// Shown because it explains the harness's behaviour, never removable.
     pub builtin: bool,
@@ -99,10 +105,15 @@ pub fn state() -> PluginState {
     let profile_dir = paths::profile_dir(PROFILE);
     let manifest = read_manifest(&profile_dir);
 
+    let switched_off = switches::switched_off(PROFILE);
+
     PluginState {
         profile: PROFILE.to_string(),
         initialized: manifest.is_some(),
-        plugins: manifest.as_ref().map(list).unwrap_or_default(),
+        plugins: manifest
+            .as_ref()
+            .map(|manifest| list(manifest, &switched_off))
+            .unwrap_or_default(),
         package_manager: package_manager_available(),
         profile_dir,
     }
@@ -115,10 +126,11 @@ fn read_manifest(profile_dir: &Path) -> Option<serde_json::Value> {
 
 /// Turn the manifest into the list the panel shows.
 ///
-/// Two sources, deliberately merged: `dependencies` is what was installed, and
-/// `dsh.profile.bundles` is what is switched on. A name in the second but not
-/// the first came with the profile template.
-fn list(manifest: &serde_json::Value) -> Vec<InstalledPlugin> {
+/// Three sources, deliberately merged: `dependencies` is what was installed,
+/// `dsh.profile.bundles` is what is switched on, and `switched_off` is what the
+/// user took out of that list. A name in the second but not the first came with
+/// the profile template.
+fn list(manifest: &serde_json::Value, switched_off: &BTreeSet<String>) -> Vec<InstalledPlugin> {
     let bundles: Vec<&str> = manifest
         .pointer("/dsh/profile/bundles")
         .and_then(serde_json::Value::as_array)
@@ -138,6 +150,7 @@ fn list(manifest: &serde_json::Value) -> Vec<InstalledPlugin> {
                 .iter()
                 .map(|(name, spec)| InstalledPlugin {
                     active: bundles.contains(&name.as_str()),
+                    disabled: switched_off.contains(name),
                     name: name.clone(),
                     spec: spec.as_str().unwrap_or_default().to_string(),
                     builtin: false,
@@ -152,6 +165,7 @@ fn list(manifest: &serde_json::Value) -> Vec<InstalledPlugin> {
                 name: name.to_string(),
                 spec: String::new(),
                 active: true,
+                disabled: false,
                 builtin: true,
             });
         }
@@ -225,25 +239,100 @@ where
             "the plugin command could not be waited on: {cause}"
         ))
     })?;
-    let _ = tokio::join!(out, err);
+    let (out, err) = tokio::join!(out, err);
 
     if !status.success() {
-        return Err(Error::Plugin(format!(
-            "the plugin command exited with {status}"
-        )));
+        // Every line went to the console, but the button that started this is in
+        // the plugin panel, and an exit code on its own gives the person who
+        // pressed it nothing to act on. So the failure carries its own reason.
+        return Err(Error::Plugin(
+            match last_words(err).or_else(|| last_words(out)) {
+                Some(reason) => format!("the plugin command failed ({status}): {reason}"),
+                None => format!("the plugin command exited with {status} without saying why"),
+            },
+        ));
     }
+
+    // The harness has just rebuilt the layer list from what is installed, which
+    // puts back anything the user had switched off. Saying so again here is the
+    // only reason a switched-off plugin stays switched off across an install.
+    switches::apply(PROFILE, &paths::profile_dir(PROFILE))?;
     Ok(())
 }
 
-async fn forward<P, R>(pipe: P, stream: Stream, report: R)
+/// Switch an installed plugin on or off without uninstalling it.
+///
+/// Cheap in a way installing is not — nothing is fetched, nothing is spawned,
+/// and the package stays on disk — so this is the reversible half of the panel,
+/// and the one to reach for when someone is only trying something out.
+pub fn switch(name: &str, enabled: bool) -> Result<()> {
+    if !is_package_spec(name) {
+        return Err(Error::Plugin(format!(
+            "{name} is not a package name this panel will pass on"
+        )));
+    }
+
+    // The profile template's own bundles are what make the harness a harness.
+    // Switching one off would leave a running application with no interface and
+    // no obvious way back; they are shown, and they are not ours to turn off.
+    if state()
+        .plugins
+        .iter()
+        .any(|plugin| plugin.name == name && plugin.builtin)
+    {
+        return Err(Error::Plugin(format!(
+            "{name} came with the profile and cannot be switched off"
+        )));
+    }
+
+    switches::set(PROFILE, name, enabled, &paths::profile_dir(PROFILE))
+}
+
+/// How many trailing lines are kept to explain a failure. Enough to hold an
+/// `ERR_PNPM_*` heading and the sentence under it; short enough to read at once.
+const TAIL_LINES: usize = 3;
+
+/// Report every line of a stream, and hand back the last few of them.
+async fn forward<P, R>(pipe: P, stream: Stream, report: R) -> Vec<String>
 where
     P: tokio::io::AsyncRead + Unpin,
     R: Fn(Stream, String),
 {
-    let mut lines = BufReader::new(pipe).lines();
-    while let Ok(Some(line)) = lines.next_line().await {
+    let mut reader = BufReader::new(pipe);
+    let mut raw: Vec<u8> = Vec::new();
+    let mut tail: VecDeque<String> = VecDeque::with_capacity(TAIL_LINES);
+
+    // Bytes rather than `lines()`: a shell on a Chinese Windows writes its
+    // errors in the OEM code page, and a UTF-8 line reader ends the stream at
+    // the first byte it cannot decode — dropping the rest of the output at
+    // precisely the moment someone has a reason to read it.
+    loop {
+        raw.clear();
+        match reader.read_until(b'\n', &mut raw).await {
+            Ok(0) | Err(_) => break,
+            Ok(_) => {}
+        }
+
+        let line = String::from_utf8_lossy(&raw).trim_end().to_string();
+        if line.is_empty() {
+            continue;
+        }
+        if tail.len() == TAIL_LINES {
+            tail.pop_front();
+        }
+        tail.push_back(line.clone());
         report(stream, line);
     }
+
+    tail.into()
+}
+
+/// What a stream said last, as one line an error message can carry.
+fn last_words(
+    collected: std::result::Result<Vec<String>, tokio::task::JoinError>,
+) -> Option<String> {
+    let joined = collected.ok()?.join(" · ");
+    (!joined.is_empty()).then_some(joined)
 }
 
 /// Whether the harness will find a package manager when it looks for one.
@@ -318,15 +407,24 @@ fn executable_in(directory: &Path, stem: &str) -> Option<PathBuf> {
 
 /// `PATH` for the child: the chosen Node first, then any managed pnpm, then
 /// whatever the user has. Nothing is written to the user's own environment.
+///
+/// Every entry added here is passed through [`node_runtime::plain_path`], and
+/// that is not decoration. `dsh plugin` reaches pnpm through a shell, so these
+/// directories are searched by `cmd.exe`, which cannot read Windows'
+/// extended-length spelling — an entry it cannot read is not an entry it skips,
+/// it is a launch that fails with "the system cannot find the path specified"
+/// and an exit code with no explanation attached. A `PATH` is a promise that
+/// something can be found in it, and it is cheap to keep that promise here
+/// rather than trust every caller to have.
 fn path_with(node: &Path, manager: Option<&Path>) -> OsString {
     let existing = std::env::var_os("PATH").unwrap_or_default();
     let mut entries: Vec<PathBuf> = Vec::new();
 
     if let Some(directory) = node.parent() {
-        entries.push(directory.to_path_buf());
+        entries.push(node_runtime::plain_path(directory.to_path_buf()));
     }
     if let Some(directory) = manager {
-        entries.push(directory.to_path_buf());
+        entries.push(node_runtime::plain_path(directory.to_path_buf()));
     }
     entries.extend(std::env::split_paths(&existing));
     std::env::join_paths(entries).unwrap_or(existing)
@@ -385,15 +483,26 @@ fn is_name_segment(segment: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_package_spec, list, split_spec};
+    use std::sync::{Arc, Mutex};
+
+    use std::path::{Path, PathBuf};
+
+    use std::collections::BTreeSet;
+
+    use super::{forward, is_package_spec, list, path_with, split_spec, Stream};
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
     }
 
+    /// The panel's list, for a profile where nothing was switched off.
+    fn listed(manifest: &serde_json::Value) -> Vec<super::InstalledPlugin> {
+        list(manifest, &BTreeSet::new())
+    }
+
     #[test]
     fn separates_installed_plugins_from_the_ones_that_came_with_the_profile() {
-        let plugins = list(&manifest(
+        let plugins = listed(&manifest(
             r#"{
                 "dependencies": { "@vendor/dsh-notes": "^1.2.0" },
                 "dsh": { "profile": { "bundles": [
@@ -414,18 +523,48 @@ mod tests {
     fn shows_an_installed_dependency_that_is_not_a_layer() {
         // A plain library the harness declined to activate still has to appear,
         // or the panel would offer no way to remove it.
-        let plugins = list(&manifest(
+        let plugins = listed(&manifest(
             r#"{ "dependencies": { "left-pad": "^1.3.0" }, "dsh": { "profile": { "bundles": [] } } }"#,
         ));
 
         assert_eq!(plugins.len(), 1);
         assert!(!plugins[0].active);
+        assert!(
+            !plugins[0].disabled,
+            "never in the stack is not switched off"
+        );
         assert!(!plugins[0].builtin);
     }
 
     #[test]
+    fn tells_a_switched_off_plugin_apart_from_a_plain_library() {
+        // Both are installed and out of the layer stack, and only one of them
+        // has a switch that puts it back — so the panel has to know which.
+        let manifest = manifest(
+            r#"{
+                "dependencies": { "@vendor/dsh-notes": "^1.2.0", "left-pad": "^1.3.0" },
+                "dsh": { "profile": { "bundles": [] } }
+            }"#,
+        );
+        let off = BTreeSet::from(["@vendor/dsh-notes".to_string()]);
+
+        let plugins = list(&manifest, &off);
+
+        let notes = plugins
+            .iter()
+            .find(|p| p.name == "@vendor/dsh-notes")
+            .expect("listed");
+        let library = plugins
+            .iter()
+            .find(|p| p.name == "left-pad")
+            .expect("listed");
+        assert!(notes.disabled && !notes.active);
+        assert!(!library.disabled && !library.active);
+    }
+
+    #[test]
     fn reads_an_empty_profile_without_complaining() {
-        assert!(list(&manifest(r#"{ "name": "dsh-profile-web" }"#)).is_empty());
+        assert!(listed(&manifest(r#"{ "name": "dsh-profile-web" }"#)).is_empty());
     }
 
     #[test]
@@ -449,6 +588,64 @@ mod tests {
         assert!(!is_package_spec("@scope"), "a scope without a name");
         assert!(!is_package_spec("UPPER"), "npm names are lowercase");
         assert!(!is_package_spec(".hidden"), "cannot start with a dot");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn never_puts_a_path_a_shell_cannot_read_on_the_child_path() {
+        // `canonicalize` hands back this spelling, the harness forwards to pnpm
+        // through `cmd.exe`, and `cmd.exe` cannot look anything up in it. The
+        // symptom is an exit code 1 with no message, which is why this is
+        // asserted at the boundary rather than left to whoever supplies a path.
+        let node = Path::new(r"\\?\C:\Users\someone\AppData\Local\nvm\v22.14.0\node.exe");
+        let manager =
+            PathBuf::from(r"\\?\C:\Users\someone\AppData\Local\dsh-studio\tools\node_modules\.bin");
+
+        let path = path_with(node, Some(&manager));
+        let entries: Vec<PathBuf> = std::env::split_paths(&path).collect();
+
+        assert_eq!(
+            entries[0],
+            Path::new(r"C:\Users\someone\AppData\Local\nvm\v22.14.0")
+        );
+        assert_eq!(
+            entries[1],
+            Path::new(r"C:\Users\someone\AppData\Local\dsh-studio\tools\node_modules\.bin")
+        );
+        assert!(
+            !entries
+                .iter()
+                .any(|entry| entry.to_string_lossy().starts_with(r"\\?\")),
+            "no entry this shell contributed may carry the extended-length prefix"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_byte_that_is_not_utf8_does_not_end_the_output() {
+        // What a shell on a Chinese Windows writes when it fails, in the OEM
+        // code page — and the line after it is the one naming what went wrong.
+        let raw: &[u8] =
+            b"first\n\xcf\xb5\xcd\xb3\xd5\xd2\xb2\xbb\xb5\xbd\n second \nthird\nfourth\n";
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let record = {
+            let seen = Arc::clone(&seen);
+            move |_: Stream, line: String| seen.lock().expect("not poisoned").push(line)
+        };
+
+        let tail = forward(raw, Stream::Stdout, record).await;
+
+        assert_eq!(
+            seen.lock().expect("not poisoned").len(),
+            5,
+            "the undecodable line must not take the rest of the stream with it"
+        );
+        // Only the line ending is taken: pnpm indents what it lists under a
+        // heading, and that shape is part of what the console is showing.
+        assert_eq!(
+            tail,
+            [" second", "third", "fourth"],
+            "the tail explains the failure"
+        );
     }
 
     #[test]

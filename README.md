@@ -74,7 +74,9 @@ profile. Installation goes through the harness's own plugin command rather than
 around it — no private side channel into somebody else's config. A package whose
 manifest declares a profile patch becomes a layer the harness loads; one that
 does not is labelled the plain library it is, instead of appearing as a plugin
-that mysteriously did nothing.
+that mysteriously did nothing. An installed plugin can also be switched off
+without being uninstalled, so "is this the one breaking it?" costs a click
+rather than a download.
 
 **Reaches your phone without putting the agent on the network.**
 Remote access is off until you open it, and opening it does not move the
@@ -173,14 +175,15 @@ about being unfinished.
 | Supervisor, backoff restart, health probing  | ✅                                                                 |
 | Process-tree reclamation (Windows / Unix)    | ✅                                                                 |
 | Harness hosting, log console, English + 中文 | ✅                                                                 |
-| Plugin marketplace — search, install, remove | ✅                                                                 |
+| Plugin marketplace — install, switch, remove | ✅                                                                 |
 | Remote access, single-use QR, revocable keys | ✅                                                                 |
-| Update notice, checked on a schedule         | ✅                                                                 |
+| Signed in-app update, checked on a schedule  | ✅                                                                 |
 | Verified on Windows 11                       | ✅                                                                 |
 | macOS / Linux rendering                      | ⏳ not yet run                                                     |
 | Bundled Node runtime (no system Node needed) | ⏳ planned                                                         |
 | Tray icon, close-to-tray while serving       | ✅                                                                 |
 | Native context menus, saved window bounds    | ✅                                                                 |
+| Light and dark, following the system or not  | ✅                                                                 |
 | Silent self-update                           | ⏳ planned                                                         |
 | Packaged releases                            | ✅ automated for Windows, Linux, and macOS (Intel + Apple Silicon) |
 
@@ -239,7 +242,7 @@ cargo test --manifest-path src-tauri/Cargo.toml --workspace
 src/                       React 19 + Tailwind 4 shell UI
 src-tauri/src/harness/     supervisor, readiness parsing, health probe, install
 src-tauri/src/remote/      LAN gateway, pairing codes, QR, address selection
-src-tauri/src/plugins/     registry search, profile inspection, install/remove
+src-tauri/src/plugins/     registry search, profile inspection, install/switch/remove
 src-tauri/crates/
   node-runtime/            find a usable Node on this machine
   proc-guard/              kill a process tree and mean it

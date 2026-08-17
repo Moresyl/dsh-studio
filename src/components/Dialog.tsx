@@ -3,6 +3,7 @@ import { Info, TriangleAlert } from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { t } from '@/lib/i18n'
+import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { useDialog } from '@/state/dialog'
 
 /**
@@ -43,37 +44,14 @@ export function Dialog() {
   const danger = pending.tone !== 'brand'
   const Icon = danger ? TriangleAlert : Info
 
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation()
-      settle(false)
-      return
-    }
+  // Escape says no, Tab stays in here: outside a modal the rest of the window
+  // is still focusable, and a caret that walks out of a question and into the
+  // pane behind it is how a dialog stops being a dialog.
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) =>
+    holdFocus(card.current, event, () => settle(false))
 
-    // Tab stays in here. Outside a modal the rest of the window is still
-    // focusable, and a caret that walks out of a question and into the pane
-    // behind it is how a dialog stops being a dialog.
-    if (event.key !== 'Tab') return
-
-    const stops = Array.from(card.current?.querySelectorAll<HTMLElement>('button') ?? [])
-    const first = stops.at(0)
-    const last = stops.at(-1)
-    if (!first || !last) return
-
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault()
-      last.focus()
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault()
-      first.focus()
-    }
-  }
-
-  // On the press and only on the backdrop itself: a selection that started on
-  // the text in the card and ended out here is a drag, not a dismissal.
-  const onBackdrop = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) settle(false)
-  }
+  const onBackdrop = (event: MouseEvent<HTMLDivElement>) =>
+    pressedBackdrop(event, () => settle(false))
 
   return (
     <div

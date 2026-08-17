@@ -9,6 +9,72 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-17
+
+This release adds a light palette and reversible plugin switches, fixes plugin
+installation with NVM-managed Node on Windows, moves package details into a
+focused dialog, and completes updates inside the app with signed verification.
+
+### Added
+
+- **A light palette, and a switch for it.** Three choices in the title bar —
+  match system, light, dark — because the first two are not the same thing: a
+  window that follows the desktop is right until you are the person who keeps
+  the desktop dark and reads documentation in the light, and then it is wrong
+  twice a day with no way to say so. "Match system" is the default and stays
+  live, so a desktop that turns itself down at sunset takes the window with it.
+  The choice is remembered, and applied before React draws anything: a window
+  that renders dark and turns light a frame later is worse than one that was
+  never asked to.
+
+- **Installed plugins can be switched off without being uninstalled.** Removing
+  a plugin to find out whether it is the reason something broke costs a download
+  to put it back, which is enough friction that the question does not get asked.
+  A switch on each row takes the package's patch out of the layer stack and
+  leaves the package on disk, so the answer costs one click and the undo costs
+  one more. The switch appears only where throwing it means something: a package
+  that declares no patch has no layer to remove, and one that came with the
+  profile template stays in the stack — both say so in words rather than
+  offering a control that would quietly undo itself. The harness rebuilds the
+  layer list from what is installed after every plugin command, so the shell
+  re-asserts what you switched off after each one; nothing you turned off comes
+  back on because something else was installed.
+
+### Changed
+
+- **Updates finish where they begin.** The prompt now opens localized release
+  notes in DSH Studio, then downloads, verifies, installs, and restarts the
+  signed update in place. Progress stays visible, and the release page remains
+  available when a manual download is needed.
+- **A package's details open in front of you instead of down the side.** The
+  rail took 318px of window permanently, to hold something worth reading one
+  package at a time, and it was empty until something was picked — while the
+  Install button in it sat a long way from the row the eye was on. The details
+  are now a dialog: the list gets the whole width back, and the decision arrives
+  where the click happened. Escape, the dimmed area, and the close button all
+  dismiss it, Tab stays inside, and the caret goes back to the row it came from.
+  What it says is unchanged, because the reason the rail existed is unchanged —
+  a registry search returns packages that merely mention the harness beside
+  packages that extend it, and the only honest way to tell them apart is to read
+  the published manifest.
+- Removing a plugin from the installed list is an icon now rather than a word,
+  and both lists open the same dialog and ask the same removal question, so
+  which list you happened to be looking at no longer changes the wording.
+
+### Fixed
+
+- **Installing a plugin failed with `the plugin command exited with exit code: 1`.**
+  The shell puts the detected Node's directory on the child's `PATH`, and it had
+  been taking that path from `canonicalize`, which on Windows answers in
+  extended-length form — `\\?\C:\Program Files\nodejs`. That prefix is a signal
+  to the file system API to skip path parsing entirely, and `cmd.exe` cannot
+  resolve an executable out of a `PATH` entry that carries it. So `npm` — a
+  `.cmd` shim that shells out — could not find `node`, and every install died
+  the moment the package manager was reached. The prefix is now stripped for
+  ordinary drive paths before the variable is built, kept for volume GUID paths
+  where it is the only form that works, and rewritten to `\\` for UNC paths so a
+  Node on a network share still resolves. Covered by tests on Windows.
+
 ## [0.3.0] — 2026-08-17
 
 The desktop shell feels more native, announces new releases without taking over
@@ -206,7 +272,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Moresyl/dsh-studio/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Moresyl/dsh-studio/compare/v0.1.0...v0.1.1

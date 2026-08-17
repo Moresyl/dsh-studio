@@ -159,6 +159,11 @@ export interface InstalledPlugin {
   spec: string
   /** Whether the package's profile patch is in the layer stack. */
   active: boolean
+  /**
+   * Installed, but taken out of the layer stack by the user. Different from a
+   * package that was never in it: this one comes back without a download.
+   */
+  disabled: boolean
   /** Part of the profile template, so never removable from here. */
   builtin: boolean
 }
@@ -210,6 +215,16 @@ export const pluginAdd = (spec: string): Promise<PluginState> => invoke('plugin_
 export const pluginRemove = (name: string): Promise<PluginState> =>
   invoke('plugin_remove', { name })
 
+/**
+ * Take an installed plugin out of the layer stack, or put it back.
+ *
+ * Nothing is fetched and nothing is deleted, so unlike `pluginAdd` this answers
+ * immediately — and unlike `pluginRemove` it is undone by asking for the
+ * opposite.
+ */
+export const pluginSwitch = (name: string, enabled: boolean): Promise<PluginState> =>
+  invoke('plugin_switch', { name, enabled })
+
 /* -------------------------------------------------------------------------- */
 /* About                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -223,17 +238,4 @@ export interface About {
   profileDir: string
 }
 
-export interface Release {
-  /** The published version, without any leading `v`. */
-  version: string
-  /** True only when it is actually newer than what is running. */
-  newer: boolean
-  url: string
-  notes: string
-  published: string
-}
-
 export const about = (): Promise<About> => invoke('app_about')
-
-/** Ask the release feed what the newest published version is. Nothing downloads. */
-export const checkUpdate = (): Promise<Release> => invoke('app_check_update')

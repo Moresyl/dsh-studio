@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react'
 import { ArrowUpCircle, Copy, FolderOpen, X } from 'lucide-react'
-import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { StatusDot } from '@/components/StatusDot'
 import { t } from '@/lib/i18n'
@@ -27,9 +27,10 @@ import { isAnnounceable, useUpdate } from '@/state/update'
 interface StatusBarProps {
   status: Status
   environment: Environment | null
+  onOpenUpdate: () => void
 }
 
-export function StatusBar({ status, environment }: StatusBarProps) {
+export function StatusBar({ status, environment, onOpenUpdate }: StatusBarProps) {
   const node = environment?.node ?? null
 
   return (
@@ -39,7 +40,7 @@ export function StatusBar({ status, environment }: StatusBarProps) {
         {labelOf(status)}
       </Segment>
 
-      <UpdateNotice />
+      <UpdateNotice onOpen={onOpenUpdate} />
 
       <div className="flex-1" />
 
@@ -97,14 +98,15 @@ export function StatusBar({ status, environment }: StatusBarProps) {
  * The status bar is the right place for this and a modal is the wrong one: an
  * update is news, not an interruption, and the corner of the window is where a
  * desktop application has always been allowed to mention news. It reads as a
- * link because it is one — the click opens the release page, and nothing is
- * downloaded or installed behind anybody's back.
+ * link because it is one — the click opens About, where the release notes and
+ * signed installer are both available. Installation still begins only after a
+ * second, explicit click.
  *
  * The dismiss button is the point of the whole design. Without it this is an
  * advertisement that reappears every launch; with it, the answer is remembered
  * and the notice stays gone until there is genuinely something else to say.
  */
-function UpdateNotice() {
+function UpdateNotice({ onOpen }: { onOpen: () => void }) {
   const release = useUpdate((state) => state.release)
   const announce = useUpdate(isAnnounceable)
   const dismiss = useUpdate((state) => state.dismiss)
@@ -116,7 +118,7 @@ function UpdateNotice() {
       <button
         type="button"
         data-hint={t('update.view')}
-        onClick={() => void openUrl(release.url)}
+        onClick={onOpen}
         className="flex h-[19px] items-center gap-1.5 rounded-l-control bg-brand/12 pr-1.5 pl-2 text-brand transition-colors duration-100 hover:bg-brand/20"
       >
         <ArrowUpCircle size={12} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />

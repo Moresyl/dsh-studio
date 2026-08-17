@@ -17,6 +17,7 @@
     "dialog:default",
     "opener:default",
     "opener:allow-open-url",
-    "process:default"
+    "process:default",
+    "updater:default"
   ]
 }

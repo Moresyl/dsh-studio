@@ -11,7 +11,10 @@ import prettier from 'eslint-config-prettier/flat'
  * make it slower and give the same answers twice.
  */
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'src-tauri/**'] },
+  // `.workflow` is the gitignored scratch directory: throwaway reproductions
+  // written to be run once and deleted, which is not something to hold to the
+  // standard the shipped source is held to.
+  { ignores: ['dist/**', 'node_modules/**', 'src-tauri/**', '.workflow/**'] },
 
   ...tsPlugin.configs['flat/recommended'],
 

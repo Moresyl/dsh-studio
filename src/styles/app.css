@@ -37,6 +37,13 @@
   --color-warn: #ffc46b;
   --color-danger: #ff7a8a;
 
+  /* The ink a filled accent carries. Its own token because the answer flips
+     with the palette: an accent light enough to read against a dark window
+     needs dark ink, and the darker accent the light window needs takes light
+     ink — so a hard-coded value is legible in exactly one of the two. */
+  --color-on-brand: #07101f;
+  --color-on-danger: #2b0a11;
+
   --font-sans:
     'Inter var', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable Text', 'Segoe UI', system-ui,
     'PingFang SC', 'Microsoft YaHei UI', 'Noto Sans SC', sans-serif;
@@ -94,15 +101,22 @@
 }
 
 /*
- * The light palette.
+ * The light palette, selected two ways.
  *
- * Only the system preference selects it. There is deliberately no second block
- * for an in-app theme pin: nothing sets `data-theme` yet, and a duplicated
- * palette maintained against a switch that does not exist is a palette that
- * will already be wrong on the day the switch arrives.
+ * The system preference is one of them, and it has to stay a real one: a window
+ * that stopped following a machine set to turn light in the morning would have
+ * taken that decision away from its owner. The other is the switch in the title
+ * bar, which writes `data-theme` — and `:not([data-theme='dark'])` is what makes
+ * the switch beat the preference rather than tie with it.
+ *
+ * Written out twice because CSS has no way to say "this block, under a media
+ * query *or* under an attribute", and every alternative — `light-dark()`, an
+ * inline script resolving the preference before first paint — costs either a
+ * webview this ships on or the app's own content security policy. The two blocks
+ * are adjacent so that editing one and not the other is hard to do by accident.
  */
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme='dark']) {
     --color-canvas: #f6f7fa;
     --color-canvas-deep: #eceef4;
     --color-surface: #ffffff;
@@ -114,21 +128,62 @@
     --color-muted: #4c5468;
     --color-faint: #7b8398;
 
-    --color-brand: #3f6cf0;
-    --color-brand-cyan: #1fa8c4;
-    --color-brand-violet: #7d5ce8;
+    --color-brand: #3560e8;
+    --color-brand-cyan: #1189a2;
+    --color-brand-violet: #6b46df;
     --color-ok: #0e9e74;
-    --color-warn: #a8710e;
-    --color-danger: #d43f57;
+    --color-warn: #8f5f08;
+    --color-danger: #c62d46;
+
+    --color-on-brand: #ffffff;
+    --color-on-danger: #ffffff;
 
     --shadow-panel: 0 1px 2px #1b234a1f;
     --shadow-lift: 0 6px 16px -8px #1b234a3d;
   }
 }
 
+:root[data-theme='light'] {
+  --color-canvas: #f6f7fa;
+  --color-canvas-deep: #eceef4;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef0f6;
+  --color-line: #0d132b1f;
+  --color-line-strong: #0d132b36;
+
+  --color-text: #101623;
+  --color-muted: #4c5468;
+  --color-faint: #7b8398;
+
+  --color-brand: #3560e8;
+  --color-brand-cyan: #1189a2;
+  --color-brand-violet: #6b46df;
+  --color-ok: #0e9e74;
+  --color-warn: #8f5f08;
+  --color-danger: #c62d46;
+
+  --color-on-brand: #ffffff;
+  --color-on-danger: #ffffff;
+
+  --shadow-panel: 0 1px 2px #1b234a1f;
+  --shadow-lift: 0 6px 16px -8px #1b234a3d;
+}
+
 @layer base {
+  /* Dark first, so a machine with no stated preference gets the surface this
+     app was designed around. The two pins below are what keep the furniture the
+     webview still draws itself — scrollbars, the caret, a native control —
+     agreeing with the palette above. */
   html {
     color-scheme: dark light;
+  }
+
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
   }
 
   body {

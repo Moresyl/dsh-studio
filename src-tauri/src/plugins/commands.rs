@@ -49,6 +49,27 @@ pub async fn plugin_remove(
     apply(Change::Remove, &name, &state, &jobs).await
 }
 
+/// Switch an installed plugin on or off, leaving it installed either way.
+///
+/// Synchronous where installing is not: no package manager runs, so there is
+/// nothing to stream and nothing to guard against a second click.
+#[tauri::command]
+pub fn plugin_switch(
+    name: String,
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<PluginState> {
+    super::switch(&name, enabled)?;
+    state.supervisor.note(
+        Stream::Stdout,
+        format!(
+            "{name} switched {} in the profile; restart the harness to apply it",
+            if enabled { "on" } else { "off" }
+        ),
+    );
+    Ok(super::state())
+}
+
 async fn apply(
     change: Change,
     spec: &str,

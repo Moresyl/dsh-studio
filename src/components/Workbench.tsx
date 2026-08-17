@@ -52,7 +52,7 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
   // Deliberately not the status bar's rule: that notice can be waved away, and
   // this dot is then the only thing left pointing at where the release is. A
   // rail badge is not an interruption, so it stays until the update is taken.
-  const updatable = useUpdate((state) => state.release?.newer ?? false)
+  const updatable = useUpdate((state) => state.release !== null)
   const refreshPlugins = usePlugins((state) => state.refresh)
   const installed = usePlugins(
     (state) => state.profile?.plugins.filter((plugin) => !plugin.builtin).length ?? 0,
@@ -173,7 +173,7 @@ function Count({ value }: { value: number }) {
   return (
     <span
       aria-hidden="true"
-      className="block min-w-[14px] rounded-full bg-brand px-[3px] text-center text-[9px] leading-[14px] font-semibold text-[#07101f] tabular-nums"
+      className="block min-w-[14px] rounded-full bg-brand px-[3px] text-center text-[9px] leading-[14px] font-semibold text-on-brand tabular-nums"
     >
       {value}
     </span>

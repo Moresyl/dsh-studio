@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 
 import { BrandMark } from '@/components/BrandMark'
+import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { t } from '@/lib/i18n'
 import { drawsWindowControls, isMac } from '@/lib/platform'
 import { contextMenu, SEPARATOR } from '@/state/menu'
@@ -78,6 +79,13 @@ export function TitleBar({ serving, panelOpen, onTogglePanel }: TitleBarProps) {
         <span className="text-[12px] font-medium text-muted">DSH Studio</span>
 
         {serving && onTogglePanel && <ViewSwitch panelOpen={panelOpen} onToggle={onTogglePanel} />}
+      </div>
+
+      {/* Beside the window buttons rather than inside a pane, because the theme
+          is a property of the window: the panes can all be behind the harness,
+          and this strip is the one piece of chrome that is always on screen. */}
+      <div className={drawsWindowControls ? 'pr-2' : 'px-2'}>
+        <ThemeSwitch />
       </div>
 
       {drawsWindowControls && (

@@ -1,7 +1,7 @@
 {
   "name": "dsh-studio",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "description": "Native desktop studio for DeepSeek Harness — Linux/macOS/Windows, built with Rust + Tauri",
   "keywords": [
@@ -38,6 +38,7 @@
     "@tauri-apps/plugin-dialog": "^2.4.0",
     "@tauri-apps/plugin-opener": "^2.5.0",
     "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "lucide-react": "^0.577.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

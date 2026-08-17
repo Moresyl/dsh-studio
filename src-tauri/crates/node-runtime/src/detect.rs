@@ -71,7 +71,7 @@ pub fn discover() -> Vec<NodeInstallation> {
     for (candidate, source) in candidates() {
         // Resolve first so the same install reached through two paths — a
         // version-manager shim and its target — is only reported once.
-        let resolved = candidate.canonicalize().unwrap_or(candidate);
+        let resolved = plain_path(candidate.canonicalize().unwrap_or(candidate));
         if found.iter().any(|existing| existing.path == resolved) {
             continue;
         }
@@ -91,6 +91,52 @@ pub fn discover() -> Vec<NodeInstallation> {
             .then_with(|| a.source.rank().cmp(&b.source.rank()))
     });
     found
+}
+
+/// Undo the extended-length prefix `canonicalize` leaves on a Windows path.
+///
+/// `\\?\C:\...` is why the prefix survives so long: every Win32 call accepts it,
+/// so a runtime is found, probed and launched through it without complaint. What
+/// does not accept it is `cmd.exe` — and the directory an executable sits in is
+/// put on the `PATH` of child processes, some of which reach their own tools
+/// through a shell. There the prefix stops being a spelling and becomes "the
+/// system cannot find the path specified", three processes away from here.
+///
+/// Public because anything assembling a `PATH` has to be able to insist on it,
+/// wherever the path it was handed came from.
+#[cfg(windows)]
+pub fn plain_path(path: PathBuf) -> PathBuf {
+    // A path that is not valid Unicode cannot be reasoned about as text, and a
+    // Node install has never been found at one.
+    let Some(text) = path.to_str() else {
+        return path;
+    };
+
+    if let Some(share) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{share}"));
+    }
+    // Only a drive path has a shorter spelling. A volume GUID has none, and
+    // returning `Volume{...}\node.exe` would be worse than keeping the prefix.
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) if is_drive_path(rest) => PathBuf::from(rest),
+        _ => path,
+    }
+}
+
+#[cfg(windows)]
+fn is_drive_path(text: &str) -> bool {
+    let mut characters = text.chars();
+    characters
+        .next()
+        .is_some_and(|letter| letter.is_ascii_alphabetic())
+        && characters.next() == Some(':')
+        && characters.next() == Some('\\')
+}
+
+/// Nothing to undo: no other platform spells a path two ways.
+#[cfg(not(windows))]
+pub fn plain_path(path: PathBuf) -> PathBuf {
+    path
 }
 
 /// Paths worth probing, in the order they should win ties.
@@ -232,4 +278,53 @@ fn collect_versioned(
     // and without a tiebreak which one wins would come down to directory order.
     releases.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
     out.extend(releases.into_iter().map(|(_, path)| (path, source)));
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::plain_path;
+    use std::path::PathBuf;
+
+    fn plainly(text: &str) -> String {
+        plain_path(PathBuf::from(text))
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    #[test]
+    fn a_canonicalized_drive_path_loses_its_prefix() {
+        // The whole point: this directory ends up on a child's PATH, and a
+        // shell in that child has to be able to look an executable up in it.
+        assert_eq!(
+            plainly(r"\\?\C:\Users\someone\AppData\Local\nvm\v22.14.0\node.exe"),
+            r"C:\Users\someone\AppData\Local\nvm\v22.14.0\node.exe"
+        );
+    }
+
+    #[test]
+    fn a_network_share_goes_back_to_its_own_spelling() {
+        assert_eq!(
+            plainly(r"\\?\UNC\build\tools\node.exe"),
+            r"\\build\tools\node.exe"
+        );
+    }
+
+    #[test]
+    fn a_path_with_no_shorter_spelling_is_left_alone() {
+        // A volume with no drive letter is reachable *only* through the prefix.
+        let guid = r"\\?\Volume{9f3c0000-0000-0000-0000-100000000000}\node.exe";
+        assert_eq!(plainly(guid), guid);
+    }
+
+    #[test]
+    fn an_ordinary_path_is_untouched() {
+        assert_eq!(
+            plainly(r"C:\Program Files\nodejs\node.exe"),
+            r"C:\Program Files\nodejs\node.exe"
+        );
+        assert_eq!(
+            plainly(r"\\build\tools\node.exe"),
+            r"\\build\tools\node.exe"
+        );
+    }
 }

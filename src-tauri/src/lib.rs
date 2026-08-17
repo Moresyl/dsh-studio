@@ -9,7 +9,6 @@ mod paths;
 mod plugins;
 mod remote;
 mod tray;
-mod update;
 mod window;
 
 use std::sync::Arc;
@@ -41,6 +40,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let supervisor = Supervisor::new()?;
             let remote = Arc::new(Remote::new());
@@ -73,8 +73,8 @@ pub fn run() {
             plugins::commands::plugin_detail,
             plugins::commands::plugin_add,
             plugins::commands::plugin_remove,
+            plugins::commands::plugin_switch,
             about::app_about,
-            about::app_check_update,
         ])
         .run(tauri::generate_context!())
         .expect("dsh-studio failed to start");

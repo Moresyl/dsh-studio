@@ -2,7 +2,7 @@
 members = [".", "crates/proc-guard", "crates/node-runtime"]
 
 [workspace.package]
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/Moresyl/dsh-studio"
@@ -11,7 +11,7 @@ repository = "https://github.com/Moresyl/dsh-studio"
 proc-guard = { path = "crates/proc-guard" }
 node-runtime = { path = "crates/node-runtime" }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "2"
 tokio = { version = "1", features = ["full", "parking_lot"] }
 url = "2"
@@ -48,6 +48,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
 dirs = "6"
 sys-locale = "0.3"
 # Pairing secrets come from the OS entropy source, never from a PRNG we seed.

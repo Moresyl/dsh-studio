@@ -13,7 +13,7 @@ import { create } from 'zustand'
 
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
-import type { PluginDetail, PluginListing, PluginState } from '@/lib/ipc'
+import type { InstalledPlugin, PluginDetail, PluginListing, PluginState } from '@/lib/ipc'
 
 interface PluginStore {
   /** The hosted profile as it is on disk. Null until the first read lands. */
@@ -34,6 +34,8 @@ interface PluginStore {
   select: (name: string | null) => Promise<void>
   add: (spec: string) => Promise<void>
   remove: (name: string) => Promise<void>
+  /** Take an installed plugin out of the layer stack, or put it back. */
+  toggle: (name: string, enabled: boolean) => Promise<void>
 }
 
 /** Only the newest search may write results; older answers are dropped. */
@@ -112,7 +114,29 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       set({ working: null })
     }
   },
+
+  toggle: async (name, enabled) => {
+    // Shares `working` with the two slow changes, because all three write to
+    // the same profile manifest and the harness reconciles it after each one.
+    // Fast enough that the flicker is the point: it says the write landed.
+    if (get().working) return
+    set({ working: name, error: null })
+    try {
+      set({ profile: await ipc.pluginSwitch(name, enabled) })
+    } catch (cause) {
+      set({ error: describe(cause) })
+    } finally {
+      set({ working: null })
+    }
+  },
 }))
+
+/** The profile's entry for `name`, or null when it is not installed. */
+export const installedPlugin = (
+  profile: PluginState | null,
+  name: string | null,
+): InstalledPlugin | null =>
+  (name !== null && profile?.plugins.find((plugin) => plugin.name === name)) || null
 
 /** Whether `name` is already in the profile, under any version range. */
 export const isInstalled = (profile: PluginState | null, name: string): boolean =>
