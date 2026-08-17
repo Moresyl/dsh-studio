@@ -43,7 +43,11 @@ export function ThemeSwitch() {
           onClick={theme === id ? undefined : () => choose(id)}
           className={[
             'grid h-[20px] w-[24px] place-items-center rounded-[3px] transition-colors duration-100',
-            theme === id ? 'bg-surface-2 text-text shadow-panel' : 'text-faint hover:text-muted',
+            // Same rule as the view switch: the selected segment is inert, so it
+            // shows the arrow and the other two carry the hover surface.
+            theme === id
+              ? 'cursor-default bg-surface-2 text-text shadow-panel'
+              : 'text-faint hover:bg-surface-2/60 hover:text-text',
           ].join(' ')}
         >
           <Icon size={12} strokeWidth={2.1} aria-hidden="true" />

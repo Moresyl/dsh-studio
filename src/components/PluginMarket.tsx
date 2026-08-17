@@ -267,7 +267,7 @@ function Discover({ results, searching, selected, working, onOpen, isInstalled }
                 }
               }}
               className={[
-                'relative flex w-full cursor-default items-start gap-3 border-b border-line px-4 py-3 text-left transition-colors duration-100',
+                'relative flex w-full items-start gap-3 border-b border-line px-4 py-3 text-left transition-colors duration-100',
                 selected === listing.name ? 'bg-surface-2' : 'hover:bg-surface-2/55',
               ].join(' ')}
             >
@@ -350,7 +350,7 @@ function RowAction({
     <button
       type="button"
       onClick={onOpen}
-      className="mt-0.5 inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 hover:brightness-[1.2]"
+      className="mt-0.5 inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 enabled:hover:brightness-[1.2] enabled:active:brightness-95"
     >
       {busy ? (
         <Loader2 size={11} className="animate-spin" aria-hidden="true" />
@@ -453,7 +453,7 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
                 aria-label={t('plugins.remove')}
                 onClick={() => onRemove(plugin.name)}
                 disabled={working !== null}
-                className="grid size-[26px] shrink-0 place-items-center rounded-control border border-line-strong bg-surface-2 text-muted transition duration-100 hover:border-danger/40 hover:text-danger disabled:pointer-events-none disabled:opacity-45"
+                className="grid size-[26px] shrink-0 place-items-center rounded-control border border-line-strong bg-surface-2 text-muted transition duration-100 enabled:hover:border-danger/40 enabled:hover:text-danger enabled:active:brightness-95 disabled:opacity-45"
               >
                 <Trash2 size={12} strokeWidth={2.2} aria-hidden="true" />
               </button>
@@ -483,7 +483,9 @@ function TabButton({
       onClick={active ? undefined : onClick}
       className={[
         'h-[22px] rounded-[3px] px-2.5 text-[11.5px] transition-colors duration-100',
-        active ? 'bg-surface-2 text-text shadow-panel' : 'text-faint hover:text-muted',
+        active
+          ? 'cursor-default bg-surface-2 text-text shadow-panel'
+          : 'text-faint hover:bg-surface-2/60 hover:text-text',
       ].join(' ')}
     >
       {label}

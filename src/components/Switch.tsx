@@ -33,8 +33,13 @@ export function Switch({ on, busy = false, disabled = false, label, onChange }: 
       disabled={disabled || busy}
       onClick={() => onChange(!on)}
       className={[
-        'relative h-[18px] w-[32px] shrink-0 rounded-full transition-colors duration-150 ease-[var(--ease-out-soft)]',
-        'disabled:pointer-events-none disabled:opacity-45',
+        // `transition` rather than `transition-colors`: the hover lift is a
+        // filter, and a switch that brightens without easing reads as a flicker.
+        'relative h-[18px] w-[32px] shrink-0 rounded-full transition duration-150 ease-[var(--ease-out-soft)]',
+        // A switch is the one control here with no label of its own to change,
+        // so the track has to answer the pointer or there is nothing to confirm
+        // the hit is landing.
+        'enabled:hover:brightness-[1.14] enabled:active:brightness-95 disabled:opacity-45',
         on ? 'bg-ok' : 'bg-surface-2 hairline',
       ].join(' ')}
     >

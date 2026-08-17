@@ -150,7 +150,11 @@ function SwitchTab({ label, active, onClick }: SwitchTabProps) {
       onClick={active ? undefined : onClick}
       className={[
         'h-[20px] rounded-[3px] px-2 text-[11.5px] transition-colors duration-100',
-        active ? 'bg-surface-2 text-text shadow-panel' : 'text-faint hover:text-muted',
+        // The raised half of the pair does nothing when pressed, so it does not
+        // offer the hand that promises it would.
+        active
+          ? 'cursor-default bg-surface-2 text-text shadow-panel'
+          : 'text-faint hover:bg-surface-2/60 hover:text-text',
       ].join(' ')}
     >
       {label}
@@ -173,7 +177,10 @@ function ControlButton({ label, danger, onClick, children }: ControlButtonProps)
       data-hint={label}
       onClick={onClick}
       className={[
-        'grid w-[46px] place-items-center text-muted transition-colors duration-100',
+        // Arrow, not a hand: the buttons the system would normally draw here
+        // keep the system's cursor, and both Windows and macOS leave it alone
+        // over their own window controls.
+        'grid w-[46px] cursor-default place-items-center text-muted transition-colors duration-100',
         danger
           ? 'hover:bg-danger hover:text-white'
           : 'hover:bg-[color-mix(in_oklab,var(--color-text)_10%,transparent)] hover:text-text',

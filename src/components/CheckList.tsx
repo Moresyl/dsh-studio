@@ -68,7 +68,7 @@ export function CheckList({ items }: { items: CheckItem[] }) {
                 type="button"
                 onClick={item.action.run}
                 disabled={item.action.busy}
-                className="inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 hover:brightness-[1.2] disabled:pointer-events-none disabled:opacity-55"
+                className="inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 enabled:hover:brightness-[1.2] enabled:active:brightness-95 disabled:opacity-55"
               >
                 {item.action.busy ? (
                   <Loader2 size={11} className="animate-spin" aria-hidden="true" />

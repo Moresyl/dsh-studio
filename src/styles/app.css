@@ -96,8 +96,22 @@
     }
   }
 
+  /* A bar with no percentage behind it. Slow and shallow: a fast sweep over a
+     step that takes ten seconds reads as impatience rather than as work. The
+     travel assumes the moving element is a quarter of its track, which is what
+     carries it exactly edge to edge. */
+  @keyframes drift {
+    from {
+      transform: translate3d(-100%, 0, 0);
+    }
+    to {
+      transform: translate3d(300%, 0, 0);
+    }
+  }
+
   --animate-pop: pop 0.16s var(--ease-out-soft) both;
   --animate-fade: fade 0.14s linear both;
+  --animate-drift: drift 1.4s ease-in-out infinite;
 }
 
 /*
@@ -227,6 +241,28 @@
     outline: 2px solid var(--color-brand);
     outline-offset: 2px;
     border-radius: 4px;
+  }
+
+  /* Tailwind's preflight leaves every button on the browser's arrow, so nothing
+     this app draws answers the pointer. Menu items are excluded on purpose: a
+     system menu keeps the arrow over its rows, and so does this one. The window
+     buttons and the drag strip opt back out the same way, further down. */
+  button:not([role='menuitem']),
+  [role='button'],
+  [role='switch'],
+  [role='tab'],
+  summary,
+  label[for],
+  a[href] {
+    cursor: pointer;
+  }
+
+  /* A control that cannot be pressed says so under the pointer. This works only
+     while the element is still hit-testable, which is why the controls opt out
+     of `pointer-events: none` and gate their hover on `enabled:` instead. */
+  :disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
   }
 
   /* A search field in a webview comes with the browser's own clear button and
