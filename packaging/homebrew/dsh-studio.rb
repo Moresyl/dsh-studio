@@ -2,9 +2,9 @@
 cask "dsh-studio" do
   arch arm: "aarch64", intel: "x64"
 
-  version "0.4.0"
-  sha256 arm:   "bb226e89e7df285253bf968c6632ed1a1a12bf84bfb3435413b9c5134754aa81",
-         intel: "702f78df16e2cbb5a11539aa5a1d3019bc2c4e235e1b813e7e18df36ca142d7f"
+  version "0.5.0"
+  sha256 arm:   "d2238524a7858c80302de20980fabf98e89627b829724ca9d82a5cd949a1c93a",
+         intel: "64cdc8d5b89876f8aa2b572fa6ba292bf61a4dc53bf16dc3f236e692d50ec06a"
 
   url "https://github.com/Moresyl/dsh-studio/releases/download/v#{version}/DSH.Studio_#{version}_#{arch}.dmg",
       verified: "github.com/Moresyl/dsh-studio/"
