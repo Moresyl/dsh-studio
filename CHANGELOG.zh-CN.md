@@ -9,6 +9,12 @@
 
 ## [未发布]
 
+## [0.5.0] —— 2026-08-18
+
+这一版把外壳扩成了更完整的桌面工作区：首次引导、内置终端、多 Profile、
+可搜索的会话历史与用量报告、命令式导航、多窗口、离线插件，
+以及能自行引导 Node 运行时的分发路径。
+
 ### 新增
 
 - **机器上没有 Node 时，外壳自己带一个。** 过去没有 Node 的机器只会被指去
@@ -21,10 +27,10 @@
   显然没法用来把 Node 自己引导出来；所用 crate 全部已由更新插件链入，体积零增量。
   另备一路镜像，给 nodejs.org 慢的地方用，字节完全一致。
   装出来的运行时自带 npm，所以 harness 的安装照旧可用。
-- **发布产物有了签名、公证和校验清单。** macOS 构建用 Apple Developer ID 签名、
-  用 `notarytool` 公证并装订票据，Windows 安装包通过 Azure Artifact Signing 签名。
-  两者都以对应凭证是否存在为条件，所以 fork 出去的构建是「没签名」而不是「构建失败」。
-  发布完成后再把全部产物的 SHA-256 汇总成 release 上的 `SHA256SUMS.txt`，
+- **发布流水线可以签名、公证并生成校验清单。** 配好凭证时，macOS 构建使用
+  Apple Developer ID、`notarytool` 与票据装订，Windows 安装包使用
+  Azure Artifact Signing；没配凭证的 fork 仍会得到带明确警告的未签名构建，
+  而不是整次发布失败。全部产物的 SHA-256 会汇总成 `SHA256SUMS.txt`，
   供从镜像下载的人核对。
 - **有了下载页，以及包管理器五条渠道。** 官网是两页双语静态页面，不引任何 webfont
   ——一个 2.7 MB 的安装包，不该先让人从可能连不上的 CDN 取 200 KB 字体——
@@ -36,9 +42,30 @@
   生成的，而不是手改的，每份摘要都取自那个 release 自己的 `SHA256SUMS.txt`。
   目前只有 Scoop 的 bucket 真的能用；另外四条还差什么，
   [`packaging/README.md`](packaging/README.md) 里逐条写明。
+- **首次启动变成三步引导，而不是迎面一墙开关。** 依次选择工作区、检测或安装 Node
+  与 harness、选择 Profile 预设，再进入主窗口；之后仍能从环境页调整同一套设置，
+  引导不会变成另一套互相打架的配置系统。
+- **窗口里有了真正的终端。** 每个标签页都跑在平台 PTY 上，支持尺寸同步、链接、
+  剪贴板粘贴与终端按键，并随窗口的进程树一起回收，不会在后台遗留 shell。
+- **Profile 成为一等对象。** 可以创建、切换、检查和管理多个 harness Profile，
+  比较各自的插件差异，并让每个 Profile 的插件停用状态独立跨重启保存。
+- **harness 内容有了一条受约束的桌面桥。** 带版本的客户端允许可信内容请求
+  Web frame 做不了的桌面动作，而角标、通知和深链仍由外壳校验并掌控。
+- **会话具备历史、全文搜索、产物与导出。** 过去的运行无需手翻文件即可找到，
+  可以导出分享，也能在多个窗口并行打开不同会话。
+- **Token 与花费报告。** 从已记录的会话汇总用量，支持配置模型费率，
+  同时呈现 Token 数量和估算花费的拆分。
+- **键盘优先控制。** 模糊命令面板覆盖导航和常用动作；可配置全局快捷键唤起窗口，
+  也能在设置里管理开机自启。
+- **插件可以来自本地包。** 离线归档会先检查，再按 registry 包相同的 Profile 规则安装，
+  不会暗中绕过 harness 的图层模型。
+- **一键导出诊断。** 关于页可以生成经过脱敏的环境和相关日志报告，
+  直接附到 issue，不必手动四处找文件，也不会带出凭证。
 
 ### 变更
 
+- **Windows 11 在合成器支持时使用 Mica Alt。** 材质跟随深浅色，
+  较旧 Windows 与其他平台使用可靠的纯色回退。
 - **指针形状、悬停反馈和禁用态，现在像桌面软件该有的样子。**
   能点的都显示小手，禁用的不再装作能点，
   点了会有反应的那些行，在你点下去之前就会先告诉你。
@@ -281,7 +308,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Moresyl/dsh-studio/compare/v0.1.1...v0.2.0

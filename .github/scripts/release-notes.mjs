@@ -4,7 +4,7 @@ const root = new URL('../../', import.meta.url)
 const manifest = JSON.parse(await readFile(new URL('package.json', root), 'utf8'))
 const version = manifest.version
 
-const section = async (file) => {
+const changelogSection = async (file) => {
   const changelog = await readFile(new URL(file, root), 'utf8')
   const heading = `## [${version}]`
   const start = changelog.indexOf(heading)
@@ -15,7 +15,21 @@ const section = async (file) => {
   return changelog.slice(bodyStart + 1, next < 0 ? undefined : next).trim()
 }
 
-const [zh, en] = await Promise.all([section('CHANGELOG.zh-CN.md'), section('CHANGELOG.md')])
+const notes = async (language, changelog) => {
+  try {
+    return (
+      await readFile(new URL(`.github/release-notes/${version}.${language}.md`, root), 'utf8')
+    ).trim()
+  } catch (cause) {
+    if (cause?.code !== 'ENOENT') throw cause
+    return changelogSection(changelog)
+  }
+}
+
+const [zh, en] = await Promise.all([
+  notes('zh-CN', 'CHANGELOG.zh-CN.md'),
+  notes('en', 'CHANGELOG.md'),
+])
 
 process.stdout.write(`<!-- dsh-notes:zh -->
 ${zh}
@@ -24,12 +38,4 @@ ${zh}
 ${en}
 
 <!-- dsh-notes:end -->
-
-### Downloads
-
-Pick the installer for your platform from the assets below. Windows users can
-also install this and future versions directly inside DSH Studio.
-
-macOS builds are currently unsigned. On first launch, use the system security
-settings to approve the app.
 `)

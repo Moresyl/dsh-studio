@@ -9,6 +9,13 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-18
+
+This release turns the shell into a fuller desktop workspace: guided setup,
+built-in terminals, multiple profiles, searchable session history and usage
+reports, command-driven navigation, parallel windows, offline plugins, and a
+distribution path that can bootstrap its own Node runtime.
+
 ### Added
 
 - **The shell brings its own Node when the machine has none.** A machine without
@@ -25,12 +32,12 @@ pre-1.0 caveat that anything may still move.
   did not grow. A second mirror serves the same bytes where nodejs.org is slow.
   The runtime it installs carries its own npm, so installing the harness still
   works the same way.
-- **Releases are signed, notarized, and come with a checksum manifest.** macOS
-  builds are signed with an Apple Developer ID, notarized with `notarytool` and
-  stapled; Windows installers are signed through Azure Artifact Signing. Both are
-  conditional on the credentials existing, so a fork's build comes out unsigned
-  rather than failing. Every artifact's SHA-256 is then collected into a
-  `SHA256SUMS.txt` on the release, for anyone downloading through a mirror.
+- **The release pipeline can sign, notarize, and publish a checksum manifest.**
+  When credentials are configured, macOS builds use an Apple Developer ID,
+  `notarytool`, and stapling, while Windows installers use Azure Artifact
+  Signing. Without those credentials a fork still gets an unsigned build with a
+  clear warning instead of a failed release. Every artifact's SHA-256 is
+  collected into `SHA256SUMS.txt` for downloads served through a mirror.
 - **A download page, and five package-manager channels.** The site is two
   bilingual static pages that link no webfont — a 2.7 MB installer should not
   ask you to fetch 200 KB of type from a CDN you may not reach — and it takes its
@@ -42,9 +49,41 @@ pre-1.0 caveat that anything may still move.
   than hand-edited, taking each digest from that release's own `SHA256SUMS.txt`.
   Only the Scoop bucket is live right now; [`packaging/README.md`](packaging/README.md)
   says what each of the other four is still waiting on.
+- **First launch is a three-step setup instead of a wall of controls.** It picks
+  a workspace, finds or installs Node and the harness, and chooses a profile
+  preset before opening the main window. The same environment controls remain
+  available afterwards, so onboarding is a starting point rather than a second
+  configuration system.
+- **A real terminal lives in the window.** Each tab runs through a platform PTY,
+  supports resize, links, clipboard paste and terminal key handling, and is
+  reclaimed with the window's process tree instead of leaving a shell behind.
+- **Profiles are first-class.** Create, switch, inspect and manage multiple
+  harness profiles, see how their plugins differ, and keep each profile's
+  disabled-plugin choices independent across restarts.
+- **Harness content gets a bounded desktop bridge.** A versioned client lets
+  trusted content request the desktop actions a web frame cannot provide, while
+  badges, notifications and deep links remain owned and validated by the shell.
+- **Sessions have history, full-text search, artifacts and export.** Past runs
+  can be found without opening files by hand, exported for sharing, and opened
+  in parallel windows when one conversation is not enough.
+- **Token and cost reports.** Usage is aggregated from recorded sessions, with
+  configurable model rates and breakdowns that make both token volume and
+  estimated spend visible.
+- **Keyboard-first control.** A fuzzy command palette exposes navigation and
+  common actions; configurable global shortcuts can summon the window, and
+  launch-at-login can be managed from Settings.
+- **Plugins can arrive as local packages.** Offline archives are inspected and
+  installed through the same profile rules as registry packages, without
+  quietly bypassing the harness's layer model.
+- **One-click diagnostics export.** The About pane can produce a redacted report
+  containing the environment and relevant logs, ready to attach to an issue
+  without leaking credentials or requiring a manual scavenger hunt.
 
 ### Changed
 
+- **Windows 11 uses Mica Alt where the compositor supports it.** The material
+  follows light and dark appearance, with solid fallbacks on older Windows and
+  other platforms.
 - **Pointers, hover states and disabled controls behave like a desktop app's.**
   Anything clickable shows a hand, anything disabled does not pretend otherwise,
   and rows that respond to a click say so before it happens.
@@ -318,7 +357,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Moresyl/dsh-studio/compare/v0.1.1...v0.2.0
