@@ -46,7 +46,7 @@ jobs:
           # Azure-hosted runners sometimes retain an unreachable Azure mirror.
           # Use the canonical Ubuntu archive so a transient mirror outage cannot
           # leave the release blocked before compilation even starts.
-          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/sources.list
+          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
           sudo apt-get update -o Acquire::Retries=3
           sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
 
