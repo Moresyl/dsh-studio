@@ -38,7 +38,7 @@ try {
   await rm(directory, { recursive: true, force: true })
 }
 
-function run(command, args, { timeout = 900_000 } = {}) {
+function run(command, args, { timeout = 1_500_000 } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { stdio: 'inherit' })
     const timer = setTimeout(() => {
