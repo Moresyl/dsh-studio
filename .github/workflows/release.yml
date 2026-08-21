@@ -33,7 +33,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.19.0
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -52,13 +52,26 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # Code signing is deliberately optional. A fork, or a maintainer running
-      # this workflow before any certificate exists, has none of the credentials
-      # below and should still get a complete set of installers out of the run —
-      # unsigned, with a warning that says so — rather than a red X and nothing
-      # to download.
-      #
-      # Which is also why this step exists at all rather than an `env:` block on
+      - name: Enforce release contract
+        shell: bash
+        env:
+          UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          expected="v$version"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error title=Version mismatch::Tag $GITHUB_REF_NAME does not match $expected."
+            exit 1
+          fi
+          test -s ".github/release-notes/$version.zh-CN.md" || { echo "::error::Missing detailed Chinese release notes for $version"; exit 1; }
+          test -s ".github/release-notes/$version.en.md" || { echo "::error::Missing English release notes for $version"; exit 1; }
+          node .github/scripts/release-notes.mjs >/dev/null
+          if [ -z "$UPDATER_KEY" ]; then
+            echo "::error title=Updater signing required::TAURI_SIGNING_PRIVATE_KEY must be configured before a formal release."
+            exit 1
+          fi
+
+      # This step exists rather than an `env:` block on
       # the build step. An unset secret interpolates to an empty string, and the
       # bundler reads these with `var_os` — so an empty APPLE_ID is not an absent
       # one. It is a set of notarization credentials whose Apple ID happens to be
@@ -82,8 +95,8 @@ jobs:
         run: |
           set -u
           if [ -z "$APPLE_CERTIFICATE" ]; then
-            echo "::warning title=Unsigned macOS build::No APPLE_CERTIFICATE secret is configured, so the .app and .dmg from this run are unsigned and Gatekeeper will refuse to open them on any other machine."
-            exit 0
+            echo "::error title=macOS signing required::APPLE_CERTIFICATE is required for every formal release."
+            exit 1
           fi
           if [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
             echo "::error title=Incomplete macOS credentials::APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD is empty. The bundler needs both to open the .p12, and it will not fall back to an unsigned build."
@@ -132,8 +145,8 @@ jobs:
         run: |
           set -u
           if [ -z "$AZURE_CLIENT_ID" ]; then
-            echo "::warning title=Unsigned Windows build::No AZURE_CLIENT_ID secret is configured, so the installers from this run are unsigned and SmartScreen will warn about them until the download builds a reputation."
-            exit 0
+            echo "::error title=Windows signing required::Azure Artifact Signing credentials are required for every formal release."
+            exit 1
           fi
 
           missing=""
@@ -224,6 +237,28 @@ jobs:
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
 
+      - name: Verify Windows Authenticode signatures
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path src-tauri/target -Recurse -File | Where-Object { $_.FullName -match '\\bundle\\' -and $_.Extension -in '.exe', '.msi' }
+          if (-not $files) { throw 'No Windows installer was produced.' }
+          foreach ($file in $files) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
+            if ($signature.Status -ne 'Valid') { throw "$($file.Name) is not Authenticode signed: $($signature.Status)" }
+          }
+
+      - name: Verify macOS signature, notarization and staple
+        if: runner.os == 'macOS'
+        run: |
+          set -eu
+          app="$(find src-tauri/target -maxdepth 8 -path '*/release/bundle/macos/*.app' -print -quit)"
+          dmg="$(find src-tauri/target -maxdepth 8 -path '*/release/bundle/dmg/*.dmg' -print -quit)"
+          test -n "$app" && test -n "$dmg"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+          xcrun stapler validate "$dmg"
+
   # Signatures say who built an installer; these say the bytes are the ones that
   # were built. Worth having for the mirrors this project will be downloaded
   # from, where the file someone gets is not necessarily the file GitHub served.
@@ -248,6 +283,7 @@ jobs:
           echo "Summing the artifacts on $tag"
 
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir artifacts --clobber
+          node .github/scripts/verify-release-assets.mjs artifacts
           # Not its own subject: a previous run may have left one up there, and
           # a file cannot state its own digest.
           rm -f artifacts/SHA256SUMS.txt

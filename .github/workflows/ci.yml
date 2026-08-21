@@ -9,6 +9,17 @@ permissions:
   contents: read
 
 jobs:
+  runtime-contract:
+    name: Cold runtime install
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - run: node .github/scripts/verify-runtime-install.mjs
+
   test:
     name: Test (${{ matrix.os }})
     strategy:
@@ -26,7 +37,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.19.0
           cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
@@ -43,3 +54,4 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: cargo test --manifest-path src-tauri/Cargo.toml --workspace
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
