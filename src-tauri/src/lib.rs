@@ -20,6 +20,7 @@ mod startup;
 mod terminal;
 mod tray;
 mod window;
+mod workspace;
 
 use std::sync::Arc;
 
@@ -115,6 +116,10 @@ pub fn run() {
             plugins::commands::plugin_recovery_acknowledge,
             plugins::commands::plugin_search,
             plugins::commands::plugin_detail,
+            plugins::commands::plugin_sources,
+            plugins::commands::plugin_source_select,
+            plugins::commands::plugin_source_add,
+            plugins::commands::plugin_source_remove,
             plugins::commands::plugin_add,
             plugins::commands::plugin_remove,
             plugins::commands::plugin_switch,

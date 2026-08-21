@@ -16,6 +16,7 @@
 //! the user's, and not on any other program's.
 
 pub mod archive;
+pub mod catalog;
 pub mod commands;
 pub mod recovery;
 pub mod registry;

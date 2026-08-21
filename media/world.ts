@@ -62,7 +62,7 @@ const environment: Environment = {
       source: 'system',
     },
   ],
-  minimumNode: { major: 20, minor: 0, patch: 0 },
+  minimumNode: { major: 22, minor: 19, patch: 0 },
   harnessInstalled: true,
   harnessCompatible: true,
   harnessVersion: '0.1.0-rc.8',
@@ -70,6 +70,7 @@ const environment: Environment = {
   harnessProblem: null,
   harnessEntry: `${HARNESS_DIR}\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js`,
   workspace: `${HOME}\\projects\\atlas`,
+  workspaceAdmission: { state: 'safe', filesystem: 'NTFS', reason: null },
 }
 
 const about: About = {
@@ -140,8 +141,15 @@ const profile = (): PluginState => ({
  * search's own results, trimmed to the first screenful and left otherwise
  * untouched — names, versions, publishers, download counts and dates included.
  */
+const NPM_LISTING = {
+  sourceId: 'npm',
+  sourceLabel: 'npm registry',
+  installable: true,
+} satisfies Pick<PluginListing, 'sourceId' | 'sourceLabel' | 'installable'>
+
 const DISCOVER: PluginListing[] = [
   {
+    ...NPM_LISTING,
     name: 'dsh-visual-plugin',
     version: '0.2.6',
     description:
@@ -152,6 +160,7 @@ const DISCOVER: PluginListing[] = [
     link: 'https://www.npmjs.com/package/dsh-visual-plugin',
   },
   {
+    ...NPM_LISTING,
     name: '@wsz987/dsh-channels',
     version: '0.2.4',
     description: 'Channel plugin for DeepSeek Harness — multiplex several conversations at once.',
@@ -161,6 +170,7 @@ const DISCOVER: PluginListing[] = [
     link: 'https://www.npmjs.com/package/@wsz987/dsh-channels',
   },
   {
+    ...NPM_LISTING,
     name: '@d4cluvtrain/dsh-plugin-manager',
     version: '0.1.2',
     description: 'Install, list and switch DeepSeek Harness plugins from inside a session.',
@@ -170,6 +180,7 @@ const DISCOVER: PluginListing[] = [
     link: 'https://www.npmjs.com/package/@d4cluvtrain/dsh-plugin-manager',
   },
   {
+    ...NPM_LISTING,
     name: 'dsh-novelweb',
     version: '0.2.0-beta.1',
     description: 'Long-form writing surface for the harness, distributed as a dsh bundle.',
@@ -179,6 +190,7 @@ const DISCOVER: PluginListing[] = [
     link: 'https://www.npmjs.com/package/dsh-novelweb',
   },
   {
+    ...NPM_LISTING,
     name: 'dsh-plugin-grok2api-media-tool',
     version: '0.7.6',
     description: 'Media generation tool bundle: images and video through an OpenAI-compatible API.',
@@ -188,6 +200,7 @@ const DISCOVER: PluginListing[] = [
     link: 'https://www.npmjs.com/package/dsh-plugin-grok2api-media-tool',
   },
   {
+    ...NPM_LISTING,
     name: '@eqman00003/knowlp-rag',
     version: '3.0.6',
     description:
@@ -198,6 +211,7 @@ const DISCOVER: PluginListing[] = [
     link: 'https://www.npmjs.com/package/@eqman00003/knowlp-rag',
   },
   {
+    ...NPM_LISTING,
     name: 'dsh-design-playbook',
     version: '0.20.2',
     description: 'Design review playbook — a bundle of prompts, checklists and report templates.',
@@ -207,6 +221,7 @@ const DISCOVER: PluginListing[] = [
     link: 'https://www.npmjs.com/package/dsh-design-playbook',
   },
   {
+    ...NPM_LISTING,
     name: '@danielng23/dsh-x402-wallet',
     version: '0.1.2',
     description: 'x402 wallet bundle: let a session pay for its own metered HTTP requests.',

@@ -48,6 +48,9 @@ pub struct Listing {
     pub weekly_downloads: u64,
     /// Somewhere to read more, if the package said where.
     pub link: Option<String>,
+    pub source_id: String,
+    pub source_label: String,
+    pub installable: bool,
 }
 
 /// What the published manifest says about one package.
@@ -109,6 +112,10 @@ pub async fn search(node: &Path, query: &str) -> Result<Vec<Listing>> {
 
 /// Read one package's latest published manifest.
 pub async fn detail(node: &Path, name: &str) -> Result<Detail> {
+    detail_with_source(node, name, "npm registry").await
+}
+
+pub async fn detail_with_source(node: &Path, name: &str, source: &str) -> Result<Detail> {
     if !super::is_package_name(name) {
         return Err(Error::Plugin(format!("{name} is not a package name")));
     }
@@ -117,7 +124,7 @@ pub async fn detail(node: &Path, name: &str) -> Result<Detail> {
     let endpoint = format!("{base}/{name}/latest");
     let manifest = fetch::json(node, &endpoint, BUDGET).await?;
 
-    Ok(detail_from_manifest(name, &base, &manifest))
+    Ok(detail_from_manifest(name, source, &manifest))
 }
 
 /// Resolve and validate the exact package spec immediately before mutation.
@@ -271,6 +278,9 @@ fn listing(entry: &serde_json::Value) -> Option<Listing> {
                 .into_iter()
                 .find_map(|key| string(links, key))
         }),
+        source_id: "npm".to_string(),
+        source_label: "npm registry".to_string(),
+        installable: true,
     })
 }
 

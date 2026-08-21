@@ -15,6 +15,7 @@ import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type {
   ArchivePackage,
+  CatalogSource,
   InstalledPlugin,
   PluginDetail,
   PluginListing,
@@ -25,8 +26,11 @@ interface PluginStore {
   /** The hosted profile as it is on disk. Null until the first read lands. */
   profile: PluginState | null
   results: PluginListing[]
+  sources: CatalogSource[]
   /** The package the detail rail is describing, if any. */
   selected: string | null
+  selectedSource: string | null
+  selectedVersion: string | null
   detail: PluginDetail | null
 
   searching: boolean
@@ -37,7 +41,10 @@ interface PluginStore {
 
   refresh: () => Promise<void>
   search: (query: string) => Promise<void>
-  select: (name: string | null) => Promise<void>
+  select: (name: string | null, sourceId?: string, version?: string) => Promise<void>
+  selectSource: (id: string) => Promise<void>
+  addSource: (label: string, endpoint: string) => Promise<boolean>
+  removeSource: (id: string) => Promise<void>
   add: (spec: string) => Promise<void>
   remove: (name: string) => Promise<void>
   /** Take an installed plugin out of the layer stack, or put it back. */
@@ -69,7 +76,10 @@ const landed = (set: Write, profile: PluginState): void => {
 export const usePlugins = create<PluginStore>((set, get) => ({
   profile: null,
   results: [],
+  sources: [],
   selected: null,
+  selectedSource: null,
+  selectedVersion: null,
   detail: null,
   searching: false,
   loadingDetail: false,
@@ -78,7 +88,8 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   refresh: async () => {
     try {
-      set({ profile: await ipc.pluginState() })
+      const [profile, sources] = await Promise.all([ipc.pluginState(), ipc.pluginSources()])
+      set({ profile, sources })
     } catch (cause) {
       set({ error: describe(cause) })
     }
@@ -97,22 +108,79 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     }
   },
 
-  select: async (name) => {
+  select: async (name, sourceId = 'npm', version = 'latest') => {
     if (name === null) {
-      set({ selected: null, detail: null })
+      set({ selected: null, selectedSource: null, selectedVersion: null, detail: null })
       return
     }
 
-    set({ selected: name, detail: null, loadingDetail: true })
+    set({
+      selected: name,
+      selectedSource: sourceId,
+      selectedVersion: version,
+      detail: null,
+      loadingDetail: true,
+    })
     try {
-      const detail = await ipc.pluginDetail(name)
+      const detail = await ipc.pluginDetail(sourceId, name, version)
       // Still the selection this request was made for, or it belongs to a
       // package the user has already clicked away from.
-      if (get().selected === name) set({ detail })
+      const current = get()
+      if (
+        current.selected === name &&
+        current.selectedSource === sourceId &&
+        current.selectedVersion === version
+      ) {
+        set({ detail })
+      }
     } catch (cause) {
-      if (get().selected === name) set({ error: describe(cause) })
+      const current = get()
+      if (
+        current.selected === name &&
+        current.selectedSource === sourceId &&
+        current.selectedVersion === version
+      ) {
+        set({ error: describe(cause) })
+      }
     } finally {
       if (get().selected === name) set({ loadingDetail: false })
+    }
+  },
+
+  selectSource: async (id) => {
+    try {
+      const sources = await ipc.pluginSourceSelect(id)
+      set({
+        sources,
+        results: [],
+        selected: null,
+        selectedSource: null,
+        selectedVersion: null,
+        detail: null,
+        error: null,
+      })
+    } catch (cause) {
+      set({ error: describe(cause) })
+    }
+  },
+
+  addSource: async (label, endpoint) => {
+    try {
+      const sources = await ipc.pluginSourceAdd(label, endpoint)
+      set({ sources, results: [], error: null })
+      return true
+    } catch (cause) {
+      set({ error: describe(cause) })
+      return false
+    }
+  },
+
+  removeSource: async (id) => {
+    try {
+      const sources = await ipc.pluginSourceRemove(id)
+      set({ sources, results: [], selected: null, detail: null, error: null })
+    } catch (cause) {
+      set({ error: describe(cause) })
     }
   },
 

@@ -53,7 +53,8 @@ export function ConsolePane() {
     environment !== null &&
     environment.node !== null &&
     environment.harnessInstalled &&
-    environment.harnessCompatible
+    environment.harnessCompatible &&
+    environment.workspaceAdmission.state !== 'blocked'
   const working = installing || provisioningNode
   const starting = busy || status.phase === 'starting' || status.phase === 'restarting'
   const running = status.phase === 'ready'

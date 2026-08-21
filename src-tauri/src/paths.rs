@@ -66,6 +66,11 @@ pub fn plugin_recovery_dir() -> PathBuf {
     app_data_dir().join("plugin-recovery")
 }
 
+/// User-selected and custom plugin catalog sources.
+pub fn market_sources_file() -> PathBuf {
+    app_data_dir().join("market-sources.json")
+}
+
 /// Where Node runtimes the shell downloaded are unpacked, one directory per
 /// release: `.../tools/node/v24.19.0`.
 ///

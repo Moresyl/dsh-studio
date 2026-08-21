@@ -9,6 +9,7 @@ import {
   Package,
   PackagePlus,
   Search,
+  Settings2,
   Trash2,
   TriangleAlert,
   X,
@@ -17,6 +18,7 @@ import {
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PluginDialog } from '@/components/PluginDialog'
+import { CatalogSourcesDialog } from '@/components/CatalogSourcesDialog'
 import { Switch } from '@/components/Switch'
 import { TabButton } from '@/components/TabButton'
 import { count, day, filesize } from '@/lib/format'
@@ -57,6 +59,7 @@ type Tab = 'discover' | 'installed'
 export function PluginMarket() {
   const profile = usePlugins((state) => state.profile)
   const results = usePlugins((state) => state.results)
+  const sources = usePlugins((state) => state.sources)
   const selected = usePlugins((state) => state.selected)
   const searching = usePlugins((state) => state.searching)
   const working = usePlugins((state) => state.working)
@@ -64,6 +67,7 @@ export function PluginMarket() {
   const refresh = usePlugins((state) => state.refresh)
   const search = usePlugins((state) => state.search)
   const select = usePlugins((state) => state.select)
+  const selectSource = usePlugins((state) => state.selectSource)
   const remove = usePlugins((state) => state.remove)
   const toggle = usePlugins((state) => state.toggle)
   const inspect = usePlugins((state) => state.inspect)
@@ -71,7 +75,9 @@ export function PluginMarket() {
 
   const [tab, setTab] = useState<Tab>('discover')
   const [query, setQuery] = useState('')
+  const [managingSources, setManagingSources] = useState(false)
   const field = useRef<HTMLInputElement>(null)
+  const activeSource = sources.find((source) => source.active) ?? null
 
   // Asked here rather than at each button: all three places remove a plugin the
   // same way, and a question whose wording depends on which list you happened
@@ -137,7 +143,7 @@ export function PluginMarket() {
   useEffect(() => {
     const timer = window.setTimeout(() => void search(query), query === '' ? 0 : DEBOUNCE)
     return () => window.clearTimeout(timer)
-  }, [query, search])
+  }, [query, search, activeSource?.id])
 
   const installed = profile?.plugins ?? []
   const removable = installed.filter((plugin) => !plugin.builtin).length
@@ -183,6 +189,27 @@ export function PluginMarket() {
 
         {tab === 'discover' && (
           <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
+            <select
+              value={activeSource?.id ?? 'npm'}
+              onChange={(event) => void selectSource(event.target.value)}
+              aria-label={t('plugins.source')}
+              className="h-7 max-w-[150px] rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
+            >
+              {sources.map((source) => (
+                <option key={source.id} value={source.id}>
+                  {source.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setManagingSources(true)}
+              data-hint={t('plugins.sources.manage')}
+              aria-label={t('plugins.sources.manage')}
+              className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text"
+            >
+              <Settings2 size={13} aria-hidden="true" />
+            </button>
             <Search
               size={14}
               strokeWidth={2.1}
@@ -249,7 +276,7 @@ export function PluginMarket() {
               searching={searching}
               selected={selected}
               working={working}
-              onOpen={(name) => void select(name)}
+              onOpen={(listing) => void select(listing.name, listing.sourceId, listing.version)}
               isInstalled={(name) => isInstalled(profile, name)}
             />
           ) : (
@@ -257,7 +284,7 @@ export function PluginMarket() {
               plugins={installed}
               initialized={profile?.initialized ?? false}
               working={working}
-              onOpen={(name) => void select(name)}
+              onOpen={(name) => void select(name, 'npm', 'latest')}
               onToggle={(name, on) => void toggle(name, on)}
               onRemove={(name) => void confirmRemove(name)}
             />
@@ -281,6 +308,7 @@ export function PluginMarket() {
           arrival, and a transform is a containing block for anything fixed
           within it. */}
       {selected !== null && <PluginDialog onRemove={confirmRemove} />}
+      {managingSources && <CatalogSourcesDialog onClose={() => setManagingSources(false)} />}
     </>
   )
 }
@@ -292,7 +320,7 @@ interface DiscoverProps {
   searching: boolean
   selected: string | null
   working: string | null
-  onOpen: (name: string) => void
+  onOpen: (listing: PluginListing) => void
   isInstalled: (name: string) => boolean
 }
 
@@ -313,11 +341,11 @@ function Discover({ results, searching, selected, working, onOpen, isInstalled }
             <div
               role="button"
               tabIndex={0}
-              onClick={() => onOpen(listing.name)}
+              onClick={() => onOpen(listing)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault()
-                  onOpen(listing.name)
+                  onOpen(listing)
                 }
               }}
               className={[
@@ -349,6 +377,7 @@ function Discover({ results, searching, selected, working, onOpen, isInstalled }
 
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
                   {listing.publisher && <span className="truncate">{listing.publisher}</span>}
+                  <span className="truncate text-brand/80">{listing.sourceLabel}</span>
                   {listing.weeklyDownloads > 0 && (
                     <span className="tabular-nums">
                       {t('plugins.downloads', { count: count(listing.weeklyDownloads) })}
@@ -371,7 +400,7 @@ function Discover({ results, searching, selected, working, onOpen, isInstalled }
                 busy={working === listing.name}
                 onOpen={(event) => {
                   event.stopPropagation()
-                  onOpen(listing.name)
+                  onOpen(listing)
                 }}
               />
             </div>

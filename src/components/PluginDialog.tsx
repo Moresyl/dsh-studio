@@ -44,6 +44,8 @@ interface PluginDialogProps {
  */
 export function PluginDialog({ onRemove }: PluginDialogProps) {
   const selected = usePlugins((state) => state.selected)
+  const selectedSource = usePlugins((state) => state.selectedSource)
+  const selectedVersion = usePlugins((state) => state.selectedVersion)
   const detail = usePlugins((state) => state.detail)
   const loading = usePlugins((state) => state.loadingDetail)
   const working = usePlugins((state) => state.working)
@@ -80,7 +82,13 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
   if (selected === null) return null
 
   const here = installedPlugin(profile, selected)
-  const listing = results.find((result) => result.name === selected) ?? null
+  const listing =
+    results.find(
+      (result) =>
+        result.name === selected &&
+        result.sourceId === selectedSource &&
+        result.version === selectedVersion,
+    ) ?? null
   const busy = working === selected
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => holdFocus(card.current, event, close)

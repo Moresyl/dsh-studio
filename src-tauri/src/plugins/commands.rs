@@ -31,12 +31,48 @@ pub fn plugin_recovery_acknowledge() -> Result<()> {
 
 #[tauri::command]
 pub async fn plugin_search(query: String) -> Result<Vec<Listing>> {
-    super::registry::search(&node()?, &query).await
+    let source = super::catalog::sources()
+        .into_iter()
+        .find(|source| source.active)
+        .ok_or_else(|| Error::Plugin("no plugin catalog source is active".into()))?;
+    if source.id == "npm" {
+        super::registry::search(&node()?, &query).await
+    } else {
+        super::catalog::search(&source.id, &query).await
+    }
 }
 
 #[tauri::command]
-pub async fn plugin_detail(name: String) -> Result<Detail> {
-    super::registry::detail(&node()?, &name).await
+pub async fn plugin_detail(source_id: String, name: String, version: String) -> Result<Detail> {
+    if source_id == "npm" {
+        return super::registry::detail(&node()?, &name).await;
+    }
+    let mut detail = super::registry::preflight(&node()?, &format!("{name}@{version}")).await?;
+    detail.source = super::catalog::label(&source_id);
+    Ok(detail)
+}
+
+#[tauri::command]
+pub fn plugin_sources() -> Vec<super::catalog::Source> {
+    super::catalog::sources()
+}
+
+#[tauri::command]
+pub fn plugin_source_select(id: String) -> Result<Vec<super::catalog::Source>> {
+    super::catalog::select(&id)
+}
+
+#[tauri::command]
+pub async fn plugin_source_add(
+    label: String,
+    endpoint: String,
+) -> Result<Vec<super::catalog::Source>> {
+    super::catalog::add(&label, &endpoint).await
+}
+
+#[tauri::command]
+pub fn plugin_source_remove(id: String) -> Result<Vec<super::catalog::Source>> {
+    super::catalog::remove(&id)
 }
 
 /// Install a plugin into the hosted profile.

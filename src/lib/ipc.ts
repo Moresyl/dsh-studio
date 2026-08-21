@@ -35,6 +35,11 @@ export interface Environment {
   harnessProblem: string | null
   harnessEntry: string
   workspace: string
+  workspaceAdmission: {
+    state: 'safe' | 'warning' | 'blocked'
+    filesystem: string | null
+    reason: string | null
+  }
 }
 
 export type Status =
@@ -230,6 +235,18 @@ export interface PluginListing {
   updated: string
   weeklyDownloads: number
   link: string | null
+  sourceId: string
+  sourceLabel: string
+  installable: boolean
+}
+
+export interface CatalogSource {
+  id: string
+  label: string
+  kind: 'npm' | 'reviewed-http' | 'standard-http-v1'
+  endpoint: string | null
+  builtIn: boolean
+  active: boolean
 }
 
 export interface PluginDetail {
@@ -268,8 +285,22 @@ export const pluginRecoveryAcknowledge = (): Promise<void> => invoke('plugin_rec
 export const pluginSearch = (query: string): Promise<PluginListing[]> =>
   invoke('plugin_search', { query })
 
-export const pluginDetail = (name: string): Promise<PluginDetail> =>
-  invoke('plugin_detail', { name })
+export const pluginDetail = (
+  sourceId: string,
+  name: string,
+  version: string,
+): Promise<PluginDetail> => invoke('plugin_detail', { sourceId, name, version })
+
+export const pluginSources = (): Promise<CatalogSource[]> => invoke('plugin_sources')
+
+export const pluginSourceSelect = (id: string): Promise<CatalogSource[]> =>
+  invoke('plugin_source_select', { id })
+
+export const pluginSourceAdd = (label: string, endpoint: string): Promise<CatalogSource[]> =>
+  invoke('plugin_source_add', { label, endpoint })
+
+export const pluginSourceRemove = (id: string): Promise<CatalogSource[]> =>
+  invoke('plugin_source_remove', { id })
 
 /** Install into the hosted profile; resolves with the profile afterwards. */
 export const pluginAdd = (spec: string): Promise<PluginState> => invoke('plugin_add', { spec })

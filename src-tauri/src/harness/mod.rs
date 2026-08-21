@@ -40,6 +40,7 @@ pub struct Environment {
     pub harness_problem: Option<String>,
     pub harness_entry: PathBuf,
     pub workspace: PathBuf,
+    pub workspace_admission: crate::workspace::Admission,
 }
 
 /// Inspect the machine. Cheap enough to call whenever the UI needs it.
@@ -60,6 +61,8 @@ pub fn environment() -> Environment {
     let harness_installed = harness_entry.is_file() && harness_version.is_some();
     let harness_compatible = install::runtime_compatible(&paths::harness_dir());
 
+    let workspace = paths::default_workspace_dir();
+    let workspace_admission = crate::workspace::inspect(&workspace);
     Environment {
         node,
         all_node_runtimes,
@@ -70,7 +73,8 @@ pub fn environment() -> Environment {
         expected_harness_version: install::VERSION.to_string(),
         harness_problem,
         harness_entry,
-        workspace: paths::default_workspace_dir(),
+        workspace,
+        workspace_admission,
     }
 }
 
@@ -93,6 +97,14 @@ pub fn launch_plan() -> Result<LaunchPlan> {
                 .unwrap_or("unknown"),
             install::VERSION
         )));
+    }
+    if environment.workspace_admission.blocked() {
+        return Err(Error::Workspace(
+            environment
+                .workspace_admission
+                .reason
+                .unwrap_or_else(|| "the workspace is not safe to use".into()),
+        ));
     }
     let profile = crate::profiles::selected();
     if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {

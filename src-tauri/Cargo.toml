@@ -119,6 +119,10 @@ flate2 = "1"
 tar = "0.4"
 
 [target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Storage_FileSystem",
+  "Win32_System_WindowsProgramming",
+] }
 # Which backdrop the compositor understands is a build-number question, and it
 # has to be answered before the window is built. Already linked by
 # `window-vibrancy`, which tauri pulls in for the effects themselves, so asking

@@ -89,6 +89,9 @@ pub enum Error {
 
     #[error("{0}")]
     Window(String),
+
+    #[error("workspace cannot be opened: {0}")]
+    Workspace(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

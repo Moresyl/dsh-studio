@@ -31,6 +31,7 @@ export function EnvironmentChecks() {
   const harnessVersion = environment?.harnessVersion ?? null
   const expectedHarnessVersion = environment?.expectedHarnessVersion ?? ''
   const harnessProblem = environment?.harnessProblem ?? null
+  const workspace = environment?.workspaceAdmission ?? null
 
   // Only things that can be wrong. The workspace is neither a check nor
   // something anyone acts on from here, so it reports itself from the status bar
@@ -90,6 +91,22 @@ export function EnvironmentChecks() {
               run: () => void install(),
             }
           : undefined,
+    },
+    {
+      key: 'workspace',
+      label: t('check.workspace'),
+      value:
+        workspace === null
+          ? t('check.workspace.checking')
+          : workspace.state === 'safe'
+            ? t('check.workspace.safe', {
+                filesystem: workspace.filesystem ?? t('check.workspace.local'),
+              })
+            : workspace.state === 'warning'
+              ? t('check.workspace.warning')
+              : t('check.workspace.blocked'),
+      title: workspace?.reason ?? environment?.workspace,
+      state: workspace === null ? 'neutral' : workspace.state === 'blocked' ? 'missing' : 'ok',
     },
   ]
 

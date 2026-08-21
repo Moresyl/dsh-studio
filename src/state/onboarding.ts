@@ -88,7 +88,9 @@ export const useOnboarding = create<OnboardingState>((set, get) => ({
     const settled =
       seen() ||
       environment === null ||
-      (environment.harnessInstalled && environment.harnessCompatible)
+      (environment.harnessInstalled &&
+        environment.harnessCompatible &&
+        environment.workspaceAdmission.state !== 'blocked')
     if (settled) remember()
 
     set({ stage: settled ? 'done' : 'guiding' })

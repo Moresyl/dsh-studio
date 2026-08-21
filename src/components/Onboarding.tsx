@@ -45,7 +45,8 @@ export function Onboarding() {
     environment !== null &&
     environment.node !== null &&
     environment.harnessInstalled &&
-    environment.harnessCompatible
+    environment.harnessCompatible &&
+    environment.workspaceAdmission.state !== 'blocked'
   const running = status.phase === 'ready'
   const starting = busy || status.phase === 'starting' || status.phase === 'restarting'
   const working = installing || provisioningNode
