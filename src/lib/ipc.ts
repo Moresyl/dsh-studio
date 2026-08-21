@@ -218,6 +218,8 @@ export interface InstalledPlugin {
   disabled: boolean
   /** Part of the profile template, so never removable from here. */
   builtin: boolean
+  /** Durable receipt id when installed through a catalog. */
+  marketReceipt: string | null
 }
 
 export interface PluginState {
@@ -283,6 +285,8 @@ export interface PluginDetail {
     | { state: 'compatible'; requirement: string }
     | { state: 'unknown' }
     | { state: 'incompatible'; requirement: string; reason: string }
+  integrity: string | null
+  bundlePatch: unknown | null
 }
 
 export const pluginState = (): Promise<PluginState> => invoke('plugin_state')
@@ -326,7 +330,12 @@ export const pluginSourceRemove = (id: string): Promise<CatalogSource[]> =>
   invoke('plugin_source_remove', { id })
 
 /** Install into the hosted profile; resolves with the profile afterwards. */
-export const pluginAdd = (spec: string): Promise<PluginState> => invoke('plugin_add', { spec })
+export const pluginAdd = (
+  spec: string,
+  sourceId: string,
+  itemId: string,
+  displayName: string,
+): Promise<PluginState> => invoke('plugin_add', { spec, sourceId, itemId, displayName })
 
 export const pluginRemove = (name: string): Promise<PluginState> =>
   invoke('plugin_remove', { name })

@@ -19,6 +19,7 @@ pub mod archive;
 pub mod catalog;
 pub mod commands;
 pub mod market;
+pub mod receipts;
 pub mod recovery;
 pub mod registry;
 pub mod switches;
@@ -60,6 +61,8 @@ pub struct InstalledPlugin {
     /// Part of the profile template rather than something installed here.
     /// Shown because it explains the harness's behaviour, never removable.
     pub builtin: bool,
+    /// Receipt id when this exact profile package came from the market.
+    pub market_receipt: Option<String>,
 }
 
 /// Everything the plugin panel needs before it draws anything.
@@ -112,13 +115,19 @@ pub fn state() -> PluginState {
 
     let switched_off = switches::switched_off(&profile);
 
+    let mut plugins = manifest
+        .as_ref()
+        .map(|manifest| list(manifest, &switched_off))
+        .unwrap_or_default();
+    let receipt_ids = receipts::ids(&profile, &profile_dir);
+    for plugin in &mut plugins {
+        plugin.market_receipt = receipt_ids.get(&plugin.name).cloned();
+    }
+
     PluginState {
         profile,
         initialized: manifest.is_some(),
-        plugins: manifest
-            .as_ref()
-            .map(|manifest| list(manifest, &switched_off))
-            .unwrap_or_default(),
+        plugins,
         package_manager: package_manager_available(),
         profile_dir,
     }
@@ -162,6 +171,7 @@ pub(crate) fn list(
                     name: name.clone(),
                     spec: spec.as_str().unwrap_or_default().to_string(),
                     builtin: false,
+                    market_receipt: None,
                 })
                 .collect()
         })
@@ -175,6 +185,7 @@ pub(crate) fn list(
                 active: true,
                 disabled: false,
                 builtin: true,
+                market_receipt: None,
             });
         }
     }
@@ -194,9 +205,16 @@ pub(crate) fn list(
 /// The package manager is bootstrapped first if this machine has none, because
 /// the alternative is a 127 exit code and a message telling a desktop user to
 /// go and install pnpm.
-pub async fn change<R>(change: Change, spec: &str, guard: &ProcessGuard, report: R) -> Result<()>
+pub async fn change_finalize<R, F>(
+    change: Change,
+    spec: &str,
+    guard: &ProcessGuard,
+    report: R,
+    finalize: F,
+) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
+    F: FnOnce() -> Result<()>,
 {
     if !is_package_spec(spec) {
         return Err(Error::Plugin(format!(
@@ -226,6 +244,14 @@ where
     // puts back anything the user had switched off. Saying so again here is the
     // only reason a switched-off plugin stays switched off across an install.
     if let Err(failure) = switches::apply(&profile, &paths::profile_dir(&profile)) {
+        return match transaction.rollback() {
+            Ok(_) => Err(failure),
+            Err(rollback) => Err(Error::Plugin(format!(
+                "{failure}; automatic profile rollback also failed: {rollback}"
+            ))),
+        };
+    }
+    if let Err(failure) = finalize() {
         return match transaction.rollback() {
             Ok(_) => Err(failure),
             Err(rollback) => Err(Error::Plugin(format!(

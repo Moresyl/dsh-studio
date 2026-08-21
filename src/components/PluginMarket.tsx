@@ -616,6 +616,7 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
                   </Badge>
                 )}
                 {plugin.builtin && <Badge tone="faint">{t('plugins.builtin')}</Badge>}
+                {plugin.marketReceipt && <Badge tone="ok">{t('plugins.marketManaged')}</Badge>}
               </div>
             </div>
 

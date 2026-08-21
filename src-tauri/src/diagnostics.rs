@@ -575,6 +575,7 @@ mod tests {
             active,
             disabled,
             builtin,
+            market_receipt: None,
         };
 
         assert_eq!(standing(&entry(false, true, false)), "disabled");

@@ -99,16 +99,38 @@ const lines: LogLine[] = []
  * what the pane is for, rather than an empty list or an all-green one.
  */
 const installed: InstalledPlugin[] = [
-  { name: 'dsh-design-playbook', spec: '^0.20.2', active: true, disabled: false, builtin: false },
+  {
+    name: 'dsh-design-playbook',
+    spec: '^0.20.2',
+    active: true,
+    disabled: false,
+    builtin: false,
+    marketReceipt: 'demo-market-receipt',
+  },
   {
     name: 'dsh-plugin-grok2api-media-tool',
     spec: '^0.7.6',
     active: false,
     disabled: true,
     builtin: false,
+    marketReceipt: null,
   },
-  { name: '@deepseek-ai/dsh-base', spec: '', active: true, disabled: false, builtin: true },
-  { name: '@deepseek-ai/dsh-web-app', spec: '', active: true, disabled: false, builtin: true },
+  {
+    name: '@deepseek-ai/dsh-base',
+    spec: '',
+    active: true,
+    disabled: false,
+    builtin: true,
+    marketReceipt: null,
+  },
+  {
+    name: '@deepseek-ai/dsh-web-app',
+    spec: '',
+    active: true,
+    disabled: false,
+    builtin: true,
+    marketReceipt: null,
+  },
 ]
 
 const remote: RemoteStatus = {
@@ -249,6 +271,8 @@ const DETAILS: Record<string, PluginDetail> = {
     installSpec: 'dsh-visual-plugin@0.2.6',
     source: 'https://registry.npmjs.org',
     compatibility: { state: 'unknown' },
+    integrity: 'sha512-demo',
+    bundlePatch: {},
   },
 }
 
@@ -262,6 +286,8 @@ const detailFor = (name: string): PluginDetail => {
     installSpec: `${name}@${listing?.version ?? '1.0.0'}`,
     source: 'https://registry.npmjs.org',
     compatibility: { state: 'unknown' },
+    integrity: 'sha512-demo',
+    bundlePatch: {},
     description: listing?.description ?? '',
     license: 'MIT',
     homepage: listing?.link ?? null,
@@ -420,6 +446,7 @@ const add = async (spec: string): Promise<PluginState> => {
       active: true,
       disabled: false,
       builtin: false,
+      marketReceipt: null,
     })
   }
   say(`${spec} written to the profile; restart the harness to apply it`)

@@ -230,9 +230,15 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   add: async (spec) => {
     if (get().working) return
+    const selected = get().selected
+    const sourceId = get().selectedSource
+    if (!selected || !sourceId) {
+      set({ error: 'The selected market item no longer exists.' })
+      return
+    }
     set({ working: packageName(spec), error: null })
     try {
-      landed(set, await ipc.pluginAdd(spec))
+      landed(set, await ipc.pluginAdd(spec, sourceId, selected, get().detail?.name ?? selected))
     } catch (cause) {
       set({ error: describe(cause) })
     } finally {

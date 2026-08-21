@@ -99,11 +99,35 @@ pub async fn plugin_source_remove(id: String) -> Result<Vec<super::catalog::Sour
 #[tauri::command]
 pub async fn plugin_add(
     spec: String,
+    source_id: String,
+    item_id: String,
+    display_name: String,
     state: State<'_, AppState>,
     jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<PluginState> {
-    super::registry::preflight(&node()?, &spec).await?;
-    apply(Change::Add, &spec, &state, &jobs).await
+    let detail = super::registry::preflight(&node()?, &spec).await?;
+    let source = super::catalog::sources()
+        .into_iter()
+        .find(|source| source.id == source_id && source.active)
+        .ok_or_else(|| Error::Plugin("the selected catalog source is no longer active".into()))?;
+    if item_id != detail.name {
+        return Err(Error::Plugin(
+            "the selected catalog item does not match the resolved package".into(),
+        ));
+    }
+    let profile = crate::profiles::selected();
+    let profile_dir = crate::paths::profile_dir(&profile);
+    apply(Change::Add, &spec, &state, &jobs, move || {
+        super::receipts::record(
+            &profile,
+            &profile_dir,
+            &source.id,
+            &item_id,
+            &display_name,
+            &detail,
+        )
+    })
+    .await
 }
 
 #[tauri::command]
@@ -112,7 +136,13 @@ pub async fn plugin_remove(
     state: State<'_, AppState>,
     jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<PluginState> {
-    apply(Change::Remove, &name, &state, &jobs).await
+    let profile = crate::profiles::selected();
+    let profile_dir = crate::paths::profile_dir(&profile);
+    let receipt_name = name.clone();
+    apply(Change::Remove, &name, &state, &jobs, move || {
+        super::receipts::remove(&profile, &profile_dir, &receipt_name)
+    })
+    .await
 }
 
 /// Read a plugin archive on this machine without installing anything from it.
@@ -176,19 +206,27 @@ pub fn plugin_switch(
     Ok(super::state())
 }
 
-async fn apply(
+async fn apply<F>(
     change: Change,
     spec: &str,
     state: &State<'_, AppState>,
     jobs: &State<'_, Arc<PluginJobs>>,
-) -> Result<PluginState> {
+    finalize: F,
+) -> Result<PluginState>
+where
+    F: FnOnce() -> Result<()>,
+{
     let _busy = Busy::claim(&jobs.busy)?;
 
     let supervisor = Arc::clone(&state.supervisor);
     let reporter = Arc::clone(&supervisor);
-    let outcome = super::change(change, spec, supervisor.guard(), move |stream, line| {
-        reporter.note(stream, line)
-    })
+    let outcome = super::change_finalize(
+        change,
+        spec,
+        supervisor.guard(),
+        move |stream, line| reporter.note(stream, line),
+        finalize,
+    )
     .await;
 
     settle(&supervisor, outcome.map(|()| spec.to_string()))

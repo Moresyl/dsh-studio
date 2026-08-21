@@ -772,6 +772,7 @@ mod tests {
             active,
             disabled,
             builtin,
+            market_receipt: None,
         }
     }
 

@@ -17,11 +17,12 @@ use crate::paths;
 
 const SCHEMA: u8 = 1;
 const MAX_CONTROL_FILE: u64 = 8 << 20;
-const CONTROL_FILES: [&str; 4] = [
+const CONTROL_FILES: [&str; 5] = [
     "package.json",
     "pnpm-lock.yaml",
     "pnpm-workspace.yaml",
     "cordis.patch.yml",
+    super::receipts::FILE,
 ];
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

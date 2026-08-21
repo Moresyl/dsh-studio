@@ -188,7 +188,13 @@ fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) 
         integrity: manifest
             .pointer("/dist/integrity")
             .and_then(serde_json::Value::as_str)
-            .map(str::to_string),
+            .map(str::to_string)
+            .or_else(|| {
+                manifest
+                    .pointer("/dist/shasum")
+                    .and_then(serde_json::Value::as_str)
+                    .map(|value| format!("sha1hex-{value}"))
+            }),
         bundle_patch: manifest.pointer("/dsh/bundle/patch").cloned(),
     }
 }

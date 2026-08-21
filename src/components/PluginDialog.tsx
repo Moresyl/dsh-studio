@@ -203,6 +203,13 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                     {detail.source}
                   </span>
                 </Row>
+                {here?.marketReceipt && (
+                  <Row label={t('plugins.receipt')}>
+                    <span className="selectable break-all font-mono text-[10.5px]">
+                      {here.marketReceipt}
+                    </span>
+                  </Row>
+                )}
                 <Row label={t('plugins.compatibility')}>
                   <span
                     className={
