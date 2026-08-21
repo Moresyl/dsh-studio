@@ -190,6 +190,29 @@ impl Terminals {
             },
         );
 
+        // The first bytes belong to the Desktop environment, before the shell
+        // can draw its prompt. Emitting through the normal channel also means a
+        // frontend that has not adopted this id yet buffers them in order.
+        let profile = crate::profiles::selected();
+        let tools = if crate::harness::install::runtime_compatible(&paths::harness_dir()) {
+            "dsh · pnpm · node"
+        } else {
+            "node (Repair Environment to enable dsh and pnpm)"
+        };
+        let _ = app.emit(
+            OUTPUT_CHANNEL,
+            Output {
+                id: id.clone(),
+                data: format!(
+                    "\r\n\x1b[1;36mDSH Studio {}\x1b[0m\r\nProfile: {}\r\nWorkspace: {}\r\nTools: {}\r\n\r\n",
+                    app.package_info().version,
+                    profile,
+                    describe.cwd.display(),
+                    tools
+                ),
+            },
+        );
+
         spawn_reader(app.clone(), id.clone(), reader);
         spawn_writer(queued, writer);
         spawn_waiter(Arc::clone(self), app.clone(), id, child);
@@ -285,6 +308,10 @@ impl Terminals {
         // Same marker the supervised harness gets, so a plugin that behaves
         // differently under the desktop shell behaves the same way in here.
         command.env("DSH_DESKTOP", "1");
+        let profile = crate::profiles::selected();
+        command.env("DSH_PROFILE", &profile);
+        command.env("DSH_PROFILE_DIR", paths::profile_dir(&profile));
+        command.env("DSH_HOME", paths::dsh_home());
 
         // What every terminal emulator declares, and what curses programs read to
         // decide whether they may use colour at all. Not set on Windows: ConPTY
@@ -321,6 +348,14 @@ fn search_path(inherited: Option<&std::ffi::OsStr>) -> Option<OsString> {
     let bin = paths::harness_dir().join("node_modules").join(".bin");
     if bin.is_dir() {
         directories.push(bin);
+    }
+
+    // The pinned pnpm installed for market operations is also the pnpm the
+    // Desktop terminal promises. It remains private to child processes and
+    // never modifies the user's PATH or shell startup files.
+    let tools = paths::tools_dir().join("node_modules").join(".bin");
+    if tools.is_dir() {
+        directories.push(tools);
     }
 
     if directories.is_empty() {

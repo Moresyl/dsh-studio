@@ -28,6 +28,8 @@ pub const PACKAGE: &str = "@deepseek-ai/dsh";
 /// release graph.
 pub const VERSION: &str = "0.1.0-rc.8";
 pub const SPEC: &str = "@deepseek-ai/dsh@0.1.0-rc.8";
+pub const PNPM_VERSION: &str = "11.7.0";
+pub const PNPM_SPEC: &str = "pnpm@11.7.0";
 
 const JOURNAL_VERSION: u8 = 1;
 
@@ -147,7 +149,20 @@ where
         target: staging.clone(),
         ..plan.clone()
     };
-    if let Err(failure) = run(&staged_plan, guard, report).await {
+    if let Err(failure) = run(&staged_plan, guard, report.clone()).await {
+        let _ = remove_dir_if_exists(&staging);
+        let _ = std::fs::remove_file(&journal);
+        return Err(failure);
+    }
+
+    // The Desktop terminal and public plugin operations use the same pinned
+    // package manager. Keep it in the transactional runtime so an upgrade can
+    // never expose a new dsh with an old or missing pnpm.
+    let package_manager = InstallPlan {
+        spec: PNPM_SPEC.to_string(),
+        ..staged_plan
+    };
+    if let Err(failure) = run(&package_manager, guard, report).await {
         let _ = remove_dir_if_exists(&staging);
         let _ = std::fs::remove_file(&journal);
         return Err(failure);
@@ -301,7 +316,10 @@ pub fn runtime_version(target: &Path) -> Option<String> {
 
 /// Whether the installed runtime is exactly the family this application tested.
 pub fn runtime_compatible(target: &Path) -> bool {
-    runtime_version(target).as_deref() == Some(VERSION) && entry(target).is_file()
+    runtime_version(target).as_deref() == Some(VERSION)
+        && entry(target).is_file()
+        && pnpm_version(target).as_deref() == Some(PNPM_VERSION)
+        && pnpm_entry(target).is_file()
 }
 
 fn runtime_complete(target: &Path) -> bool {
@@ -317,11 +335,27 @@ fn entry(target: &Path) -> PathBuf {
         .join("bin.js")
 }
 
+pub fn pnpm_version(target: &Path) -> Option<String> {
+    let manifest = target.join("node_modules/pnpm/package.json");
+    let raw = std::fs::read_to_string(manifest).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    parsed.get("version")?.as_str().map(str::to_string)
+}
+
+fn pnpm_entry(target: &Path) -> PathBuf {
+    target.join("node_modules/pnpm/bin/pnpm.cjs")
+}
+
 fn require_expected_runtime(target: &Path) -> Result<()> {
     let actual = runtime_version(target).unwrap_or_else(|| "missing".to_string());
-    if actual != VERSION || !entry(target).is_file() {
+    let actual_pnpm = pnpm_version(target).unwrap_or_else(|| "missing".to_string());
+    if actual != VERSION
+        || !entry(target).is_file()
+        || actual_pnpm != PNPM_VERSION
+        || !pnpm_entry(target).is_file()
+    {
         return Err(Error::Install(format!(
-            "npm finished but the verified runtime is not {PACKAGE}@{VERSION} (found {actual})"
+            "npm finished but the verified runtime is not {PACKAGE}@{VERSION} with pnpm {PNPM_VERSION} (found {actual} with pnpm {actual_pnpm})"
         )));
     }
     Ok(())
@@ -429,7 +463,8 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        remove_dir_if_exists, runtime_compatible, runtime_version, PACKAGE, SPEC, VERSION,
+        remove_dir_if_exists, runtime_compatible, runtime_version, PACKAGE, PNPM_SPEC,
+        PNPM_VERSION, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -443,6 +478,14 @@ mod tests {
         if entry {
             fs::write(package.join("lib/bin.js"), "").expect("entry");
         }
+        let pnpm = root.join("node_modules/pnpm");
+        fs::create_dir_all(pnpm.join("bin")).expect("pnpm directory");
+        fs::write(
+            pnpm.join("package.json"),
+            format!(r#"{{"name":"pnpm","version":"{PNPM_VERSION}"}}"#),
+        )
+        .expect("pnpm manifest");
+        fs::write(pnpm.join("bin/pnpm.cjs"), "").expect("pnpm entry");
     }
 
     #[test]
@@ -450,6 +493,7 @@ mod tests {
         assert_eq!(SPEC, format!("{PACKAGE}@{VERSION}"));
         assert!(!SPEC.ends_with("@latest"));
         assert!(!VERSION.starts_with(['^', '~']));
+        assert_eq!(PNPM_SPEC, format!("pnpm@{PNPM_VERSION}"));
     }
 
     #[test]

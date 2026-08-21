@@ -21,6 +21,7 @@ import { rcompare, satisfies } from 'semver'
 export const NODE_VERSION = '22.19.0'
 export const HARNESS_PACKAGE = '@deepseek-ai/dsh'
 export const HARNESS_VERSION = '0.1.0-rc.8'
+export const PNPM_VERSION = '11.7.0'
 
 const TARGETS = {
   'x86_64-pc-windows-msvc': {
@@ -98,6 +99,7 @@ export async function prepare(target, output) {
       // the runtime closure is independently executed below instead.
       '--legacy-peer-deps',
       `${HARNESS_PACKAGE}@${HARNESS_VERSION}`,
+      `pnpm@${PNPM_VERSION}`,
     ])
     await installPeerClosure(npm, harnessRoot)
     const packageRoot = join(harnessRoot, 'node_modules', '@deepseek-ai', 'dsh')
@@ -109,7 +111,10 @@ export async function prepare(target, output) {
     }
     const harnessEntry = join(packageRoot, 'lib', 'bin.js')
     await access(harnessEntry)
+    const pnpmEntry = join(harnessRoot, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs')
+    await access(pnpmEntry)
     await run(npm.node, [harnessEntry, '--help'])
+    await run(npm.node, [pnpmEntry, '--version'])
 
     const harnessFile = 'harness.tar.gz'
     const harnessArchive = join(destination, harnessFile)

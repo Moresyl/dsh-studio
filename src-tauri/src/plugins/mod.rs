@@ -39,10 +39,6 @@ use crate::harness::install;
 use crate::harness::supervisor::Stream;
 use crate::paths;
 
-/// What the shell installs when the machine has no package manager of its own.
-const PNPM_VERSION: &str = "11.7.0";
-const PNPM_SPEC: &str = "pnpm@11.7.0";
-
 /// One entry in the profile's plugin list.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -497,9 +493,12 @@ where
     }
     report(
         Stream::Stdout,
-        format!("installing the verified plugin package manager pnpm {PNPM_VERSION}"),
+        format!(
+            "installing the verified plugin package manager pnpm {}",
+            install::PNPM_VERSION
+        ),
     );
-    let plan = install::plan(node, paths::tools_dir(), PNPM_SPEC.to_string())?;
+    let plan = install::plan(node, paths::tools_dir(), install::PNPM_SPEC.to_string())?;
     install::run(&plan, guard, report).await?;
 
     managed_manager().map(Some).ok_or_else(|| {
@@ -518,7 +517,7 @@ fn managed_manager() -> Option<PathBuf> {
         .ok()
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
         .and_then(|value| value.get("version")?.as_str().map(str::to_string));
-    if version.as_deref() != Some(PNPM_VERSION) {
+    if version.as_deref() != Some(install::PNPM_VERSION) {
         return None;
     }
     let directory = paths::tools_dir().join("node_modules").join(".bin");
@@ -631,7 +630,7 @@ mod tests {
 
     #[cfg(windows)]
     use super::path_with;
-    use super::{forward, is_package_spec, list, split_spec, Stream, PNPM_SPEC, PNPM_VERSION};
+    use super::{forward, is_package_spec, list, split_spec, Stream};
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
@@ -803,7 +802,10 @@ mod tests {
 
     #[test]
     fn package_manager_contract_is_exact() {
-        assert_eq!(PNPM_SPEC, format!("pnpm@{PNPM_VERSION}"));
-        assert!(!PNPM_SPEC.ends_with("@latest"));
+        assert_eq!(
+            crate::harness::install::PNPM_SPEC,
+            format!("pnpm@{}", crate::harness::install::PNPM_VERSION)
+        );
+        assert!(!crate::harness::install::PNPM_SPEC.ends_with("@latest"));
     }
 }
