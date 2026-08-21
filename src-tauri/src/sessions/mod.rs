@@ -18,6 +18,7 @@
 //! a hole in it.
 
 pub mod artifact;
+pub mod attention;
 pub mod commands;
 pub mod export;
 pub mod find;
@@ -198,7 +199,7 @@ struct Shelf {
 
 /// A file as it was, without opening it.
 #[derive(Clone, Copy, PartialEq, Eq)]
-struct Stamp {
+pub(super) struct Stamp {
     bytes: u64,
     changed: Option<SystemTime>,
 }
@@ -428,7 +429,7 @@ fn reread(path: &Path, stamp: Stamp) -> Option<read::Reading> {
 }
 
 /// Every session log under a store, with what each looked like when found.
-fn artifacts(root: &Path) -> HashMap<PathBuf, Stamp> {
+pub(super) fn artifacts(root: &Path) -> HashMap<PathBuf, Stamp> {
     let mut found = HashMap::new();
 
     for project in directories(root) {

@@ -93,6 +93,7 @@ pub fn run() {
             window::build(app.handle())?;
             tray::build(app.handle())?;
             desktop::wire(app.handle());
+            sessions::attention::wire(app.handle());
             // After the tray, which is the only way back to a window this may
             // decide to leave hidden.
             startup::wire(app.handle());
