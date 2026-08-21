@@ -52,7 +52,24 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test:packaging
-      - run: pnpm test
+      - name: Frontend logic coverage (80% minimum)
+        run: pnpm test:coverage
       - run: pnpm build
-      - run: cargo test --manifest-path src-tauri/Cargo.toml --workspace
+      - name: Rust and LAN remote regression
+        run: cargo test --manifest-path src-tauri/Cargo.toml --workspace
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
+
+  rust-coverage:
+    name: Native safety coverage
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Install Linux dependencies
+        run: |
+          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
+      - run: cargo llvm-cov --manifest-path src-tauri/Cargo.toml --workspace --json --output-path src-tauri/target/llvm-cov.json
+      - run: node .github/scripts/verify-rust-coverage.mjs

@@ -35,6 +35,29 @@ export default defineConfig({
   },
   test: {
     exclude: [...configDefaults.exclude, '.github/scripts/**/*.test.mjs'],
+    coverage: {
+      provider: 'v8',
+      // Deterministic browser logic only. IPC bindings are generated one-line
+      // adapters whose behavior is owned by the Rust command tests; React view
+      // composition is verified by typecheck/build and desktop smoke tests.
+      include: [
+        'src/lib/bridge.ts',
+        'src/lib/crash.ts',
+        'src/lib/errors.ts',
+        'src/lib/fuzzy.ts',
+        'src/lib/updater.ts',
+        'src/state/terminals.ts',
+        'src/state/update.ts',
+        'src/state/workspace.ts',
+      ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+      },
+      reporter: ['text', 'json-summary'],
+    },
   },
   // Both WebView2 and WKWebView are evergreen enough that transpiling further
   // down only costs bundle size.
