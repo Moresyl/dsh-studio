@@ -157,6 +157,7 @@ pub fn stamp(base: &Image<'_>, count: u32) -> Image<'static> {
 
 /// The badge on its own, for a taskbar that draws it beside the app rather than
 /// on it. Square, because that is the shape every overlay slot expects.
+#[cfg(any(windows, test))]
 pub fn alone(count: u32) -> Option<Image<'static>> {
     let plan = Plan::read(count, 4)?;
 

@@ -6,7 +6,9 @@
 //! set `$SHELL`, and a terminal that ignores that is a terminal they will not use.
 
 use std::ffi::{OsStr, OsString};
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(any(windows, test))]
+use std::path::PathBuf;
 
 /// Argv for a new terminal, resolved against `path` — the `PATH` the child will
 /// itself be given, not this process's.
@@ -23,6 +25,7 @@ pub fn argv(path: Option<&OsStr>) -> Vec<OsString> {
 /// Deliberately not a full `which`: no `PATHEXT` expansion, because every caller
 /// here passes a name with its extension already on it, and guessing extensions
 /// is how you end up launching `pwsh.bat` from somebody's project directory.
+#[cfg(any(windows, test))]
 fn first_on_path(path: &OsStr, names: &[&str]) -> Option<PathBuf> {
     for name in names {
         for directory in std::env::split_paths(path) {

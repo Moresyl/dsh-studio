@@ -119,7 +119,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 fn muted(base: &Image<'_>) -> Image<'static> {
     let mut rgba = base.rgba().to_vec();
 
-    for pixel in rgba.chunks_exact_mut(4) {
+    for pixel in rgba.as_chunks_mut::<4>().0 {
         // Rec. 601 luma: green carries most of the perceived brightness, so a
         // flat channel average would wash the mark out rather than mute it.
         let luma =

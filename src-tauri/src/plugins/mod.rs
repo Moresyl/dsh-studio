@@ -597,13 +597,14 @@ fn is_name_segment(segment: &str) -> bool {
 mod tests {
     use std::sync::{Arc, Mutex};
 
+    #[cfg(windows)]
     use std::path::{Path, PathBuf};
 
     use std::collections::BTreeSet;
 
-    use super::{
-        forward, is_package_spec, list, path_with, split_spec, Stream, PNPM_SPEC, PNPM_VERSION,
-    };
+    #[cfg(windows)]
+    use super::path_with;
+    use super::{forward, is_package_spec, list, split_spec, Stream, PNPM_SPEC, PNPM_VERSION};
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
