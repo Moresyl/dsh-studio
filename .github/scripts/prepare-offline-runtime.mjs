@@ -151,7 +151,7 @@ async function unpackedNpm(nodeArchive, scratch, plan) {
   const root = join(scratch, 'node-toolchain')
   await mkdir(root)
   const archive = tarExtractPlan(nodeArchive, root)
-  await run('tar', archive.args, archive.cwd)
+  await run(tarCommand(plan, process.env), archive.args, archive.cwd)
   const entries = await readdir(root, { withFileTypes: true })
   const releases = entries.filter((entry) => entry.isDirectory())
   if (releases.length !== 1) throw new Error('Node archive does not contain one release directory')
@@ -220,6 +220,15 @@ export function tarExtractPlan(archive, destination) {
     cwd: dirname(archive),
     args: ['-xf', basename(archive), '-C', destination],
   }
+}
+
+export function tarCommand(plan, environment) {
+  if (plan.os !== 'windows') return 'tar'
+  const systemRoot = environment.SystemRoot || environment.WINDIR
+  if (!systemRoot) throw new Error('Windows offline packaging requires SystemRoot or WINDIR')
+  // Git Bash puts GNU tar first on PATH, but GNU tar cannot extract Node's ZIP.
+  // Windows ships bsdtar at this stable path and it supports both ZIP and tar.
+  return join(systemRoot, 'System32', 'tar.exe')
 }
 
 export async function copyRuntimeContract(destination) {

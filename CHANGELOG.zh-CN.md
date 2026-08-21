@@ -53,7 +53,7 @@
 - Full / Offline 归档不再让 Windows `tar` 把绝对路径盘符误判为远程主机，也不会因本地
   Studio integration 包未实体复制而留下断链；解压和归档均改用本地文件名，离线载荷现已
   包含完整集成包；Linux 打包 smoke test 会固定 AppImage 绝对路径，并显式连接
-  `rpm2cpio` 与 `cpio` 流。
+  `rpm2cpio` 与 `cpio` 流；Windows ZIP 解压固定使用支持该格式的系统 bsdtar。
 - 目录媒体不再让渲染器直接获取任意远程 URL；通过准入的图片会先在原生侧限额、解码并
   重新编码后再显示。
 

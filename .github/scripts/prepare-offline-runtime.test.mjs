@@ -12,6 +12,7 @@ import {
   copyRuntimeContract,
   requireExactVersion,
   tarCreatePlan,
+  tarCommand,
   tarExtractPlan,
   targetPlan,
 } from './prepare-offline-runtime.mjs'
@@ -60,6 +61,15 @@ test('tar extraction never passes an absolute archive path', () => {
     cwd: dirname(archive),
     args: ['-xf', basename(archive), '-C', destination],
   })
+})
+
+test('Windows ZIP extraction uses native bsdtar instead of Git Bash GNU tar', () => {
+  assert.equal(
+    tarCommand({ os: 'windows' }, { SystemRoot: 'C:\\Windows' }),
+    join('C:\\Windows', 'System32', 'tar.exe'),
+  )
+  assert.equal(tarCommand({ os: 'linux' }, {}), 'tar')
+  assert.throws(() => tarCommand({ os: 'windows' }, {}), /requires SystemRoot or WINDIR/)
 })
 
 test('copies the local integration package into the offline install context', async () => {
