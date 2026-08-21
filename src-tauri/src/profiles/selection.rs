@@ -74,11 +74,7 @@ impl Store {
     }
 
     fn fallback(&self) -> String {
-        if self.usable(super::DEFAULT) {
-            super::DEFAULT.to_string()
-        } else {
-            super::DEFAULT.to_string()
-        }
+        super::DEFAULT.to_string()
     }
 
     fn read(&self) -> State {
