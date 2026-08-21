@@ -8,8 +8,7 @@ import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
 import { Onboarding } from '@/components/Onboarding'
 import { ProfileManager } from '@/components/ProfileManager'
-import { ProfileRecoveryDialog } from '@/components/ProfileRecoveryDialog'
-import { PluginRecoveryDialog } from '@/components/PluginRecoveryDialog'
+import { RecoveryCenter } from '@/components/RecoveryCenter'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
@@ -259,8 +258,7 @@ export default function App() {
       />
 
       {managing && <ProfileManager onClose={() => setManaging(false)} />}
-      <PluginRecoveryDialog />
-      <ProfileRecoveryDialog />
+      <RecoveryCenter />
 
       {/* Not while the guide is up, for the same reason the manager is not
           reachable from the title bar there: every command it offers is about a

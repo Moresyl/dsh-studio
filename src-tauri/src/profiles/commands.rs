@@ -17,6 +17,7 @@ use crate::plugins::{self, switches, PluginJobs};
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StartupRecovery {
+    generation: String,
     failed_profile: String,
     recovered_profile: Option<String>,
     reason: String,
@@ -42,6 +43,7 @@ pub fn profile_recovery_notice() -> Option<StartupRecovery> {
         .map(|plugin| plugin.name)
         .collect();
     Some(StartupRecovery {
+        generation: notice.generation,
         failed_profile: notice.failed_profile,
         recovered_profile: notice.recovered_profile,
         reason: notice.reason,
@@ -56,9 +58,13 @@ pub fn profile_recovery_acknowledge() -> Result<()> {
 
 /// Disable one package in the failed profile without selecting or booting it.
 #[tauri::command]
-pub fn profile_recovery_disable_plugin(name: String) -> Result<StartupRecovery> {
+pub fn profile_recovery_disable_plugin(
+    name: String,
+    generation: String,
+) -> Result<StartupRecovery> {
     let notice = super::recovery_notice()
         .ok_or_else(|| Error::Profile("there is no profile startup recovery to change".into()))?;
+    checked_generation(&notice.generation, &generation)?;
     let directory = paths::profile_dir(&notice.failed_profile);
     let switched_off = switches::switched_off(&notice.failed_profile);
     let eligible = plugins::read_manifest(&directory)
@@ -75,6 +81,27 @@ pub fn profile_recovery_disable_plugin(name: String) -> Result<StartupRecovery> 
     switches::set(&notice.failed_profile, &name, false, &directory)?;
     profile_recovery_notice()
         .ok_or_else(|| Error::Profile("the startup recovery record disappeared".into()))
+}
+
+/// Re-select the failed profile after the recovery preview. Harness startup is
+/// a separate frontend action so the existing supervisor remains the sole
+/// owner of process lifecycle and readiness checks.
+#[tauri::command]
+pub fn profile_recovery_retry(generation: String) -> Result<Roster> {
+    let notice = super::recovery_notice()
+        .ok_or_else(|| Error::Profile("there is no profile startup recovery to retry".into()))?;
+    checked_generation(&notice.generation, &generation)?;
+    super::select(&notice.failed_profile)?;
+    Ok(super::roster())
+}
+
+fn checked_generation(current: &str, offered: &str) -> Result<()> {
+    if current.is_empty() || current != offered {
+        return Err(Error::Profile(
+            "the profile recovery preview is stale; review the current state again".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// Point this window at another profile.

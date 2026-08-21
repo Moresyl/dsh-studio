@@ -204,6 +204,7 @@ pub(crate) fn list(
 pub async fn change_finalize<R, F>(
     change: Change,
     spec: &str,
+    retry: recovery::RetryPlan,
     guard: &ProcessGuard,
     report: R,
     finalize: F,
@@ -219,9 +220,32 @@ where
     }
 
     let profile = crate::profiles::selected();
-    let transaction = recovery::begin(&profile, change.verb(), spec)?;
+    change_profile_finalize(&profile, change, spec, retry, guard, report, finalize).await
+}
+
+/// The same transaction against an explicit profile, used only by a
+/// generation-checked recovery retry.
+pub async fn change_profile_finalize<R, F>(
+    profile: &str,
+    change: Change,
+    spec: &str,
+    retry: recovery::RetryPlan,
+    guard: &ProcessGuard,
+    report: R,
+    finalize: F,
+) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+    F: FnOnce() -> Result<()>,
+{
+    if !is_package_spec(spec) {
+        return Err(Error::Plugin(format!(
+            "{spec} is not a package name this panel will pass on"
+        )));
+    }
+    let transaction = recovery::begin(profile, change.verb(), spec, Some(retry))?;
     let outcome = run(
-        &profile,
+        profile,
         &[change.verb().to_string(), spec.to_string()],
         guard,
         report,
@@ -239,7 +263,7 @@ where
     // The harness has just rebuilt the layer list from what is installed, which
     // puts back anything the user had switched off. Saying so again here is the
     // only reason a switched-off plugin stays switched off across an install.
-    if let Err(failure) = switches::apply(&profile, &paths::profile_dir(&profile)) {
+    if let Err(failure) = switches::apply(profile, &paths::profile_dir(profile)) {
         return match transaction.rollback() {
             Ok(_) => Err(failure),
             Err(rollback) => Err(Error::Plugin(format!(
@@ -278,7 +302,7 @@ where
     let kept = archive::stage(path, &package)?;
 
     let profile = crate::profiles::selected();
-    let transaction = recovery::begin(&profile, "import", &package.name)?;
+    let transaction = recovery::begin(&profile, "import", &package.name, None)?;
     let installed = run(
         &profile,
         &[Change::Add.verb().to_string(), archive::spec(&kept.path)],

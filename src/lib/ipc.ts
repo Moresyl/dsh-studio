@@ -292,17 +292,31 @@ export interface PluginDetail {
 export const pluginState = (): Promise<PluginState> => invoke('plugin_state')
 
 export interface PluginRecoveryNotice {
+  generation: string
   profile: string
   operation: string
   subject: string
   restored: boolean
   detail: string
+  retry:
+    | {
+        kind: 'add'
+        spec: string
+        sourceId: string
+        itemId: string
+        displayName: string
+      }
+    | { kind: 'remove'; name: string }
+    | null
 }
 
 export const pluginRecoveryNotice = (): Promise<PluginRecoveryNotice | null> =>
   invoke('plugin_recovery_notice')
 
 export const pluginRecoveryAcknowledge = (): Promise<void> => invoke('plugin_recovery_acknowledge')
+
+export const pluginRecoveryRetry = (generation: string): Promise<void> =>
+  invoke('plugin_recovery_retry', { generation })
 
 export const pluginSearch = (
   query: string,
@@ -407,6 +421,7 @@ export interface Roster {
 }
 
 export interface ProfileStartupRecovery {
+  generation: string
   failedProfile: string
   recoveredProfile: string | null
   reason: string
@@ -463,8 +478,14 @@ export const profileRecoveryNotice = (): Promise<ProfileStartupRecovery | null> 
 export const profileRecoveryAcknowledge = (): Promise<void> =>
   invoke('profile_recovery_acknowledge')
 
-export const profileRecoveryDisablePlugin = (name: string): Promise<ProfileStartupRecovery> =>
-  invoke('profile_recovery_disable_plugin', { name })
+export const profileRecoveryDisablePlugin = (
+  name: string,
+  generation: string,
+): Promise<ProfileStartupRecovery> =>
+  invoke('profile_recovery_disable_plugin', { name, generation })
+
+export const profileRecoveryRetry = (generation: string): Promise<Roster> =>
+  invoke('profile_recovery_retry', { generation })
 
 /**
  * Point this window at another profile.

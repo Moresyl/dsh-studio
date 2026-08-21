@@ -6,6 +6,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
 use crate::paths;
@@ -42,6 +43,8 @@ struct StoredState {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecoveryNotice {
+    #[serde(default)]
+    pub generation: String,
     pub failed_profile: String,
     pub recovered_profile: Option<String>,
     pub reason: String,
@@ -173,6 +176,7 @@ impl Store {
         write_json_atomic(
             &self.notice_path(),
             &RecoveryNotice {
+                generation: generation(name, reason),
                 failed_profile: name.to_string(),
                 recovered_profile: fallback.clone(),
                 reason: reason.to_string(),
@@ -205,6 +209,25 @@ impl Store {
         }
         self.write(&state)
     }
+}
+
+fn generation(profile: &str, reason: &str) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let seed = format!("{}\0{}\0{}\0{}", std::process::id(), now, profile, reason);
+    hex(&Sha256::digest(seed.as_bytes()))
+}
+
+fn hex(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(DIGITS[(byte >> 4) as usize] as char);
+        out.push(DIGITS[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
 
 fn replace(slot: &mut String, from: &str, to: &str) {
@@ -342,6 +365,11 @@ mod tests {
                 .expect("valid notice");
         assert_eq!(notice.failed_profile, "broken");
         assert_eq!(notice.recovered_profile.as_deref(), Some("web"));
+        assert_eq!(notice.generation.len(), 64);
+        assert!(notice
+            .generation
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit()));
         let _ = std::fs::remove_dir_all(base);
     }
 

@@ -29,6 +29,120 @@ pub fn plugin_recovery_acknowledge() -> Result<()> {
     super::recovery::acknowledge()
 }
 
+/// Replay one restored package transaction after the recovery UI has shown its
+/// exact target and generation. Success consumes the notice; failure leaves it
+/// available for another reviewed attempt.
+#[tauri::command]
+pub async fn plugin_recovery_retry(
+    generation: String,
+    state: State<'_, AppState>,
+    jobs: State<'_, Arc<PluginJobs>>,
+) -> Result<()> {
+    let notice = super::recovery::checked_notice(&generation)?;
+    if !notice.restored {
+        return Err(Error::Plugin(
+            "automatic recovery did not complete; export diagnostics and repair the profile manually"
+                .into(),
+        ));
+    }
+    let retry = notice.retry.clone().ok_or_else(|| {
+        Error::Plugin("this recovered operation cannot be replayed safely".into())
+    })?;
+    reject_retry_drift(&notice.profile, &retry)?;
+    let _busy = Busy::claim(&jobs.busy)?;
+    let supervisor = Arc::clone(&state.supervisor);
+    let reporter = Arc::clone(&supervisor);
+    let profile = notice.profile.clone();
+    let profile_dir = crate::paths::profile_dir(&profile);
+
+    let outcome = match retry.clone() {
+        super::recovery::RetryPlan::Add {
+            spec,
+            source_id,
+            item_id,
+            display_name,
+        } => {
+            let detail = super::registry::preflight(&node()?, &spec).await?;
+            if detail.install_spec != spec || detail.name != item_id {
+                return Err(Error::Plugin(
+                    "the recovered package no longer resolves to the reviewed immutable version"
+                        .into(),
+                ));
+            }
+            let source = super::catalog::sources()
+                .into_iter()
+                .find(|source| source.id == source_id && source.active)
+                .ok_or_else(|| {
+                    Error::Plugin("the recovered catalog source is no longer active".into())
+                })?;
+            if source.id != "npm" {
+                let catalogued = super::catalog::search(&source.id, "")
+                    .await?
+                    .into_iter()
+                    .any(|item| {
+                        item.name == detail.name
+                            && item.version == detail.version
+                            && item.installable
+                    });
+                if !catalogued {
+                    return Err(Error::Plugin(
+                        "the recovered package is no longer present in its reviewed catalog"
+                            .into(),
+                    ));
+                }
+            }
+            let receipt_profile = profile.clone();
+            super::change_profile_finalize(
+                &profile,
+                Change::Add,
+                &spec,
+                retry,
+                supervisor.guard(),
+                move |stream, line| reporter.note(stream, line),
+                move || {
+                    super::receipts::record(
+                        &receipt_profile,
+                        &profile_dir,
+                        &source.id,
+                        &item_id,
+                        &display_name,
+                        &detail,
+                    )
+                },
+            )
+            .await
+        }
+        super::recovery::RetryPlan::Remove { name } => {
+            let receipt_name = name.clone();
+            let receipt_profile = profile.clone();
+            super::change_profile_finalize(
+                &profile,
+                Change::Remove,
+                &name,
+                retry,
+                supervisor.guard(),
+                move |stream, line| reporter.note(stream, line),
+                move || super::receipts::remove(&receipt_profile, &profile_dir, &receipt_name),
+            )
+            .await
+        }
+    };
+    match outcome {
+        Ok(()) => {
+            super::recovery::acknowledge()?;
+            supervisor.note(
+                Stream::Stdout,
+                "recovered plugin operation completed".into(),
+            );
+            Ok(())
+        }
+        Err(failure) => {
+            supervisor.note(Stream::Stderr, failure.to_string());
+            Err(failure)
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn plugin_search(
     query: String,
@@ -136,7 +250,13 @@ pub async fn plugin_add(
     }
     let profile = crate::profiles::selected();
     let profile_dir = crate::paths::profile_dir(&profile);
-    apply(Change::Add, &spec, &state, &jobs, move || {
+    let retry = super::recovery::RetryPlan::Add {
+        spec: spec.clone(),
+        source_id: source.id.clone(),
+        item_id: item_id.clone(),
+        display_name: display_name.clone(),
+    };
+    apply(Change::Add, &spec, retry, &state, &jobs, move || {
         super::receipts::record(
             &profile,
             &profile_dir,
@@ -158,7 +278,8 @@ pub async fn plugin_remove(
     let profile = crate::profiles::selected();
     let profile_dir = crate::paths::profile_dir(&profile);
     let receipt_name = name.clone();
-    apply(Change::Remove, &name, &state, &jobs, move || {
+    let retry = super::recovery::RetryPlan::Remove { name: name.clone() };
+    apply(Change::Remove, &name, retry, &state, &jobs, move || {
         super::receipts::remove(&profile, &profile_dir, &receipt_name)
     })
     .await
@@ -228,6 +349,7 @@ pub fn plugin_switch(
 async fn apply<F>(
     change: Change,
     spec: &str,
+    retry: super::recovery::RetryPlan,
     state: &State<'_, AppState>,
     jobs: &State<'_, Arc<PluginJobs>>,
     finalize: F,
@@ -242,6 +364,7 @@ where
     let outcome = super::change_finalize(
         change,
         spec,
+        retry,
         supervisor.guard(),
         move |stream, line| reporter.note(stream, line),
         finalize,
@@ -249,6 +372,31 @@ where
     .await;
 
     settle(&supervisor, outcome.map(|()| spec.to_string()))
+}
+
+fn reject_retry_drift(profile: &str, retry: &super::recovery::RetryPlan) -> Result<()> {
+    let dependencies = super::read_manifest(&crate::paths::profile_dir(profile))
+        .and_then(|manifest| manifest.get("dependencies").cloned())
+        .and_then(|value| value.as_object().cloned())
+        .unwrap_or_default();
+    let (name, matches) = retry_matches(&dependencies, retry);
+    if !matches {
+        return Err(Error::Plugin(format!(
+            "profile {profile} changed after recovery; review {name} manually before retrying"
+        )));
+    }
+    Ok(())
+}
+
+fn retry_matches<'a>(
+    dependencies: &serde_json::Map<String, serde_json::Value>,
+    retry: &'a super::recovery::RetryPlan,
+) -> (&'a str, bool) {
+    let (name, should_exist) = match retry {
+        super::recovery::RetryPlan::Add { spec, .. } => (super::split_spec(spec).0, false),
+        super::recovery::RetryPlan::Remove { name } => (name.as_str(), true),
+    };
+    (name, dependencies.contains_key(name) == should_exist)
 }
 
 /// Say how a change went, and answer with the profile as it now is.
@@ -302,4 +450,33 @@ fn node() -> Result<PathBuf> {
         .ok_or(Error::NoNodeRuntime {
             minimum: node_runtime::MINIMUM_SUPPORTED,
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{Map, Value};
+
+    use super::super::recovery::RetryPlan;
+
+    #[test]
+    fn retries_only_the_before_image_the_preview_described() {
+        let mut dependencies = Map::new();
+        dependencies.insert("plugin-a".into(), Value::String("1.0.0".into()));
+        let remove = RetryPlan::Remove {
+            name: "plugin-a".into(),
+        };
+        let add = RetryPlan::Add {
+            spec: "plugin-b@2.0.0".into(),
+            source_id: "npm".into(),
+            item_id: "plugin-b".into(),
+            display_name: "Plugin B".into(),
+        };
+
+        assert!(super::retry_matches(&dependencies, &remove).1);
+        assert!(super::retry_matches(&dependencies, &add).1);
+        dependencies.remove("plugin-a");
+        dependencies.insert("plugin-b".into(), Value::String("2.0.0".into()));
+        assert!(!super::retry_matches(&dependencies, &remove).1);
+        assert!(!super::retry_matches(&dependencies, &add).1);
+    }
 }

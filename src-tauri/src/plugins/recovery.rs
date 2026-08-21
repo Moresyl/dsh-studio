@@ -38,21 +38,48 @@ struct FileImage {
 #[serde(rename_all = "camelCase")]
 struct Journal {
     schema: u8,
+    #[serde(default)]
+    generation: String,
     profile: String,
     operation: String,
     subject: String,
+    #[serde(default)]
+    retry: Option<RetryPlan>,
     files: Vec<FileImage>,
+}
+
+/// The exact package operation that may be offered again after rollback.
+///
+/// Imports are deliberately excluded: their source can be removable media and
+/// retaining an arbitrary local path in startup state would turn a recovery
+/// button into ambient filesystem authority.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum RetryPlan {
+    Add {
+        spec: String,
+        source_id: String,
+        item_id: String,
+        display_name: String,
+    },
+    Remove {
+        name: String,
+    },
 }
 
 /// A startup-visible result. It contains no file contents or arbitrary paths.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecoveryNotice {
+    #[serde(default)]
+    pub generation: String,
     pub profile: String,
     pub operation: String,
     pub subject: String,
     pub restored: bool,
     pub detail: String,
+    #[serde(default)]
+    pub retry: Option<RetryPlan>,
 }
 
 /// One operation whose before-image is already durable.
@@ -94,7 +121,13 @@ impl Store {
         Ok(self.profiles.join(profile))
     }
 
-    fn begin(&self, profile: &str, operation: &str, subject: &str) -> Result<Journal> {
+    fn begin(
+        &self,
+        profile: &str,
+        operation: &str,
+        subject: &str,
+        retry: Option<RetryPlan>,
+    ) -> Result<Journal> {
         if self.journal_path().exists() {
             self.recover(false)?;
         }
@@ -113,9 +146,11 @@ impl Store {
 
         let journal = Journal {
             schema: SCHEMA,
+            generation: generation(profile, operation, subject),
             profile: profile.to_string(),
             operation: operation.to_string(),
             subject: subject.to_string(),
+            retry,
             files,
         };
         write_json_atomic(&self.journal_path(), &journal)?;
@@ -199,6 +234,7 @@ impl Store {
 
         self.clear_transaction()?;
         let notice = RecoveryNotice {
+            generation: journal.generation,
             profile: journal.profile,
             operation: journal.operation,
             subject: journal.subject,
@@ -209,6 +245,7 @@ impl Store {
             } else {
                 "The failed plugin operation was rolled back.".to_string()
             },
+            retry: journal.retry,
         };
         if startup {
             write_json_atomic(&self.notice_path(), &notice)?;
@@ -235,20 +272,27 @@ impl Transaction {
     /// Restore the exact declaration that existed before the operation.
     pub fn rollback(self) -> Result<RecoveryNotice> {
         let notice = self.store.recover(false)?.unwrap_or(RecoveryNotice {
+            generation: self.journal.generation.clone(),
             profile: self.journal.profile.clone(),
             operation: self.journal.operation.clone(),
             subject: self.journal.subject.clone(),
             restored: true,
             detail: "The failed plugin operation was rolled back.".to_string(),
+            retry: self.journal.retry.clone(),
         });
         Ok(notice)
     }
 }
 
 /// Persist a before-image before a plugin add/remove/import is spawned.
-pub fn begin(profile: &str, operation: &str, subject: &str) -> Result<Transaction> {
+pub fn begin(
+    profile: &str,
+    operation: &str,
+    subject: &str,
+    retry: Option<RetryPlan>,
+) -> Result<Transaction> {
     let store = Store::managed();
-    let journal = store.begin(profile, operation, subject)?;
+    let journal = store.begin(profile, operation, subject, retry)?;
     Ok(Transaction { store, journal })
 }
 
@@ -260,6 +304,11 @@ pub fn recover_startup() -> Result<Option<RecoveryNotice>> {
         Err(failure) => {
             let journal = read_json::<Journal>(&store.journal_path()).ok();
             let notice = RecoveryNotice {
+                generation: journal
+                    .as_ref()
+                    .map(|state| state.generation.clone())
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or_else(|| generation("unknown", "recover", "failed")),
                 profile: journal
                     .as_ref()
                     .map(|state| state.profile.clone())
@@ -274,6 +323,7 @@ pub fn recover_startup() -> Result<Option<RecoveryNotice>> {
                     .unwrap_or_default(),
                 restored: false,
                 detail: failure.to_string(),
+                retry: None,
             };
             write_json_atomic(&store.notice_path(), &notice)?;
             Ok(Some(notice))
@@ -291,6 +341,18 @@ pub fn acknowledge() -> Result<()> {
     remove_file_if_exists(&Store::managed().notice_path())
 }
 
+/// Re-read one startup result and reject a stale or already-consumed preview.
+pub fn checked_notice(generation: &str) -> Result<RecoveryNotice> {
+    let notice = notice()
+        .ok_or_else(|| Error::Plugin("there is no plugin recovery operation to retry".into()))?;
+    if generation.is_empty() || notice.generation != generation {
+        return Err(Error::Plugin(
+            "the plugin recovery preview is stale; review the current state again".into(),
+        ));
+    }
+    Ok(notice)
+}
+
 /// Why `profile` must not be started while an un-restored transaction exists.
 pub fn blocking_problem(profile: &str) -> Option<String> {
     let store = Store::managed();
@@ -304,7 +366,10 @@ pub fn blocking_problem(profile: &str) -> Option<String> {
 }
 
 fn validate_journal(journal: &Journal) -> Result<()> {
-    if journal.schema != SCHEMA || !valid_profile(&journal.profile) {
+    if journal.schema != SCHEMA
+        || !valid_profile(&journal.profile)
+        || !valid_generation(&journal.generation)
+    {
         return Err(Error::Plugin("plugin recovery state is invalid".into()));
     }
     if journal.files.len() != CONTROL_FILES.len() {
@@ -318,6 +383,26 @@ fn validate_journal(journal: &Journal) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn generation(profile: &str, operation: &str, subject: &str) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let seed = format!(
+        "{}\0{}\0{}\0{}\0{}",
+        std::process::id(),
+        now,
+        profile,
+        operation,
+        subject
+    );
+    hex(&Sha256::digest(seed.as_bytes()))
+}
+
+fn valid_generation(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn valid_profile(profile: &str) -> bool {
@@ -428,7 +513,7 @@ fn hex(bytes: &[u8]) -> String {
 mod tests {
     use std::fs;
 
-    use super::Store;
+    use super::{RetryPlan, Store};
 
     fn store() -> (Store, std::path::PathBuf) {
         let base = std::env::temp_dir().join(format!(
@@ -455,7 +540,19 @@ mod tests {
         fs::create_dir_all(&profile).expect("profile");
         fs::write(profile.join("package.json"), "before").expect("manifest");
 
-        store.begin("web", "add", "plugin-a").expect("begin");
+        store
+            .begin(
+                "web",
+                "add",
+                "plugin-a@1.0.0",
+                Some(RetryPlan::Add {
+                    spec: "plugin-a@1.0.0".into(),
+                    source_id: "npm".into(),
+                    item_id: "plugin-a".into(),
+                    display_name: "Plugin A".into(),
+                }),
+            )
+            .expect("begin");
         fs::write(profile.join("package.json"), "after").expect("changed");
         fs::write(profile.join("pnpm-lock.yaml"), "new lock").expect("new file");
 
@@ -466,6 +563,8 @@ mod tests {
             "before"
         );
         assert!(!profile.join("pnpm-lock.yaml").exists());
+        assert_eq!(notice.generation.len(), 64);
+        assert!(matches!(notice.retry, Some(RetryPlan::Add { .. })));
         assert!(store.notice().is_some());
         fs::remove_dir_all(base).expect("cleanup");
     }
@@ -476,8 +575,37 @@ mod tests {
         let profile = store.profiles.join("web");
         fs::create_dir_all(&profile).expect("profile");
         fs::write(profile.join("package.json"), "before").expect("manifest");
-        store.begin("web", "remove", "plugin-a").expect("begin");
+        store
+            .begin("web", "remove", "plugin-a", None)
+            .expect("begin");
         fs::write(store.backups().join("package.json"), "corrupt").expect("corrupt");
+        fs::write(profile.join("package.json"), "after").expect("changed");
+
+        assert!(store.recover(true).is_err());
+        assert_eq!(
+            fs::read_to_string(profile.join("package.json")).unwrap(),
+            "after"
+        );
+        fs::remove_dir_all(base).expect("cleanup");
+    }
+
+    #[test]
+    fn invalid_generation_is_rejected_before_profile_is_changed() {
+        let (store, base) = store();
+        let profile = store.profiles.join("web");
+        fs::create_dir_all(&profile).expect("profile");
+        fs::write(profile.join("package.json"), "before").expect("manifest");
+        store
+            .begin("web", "remove", "plugin-a", None)
+            .expect("begin");
+        let mut journal: serde_json::Value =
+            serde_json::from_slice(&fs::read(store.journal_path()).expect("journal")).unwrap();
+        journal["generation"] = "stale".into();
+        fs::write(
+            store.journal_path(),
+            serde_json::to_vec(&journal).expect("json"),
+        )
+        .expect("tamper");
         fs::write(profile.join("package.json"), "after").expect("changed");
 
         assert!(store.recover(true).is_err());
