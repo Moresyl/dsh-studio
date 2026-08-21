@@ -259,10 +259,8 @@ mod tests {
         fs::write(root.join("manifest.json"), manifest("node.tar.gz", "0.0.0")).unwrap();
         assert!(read(&root).is_err());
 
-        let wrong_pnpm = manifest("node.tar.gz", crate::harness::install::VERSION).replace(
-            crate::harness::install::PNPM_VERSION,
-            "0.0.0",
-        );
+        let wrong_pnpm = manifest("node.tar.gz", crate::harness::install::VERSION)
+            .replace(crate::harness::install::PNPM_VERSION, "0.0.0");
         fs::write(root.join("manifest.json"), wrong_pnpm).unwrap();
         assert!(read(&root).is_err());
         fs::remove_dir_all(root).unwrap();

@@ -32,6 +32,8 @@ pub const PNPM_VERSION: &str = "11.7.0";
 pub const PNPM_SPEC: &str = "pnpm@11.7.0";
 
 const JOURNAL_VERSION: u8 = 1;
+const RUNTIME_PACKAGE: &[u8] = include_bytes!("../../runtime-contract/package.json");
+const RUNTIME_LOCK: &[u8] = include_bytes!("../../runtime-contract/package-lock.json");
 
 #[derive(Debug, Deserialize, Serialize)]
 struct InstallJournal {
@@ -71,6 +73,29 @@ impl InstallPlan {
             .arg("--loglevel=http")
             .current_dir(&self.target)
             // Package lifecycle scripts expect to find `node` on PATH.
+            .env("PATH", path_with_node(&self.node))
+            .env("npm_config_update_notifier", "false")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        command
+    }
+
+    fn to_locked_command(&self) -> Command {
+        let mut command = Command::new(&self.node);
+        command
+            .arg(&self.npm_cli)
+            .arg("ci")
+            .arg("--prefix")
+            .arg(&self.target)
+            // Upstream rc.8 declares React 18 and ReactDOM 19 through separate
+            // peer chains. The qualified lock records that exact working graph;
+            // asking npm to solve those peers again defeats the lock and fails.
+            .arg("--legacy-peer-deps")
+            .arg("--no-audit")
+            .arg("--no-fund")
+            .arg("--loglevel=http")
+            .current_dir(&self.target)
             .env("PATH", path_with_node(&self.node))
             .env("npm_config_update_notifier", "false")
             .stdin(std::process::Stdio::null())
@@ -134,6 +159,11 @@ pub async fn run_transactional<R>(plan: &InstallPlan, guard: &ProcessGuard, repo
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
+    if plan.spec != SPEC {
+        return Err(Error::Install(
+            "managed runtime install did not use the qualified Harness contract".into(),
+        ));
+    }
     recover_managed_install()?;
 
     let live = &plan.target;
@@ -149,20 +179,7 @@ where
         target: staging.clone(),
         ..plan.clone()
     };
-    if let Err(failure) = run(&staged_plan, guard, report.clone()).await {
-        let _ = remove_dir_if_exists(&staging);
-        let _ = std::fs::remove_file(&journal);
-        return Err(failure);
-    }
-
-    // The Desktop terminal and public plugin operations use the same pinned
-    // package manager. Keep it in the transactional runtime so an upgrade can
-    // never expose a new dsh with an old or missing pnpm.
-    let package_manager = InstallPlan {
-        spec: PNPM_SPEC.to_string(),
-        ..staged_plan
-    };
-    if let Err(failure) = run(&package_manager, guard, report).await {
+    if let Err(failure) = run_locked(&staged_plan, guard, report).await {
         let _ = remove_dir_if_exists(&staging);
         let _ = std::fs::remove_file(&journal);
         return Err(failure);
@@ -171,6 +188,37 @@ where
     require_expected_runtime(&staging)?;
 
     promote(live, &staging, &backup, &journal)
+}
+
+async fn run_locked<R>(plan: &InstallPlan, guard: &ProcessGuard, report: R) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    std::fs::create_dir_all(&plan.target).map_err(|cause| {
+        Error::Install(format!(
+            "could not create {}: {cause}",
+            plan.target.display()
+        ))
+    })?;
+    std::fs::write(plan.target.join("package.json"), RUNTIME_PACKAGE)
+        .and_then(|_| std::fs::write(plan.target.join("package-lock.json"), RUNTIME_LOCK))
+        .map_err(|cause| Error::Install(format!("could not stage the runtime lock: {cause}")))?;
+
+    let mut command = plan.to_locked_command();
+    let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
+    let stdout = child.stdout.take().expect("stdout was piped");
+    let stderr = child.stderr.take().expect("stderr was piped");
+    let out = tokio::spawn(forward(stdout, Stream::Stdout, report.clone()));
+    let err = tokio::spawn(forward(stderr, Stream::Stderr, report));
+    let status = child
+        .wait()
+        .await
+        .map_err(|cause| Error::Install(format!("npm ci could not be waited on: {cause}")))?;
+    let _ = tokio::join!(out, err);
+    if !status.success() {
+        return Err(Error::Install(format!("npm ci exited with {status}")));
+    }
+    Ok(())
 }
 
 /// Restore a Full package's pre-resolved dependency closure without npm.
@@ -464,7 +512,7 @@ mod tests {
 
     use super::{
         remove_dir_if_exists, runtime_compatible, runtime_version, PACKAGE, PNPM_SPEC,
-        PNPM_VERSION, SPEC, VERSION,
+        PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -494,6 +542,33 @@ mod tests {
         assert!(!SPEC.ends_with("@latest"));
         assert!(!VERSION.starts_with(['^', '~']));
         assert_eq!(PNPM_SPEC, format!("pnpm@{PNPM_VERSION}"));
+    }
+
+    #[test]
+    fn embedded_runtime_lock_matches_the_qualified_versions() {
+        let package: serde_json::Value =
+            serde_json::from_slice(RUNTIME_PACKAGE).expect("runtime package contract");
+        let dependencies = package["dependencies"]
+            .as_object()
+            .expect("runtime dependencies");
+        assert_eq!(dependencies[PACKAGE], VERSION);
+        assert_eq!(dependencies["pnpm"], PNPM_VERSION);
+        assert!(dependencies
+            .values()
+            .all(|version| version.as_str().is_some_and(|version| {
+                !version.starts_with(['^', '~']) && !version.contains('*')
+            })));
+
+        let lock: serde_json::Value =
+            serde_json::from_slice(RUNTIME_LOCK).expect("runtime package lock");
+        assert_eq!(lock["lockfileVersion"], 3);
+        assert_eq!(
+            lock["packages"][""]["dependencies"],
+            package["dependencies"]
+        );
+        let serialized = String::from_utf8_lossy(RUNTIME_LOCK);
+        assert!(!serialized.contains("registry.npmmirror.com"));
+        assert!(serialized.contains("https://registry.npmjs.org/"));
     }
 
     #[test]

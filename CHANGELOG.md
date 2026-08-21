@@ -26,6 +26,9 @@ pre-1.0 caveat that anything may still move.
 
 ### Changed
 
+- Lite and Full now share one immutable runtime lock committed to the repository.
+  Versions, registry URLs and integrity for its 510 packages come from the same
+  contract, so online first-run and offline payloads no longer solve separately.
 - Packaged applications must execute a smoke test before publication, Windows
   installers must pass an upgrade regression, and release verification now
   requires the portable and Universal artifacts.
@@ -37,6 +40,10 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixed
 
+- Fixed the floating rc.8 transitive graph resolving to the unpublished
+  `@aws-sdk/core@^3.977.9` after upstream publication and failing Lite first-run
+  with `ETARGET`. Installation now accepts only the execution-qualified lock
+  while retaining exact Harness and pnpm versions.
 - A damaged or deleted selected profile no longer strands startup in a repeated
   failure loop; Studio can restore the last known good profile or disable the
   plugin implicated by the failed launch.

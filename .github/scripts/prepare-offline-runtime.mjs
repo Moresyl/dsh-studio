@@ -16,7 +16,6 @@ import process from 'node:process'
 import { spawn } from 'node:child_process'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
-import { rcompare, satisfies } from 'semver'
 
 export const NODE_VERSION = '22.19.0'
 export const HARNESS_PACKAGE = '@deepseek-ai/dsh'
@@ -86,22 +85,25 @@ export async function prepare(target, output) {
 
     const harnessRoot = join(scratch, 'harness')
     await mkdir(harnessRoot)
+    await Promise.all([
+      copyFile('src-tauri/runtime-contract/package.json', join(harnessRoot, 'package.json')),
+      copyFile(
+        'src-tauri/runtime-contract/package-lock.json',
+        join(harnessRoot, 'package-lock.json'),
+      ),
+    ])
     await run(npm.node, [
       npm.cli,
-      'install',
+      'ci',
       '--prefix',
       harnessRoot,
       '--no-audit',
       '--no-fund',
       '--ignore-scripts=false',
-      // The published DSH family pins one coherent peer graph. Asking npm to
-      // re-solve that graph can consume gigabytes for minutes on a cold cache;
-      // the runtime closure is independently executed below instead.
+      // The committed lock records the qualified peer graph. npm must use the
+      // same peer mode that produced it instead of trying to solve it again.
       '--legacy-peer-deps',
-      `${HARNESS_PACKAGE}@${HARNESS_VERSION}`,
-      `pnpm@${PNPM_VERSION}`,
     ])
-    await installPeerClosure(npm, harnessRoot)
     const packageRoot = join(harnessRoot, 'node_modules', '@deepseek-ai', 'dsh')
     const installed = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
     if (installed.name !== HARNESS_PACKAGE || installed.version !== HARNESS_VERSION) {
@@ -166,118 +168,6 @@ async function unpackedNpm(nodeArchive, scratch, plan) {
         node: join(release, 'bin', 'node'),
         cli: join(release, 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js'),
       }
-}
-
-async function installPeerClosure(npm, root) {
-  for (let pass = 1; pass <= 12; pass += 1) {
-    const manifests = await installedManifests(join(root, 'node_modules'))
-    const installed = await installedPackageNames(join(root, 'node_modules'))
-    const missing = new Map()
-    for (const manifest of manifests) {
-      for (const [name, range] of Object.entries(manifest.peerDependencies ?? {})) {
-        if (manifest.peerDependenciesMeta?.[name]?.optional || installed.has(name)) continue
-        const ranges = missing.get(name) ?? new Set()
-        ranges.add(range)
-        missing.set(name, ranges)
-      }
-    }
-    if (missing.size === 0) {
-      console.log(`verified a closed peer graph across ${manifests.length} installed packages`)
-      return
-    }
-
-    const specs = await Promise.all(
-      [...missing]
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(async ([name, ranges]) => `${name}@${await peerVersion(name, [...ranges])}`),
-    )
-    console.log(`peer closure pass ${pass}: installing ${specs.length} required package(s)`)
-    await run(npm.node, [
-      npm.cli,
-      'install',
-      '--prefix',
-      root,
-      '--no-audit',
-      '--no-fund',
-      '--ignore-scripts=false',
-      '--legacy-peer-deps',
-      ...specs,
-    ])
-  }
-  throw new Error('offline runtime peer closure did not converge')
-}
-
-async function peerVersion(name, ranges) {
-  const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(name)}`, {
-    headers: { Accept: 'application/vnd.npm.install-v1+json' },
-  })
-  if (!response.ok) throw new Error(`npm registry answered ${response.status} for peer ${name}`)
-  const packument = await response.json()
-  const versions = Object.keys(packument.versions ?? {})
-  const candidates = versions.filter((version) =>
-    ranges.every((range) => satisfies(version, range)),
-  )
-
-  // Keep every first-party package on the exact family this application tested,
-  // even when a caret would admit a newer prerelease published later.
-  const preferred =
-    name.startsWith('@deepseek-ai/dsh-') && candidates.includes(HARNESS_VERSION)
-      ? HARNESS_VERSION
-      : candidates.sort(rcompare)[0]
-  if (!preferred) {
-    throw new Error(`${name} has no version satisfying required peers: ${ranges.join(', ')}`)
-  }
-  return preferred
-}
-
-async function installedManifests(nodeModules) {
-  let entries
-  try {
-    entries = await readdir(nodeModules, { withFileTypes: true })
-  } catch (error) {
-    if (error?.code === 'ENOENT') return []
-    throw error
-  }
-  const directories = []
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name === '.bin') continue
-    if (entry.name.startsWith('@')) {
-      const scoped = await readdir(join(nodeModules, entry.name), { withFileTypes: true })
-      for (const child of scoped) {
-        if (child.isDirectory()) directories.push(join(nodeModules, entry.name, child.name))
-      }
-    } else {
-      directories.push(join(nodeModules, entry.name))
-    }
-  }
-
-  const manifests = []
-  for (const directory of directories) {
-    try {
-      manifests.push(JSON.parse(await readFile(join(directory, 'package.json'), 'utf8')))
-    } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
-    }
-    manifests.push(...(await installedManifests(join(directory, 'node_modules'))))
-  }
-  return manifests
-}
-
-async function installedPackageNames(nodeModules) {
-  const entries = await readdir(nodeModules, { withFileTypes: true })
-  const names = new Set()
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name === '.bin') continue
-    if (!entry.name.startsWith('@')) {
-      names.add(entry.name)
-      continue
-    }
-    const scoped = await readdir(join(nodeModules, entry.name), { withFileTypes: true })
-    for (const child of scoped) {
-      if (child.isDirectory()) names.add(`${entry.name}/${child.name}`)
-    }
-  }
-  return names
 }
 
 function checksumFor(text, archive) {
