@@ -24,6 +24,7 @@
 //! producing that.
 
 pub mod commands;
+mod selection;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
@@ -47,9 +48,6 @@ const SHIPPED: [&str; 2] = ["web", "headless"];
 /// links its whole dependency closure in here, which is how a profile with no
 /// `node_modules` of its own still resolves the bundles that came with it.
 const SHARED_MODULES: &str = "node_modules";
-
-/// Where the shell records which profile this window hosts.
-const SELECTION_FILE: &str = "profile.json";
 
 const MANIFEST: &str = "package.json";
 const PATCH: &str = "cordis.patch.yml";
@@ -188,10 +186,7 @@ pub fn roster() -> Roster {
 /// written by hand. The fallback is silent on purpose — the alternative is an
 /// application that will not start until someone fixes a JSON file.
 pub fn selected() -> String {
-    match recorded() {
-        Some(name) if is_name(&name) && paths::profile_dir(&name).is_dir() => name,
-        _ => DEFAULT.to_string(),
-    }
+    selection::chosen()
 }
 
 /// Point this window at another profile.
@@ -202,7 +197,7 @@ pub fn selected() -> String {
 /// would be deciding something that is the user's to decide.
 pub fn select(name: &str) -> Result<()> {
     let name = expect_profile(name)?;
-    store_selection(&name)
+    selection::choose(&name)
 }
 
 /// Make a profile with the interface bundles in it and nothing else.
@@ -284,9 +279,7 @@ pub fn rename(from: &str, to: &str) -> Result<()> {
     // opens the file next.
     rename_in_manifest(&target, to)?;
     switches::rename(&from, to)?;
-    if selected() == from {
-        store_selection(to)?;
-    }
+    selection::rename(&from, to)?;
     Ok(())
 }
 
@@ -303,9 +296,7 @@ pub fn remove(name: &str) -> Result<()> {
     // Never leave the window pointed at a profile that is not there. The
     // fallback in `selected` would cover it, but a selection file naming a
     // deleted profile is a lie the next reader has to work out for themselves.
-    if recorded().as_deref() == Some(name.as_str()) {
-        store_selection(DEFAULT)?;
-    }
+    selection::remove(&name)?;
     Ok(())
 }
 
@@ -685,35 +676,24 @@ fn workspace(name: &str) -> Option<String> {
     std::fs::read_to_string(paths::profile_dir(name).join(WORKSPACE)).ok()
 }
 
-/// The recorded selection, whatever it says.
-fn recorded() -> Option<String> {
-    let raw = std::fs::read_to_string(paths::app_data_dir().join(SELECTION_FILE)).ok()?;
-    serde_json::from_str::<Selection>(&raw)
-        .ok()
-        .map(|selection| selection.selected)
+pub use selection::RecoveryNotice as StartupRecoveryNotice;
+
+/// Promote a candidate only after the Harness has announced readiness.
+pub fn mark_healthy(name: &str) -> Result<()> {
+    selection::mark_healthy(name)
 }
 
-#[derive(Deserialize, Serialize)]
-struct Selection {
-    selected: String,
+/// Contain a failed candidate and return the protected profile to retry.
+pub fn failed_start(name: &str, reason: &str) -> Result<Option<String>> {
+    selection::failed(name, reason)
 }
 
-fn store_selection(name: &str) -> Result<()> {
-    let directory = paths::app_data_dir();
-    std::fs::create_dir_all(&directory).map_err(|cause| {
-        Error::Profile(format!(
-            "{} could not be made: {cause}",
-            directory.display()
-        ))
-    })?;
+pub fn recovery_notice() -> Option<StartupRecoveryNotice> {
+    selection::notice()
+}
 
-    let selection = Selection {
-        selected: name.to_string(),
-    };
-    let mut json = serde_json::to_string_pretty(&selection)
-        .map_err(|cause| Error::Profile(format!("the selection could not be written: {cause}")))?;
-    json.push('\n');
-    write(&directory.join(SELECTION_FILE), &json)
+pub fn recovery_acknowledge() -> Result<()> {
+    selection::acknowledge()
 }
 
 /// A name that is a profile on this machine, or a sentence saying it is not.

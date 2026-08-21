@@ -374,6 +374,14 @@ export interface Roster {
   root: string
 }
 
+export interface ProfileStartupRecovery {
+  failedProfile: string
+  recoveredProfile: string | null
+  reason: string
+  /** Active third-party plugins in the failed profile that can be disabled safely. */
+  plugins: string[]
+}
+
 /** How one package stands in one profile. */
 export type Standing = 'absent' | 'active' | 'disabled' | 'library' | 'builtin'
 
@@ -416,6 +424,15 @@ export interface Declaration {
 }
 
 export const profileRoster = (): Promise<Roster> => invoke('profile_roster')
+
+export const profileRecoveryNotice = (): Promise<ProfileStartupRecovery | null> =>
+  invoke('profile_recovery_notice')
+
+export const profileRecoveryAcknowledge = (): Promise<void> =>
+  invoke('profile_recovery_acknowledge')
+
+export const profileRecoveryDisablePlugin = (name: string): Promise<ProfileStartupRecovery> =>
+  invoke('profile_recovery_disable_plugin', { name })
 
 /**
  * Point this window at another profile.

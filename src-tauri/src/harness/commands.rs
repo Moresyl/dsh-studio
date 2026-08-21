@@ -50,7 +50,36 @@ pub fn harness_status(state: State<'_, AppState>) -> Status {
 #[tauri::command]
 pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
     let plan = super::launch_plan()?;
-    Arc::clone(&state.supervisor).start(plan).await
+    let attempted = plan.profile.clone();
+    match Arc::clone(&state.supervisor).start(plan).await {
+        Ok(origin) => {
+            crate::profiles::mark_healthy(&attempted)?;
+            Ok(origin)
+        }
+        Err(failure) => {
+            let reason = failure.to_string();
+            let Some(recovered) = crate::profiles::failed_start(&attempted, &reason)? else {
+                return Err(failure);
+            };
+
+            state.supervisor.note(
+                Stream::Stderr,
+                format!(
+                    "profile {attempted} failed startup; automatically retrying last-known-good profile {recovered}"
+                ),
+            );
+            let fallback = super::launch_plan()?;
+            match Arc::clone(&state.supervisor).start(fallback).await {
+                Ok(origin) => {
+                    crate::profiles::mark_healthy(&recovered)?;
+                    Ok(origin)
+                }
+                Err(fallback_failure) => Err(Error::Profile(format!(
+                    "profile {attempted} failed to start ({reason}); last-known-good profile {recovered} also failed ({fallback_failure})"
+                ))),
+            }
+        }
+    }
 }
 
 #[tauri::command]

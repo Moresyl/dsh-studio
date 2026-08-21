@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use serde::Serialize;
 use tauri::State;
 
 use super::{Comparison, Declaration, Roster};
@@ -13,9 +14,67 @@ use crate::harness::supervisor::{Status, Stream};
 use crate::paths;
 use crate::plugins::{self, switches, PluginJobs};
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartupRecovery {
+    failed_profile: String,
+    recovered_profile: Option<String>,
+    reason: String,
+    plugins: Vec<String>,
+}
+
 #[tauri::command]
 pub fn profile_roster() -> Roster {
     super::roster()
+}
+
+/// Latest failed profile startup, with only plugins that are safe to disable.
+#[tauri::command]
+pub fn profile_recovery_notice() -> Option<StartupRecovery> {
+    let notice = super::recovery_notice()?;
+    let directory = paths::profile_dir(&notice.failed_profile);
+    let switched_off = switches::switched_off(&notice.failed_profile);
+    let plugins = plugins::read_manifest(&directory)
+        .map(|manifest| plugins::list(&manifest, &switched_off))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|plugin| !plugin.builtin && plugin.active && !plugin.disabled)
+        .map(|plugin| plugin.name)
+        .collect();
+    Some(StartupRecovery {
+        failed_profile: notice.failed_profile,
+        recovered_profile: notice.recovered_profile,
+        reason: notice.reason,
+        plugins,
+    })
+}
+
+#[tauri::command]
+pub fn profile_recovery_acknowledge() -> Result<()> {
+    super::recovery_acknowledge()
+}
+
+/// Disable one package in the failed profile without selecting or booting it.
+#[tauri::command]
+pub fn profile_recovery_disable_plugin(name: String) -> Result<StartupRecovery> {
+    let notice = super::recovery_notice()
+        .ok_or_else(|| Error::Profile("there is no profile startup recovery to change".into()))?;
+    let directory = paths::profile_dir(&notice.failed_profile);
+    let switched_off = switches::switched_off(&notice.failed_profile);
+    let eligible = plugins::read_manifest(&directory)
+        .map(|manifest| plugins::list(&manifest, &switched_off))
+        .unwrap_or_default()
+        .into_iter()
+        .any(|plugin| plugin.name == name && !plugin.builtin && plugin.active && !plugin.disabled);
+    if !eligible {
+        return Err(Error::Profile(format!(
+            "{name} is not an active third-party plugin in {}",
+            notice.failed_profile
+        )));
+    }
+    switches::set(&notice.failed_profile, &name, false, &directory)?;
+    profile_recovery_notice()
+        .ok_or_else(|| Error::Profile("the startup recovery record disappeared".into()))
 }
 
 /// Point this window at another profile.

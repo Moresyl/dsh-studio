@@ -512,6 +512,16 @@ const en = {
   'recovery.operation': 'Operation',
   'recovery.subject': 'Package',
   'recovery.continue': 'Continue',
+  'profileRecovery.title': 'Profile startup recovered',
+  'profileRecovery.rolledBack':
+    'Profile {failed} could not start. DSH Studio automatically returned to the last-known-good profile {recovered}.',
+  'profileRecovery.noFallback':
+    'Profile {failed} could not start and no different healthy profile was available.',
+  'profileRecovery.disableHint':
+    'You can disable an active third-party plugin in the failed profile before trying it again.',
+  'profileRecovery.disable': 'Disable',
+  'profileRecovery.disabling': 'Disabling…',
+  'profileRecovery.continue': 'Continue safely',
 } as const
 
 export type MessageKey = keyof typeof en
@@ -993,6 +1003,14 @@ const zh: Record<MessageKey, string> = {
   'recovery.operation': '操作',
   'recovery.subject': '扩展包',
   'recovery.continue': '继续',
+  'profileRecovery.title': '配置启动失败已恢复',
+  'profileRecovery.rolledBack':
+    '配置 {failed} 无法启动，DSH Studio 已自动回退到上一个健康配置 {recovered}。',
+  'profileRecovery.noFallback': '配置 {failed} 无法启动，并且没有其他已验证的健康配置可回退。',
+  'profileRecovery.disableHint': '再次尝试前，可以先停用故障配置中正在启用的第三方插件。',
+  'profileRecovery.disable': '停用',
+  'profileRecovery.disabling': '正在停用…',
+  'profileRecovery.continue': '安全继续',
 }
 
 const dictionaries = { en, zh }
