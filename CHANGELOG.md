@@ -64,6 +64,9 @@ pre-1.0 caveat that anything may still move.
 - Installer upgrades preserve application data and can launch the upgraded
   binary; background completion/failure no longer goes unnoticed when the
   Studio window is not focused.
+- Full / Offline archives no longer let Windows `tar` interpret an absolute
+  drive path as a remote host or retain a broken local Studio integration link;
+  the complete integration package is now materialized in every payload.
 - Catalog media can no longer make the renderer fetch arbitrary remote URLs;
   admitted images are bounded, decoded and re-encoded locally before display.
 
