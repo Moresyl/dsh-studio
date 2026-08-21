@@ -131,23 +131,30 @@ async function verifyLinux(files) {
 
 async function extractRpm(rpm, directory) {
   await mkdir(directory, { recursive: true })
-  await new Promise((resolve, reject) => {
-    const unpack = spawn('rpm2cpio', [rpm], { stdio: ['ignore', 'pipe', 'inherit'] })
-    const cpio = spawn('cpio', ['-idm', '--quiet'], {
-      cwd: directory,
-      stdio: [unpack.stdout, 'inherit', 'inherit'],
-    })
-    let first = null
-    unpack.on('error', reject)
-    cpio.on('error', reject)
-    unpack.on('exit', (code) => {
-      if (code !== 0) first = new Error(`rpm2cpio exited with ${code}`)
-    })
-    cpio.on('exit', (code) => {
-      if (first) reject(first)
-      else if (code === 0) resolve()
-      else reject(new Error(`cpio exited with ${code}`))
-    })
+  const unpack = spawn('rpm2cpio', [rpm], { stdio: ['ignore', 'pipe', 'inherit'] })
+  const cpio = spawn('cpio', ['-idm', '--quiet'], {
+    cwd: directory,
+    stdio: ['pipe', 'inherit', 'inherit'],
+  })
+  connectChildPipeline(unpack, cpio)
+  const [unpackStatus, cpioStatus] = await Promise.all([
+    childStatus(unpack, 'rpm2cpio'),
+    childStatus(cpio, 'cpio'),
+  ])
+  const failures = [unpackStatus, cpioStatus].filter((status) => status.code !== 0)
+  if (failures.length) {
+    throw new Error(failures.map(({ label, code }) => `${label} exited with ${code}`).join('; '))
+  }
+}
+
+export function connectChildPipeline(source, destination) {
+  source.stdout.pipe(destination.stdin)
+}
+
+function childStatus(child, label) {
+  return new Promise((resolve, reject) => {
+    child.on('error', reject)
+    child.on('exit', (code, signal) => resolve({ label, code: code ?? signal }))
   })
 }
 
