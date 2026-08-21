@@ -14,6 +14,7 @@ import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type { Startup } from '@/lib/ipc'
 import type { NotificationPreference } from '@/lib/ipc'
+import type { LogLevel } from '@/lib/ipc'
 
 interface StartupStore {
   /** Null until the first read lands. */
@@ -27,6 +28,7 @@ interface StartupStore {
   /** `null` gives the key up. */
   setShortcut: (accelerator: string | null) => Promise<void>
   setNotification: (kind: NotificationPreference, enabled: boolean) => Promise<void>
+  setLogLevel: (level: LogLevel) => Promise<void>
   /** Take the same key again after another program has let go of it. */
   retry: () => Promise<void>
 }
@@ -54,6 +56,10 @@ export const useStartup = create<StartupStore>((set, get) => ({
 
   setNotification: async (kind, enabled) => {
     await change(set, get, () => ipc.startupNotification(kind, enabled))
+  },
+
+  setLogLevel: async (level) => {
+    await change(set, get, () => ipc.startupLogLevel(level))
   },
 
   retry: async () => {

@@ -188,6 +188,14 @@ impl Supervisor {
             .path()
     }
 
+    /// Change the disk log threshold without filtering the live console.
+    pub fn set_log_level(&self, level: crate::logging::LogLevel) -> Result<()> {
+        self.persistent_log
+            .lock()
+            .expect("persistent log poisoned")
+            .set_level(level)
+    }
+
     /// Start the harness and return the origin it is serving on.
     ///
     /// The first attempt runs inline so a misconfigured launch reports a real

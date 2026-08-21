@@ -7,6 +7,7 @@ import {
   Keyboard,
   Power,
   PanelsTopLeft,
+  ScrollText,
   SunMoon,
   TriangleAlert,
   X,
@@ -43,6 +44,7 @@ export function SettingsPane() {
   const refresh = useStartup((store) => store.refresh)
   const setAutostart = useStartup((store) => store.setAutostart)
   const setNotification = useStartup((store) => store.setNotification)
+  const setLogLevel = useStartup((store) => store.setLogLevel)
   const retry = useStartup((store) => store.retry)
   const presentation = usePresentation((store) => store.mode)
   const choosePresentation = usePresentation((store) => store.choose)
@@ -129,6 +131,22 @@ export function SettingsPane() {
               >
                 <option value="compatibility">{t('settings.presentation.compatibility')}</option>
                 <option value="advanced">{t('settings.presentation.advanced')}</option>
+              </select>
+            </Row>
+
+            <Row icon={ScrollText} label={t('settings.logLevel')} hint={t('settings.logLevelHint')}>
+              <select
+                value={state?.logLevel ?? 'info'}
+                disabled={!ready || busy}
+                onChange={(event) =>
+                  void setLogLevel(event.target.value as 'debug' | 'info' | 'warn' | 'error')
+                }
+                className="h-[30px] rounded-control border border-line-strong bg-surface-2 px-2.5 text-[11.5px] text-text outline-none focus:border-brand disabled:opacity-40"
+              >
+                <option value="debug">{t('settings.logLevel.debug')}</option>
+                <option value="info">{t('settings.logLevel.info')}</option>
+                <option value="warn">{t('settings.logLevel.warn')}</option>
+                <option value="error">{t('settings.logLevel.error')}</option>
               </select>
             </Row>
 

@@ -156,6 +156,7 @@ pub fn run() {
             startup::startup_autostart,
             startup::startup_shortcut,
             startup::startup_notification,
+            startup::startup_log_level,
             material::window_material,
             window::window_open,
             desktop::commands::desktop_offer,
@@ -165,6 +166,8 @@ pub fn run() {
             about::app_about,
             diagnostics::report_build,
             diagnostics::report_save,
+            diagnostics::report_archive,
+            diagnostics::report_frontend_crash,
             workspace::workspace_select,
         ])
         .run(tauri::generate_context!())

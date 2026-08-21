@@ -117,10 +117,18 @@ ruzstd = { version = "0.9", default-features = false, features = ["std"] }
 # (`src/plugins/archive.rs`).
 flate2 = "1"
 tar = "0.4"
+# Diagnostic support archives are written on every platform, while the same
+# reader also unpacks official Node zip archives on Windows.
+zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
   "Win32_Storage_FileSystem",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Kernel",
+  "Win32_System_Memory",
+  "Win32_System_Threading",
   "Win32_System_WindowsProgramming",
 ] }
 # Which backdrop the compositor understands is a build-number question, and it
@@ -128,11 +136,6 @@ windows-sys = { version = "0.61", features = [
 # `window-vibrancy`, which tauri pulls in for the effects themselves, so asking
 # for it directly costs no binary size.
 windows-version = "0.1"
-# Node ships Windows as a zip and every other platform as a tarball, so this is
-# the half of that extractor only Windows needs. Only the reading half of
-# deflate is wanted, so this asks for the flate2 backend by name rather than the
-# `deflate` bundle, which drags in a compressor as well.
-zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
 
 [profile.dev]
 # Match CCHub: optimized dev builds have tripped intermittent MSVC linker

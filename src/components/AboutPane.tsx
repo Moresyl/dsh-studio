@@ -114,14 +114,15 @@ export function AboutPane() {
 
     const path = await pickPath({
       title: t('about.reportTitle'),
-      defaultPath: report.name,
-      filters: [{ name: t('about.reportKind'), extensions: ['md'] }],
+      defaultPath: report.archiveName,
+      filters: [{ name: t('about.reportKind'), extensions: ['zip'] }],
     })
     // Dismissed, which is an answer rather than a failure.
     if (!path) return
 
     try {
-      await ipc.reportSave(path, report.text)
+      await ipc.reportArchive(path, report.text)
+      await revealItemInDir(path)
     } catch (cause) {
       setError(describe(cause))
     }

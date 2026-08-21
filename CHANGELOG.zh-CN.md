@@ -13,6 +13,8 @@
 
 ### 新增
 
+- 新增限额诊断 ZIP、Rust/WebView 崩溃证据、Windows 原生 minidump、日志级别设置，
+  以及按 10 MiB 单文件、七天时间和 200 MiB 总量执行的日志轮转。
 - 完整离线版内置按 SHA-256 固定的 Node、Harness 与 pnpm 载荷；同时新增 Windows
   轻量便携版和 macOS 通用轻量版。
 - 原生工作区目录选择与拖放、可分别控制的用户轮次/后台任务通知，以及持久化的

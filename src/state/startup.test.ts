@@ -17,6 +17,7 @@ const state: Startup = {
     jobCompleted: true,
     jobFailed: true,
   },
+  logLevel: 'info',
 }
 
 beforeEach(() => {
@@ -53,5 +54,15 @@ describe('desktop startup settings', () => {
 
     expect(useStartup.getState().state).toEqual(state)
     expect(useStartup.getState().error).toBe('settings file is read-only')
+  })
+
+  it('changes the persistent log level using the backend answer', async () => {
+    const changed = { ...state, logLevel: 'error' as const }
+    vi.mocked(ipc.startupLogLevel).mockResolvedValue(changed)
+
+    await useStartup.getState().setLogLevel('error')
+
+    expect(ipc.startupLogLevel).toHaveBeenCalledWith('error')
+    expect(useStartup.getState().state).toEqual(changed)
   })
 })

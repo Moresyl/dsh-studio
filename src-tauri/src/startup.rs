@@ -81,6 +81,8 @@ pub struct Startup {
     pub suggested: &'static str,
     /// Which background outcomes are allowed to ask for attention.
     pub notifications: Notifications,
+    /// Minimum severity persisted to the bounded desktop log.
+    pub log_level: crate::logging::LogLevel,
 }
 
 /// Notification preferences owned by the desktop shell.
@@ -222,6 +224,19 @@ pub fn startup_notification<R: Runtime>(
     Ok(report(&app, &keys))
 }
 
+/// Change the persistent log threshold immediately and durably.
+#[tauri::command]
+pub fn startup_log_level<R: Runtime>(
+    app: AppHandle<R>,
+    keys: State<'_, Keys>,
+    state: State<'_, crate::harness::commands::AppState>,
+    level: String,
+) -> Result<Startup> {
+    let level = crate::logging::LogLevel::parse(&level)?;
+    state.supervisor.set_log_level(level)?;
+    Ok(report(&app, &keys))
+}
+
 /// Read at the moment attention would be requested. Notifications are rare,
 /// and this makes changes from another window effective without a second cache.
 pub fn attention_enabled(attention: Attention) -> bool {
@@ -245,6 +260,7 @@ fn report<R: Runtime>(app: &AppHandle<R>, keys: &Keys) -> Startup {
         held: keys.held.load(Ordering::Relaxed),
         suggested: SUGGESTED,
         notifications: saved.notifications,
+        log_level: crate::logging::configured_level(),
     }
 }
 

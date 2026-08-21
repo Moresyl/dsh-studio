@@ -855,7 +855,10 @@ export interface Startup {
   /** What to offer when nothing is chosen yet. */
   suggested: string
   notifications: NotificationPreferences
+  logLevel: LogLevel
 }
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 export interface NotificationPreferences {
   turnCompleted: boolean
@@ -881,6 +884,9 @@ export const startupNotification = (
   enabled: boolean,
 ): Promise<Startup> => invoke('startup_notification', { kind, enabled })
 
+export const startupLogLevel = (level: LogLevel): Promise<Startup> =>
+  invoke('startup_log_level', { level })
+
 /* -------------------------------------------------------------------------- */
 /* About                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -905,6 +911,7 @@ export const about = (): Promise<About> => invoke('app_about')
 export interface Report {
   /** The name to offer, which the save dialog may well be told to override. */
   name: string
+  archiveName: string
   text: string
 }
 
@@ -920,3 +927,13 @@ export const reportBuild = (): Promise<Report> => invoke('report_build')
 /** The same document, put where the save dialog pointed. */
 export const reportSave = (path: string, text: string): Promise<void> =>
   invoke('report_save', { path, text })
+
+/** A bounded ZIP with the redacted report, recent logs and local crash evidence. */
+export const reportArchive = (path: string, text: string): Promise<void> =>
+  invoke('report_archive', { path, text })
+
+export const frontendCrash = (payload: {
+  message: string
+  stack: string
+  url: string
+}): Promise<void> => invoke('report_frontend_crash', payload)

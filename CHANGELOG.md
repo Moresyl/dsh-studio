@@ -13,6 +13,9 @@ pre-1.0 caveat that anything may still move.
 
 ### Added
 
+- Bounded diagnostic ZIP export, Rust/WebView crash evidence, native Windows
+  minidumps, a persistent log-level setting, and 10 MiB file / seven-day /
+  200 MiB directory log retention.
 - A Full / Offline edition that carries SHA-256-pinned Node, Harness and pnpm
   payloads, plus a Windows Lite portable executable and a macOS Universal Lite
   image.

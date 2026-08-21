@@ -14,6 +14,8 @@
 //! module — they came out of the log, where npm and the harness put them.
 
 use std::fmt::Write as _;
+use std::io::{Read as _, Write as _};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -44,12 +46,19 @@ const LOG_LINES: usize = 300;
 /// issue body refused for length helps nobody.
 const LOG_CEILING: usize = 32 << 10;
 
+/// One support package is intentionally small enough to inspect and attach.
+const ARCHIVE_CEILING: u64 = 50 << 20;
+const ARCHIVE_ENTRY_CEILING: u64 = 20 << 20;
+const ARCHIVE_MAX_FILES: usize = 64;
+
 /// A finished report, and what to call the file it should go in.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Report {
     /// The filename to offer, which the save dialog may well have overridden.
     pub name: String,
+    /// Support package filename, separate because it carries binary evidence.
+    pub archive_name: String,
     pub text: String,
 }
 
@@ -89,6 +98,196 @@ pub async fn report_save(path: String, text: String) -> Result<()> {
         .map_err(|cause| Error::Report(format!("writing the report failed: {cause}")))
 }
 
+/// Save the same public-safe report together with bounded local evidence.
+///
+/// Logs and textual crash records are redacted again while being copied. Native
+/// minidumps are binary memory evidence and cannot be safely rewritten, so the
+/// UI tells the user to review the archive before sharing it.
+#[tauri::command]
+pub async fn report_archive(path: String, text: String) -> Result<()> {
+    tokio::task::spawn_blocking(move || {
+        let logs = crate::logging::log_files();
+        let crashes = crate::logging::crash_files();
+        write_archive(Path::new(&path), &text, &logs, &crashes)
+    })
+    .await
+    .map_err(|cause| Error::Report(format!("building the diagnostic archive failed: {cause}")))?
+}
+
+/// Local-only sink for uncaught WebView failures. It deliberately returns no
+/// path, because renderer code should not gain filesystem authority from an
+/// error reporting hook.
+#[tauri::command]
+pub fn report_frontend_crash(message: String, stack: String, url: String) -> Result<()> {
+    crate::logging::write_frontend_crash(&message, &stack, &url)
+}
+
+fn write_archive(path: &Path, report: &str, logs: &[PathBuf], crashes: &[PathBuf]) -> Result<()> {
+    if !path.is_absolute() {
+        return Err(Error::Report(
+            "the diagnostic archive needs an absolute destination".into(),
+        ));
+    }
+    let parent = path
+        .parent()
+        .ok_or_else(|| Error::Report("the diagnostic archive has no parent directory".into()))?;
+    let parent_kind = std::fs::symlink_metadata(parent)
+        .map_err(|cause| Error::Report(format!("could not inspect archive destination: {cause}")))?
+        .file_type();
+    if parent_kind.is_symlink() || !parent_kind.is_dir() {
+        return Err(Error::Report(
+            "the diagnostic archive destination is not a real directory".into(),
+        ));
+    }
+    if std::fs::symlink_metadata(path)
+        .map(|metadata| metadata.file_type().is_symlink() || !metadata.is_file())
+        .unwrap_or(false)
+    {
+        return Err(Error::Report(
+            "the diagnostic archive destination is not a regular file".into(),
+        ));
+    }
+
+    let temporary = parent.join(format!(
+        ".{}.{}.tmp",
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("dsh-studio-diagnostics.zip"),
+        std::process::id()
+    ));
+    let result = build_archive(&temporary, report, logs, crashes);
+    if let Err(cause) = result {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(cause);
+    }
+    if path.exists() {
+        std::fs::remove_file(path).map_err(|cause| {
+            Error::Report(format!("could not replace diagnostic archive: {cause}"))
+        })?;
+    }
+    std::fs::rename(&temporary, path)
+        .map_err(|cause| Error::Report(format!("could not publish diagnostic archive: {cause}")))
+}
+
+fn build_archive(path: &Path, report: &str, logs: &[PathBuf], crashes: &[PathBuf]) -> Result<()> {
+    let file = std::fs::File::create(path)
+        .map_err(|cause| Error::Report(format!("could not create diagnostic archive: {cause}")))?;
+    let mut zip = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .unix_permissions(0o600);
+    let report = redact(report);
+    let mut used = report.len() as u64;
+    zip.start_file("report.md", options)
+        .and_then(|_| {
+            zip.write_all(report.as_bytes())
+                .map_err(zip::result::ZipError::Io)
+        })
+        .map_err(|cause| Error::Report(format!("could not write diagnostic report: {cause}")))?;
+
+    let mut omitted = Vec::new();
+    let mut count = 1;
+    for (kind, paths) in [("logs", logs), ("crash-evidence", crashes)] {
+        for source in paths {
+            if count == ARCHIVE_MAX_FILES {
+                omitted.push(format!("{}: file-count limit", source.display()));
+                continue;
+            }
+            let metadata = match std::fs::symlink_metadata(source) {
+                Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+                    metadata
+                }
+                _ => {
+                    omitted.push(format!("{}: unsafe or unavailable", source.display()));
+                    continue;
+                }
+            };
+            if metadata.len() > ARCHIVE_ENTRY_CEILING
+                || used.saturating_add(metadata.len()) > ARCHIVE_CEILING
+            {
+                omitted.push(format!("{}: evidence-size limit", source.display()));
+                continue;
+            }
+            let name = source
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(safe_leaf)
+                .unwrap_or_else(|| format!("evidence-{count}"));
+            let entry = format!("{kind}/{count:02}-{name}");
+            let bytes = read_evidence(source, metadata.len())?;
+            let bytes = if textual(source) {
+                redact(&String::from_utf8_lossy(&bytes)).into_bytes()
+            } else {
+                bytes
+            };
+            used = used.saturating_add(bytes.len() as u64);
+            zip.start_file(entry, options)
+                .and_then(|_| zip.write_all(&bytes).map_err(zip::result::ZipError::Io))
+                .map_err(|cause| {
+                    Error::Report(format!("could not add diagnostic evidence: {cause}"))
+                })?;
+            count += 1;
+        }
+    }
+
+    if !omitted.is_empty() {
+        let note = redact(&format!(
+            "Some evidence was omitted to keep the archive bounded:\n{}\n",
+            omitted.join("\n")
+        ));
+        zip.start_file("omitted.txt", options)
+            .and_then(|_| {
+                zip.write_all(note.as_bytes())
+                    .map_err(zip::result::ZipError::Io)
+            })
+            .map_err(|cause| Error::Report(format!("could not add omission notice: {cause}")))?;
+    }
+    zip.finish()
+        .map(|_| ())
+        .map_err(|cause| Error::Report(format!("could not finish diagnostic archive: {cause}")))
+}
+
+fn read_evidence(path: &Path, expected: u64) -> Result<Vec<u8>> {
+    let file = std::fs::File::open(path)
+        .map_err(|cause| Error::Report(format!("could not read {}: {cause}", path.display())))?;
+    let mut bytes = Vec::with_capacity(expected.min(ARCHIVE_ENTRY_CEILING) as usize);
+    file.take(ARCHIVE_ENTRY_CEILING + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|cause| Error::Report(format!("could not read {}: {cause}", path.display())))?;
+    if bytes.len() as u64 > ARCHIVE_ENTRY_CEILING {
+        return Err(Error::Report(
+            "diagnostic evidence changed while it was read".into(),
+        ));
+    }
+    Ok(bytes)
+}
+
+fn textual(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .map(str::to_ascii_lowercase)
+            .as_deref(),
+        Some("txt" | "log" | "crash" | "ips" | "json")
+    )
+}
+
+fn safe_leaf(name: &str) -> String {
+    let mut leaf: String = name
+        .chars()
+        .map(|character| match character {
+            '/' | '\\' | ':' | '\0' => '_',
+            character if character.is_control() => '_',
+            character => character,
+        })
+        .take(120)
+        .collect();
+    if leaf.is_empty() || leaf == "." || leaf == ".." {
+        leaf = "evidence".into();
+    }
+    leaf
+}
+
 /// Everything the shell knows about itself, as one document.
 fn compose(version: &str, supervisor: &Supervisor, remote_open: bool) -> Report {
     let taken = stamp(now_millis());
@@ -116,6 +315,7 @@ fn compose(version: &str, supervisor: &Supervisor, remote_open: bool) -> Report 
 
     Report {
         name: file_name(&taken),
+        archive_name: archive_name(&taken),
         text: redact(&out),
     }
 }
@@ -381,6 +581,11 @@ fn file_name(taken: &str) -> String {
     format!("dsh-studio-report-{day}.md")
 }
 
+fn archive_name(taken: &str) -> String {
+    let day = taken.split('T').next().unwrap_or(taken);
+    format!("dsh-studio-diagnostics-{day}.zip")
+}
+
 fn now_millis() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -555,6 +760,54 @@ mod tests {
             file_name("2026-08-18T09:14:33Z"),
             "dsh-studio-report-2026-08-18.md"
         );
+        assert_eq!(
+            archive_name("2026-08-18T09:14:33Z"),
+            "dsh-studio-diagnostics-2026-08-18.zip"
+        );
+    }
+
+    #[test]
+    fn diagnostic_archives_redact_text_and_preserve_binary_evidence() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-diagnostic-archive-{}-{}",
+            std::process::id(),
+            now_millis()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let log = root.join("runtime.log");
+        let dump = root.join("native.dmp");
+        let out = root.join("support.zip");
+        std::fs::write(&log, "Authorization: Bearer secret-value").unwrap();
+        std::fs::write(&dump, [0_u8, 1, 2, 3]).unwrap();
+
+        write_archive(&out, "api_key=sk-report", &[log], &[dump]).unwrap();
+        let file = std::fs::File::open(&out).unwrap();
+        let mut zip = zip::ZipArchive::new(file).unwrap();
+        let mut report = String::new();
+        zip.by_name("report.md")
+            .unwrap()
+            .read_to_string(&mut report)
+            .unwrap();
+        assert!(!report.contains("sk-report"));
+        let mut log = String::new();
+        zip.by_name("logs/01-runtime.log")
+            .unwrap()
+            .read_to_string(&mut log)
+            .unwrap();
+        assert!(!log.contains("secret-value"));
+        let mut dump = Vec::new();
+        zip.by_name("crash-evidence/02-native.dmp")
+            .unwrap()
+            .read_to_end(&mut dump)
+            .unwrap();
+        assert_eq!(dump, [0_u8, 1, 2, 3]);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn archive_leaf_names_cannot_create_paths() {
+        assert_eq!(safe_leaf("../secret\\dump.dmp"), ".._secret_dump.dmp");
+        assert_eq!(safe_leaf(""), "evidence");
     }
 
     #[test]
