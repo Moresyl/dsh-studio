@@ -4,6 +4,7 @@ pub mod commands;
 pub mod health;
 pub mod install;
 pub mod readiness;
+pub mod shell_environment;
 pub mod supervisor;
 
 use std::path::PathBuf;
@@ -118,6 +119,7 @@ pub fn launch_plan() -> Result<LaunchPlan> {
         workspace: environment.workspace,
         host: BIND_HOST.to_string(),
         port: EPHEMERAL_PORT,
+        environment: Default::default(),
     })
 }
 

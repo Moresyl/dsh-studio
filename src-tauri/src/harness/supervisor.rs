@@ -5,6 +5,7 @@
 //! crash detection, and backoff restart — in one place, and exposing it as a
 //! state machine the UI can render honestly.
 
+use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -92,6 +93,8 @@ pub struct LaunchPlan {
     pub host: String,
     /// Listen port, or `0` to let the OS choose a free one.
     pub port: u16,
+    /// Selected login-shell exports for GUI launches. Empty on Windows/dev.
+    pub environment: BTreeMap<String, String>,
 }
 
 impl LaunchPlan {
@@ -116,6 +119,7 @@ impl LaunchPlan {
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
+        command.envs(&self.environment);
         command
     }
 }

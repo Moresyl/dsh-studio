@@ -49,7 +49,17 @@ pub fn harness_status(state: State<'_, AppState>) -> Status {
 /// Start the harness and return the origin it is serving on.
 #[tauri::command]
 pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
-    let plan = super::launch_plan()?;
+    let shell = super::shell_environment::resolve().await;
+    state.supervisor.note(
+        Stream::Stdout,
+        match shell.fallback_reason {
+            Some(reason) => format!("GUI shell environment: {} ({reason})", shell.source),
+            None => format!("GUI shell environment: {}", shell.source),
+        },
+    );
+    let environment = shell.updates;
+    let mut plan = super::launch_plan()?;
+    plan.environment = environment.clone();
     let attempted = plan.profile.clone();
     match Arc::clone(&state.supervisor).start(plan).await {
         Ok(origin) => {
@@ -68,7 +78,8 @@ pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
                     "profile {attempted} failed startup; automatically retrying last-known-good profile {recovered}"
                 ),
             );
-            let fallback = super::launch_plan()?;
+            let mut fallback = super::launch_plan()?;
+            fallback.environment = environment;
             match Arc::clone(&state.supervisor).start(fallback).await {
                 Ok(origin) => {
                     crate::profiles::mark_healthy(&recovered)?;
