@@ -43,6 +43,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true
+semver = "1"
+regex = "1"
 # `macos-private-api` is what makes `.transparent()` exist on macOS, and a
 # transparent window is the prerequisite for every backdrop material — see
 # `src/material.rs`. It is a private-API opt-in, so it is also declared in

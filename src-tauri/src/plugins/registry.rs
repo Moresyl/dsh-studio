@@ -65,6 +65,23 @@ pub struct Detail {
     /// is worth checking before installing rather than after.
     pub bundle: bool,
     pub dependencies: Vec<String>,
+    /// Exact immutable spec the confirmation button will install.
+    pub install_spec: String,
+    /// Registry provenance shown before installation.
+    pub source: String,
+    pub compatibility: Compatibility,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(
+    tag = "state",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
+pub enum Compatibility {
+    Compatible { requirement: String },
+    Unknown,
+    Incompatible { requirement: String, reason: String },
 }
 
 /// Search the registry, or show what a plugin looks like when asked nothing.
@@ -100,9 +117,46 @@ pub async fn detail(node: &Path, name: &str) -> Result<Detail> {
     let endpoint = format!("{base}/{name}/latest");
     let manifest = fetch::json(node, &endpoint, BUDGET).await?;
 
-    Ok(Detail {
+    Ok(detail_from_manifest(name, &base, &manifest))
+}
+
+/// Resolve and validate the exact package spec immediately before mutation.
+pub async fn preflight(node: &Path, spec: &str) -> Result<Detail> {
+    if !super::is_package_spec(spec) {
+        return Err(Error::Plugin(format!("{spec} is not a package specifier")));
+    }
+    let (name, requested) = super::split_spec(spec);
+    let version = requested.unwrap_or("latest");
+    let base = base(node).await;
+    let endpoint = format!("{base}/{name}/{version}");
+    let manifest = fetch::json(node, &endpoint, BUDGET)
+        .await
+        .map_err(|failure| {
+            Error::Plugin(format!(
+                "preflight could not resolve {spec} from {base}: {failure}"
+            ))
+        })?;
+    let detail = detail_from_manifest(name, &base, &manifest);
+    if detail.version.is_empty() {
+        return Err(Error::Plugin(format!(
+            "preflight resolved {spec} but the registry returned no version"
+        )));
+    }
+    if let Compatibility::Incompatible { reason, .. } = &detail.compatibility {
+        return Err(Error::Plugin(format!(
+            "{name} is not compatible with Harness {}: {reason}",
+            crate::harness::install::VERSION
+        )));
+    }
+    Ok(detail)
+}
+
+fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) -> Detail {
+    let version = string(manifest, "version").unwrap_or_default();
+    Detail {
         name: string(&manifest, "name").unwrap_or_else(|| name.to_string()),
-        version: string(&manifest, "version").unwrap_or_default(),
+        install_spec: format!("{name}@{version}"),
+        version,
         description: string(&manifest, "description").unwrap_or_default(),
         license: string(&manifest, "license").unwrap_or_default(),
         homepage: string(&manifest, "homepage"),
@@ -116,7 +170,39 @@ pub async fn detail(node: &Path, name: &str) -> Result<Detail> {
             .and_then(serde_json::Value::as_object)
             .map(|dependencies| dependencies.keys().cloned().collect())
             .unwrap_or_default(),
-    })
+        source: source.to_string(),
+        compatibility: compatibility(manifest),
+    }
+}
+
+fn compatibility(manifest: &serde_json::Value) -> Compatibility {
+    let Some(requirement) = manifest
+        .pointer("/peerDependencies/@deepseek-ai~1dsh")
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return Compatibility::Unknown;
+    };
+
+    let Ok(requirement_parsed) = semver::VersionReq::parse(requirement) else {
+        return Compatibility::Incompatible {
+            requirement: requirement.to_string(),
+            reason: "the package declares an unreadable peer dependency range".to_string(),
+        };
+    };
+    let current = semver::Version::parse(crate::harness::install::VERSION)
+        .expect("the pinned Harness version is valid semver");
+    if requirement_parsed.matches(&current) {
+        Compatibility::Compatible {
+            requirement: requirement.to_string(),
+        }
+    } else {
+        Compatibility::Incompatible {
+            requirement: requirement.to_string(),
+            reason: format!("it requires {requirement}"),
+        }
+    }
 }
 
 /// The registry npm resolves to, without a trailing slash.
@@ -194,7 +280,7 @@ fn string(value: &serde_json::Value, key: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::listing;
+    use super::{compatibility, detail_from_manifest, listing, Compatibility};
 
     #[test]
     fn reads_one_search_result() {
@@ -233,5 +319,37 @@ mod tests {
     #[test]
     fn skips_a_result_with_no_package_at_all() {
         assert!(listing(&serde_json::json!({ "downloads": { "weekly": 1 } })).is_none());
+    }
+
+    #[test]
+    fn detail_pins_the_registry_version_and_records_its_source() {
+        let detail = detail_from_manifest(
+            "@vendor/tool",
+            "https://registry.example",
+            &serde_json::json!({
+                "name": "@vendor/tool",
+                "version": "1.2.3",
+                "peerDependencies": { "@deepseek-ai/dsh": "^0.1.0-rc.7" }
+            }),
+        );
+        assert_eq!(detail.install_spec, "@vendor/tool@1.2.3");
+        assert_eq!(detail.source, "https://registry.example");
+        assert!(matches!(
+            detail.compatibility,
+            Compatibility::Compatible { .. }
+        ));
+    }
+
+    #[test]
+    fn incompatible_and_malformed_peer_ranges_are_blocked() {
+        let incompatible = compatibility(&serde_json::json!({
+            "peerDependencies": { "@deepseek-ai/dsh": "<0.1.0-rc.7" }
+        }));
+        assert!(matches!(incompatible, Compatibility::Incompatible { .. }));
+
+        let malformed = compatibility(&serde_json::json!({
+            "peerDependencies": { "@deepseek-ai/dsh": "not a range" }
+        }));
+        assert!(matches!(malformed, Compatibility::Incompatible { .. }));
     }
 }

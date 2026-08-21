@@ -18,6 +18,17 @@ pub fn plugin_state() -> PluginState {
     super::state()
 }
 
+/// Result of recovering a package-manager operation interrupted by shutdown.
+#[tauri::command]
+pub fn plugin_recovery_notice() -> Option<super::recovery::RecoveryNotice> {
+    super::recovery::notice()
+}
+
+#[tauri::command]
+pub fn plugin_recovery_acknowledge() -> Result<()> {
+    super::recovery::acknowledge()
+}
+
 #[tauri::command]
 pub async fn plugin_search(query: String) -> Result<Vec<Listing>> {
     super::registry::search(&node()?, &query).await
@@ -38,6 +49,7 @@ pub async fn plugin_add(
     state: State<'_, AppState>,
     jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<PluginState> {
+    super::registry::preflight(&node()?, &spec).await?;
     apply(Change::Add, &spec, &state, &jobs).await
 }
 

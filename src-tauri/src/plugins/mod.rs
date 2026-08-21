@@ -17,6 +17,7 @@
 
 pub mod archive;
 pub mod commands;
+pub mod recovery;
 pub mod registry;
 pub mod switches;
 
@@ -36,7 +37,8 @@ use crate::harness::supervisor::Stream;
 use crate::paths;
 
 /// What the shell installs when the machine has no package manager of its own.
-const PNPM_SPEC: &str = "pnpm@latest";
+const PNPM_VERSION: &str = "11.7.0";
+const PNPM_SPEC: &str = "pnpm@11.7.0";
 
 /// One entry in the profile's plugin list.
 #[derive(Debug, Serialize)]
@@ -201,18 +203,35 @@ where
     }
 
     let profile = crate::profiles::selected();
-    run(
+    let transaction = recovery::begin(&profile, change.verb(), spec)?;
+    let outcome = run(
         &profile,
         &[change.verb().to_string(), spec.to_string()],
         guard,
         report,
     )
-    .await?;
+    .await;
+    if let Err(failure) = outcome {
+        return match transaction.rollback() {
+            Ok(_) => Err(failure),
+            Err(rollback) => Err(Error::Plugin(format!(
+                "{failure}; automatic profile rollback also failed: {rollback}"
+            ))),
+        };
+    }
 
     // The harness has just rebuilt the layer list from what is installed, which
     // puts back anything the user had switched off. Saying so again here is the
     // only reason a switched-off plugin stays switched off across an install.
-    switches::apply(&profile, &paths::profile_dir(&profile))
+    if let Err(failure) = switches::apply(&profile, &paths::profile_dir(&profile)) {
+        return match transaction.rollback() {
+            Ok(_) => Err(failure),
+            Err(rollback) => Err(Error::Plugin(format!(
+                "{failure}; automatic profile rollback also failed: {rollback}"
+            ))),
+        };
+    }
+    transaction.commit()
 }
 
 /// Install a plugin from a file on this machine instead of from a registry.
@@ -235,6 +254,7 @@ where
     let kept = archive::stage(path, &package)?;
 
     let profile = crate::profiles::selected();
+    let transaction = recovery::begin(&profile, "import", &package.name)?;
     let installed = run(
         &profile,
         &[Change::Add.verb().to_string(), archive::spec(&kept.path)],
@@ -253,12 +273,25 @@ where
         if kept.fresh {
             let _ = std::fs::remove_file(&kept.path);
         }
-        return Err(failure);
+        return match transaction.rollback() {
+            Ok(_) => Err(failure),
+            Err(rollback) => Err(Error::Plugin(format!(
+                "{failure}; automatic profile rollback also failed: {rollback}"
+            ))),
+        };
     }
 
     // Same as `change`: the harness has just rebuilt the layer list from what is
     // installed, which puts back anything the user had switched off.
-    switches::apply(&profile, &paths::profile_dir(&profile))?;
+    if let Err(failure) = switches::apply(&profile, &paths::profile_dir(&profile)) {
+        return match transaction.rollback() {
+            Ok(_) => Err(failure),
+            Err(rollback) => Err(Error::Plugin(format!(
+                "{failure}; automatic profile rollback also failed: {rollback}"
+            ))),
+        };
+    }
+    transaction.commit()?;
     Ok(package)
 }
 
@@ -279,6 +312,12 @@ where
     })?;
     if !environment.harness_installed {
         return Err(Error::HarnessNotInstalled);
+    }
+    if !environment.harness_compatible {
+        return Err(Error::Plugin(format!(
+            "plugins require the verified Harness runtime {}; repair it from the Environment panel first",
+            crate::harness::install::VERSION
+        )));
     }
     let manager = ensure_package_manager(&node.path, guard, report.clone()).await?;
 
@@ -410,7 +449,7 @@ fn last_words(
 
 /// Whether the harness will find a package manager when it looks for one.
 pub fn package_manager_available() -> bool {
-    managed_manager().is_some() || on_path("pnpm").is_some()
+    managed_manager().is_some()
 }
 
 /// Make sure there is a pnpm to forward to, installing one if there is not.
@@ -428,13 +467,9 @@ where
     if let Some(directory) = managed_manager() {
         return Ok(Some(directory));
     }
-    if on_path("pnpm").is_some() {
-        return Ok(None);
-    }
-
     report(
         Stream::Stdout,
-        "no package manager found; installing one for the plugin system".to_string(),
+        format!("installing the verified plugin package manager pnpm {PNPM_VERSION}"),
     );
     let plan = install::plan(node, paths::tools_dir(), PNPM_SPEC.to_string())?;
     install::run(&plan, guard, report).await?;
@@ -450,13 +485,16 @@ where
 /// symlink elsewhere — which is exactly what the harness's PATH lookup expects
 /// to find, so nothing here has to write a shim of its own.
 fn managed_manager() -> Option<PathBuf> {
+    let manifest = paths::tools_dir().join("node_modules/pnpm/package.json");
+    let version = std::fs::read_to_string(manifest)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+        .and_then(|value| value.get("version")?.as_str().map(str::to_string));
+    if version.as_deref() != Some(PNPM_VERSION) {
+        return None;
+    }
     let directory = paths::tools_dir().join("node_modules").join(".bin");
     executable_in(&directory, "pnpm").map(|_| directory)
-}
-
-fn on_path(stem: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path).find_map(|directory| executable_in(&directory, stem))
 }
 
 fn executable_in(directory: &Path, stem: &str) -> Option<PathBuf> {
@@ -525,7 +563,7 @@ pub(crate) fn is_package_spec(spec: &str) -> bool {
 }
 
 /// Split `@scope/name@^1.2.3` at the separator that is not the scope marker.
-fn split_spec(spec: &str) -> (&str, Option<&str>) {
+pub(crate) fn split_spec(spec: &str) -> (&str, Option<&str>) {
     let scoped = usize::from(spec.starts_with('@'));
     match spec[scoped..].find('@') {
         Some(at) => (&spec[..scoped + at], Some(&spec[scoped + at + 1..])),
@@ -562,7 +600,9 @@ mod tests {
 
     use std::collections::BTreeSet;
 
-    use super::{forward, is_package_spec, list, path_with, split_spec, Stream};
+    use super::{
+        forward, is_package_spec, list, path_with, split_spec, Stream, PNPM_SPEC, PNPM_VERSION,
+    };
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
@@ -730,5 +770,11 @@ mod tests {
         assert_eq!(split_spec("@vendor/name"), ("@vendor/name", None));
         assert_eq!(split_spec("name@1.0.0"), ("name", Some("1.0.0")));
         assert_eq!(split_spec("name"), ("name", None));
+    }
+
+    #[test]
+    fn package_manager_contract_is_exact() {
+        assert_eq!(PNPM_SPEC, format!("pnpm@{PNPM_VERSION}"));
+        assert!(!PNPM_SPEC.ends_with("@latest"));
     }
 }

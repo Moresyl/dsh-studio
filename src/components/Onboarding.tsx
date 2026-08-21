@@ -41,7 +41,11 @@ export function Onboarding() {
   const provisioningNode = useHarness((state) => state.provisioningNode)
   const start = useHarness((state) => state.start)
 
-  const ready = environment !== null && environment.node !== null && environment.harnessInstalled
+  const ready =
+    environment !== null &&
+    environment.node !== null &&
+    environment.harnessInstalled &&
+    environment.harnessCompatible
   const running = status.phase === 'ready'
   const starting = busy || status.phase === 'starting' || status.phase === 'restarting'
   const working = installing || provisioningNode

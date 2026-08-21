@@ -118,7 +118,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   add: async (spec) => {
     if (get().working) return
-    set({ working: spec, error: null })
+    set({ working: packageName(spec), error: null })
     try {
       landed(set, await ipc.pluginAdd(spec))
     } catch (cause) {
@@ -192,3 +192,10 @@ export const installedPlugin = (
 /** Whether `name` is already in the profile, under any version range. */
 export const isInstalled = (profile: PluginState | null, name: string): boolean =>
   profile?.plugins.some((plugin) => plugin.name === name) ?? false
+
+/** Package name without an exact version used to make installation immutable. */
+export const packageName = (spec: string): string => {
+  const offset = spec.startsWith('@') ? 1 : 0
+  const separator = spec.indexOf('@', offset)
+  return separator < 0 ? spec : spec.slice(0, separator)
+}

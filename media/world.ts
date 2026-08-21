@@ -64,6 +64,10 @@ const environment: Environment = {
   ],
   minimumNode: { major: 20, minor: 0, patch: 0 },
   harnessInstalled: true,
+  harnessCompatible: true,
+  harnessVersion: '0.1.0-rc.8',
+  expectedHarnessVersion: '0.1.0-rc.8',
+  harnessProblem: null,
   harnessEntry: `${HARNESS_DIR}\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js`,
   workspace: `${HOME}\\projects\\atlas`,
 }
@@ -225,6 +229,9 @@ const DETAILS: Record<string, PluginDetail> = {
     repository: 'https://github.com/yihengjiang/dsh-visual-plugin',
     bundle: true,
     dependencies: [],
+    installSpec: 'dsh-visual-plugin@0.2.6',
+    source: 'https://registry.npmjs.org',
+    compatibility: { state: 'unknown' },
   },
 }
 
@@ -235,6 +242,9 @@ const detailFor = (name: string): PluginDetail => {
   return {
     name,
     version: listing?.version ?? '1.0.0',
+    installSpec: `${name}@${listing?.version ?? '1.0.0'}`,
+    source: 'https://registry.npmjs.org',
+    compatibility: { state: 'unknown' },
     description: listing?.description ?? '',
     license: 'MIT',
     homepage: listing?.link ?? null,

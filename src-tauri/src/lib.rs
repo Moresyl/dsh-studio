@@ -7,6 +7,7 @@ mod error;
 mod fetch;
 mod harness;
 mod locale;
+mod logging;
 mod material;
 mod node;
 mod paths;
@@ -39,6 +40,7 @@ const REMOTE_CHANNEL: &str = "remote://changed";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    logging::install_panic_hook();
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             // A second launch surfaces the running app instead of starting
@@ -68,6 +70,9 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // Before a profile can be started or shown as healthy. The recovery
+            // result is persisted and the first window explains it.
+            let _ = plugins::recovery::recover_startup();
             let supervisor = Supervisor::new()?;
             let remote = Arc::new(Remote::new());
 
@@ -106,6 +111,8 @@ pub fn run() {
             remote::commands::remote_renew,
             remote::commands::remote_forget,
             plugins::commands::plugin_state,
+            plugins::commands::plugin_recovery_notice,
+            plugins::commands::plugin_recovery_acknowledge,
             plugins::commands::plugin_search,
             plugins::commands::plugin_detail,
             plugins::commands::plugin_add,

@@ -19,6 +19,24 @@ pub fn harness_dir() -> PathBuf {
     app_data_dir().join("harness")
 }
 
+/// Sibling used while a complete Harness runtime is assembled and verified.
+///
+/// A sibling, rather than a child of [`harness_dir`], lets the final promotion
+/// be one same-volume rename. The live runtime is never npm's working directory.
+pub fn harness_staging_dir() -> PathBuf {
+    app_data_dir().join("harness.installing")
+}
+
+/// Last complete runtime, kept only across the promotion crash window.
+pub fn harness_backup_dir() -> PathBuf {
+    app_data_dir().join("harness.previous")
+}
+
+/// Durable marker that makes an interrupted runtime promotion recoverable.
+pub fn harness_install_journal() -> PathBuf {
+    app_data_dir().join("harness-install.json")
+}
+
 /// Entry point of the managed harness CLI.
 pub fn harness_entry() -> PathBuf {
     harness_dir()
@@ -36,6 +54,16 @@ pub fn harness_entry() -> PathBuf {
 /// something the user is expected to maintain.
 pub fn tools_dir() -> PathBuf {
     app_data_dir().join("tools")
+}
+
+/// Persistent application logs, separate from user-owned Harness state.
+pub fn logs_dir() -> PathBuf {
+    app_data_dir().join("logs")
+}
+
+/// Durable state and backups for an in-flight profile package operation.
+pub fn plugin_recovery_dir() -> PathBuf {
+    app_data_dir().join("plugin-recovery")
 }
 
 /// Where Node runtimes the shell downloaded are unpacked, one directory per

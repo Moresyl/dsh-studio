@@ -16,11 +16,10 @@ pub use version::Version;
 
 /// Lowest Node release this application will run the harness on.
 ///
-/// The `@deepseek-ai/dsh` package publishes no `engines` field, so this is a
-/// deliberate floor rather than a value read from upstream: Node 20 is the
-/// oldest release line still receiving security support, and everything below it
-/// predates the stable `node:` built-ins the harness dependency tree relies on.
-pub const MINIMUM_SUPPORTED: Version = Version::new(20, 0, 0);
+/// The verified Harness family is composed and tested on Node 22.19 or newer,
+/// and its pinned pnpm runtime requires Node 22.13. Keeping the higher upstream
+/// floor prevents an install that succeeds only to fail during profile boot.
+pub const MINIMUM_SUPPORTED: Version = Version::new(22, 19, 0);
 
 /// The best runtime to use, or `None` when nothing on this machine qualifies.
 pub fn best_available() -> Option<NodeInstallation> {

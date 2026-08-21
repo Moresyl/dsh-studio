@@ -190,6 +190,24 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
               )}
 
               <dl className="flex flex-col gap-2 border-t border-line pt-3.5">
+                <Row label={t('plugins.source')}>
+                  <span className="selectable break-all font-mono text-[10.5px]">
+                    {detail.source}
+                  </span>
+                </Row>
+                <Row label={t('plugins.compatibility')}>
+                  <span
+                    className={
+                      detail.compatibility.state === 'incompatible' ? 'text-danger' : 'text-ok'
+                    }
+                  >
+                    {detail.compatibility.state === 'compatible'
+                      ? t('plugins.compatible', { range: detail.compatibility.requirement })
+                      : detail.compatibility.state === 'incompatible'
+                        ? t('plugins.incompatible', { range: detail.compatibility.requirement })
+                        : t('plugins.compatibilityUnknown')}
+                  </span>
+                </Row>
                 {detail.license && <Row label={t('plugins.license')}>{detail.license}</Row>}
                 {listing && listing.weeklyDownloads > 0 && (
                   <Row label={t('plugins.weekly')}>
@@ -266,8 +284,8 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
             <Button
               ref={primary}
               variant="primary"
-              onClick={() => void add(selected)}
-              disabled={working !== null}
+              onClick={() => void add(detail?.installSpec ?? selected)}
+              disabled={working !== null || detail?.compatibility.state === 'incompatible'}
             >
               {busy ? (
                 <Loader2 size={13} className="animate-spin" />

@@ -111,6 +111,7 @@ fn compose(version: &str, supervisor: &Supervisor, remote_open: bool) -> Report 
         &harness_block(&environment, supervisor, remote_open),
     );
     section(&mut out, "Profile", &profile_block(&profile));
+    section(&mut out, "Evidence", &evidence_block(supervisor));
     log_section(&mut out, supervisor);
 
     Report {
@@ -206,6 +207,24 @@ fn profile_block(state: &PluginState) -> String {
         }
     }
     block
+}
+
+fn evidence_block(supervisor: &Supervisor) -> String {
+    let persistent = supervisor
+        .persistent_log_path()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "persistent logging unavailable".to_string());
+    let crashes = crate::logging::crash_files();
+    rows(&[
+        ("persistent log", persistent),
+        ("crash files", plural(crashes.len(), "file")),
+        (
+            "plugin recovery",
+            crate::plugins::recovery::notice()
+                .map(|notice| notice.detail)
+                .unwrap_or_else(|| "none pending".to_string()),
+        ),
+    ])
 }
 
 /// The tail of the harness log, which is usually the only part that matters.
@@ -371,10 +390,11 @@ fn now_millis() -> i64 {
 
 /// Take the user's home directory out of the finished report.
 fn redact(text: &str) -> String {
-    match dirs::home_dir() {
+    let paths = match dirs::home_dir() {
         Some(home) => scrub(text, &home.display().to_string()),
         None => text.to_string(),
-    }
+    };
+    crate::logging::redact_secrets(&paths)
 }
 
 /// The substitution itself, with the directory passed in so it can be tested.
@@ -457,6 +477,14 @@ mod tests {
     #[test]
     fn a_machine_with_no_home_directory_is_reported_unchanged() {
         assert_eq!(scrub("nothing to hide", ""), "nothing to hide");
+    }
+
+    #[test]
+    fn exported_reports_remove_credentials_as_well_as_paths() {
+        let text = redact("Authorization: Bearer top-secret api_key=sk-live");
+        assert!(!text.contains("top-secret"));
+        assert!(!text.contains("sk-live"));
+        assert!(text.contains("[REDACTED]"));
     }
 
     #[test]

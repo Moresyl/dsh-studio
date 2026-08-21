@@ -26,6 +26,11 @@ export function EnvironmentChecks() {
   const node = environment?.node ?? null
   const minimum = environment ? formatVersion(environment.minimumNode) : ''
   const harnessInstalled = environment?.harnessInstalled ?? false
+  const harnessCompatible = environment?.harnessCompatible ?? false
+  const harnessReady = harnessInstalled && harnessCompatible
+  const harnessVersion = environment?.harnessVersion ?? null
+  const expectedHarnessVersion = environment?.expectedHarnessVersion ?? ''
+  const harnessProblem = environment?.harnessProblem ?? null
 
   // Only things that can be wrong. The workspace is neither a check nor
   // something anyone acts on from here, so it reports itself from the status bar
@@ -58,13 +63,28 @@ export function EnvironmentChecks() {
     {
       key: 'harness',
       label: t('check.harness'),
-      value: harnessInstalled ? t('check.harness.installed') : t('check.harness.missing'),
+      value: harnessProblem
+        ? t('check.harness.recoveryFailed')
+        : harnessInstalled && !harnessCompatible
+          ? t('check.harness.incompatible', {
+              actual: harnessVersion ?? t('check.harness.unknown'),
+              expected: expectedHarnessVersion,
+            })
+          : harnessInstalled
+            ? t('check.harness.installedVersion', {
+                version: harnessVersion ?? expectedHarnessVersion,
+              })
+            : t('check.harness.missing'),
       title: environment?.harnessEntry,
-      state: environment === null ? 'neutral' : harnessInstalled ? 'ok' : 'missing',
+      state: environment === null ? 'neutral' : harnessReady ? 'ok' : 'missing',
       action:
-        environment !== null && !harnessInstalled && node !== null
+        environment !== null && !harnessReady && node !== null
           ? {
-              label: installing ? t('action.installing') : t('action.install'),
+              label: installing
+                ? t('action.installing')
+                : harnessInstalled
+                  ? t('action.repair')
+                  : t('action.install'),
               icon: Download,
               busy: installing,
               run: () => void install(),

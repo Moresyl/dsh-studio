@@ -49,7 +49,11 @@ export function ConsolePane() {
     clear,
   } = useHarness()
 
-  const runnable = environment !== null && environment.node !== null && environment.harnessInstalled
+  const runnable =
+    environment !== null &&
+    environment.node !== null &&
+    environment.harnessInstalled &&
+    environment.harnessCompatible
   const working = installing || provisioningNode
   const starting = busy || status.phase === 'starting' || status.phase === 'restarting'
   const running = status.phase === 'ready'

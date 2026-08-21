@@ -90,7 +90,7 @@ async fn perform_install(state: &State<'_, AppState>) -> Result<()> {
     );
 
     let reporter = Arc::clone(&supervisor);
-    install::run(&plan, supervisor.guard(), move |stream, line| {
+    install::run_transactional(&plan, supervisor.guard(), move |stream, line| {
         reporter.note(stream, line)
     })
     .await?;

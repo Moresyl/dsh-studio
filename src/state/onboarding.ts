@@ -85,7 +85,10 @@ export const useOnboarding = create<OnboardingState>((set, get) => ({
     // installing what they already have is how a first run becomes a thing to
     // click past. A probe that came back with nothing is not a machine to guide
     // anyone through either; the console pane is where that gets explained.
-    const settled = seen() || environment === null || environment.harnessInstalled
+    const settled =
+      seen() ||
+      environment === null ||
+      (environment.harnessInstalled && environment.harnessCompatible)
     if (settled) remember()
 
     set({ stage: settled ? 'done' : 'guiding' })

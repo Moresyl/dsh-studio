@@ -126,6 +126,7 @@ pub struct Supervisor {
     events: broadcast::Sender<Event>,
     status: Mutex<Status>,
     log: Mutex<VecDeque<(Stream, String)>>,
+    persistent_log: Mutex<crate::logging::PersistentLog>,
     /// Set while a supervision loop owns a child, so `start` is idempotent.
     active: AtomicBool,
     /// Set by `stop`, so the supervision loop knows an exit was intentional.
@@ -139,6 +140,7 @@ impl Supervisor {
             events: broadcast::channel(512).0,
             status: Mutex::new(Status::Stopped),
             log: Mutex::new(VecDeque::with_capacity(LOG_HISTORY)),
+            persistent_log: Mutex::new(crate::logging::PersistentLog::managed()),
             active: AtomicBool::new(false),
             stopping: AtomicBool::new(false),
         }))
@@ -173,6 +175,13 @@ impl Supervisor {
             .iter()
             .cloned()
             .collect()
+    }
+
+    pub fn persistent_log_path(&self) -> Option<PathBuf> {
+        self.persistent_log
+            .lock()
+            .expect("persistent log poisoned")
+            .path()
     }
 
     /// Start the harness and return the origin it is serving on.
@@ -391,6 +400,10 @@ impl Supervisor {
     }
 
     fn record(&self, stream: Stream, line: String) {
+        self.persistent_log
+            .lock()
+            .expect("persistent log poisoned")
+            .write(stream, &line);
         {
             let mut log = self.log.lock().expect("log poisoned");
             if log.len() == LOG_HISTORY {

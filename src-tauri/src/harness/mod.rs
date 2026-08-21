@@ -34,12 +34,19 @@ pub struct Environment {
     pub all_node_runtimes: Vec<NodeInstallation>,
     pub minimum_node: Version,
     pub harness_installed: bool,
+    pub harness_compatible: bool,
+    pub harness_version: Option<String>,
+    pub expected_harness_version: String,
+    pub harness_problem: Option<String>,
     pub harness_entry: PathBuf,
     pub workspace: PathBuf,
 }
 
 /// Inspect the machine. Cheap enough to call whenever the UI needs it.
 pub fn environment() -> Environment {
+    let harness_problem = install::recover_managed_install()
+        .err()
+        .map(|failure| failure.to_string());
     // The shell's own store is searched alongside the version managers, so a
     // runtime it installed is chosen by exactly the same rule as one the user
     // installed — and shows up in the same list, labelled for what it is.
@@ -49,12 +56,19 @@ pub fn environment() -> Environment {
         .find(|install| install.version >= node_runtime::MINIMUM_SUPPORTED)
         .cloned();
     let harness_entry = paths::harness_entry();
+    let harness_version = install::runtime_version(&paths::harness_dir());
+    let harness_installed = harness_entry.is_file() && harness_version.is_some();
+    let harness_compatible = install::runtime_compatible(&paths::harness_dir());
 
     Environment {
         node,
         all_node_runtimes,
         minimum_node: node_runtime::MINIMUM_SUPPORTED,
-        harness_installed: harness_entry.is_file(),
+        harness_installed,
+        harness_compatible,
+        harness_version,
+        expected_harness_version: install::VERSION.to_string(),
+        harness_problem,
         harness_entry,
         workspace: paths::default_workspace_dir(),
     }
@@ -70,11 +84,25 @@ pub fn launch_plan() -> Result<LaunchPlan> {
     if !environment.harness_installed {
         return Err(Error::HarnessNotInstalled);
     }
+    if !environment.harness_compatible {
+        return Err(Error::Install(format!(
+            "the installed Harness runtime is {}, but DSH Studio requires {}; reinstall it from the Environment panel",
+            environment
+                .harness_version
+                .as_deref()
+                .unwrap_or("unknown"),
+            install::VERSION
+        )));
+    }
+    let profile = crate::profiles::selected();
+    if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {
+        return Err(Error::Plugin(problem));
+    }
 
     Ok(LaunchPlan {
         node: node.path,
         entry: environment.harness_entry,
-        profile: crate::profiles::selected(),
+        profile,
         workspace: environment.workspace,
         host: BIND_HOST.to_string(),
         port: EPHEMERAL_PORT,
@@ -87,9 +115,5 @@ pub fn install_plan() -> Result<InstallPlan> {
         minimum: node_runtime::MINIMUM_SUPPORTED,
     })?;
 
-    install::plan(
-        &node.path,
-        paths::harness_dir(),
-        format!("{}@latest", install::PACKAGE),
-    )
+    install::plan(&node.path, paths::harness_dir(), install::SPEC.to_string())
 }

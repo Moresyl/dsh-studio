@@ -25,6 +25,10 @@ const en = {
   'check.harness': 'DeepSeek Harness',
   'check.harness.missing': 'Not installed yet',
   'check.harness.installed': 'Ready',
+  'check.harness.installedVersion': 'Ready · {version}',
+  'check.harness.incompatible': 'Found {actual}; this release requires {expected}',
+  'check.harness.recoveryFailed': 'An interrupted install needs repair',
+  'check.harness.unknown': 'unknown version',
 
   'service.address': 'Address',
   'service.process': 'Process',
@@ -45,6 +49,7 @@ const en = {
   'action.stop': 'Stop',
   'action.recheck': 'Check again',
   'action.install': 'Install',
+  'action.repair': 'Repair',
   'action.installing': 'Installing…',
   'action.getNode': 'Install Node.js',
 
@@ -137,6 +142,11 @@ const en = {
   'plugins.dependencies': 'Dependencies',
   'plugins.homepage': 'Homepage',
   'plugins.repository': 'Repository',
+  'plugins.source': 'Source',
+  'plugins.compatibility': 'Compatibility',
+  'plugins.compatible': 'Compatible · {range}',
+  'plugins.incompatible': 'Incompatible · requires {range}',
+  'plugins.compatibilityUnknown': 'No Harness peer range declared; preflight will verify it',
   'plugins.profile': 'Profile',
   'plugins.pick': 'Pick a package to see what it declares.',
   'plugins.detailFailed': 'Could not read the published manifest.',
@@ -475,6 +485,15 @@ const en = {
   'guide.session.workspace': 'Working directory',
 
   'dialog.cancel': 'Cancel',
+  'recovery.title': 'Plugin profile recovered',
+  'recovery.restored':
+    'DSH Studio found an interrupted plugin operation and restored the profile before Harness started.',
+  'recovery.failed':
+    'The interrupted operation could not be restored automatically. The diagnostic report contains the recovery error.',
+  'recovery.profile': 'Profile',
+  'recovery.operation': 'Operation',
+  'recovery.subject': 'Package',
+  'recovery.continue': 'Continue',
 } as const
 
 export type MessageKey = keyof typeof en
@@ -498,6 +517,10 @@ const zh: Record<MessageKey, string> = {
   'check.harness': 'DeepSeek Harness',
   'check.harness.missing': '尚未安装',
   'check.harness.installed': '就绪',
+  'check.harness.installedVersion': '已就绪 · {version}',
+  'check.harness.incompatible': '检测到 {actual}；当前版本要求 {expected}',
+  'check.harness.recoveryFailed': '上次安装中断，需要修复',
+  'check.harness.unknown': '未知版本',
 
   'service.address': '地址',
   'service.process': '进程',
@@ -518,6 +541,7 @@ const zh: Record<MessageKey, string> = {
   'action.stop': '停止',
   'action.recheck': '重新检测',
   'action.install': '安装',
+  'action.repair': '修复',
   'action.installing': '安装中…',
   'action.getNode': '安装 Node.js',
 
@@ -604,6 +628,11 @@ const zh: Record<MessageKey, string> = {
   'plugins.dependencies': '依赖',
   'plugins.homepage': '主页',
   'plugins.repository': '仓库',
+  'plugins.source': '来源',
+  'plugins.compatibility': '兼容性',
+  'plugins.compatible': '兼容 · {range}',
+  'plugins.incompatible': '不兼容 · 要求 {range}',
+  'plugins.compatibilityUnknown': '未声明 Harness 版本范围，安装前仍会执行预检',
   'plugins.profile': '配置',
   'plugins.pick': '选择一个扩展包，查看它声明了什么。',
   'plugins.detailFailed': '无法读取已发布的清单。',
@@ -922,6 +951,13 @@ const zh: Record<MessageKey, string> = {
   'guide.session.workspace': '工作目录',
 
   'dialog.cancel': '取消',
+  'recovery.title': '插件配置已恢复',
+  'recovery.restored': '检测到上次插件操作被中断，已在 Harness 启动前恢复到操作前的配置。',
+  'recovery.failed': '中断的操作无法自动恢复，诊断报告中保留了恢复错误。',
+  'recovery.profile': '配置',
+  'recovery.operation': '操作',
+  'recovery.subject': '扩展包',
+  'recovery.continue': '继续',
 }
 
 const dictionaries = { en, zh }

@@ -27,6 +27,12 @@ export interface Environment {
   allNodeRuntimes: NodeInstallation[]
   minimumNode: NodeVersion
   harnessInstalled: boolean
+  /** The managed package is exactly the upstream family this release tested. */
+  harnessCompatible: boolean
+  harnessVersion: string | null
+  expectedHarnessVersion: string
+  /** An interrupted install that could not be recovered automatically. */
+  harnessProblem: string | null
   harnessEntry: string
   workspace: string
 }
@@ -236,9 +242,28 @@ export interface PluginDetail {
   /** Whether the manifest declares a profile patch — a plugin, not a library. */
   bundle: boolean
   dependencies: string[]
+  installSpec: string
+  source: string
+  compatibility:
+    | { state: 'compatible'; requirement: string }
+    | { state: 'unknown' }
+    | { state: 'incompatible'; requirement: string; reason: string }
 }
 
 export const pluginState = (): Promise<PluginState> => invoke('plugin_state')
+
+export interface PluginRecoveryNotice {
+  profile: string
+  operation: string
+  subject: string
+  restored: boolean
+  detail: string
+}
+
+export const pluginRecoveryNotice = (): Promise<PluginRecoveryNotice | null> =>
+  invoke('plugin_recovery_notice')
+
+export const pluginRecoveryAcknowledge = (): Promise<void> => invoke('plugin_recovery_acknowledge')
 
 export const pluginSearch = (query: string): Promise<PluginListing[]> =>
   invoke('plugin_search', { query })
