@@ -245,6 +245,7 @@ export interface PluginListing {
   sourceLabel: string
   installable: boolean
   categories: string[]
+  hasIcon: boolean
 }
 
 export type PluginSort = 'relevance' | 'updated' | 'name' | 'downloads'
@@ -287,6 +288,10 @@ export interface PluginDetail {
     | { state: 'incompatible'; requirement: string; reason: string }
   integrity: string | null
   bundlePatch: unknown | null
+  lifecycleScripts: string[]
+  deprecated: string | null
+  repositoryVerified: boolean
+  integrityVerified: boolean
 }
 
 export const pluginState = (): Promise<PluginState> => invoke('plugin_state')
@@ -332,6 +337,16 @@ export const pluginDetail = (
   version: string,
 ): Promise<PluginDetail> => invoke('plugin_detail', { sourceId, name, version })
 
+export interface PluginMedia {
+  dataUrl: string
+}
+
+export const pluginMedia = (
+  sourceId: string,
+  name: string,
+  version: string,
+): Promise<PluginMedia | null> => invoke('plugin_media', { sourceId, name, version })
+
 export const pluginSources = (): Promise<CatalogSource[]> => invoke('plugin_sources')
 
 export const pluginSourceSelect = (id: string): Promise<CatalogSource[]> =>
@@ -344,12 +359,20 @@ export const pluginSourceRemove = (id: string): Promise<CatalogSource[]> =>
   invoke('plugin_source_remove', { id })
 
 /** Install into the hosted profile; resolves with the profile afterwards. */
-export const pluginAdd = (
+export interface PluginInstallPreview {
+  token: string
+  expiresInSeconds: number
+}
+
+export const pluginPreview = (
   spec: string,
   sourceId: string,
   itemId: string,
   displayName: string,
-): Promise<PluginState> => invoke('plugin_add', { spec, sourceId, itemId, displayName })
+): Promise<PluginInstallPreview> =>
+  invoke('plugin_preview', { spec, sourceId, itemId, displayName })
+
+export const pluginAdd = (token: string): Promise<PluginState> => invoke('plugin_add', { token })
 
 export const pluginRemove = (name: string): Promise<PluginState> =>
   invoke('plugin_remove', { name })

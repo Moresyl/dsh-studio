@@ -1,4 +1,11 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react'
 import {
   Check,
   Download,
@@ -6,6 +13,7 @@ import {
   Layers,
   Loader2,
   Package,
+  ShieldCheck,
   Trash2,
   TriangleAlert,
   X,
@@ -48,11 +56,13 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
   const selectedVersion = usePlugins((state) => state.selectedVersion)
   const detail = usePlugins((state) => state.detail)
   const loading = usePlugins((state) => state.loadingDetail)
+  const previewing = usePlugins((state) => state.previewing)
   const working = usePlugins((state) => state.working)
   const profile = usePlugins((state) => state.profile)
   const results = usePlugins((state) => state.results)
   const select = usePlugins((state) => state.select)
   const add = usePlugins((state) => state.add)
+  const preview = usePlugins((state) => state.preview)
   const toggle = usePlugins((state) => state.toggle)
 
   // The package manager talks while it works, and it talks through the
@@ -61,8 +71,12 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
 
   const card = useRef<HTMLDivElement>(null)
   const primary = useRef<HTMLButtonElement>(null)
+  const [reviewing, setReviewing] = useState(false)
 
-  const close = () => void select(null)
+  const close = () => {
+    setReviewing(false)
+    void select(null)
+  }
 
   // Focus lands on the action, not on the close button: this dialog is opened
   // by pressing Install, and the thing it opened onto should be one Enter away.
@@ -90,6 +104,13 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
         result.version === selectedVersion,
     ) ?? null
   const busy = working === selected
+  const installBlocked =
+    detail !== null &&
+    (detail.compatibility.state === 'incompatible' ||
+      detail.lifecycleScripts.length > 0 ||
+      detail.deprecated !== null ||
+      !detail.repositoryVerified ||
+      !detail.integrityVerified)
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => holdFocus(card.current, event, close)
   const onBackdrop = (event: MouseEvent<HTMLDivElement>) => pressedBackdrop(event, close)
@@ -184,6 +205,61 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                 />
                 {detail.bundle ? t('plugins.declaresPatch') : t('plugins.noPatch')}
               </div>
+
+              {!here && reviewing && (
+                <section className="rounded-control border border-warn/35 bg-warn/7 p-3">
+                  <div className="flex items-start gap-2">
+                    <ShieldCheck
+                      size={14}
+                      className="mt-0.5 shrink-0 text-warn"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-[11.5px] font-medium text-text">
+                        {t('plugins.review.title')}
+                      </h3>
+                      <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
+                        {t('plugins.review.warning')}
+                      </p>
+                    </div>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-[106px_1fr] gap-x-3 gap-y-1.5 text-[10.5px]">
+                    <dt className="text-faint">{t('plugins.review.target')}</dt>
+                    <dd className="break-all font-mono text-muted">{detail.installSpec}</dd>
+                    <dt className="text-faint">{t('plugins.review.integrity')}</dt>
+                    <dd className={detail.integrityVerified ? 'text-ok' : 'text-danger'}>
+                      {detail.integrityVerified
+                        ? t('plugins.review.verified')
+                        : t('plugins.review.blocked')}
+                    </dd>
+                    <dt className="text-faint">{t('plugins.review.repository')}</dt>
+                    <dd className={detail.repositoryVerified ? 'text-ok' : 'text-danger'}>
+                      {detail.repositoryVerified
+                        ? t('plugins.review.verified')
+                        : t('plugins.review.blocked')}
+                    </dd>
+                    <dt className="text-faint">{t('plugins.review.scripts')}</dt>
+                    <dd
+                      className={detail.lifecycleScripts.length === 0 ? 'text-ok' : 'text-danger'}
+                    >
+                      {detail.lifecycleScripts.length === 0
+                        ? t('plugins.review.none')
+                        : detail.lifecycleScripts.join(', ')}
+                    </dd>
+                    {detail.deprecated !== null && (
+                      <>
+                        <dt className="text-faint">{t('plugins.review.deprecated')}</dt>
+                        <dd className="text-danger">{detail.deprecated}</dd>
+                      </>
+                    )}
+                  </dl>
+                  {installBlocked && (
+                    <p className="mt-3 text-[10.5px] leading-relaxed text-danger">
+                      {t('plugins.review.cannotInstall')}
+                    </p>
+                  )}
+                </section>
+              )}
 
               {here && (
                 <ProfileState
@@ -299,15 +375,29 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
             <Button
               ref={primary}
               variant="primary"
-              onClick={() => void add(detail?.installSpec ?? selected)}
-              disabled={working !== null || detail?.compatibility.state === 'incompatible'}
+              onClick={() => {
+                if (!reviewing) {
+                  void preview(detail?.installSpec ?? selected).then((ready) => {
+                    if (ready) setReviewing(true)
+                  })
+                } else {
+                  void add()
+                }
+              }}
+              disabled={working !== null || previewing || installBlocked}
             >
-              {busy ? (
+              {busy || previewing ? (
                 <Loader2 size={13} className="animate-spin" />
               ) : (
                 <Download size={13} strokeWidth={2.3} />
               )}
-              {busy ? t('plugins.installing') : t('plugins.install')}
+              {busy
+                ? t('plugins.installing')
+                : previewing
+                  ? t('plugins.review.previewing')
+                  : reviewing
+                    ? t('plugins.review.installExact')
+                    : t('plugins.review.action')}
             </Button>
           )}
         </footer>

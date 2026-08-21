@@ -169,7 +169,11 @@ const NPM_LISTING = {
   sourceLabel: 'npm registry',
   installable: true,
   categories: ['dsh'],
-} satisfies Pick<PluginListing, 'sourceId' | 'sourceLabel' | 'installable' | 'categories'>
+  hasIcon: false,
+} satisfies Pick<
+  PluginListing,
+  'sourceId' | 'sourceLabel' | 'installable' | 'categories' | 'hasIcon'
+>
 
 const DISCOVER: PluginListing[] = [
   {
@@ -273,6 +277,10 @@ const DETAILS: Record<string, PluginDetail> = {
     compatibility: { state: 'unknown' },
     integrity: 'sha512-demo',
     bundlePatch: {},
+    lifecycleScripts: [],
+    deprecated: null,
+    repositoryVerified: true,
+    integrityVerified: true,
   },
 }
 
@@ -294,6 +302,10 @@ const detailFor = (name: string): PluginDetail => {
     repository: listing?.link ?? null,
     bundle: true,
     dependencies: [],
+    lifecycleScripts: [],
+    deprecated: null,
+    repositoryVerified: true,
+    integrityVerified: true,
   }
 }
 

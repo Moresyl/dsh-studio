@@ -31,7 +31,7 @@ use tokio::sync::broadcast::error::RecvError;
 use harness::commands::AppState;
 use harness::supervisor::{Event, Status, Supervisor};
 use node::NodeJobs;
-use plugins::PluginJobs;
+use plugins::{PluginIntents, PluginJobs};
 use remote::Remote;
 
 /// Channel the frontend listens on for supervisor status and log events.
@@ -84,6 +84,7 @@ pub fn run() {
             app.manage(AppState::new(Arc::clone(&supervisor)));
             app.manage(remote);
             app.manage(Arc::new(PluginJobs::default()));
+            app.manage(Arc::new(PluginIntents::default()));
             app.manage(Arc::new(NodeJobs::default()));
             app.manage(Arc::new(sessions::Library::default()));
             app.manage(terminal::Terminals::new()?);
@@ -119,6 +120,8 @@ pub fn run() {
             plugins::commands::plugin_recovery_retry,
             plugins::commands::plugin_search,
             plugins::commands::plugin_detail,
+            plugins::commands::plugin_media,
+            plugins::commands::plugin_preview,
             plugins::commands::plugin_sources,
             plugins::commands::plugin_source_select,
             plugins::commands::plugin_source_add,

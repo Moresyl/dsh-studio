@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Database,
   Info,
   Layers,
   Loader2,
@@ -26,15 +27,17 @@ import { Switch } from '@/components/Switch'
 import { TabButton } from '@/components/TabButton'
 import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
-import type { InstalledPlugin, PluginListing, PluginSort } from '@/lib/ipc'
+import * as ipc from '@/lib/ipc'
+import type { CatalogSource, InstalledPlugin, PluginListing, PluginSort } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
 import { isInstalled, usePlugins } from '@/state/plugins'
 
 /** Long enough that typing a scoped name is one request, short enough to feel live. */
 const DEBOUNCE = 320
+const ICONS = new Map<string, string | null>()
 
-type Tab = 'discover' | 'installed'
+type Tab = 'discover' | 'installable' | 'installed' | 'sources'
 
 /**
  * The plugin marketplace.
@@ -152,12 +155,13 @@ export function PluginMarket() {
   // The empty query is what fills the pane on arrival, so it runs immediately;
   // everything after it is somebody typing.
   useEffect(() => {
+    if (tab === 'installed' || tab === 'sources') return
     const timer = window.setTimeout(
       () => void search(query, category, sort, page),
       query === '' ? 0 : DEBOUNCE,
     )
     return () => window.clearTimeout(timer)
-  }, [query, category, sort, page, search, activeSource?.id])
+  }, [query, category, sort, page, search, activeSource?.id, tab])
 
   const installed = profile?.plugins ?? []
   const removable = installed.filter((plugin) => !plugin.builtin).length
@@ -177,6 +181,11 @@ export function PluginMarket() {
               onClick={() => setTab('discover')}
             />
             <TabButton
+              label={t('plugins.tab.installable')}
+              active={tab === 'installable'}
+              onClick={() => setTab('installable')}
+            />
+            <TabButton
               label={
                 removable > 0
                   ? `${t('plugins.tab.installed')} ${removable}`
@@ -184,6 +193,11 @@ export function PluginMarket() {
               }
               active={tab === 'installed'}
               onClick={() => setTab('installed')}
+            />
+            <TabButton
+              label={t('plugins.tab.sources')}
+              active={tab === 'sources'}
+              onClick={() => setTab('sources')}
             />
           </div>
 
@@ -201,7 +215,7 @@ export function PluginMarket() {
           </Button>
         </PaneHeader>
 
-        {tab === 'discover' && (
+        {(tab === 'discover' || tab === 'installable') && (
           <div className="shrink-0 border-b border-line">
             <div className="flex h-11 items-center gap-2 px-4">
               <select
@@ -382,7 +396,18 @@ export function PluginMarket() {
               onOpen={(listing) => void select(listing.name, listing.sourceId, listing.version)}
               isInstalled={(name) => isInstalled(profile, name)}
             />
-          ) : (
+          ) : tab === 'installable' ? (
+            <Discover
+              results={results.filter(
+                (listing) => listing.installable && !isInstalled(profile, listing.name),
+              )}
+              searching={searching}
+              selected={selected}
+              working={working}
+              onOpen={(listing) => void select(listing.name, listing.sourceId, listing.version)}
+              isInstalled={() => false}
+            />
+          ) : tab === 'installed' ? (
             <Installed
               plugins={installed}
               initialized={profile?.initialized ?? false}
@@ -390,6 +415,13 @@ export function PluginMarket() {
               onOpen={(name) => void select(name, 'npm', 'latest')}
               onToggle={(name, on) => void toggle(name, on)}
               onRemove={(name) => void confirmRemove(name)}
+            />
+          ) : (
+            <Sources
+              sources={sources}
+              working={working !== null}
+              onSelect={(id) => void selectSource(id)}
+              onManage={() => setManagingSources(true)}
             />
           )}
         </div>
@@ -413,6 +445,66 @@ export function PluginMarket() {
       {selected !== null && <PluginDialog onRemove={confirmRemove} />}
       {managingSources && <CatalogSourcesDialog onClose={() => setManagingSources(false)} />}
     </>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+
+interface SourcesProps {
+  sources: CatalogSource[]
+  working: boolean
+  onSelect: (id: string) => void
+  onManage: () => void
+}
+
+function Sources({ sources, working, onSelect, onManage }: SourcesProps) {
+  return (
+    <div className="p-4">
+      <div className="mb-3 flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-[12.5px] font-medium text-text">{t('plugins.sources.title')}</h3>
+          <p className="mt-1 text-[11px] leading-relaxed text-faint">
+            {t('plugins.sources.subtitle')}
+          </p>
+        </div>
+        <Button variant="secondary" onClick={onManage} disabled={working}>
+          <Settings2 size={13} aria-hidden="true" />
+          {t('plugins.sources.manage')}
+        </Button>
+      </div>
+      <ul className="overflow-hidden rounded-control border border-line">
+        {sources.map((source) => (
+          <li key={source.id} className="border-b border-line last:border-b-0">
+            <button
+              type="button"
+              disabled={working || source.active}
+              onClick={() => onSelect(source.id)}
+              className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors enabled:hover:bg-surface-2/60 disabled:cursor-default"
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-control border border-line bg-surface-2 text-brand">
+                <Database size={14} aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2 text-[12px] font-medium text-text">
+                  <span className="truncate">{source.label}</span>
+                  {source.builtIn && (
+                    <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9.5px] text-faint">
+                      {t('plugins.builtin')}
+                    </span>
+                  )}
+                </span>
+                <span className="mt-1 block truncate font-mono text-[10px] text-faint">
+                  {source.endpoint ?? source.kind}
+                </span>
+              </span>
+              <span className={source.active ? 'text-[11px] text-ok' : 'text-[11px] text-faint'}>
+                {source.active ? t('plugins.sources.active') : t('plugins.sources.use')}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -460,7 +552,10 @@ function Discover({ results, searching, selected, working, onOpen, isInstalled }
                 <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[2px] bg-brand" />
               )}
 
-              <Tile />
+              <Tile
+                key={`${listing.sourceId}\0${listing.name}\0${listing.version}`}
+                listing={listing}
+              />
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-2">
@@ -654,7 +749,33 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
 
 /* -------------------------------------------------------------------------- */
 
-function Tile({ muted = false }: { muted?: boolean }) {
+function Tile({ listing, muted = false }: { listing?: PluginListing; muted?: boolean }) {
+  const sourceId = listing?.sourceId ?? ''
+  const name = listing?.name ?? ''
+  const version = listing?.version ?? ''
+  const hasIcon = listing?.hasIcon ?? false
+  const key = listing ? `${sourceId}\0${name}\0${version}` : ''
+  const [icon, setIcon] = useState<string | null | undefined>(() => ICONS.get(key))
+
+  useEffect(() => {
+    if (!hasIcon || icon !== undefined) return
+    let active = true
+    void ipc
+      .pluginMedia(sourceId, name, version)
+      .then((asset) => {
+        const dataUrl = asset?.dataUrl ?? null
+        ICONS.set(key, dataUrl)
+        if (active) setIcon(dataUrl)
+      })
+      .catch(() => {
+        ICONS.set(key, null)
+        if (active) setIcon(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [hasIcon, icon, key, name, sourceId, version])
+
   return (
     <span
       aria-hidden="true"
@@ -663,7 +784,17 @@ function Tile({ muted = false }: { muted?: boolean }) {
         muted ? 'bg-surface-2/50 text-faint' : 'bg-surface-2 text-brand',
       ].join(' ')}
     >
-      <Package size={15} strokeWidth={1.9} />
+      {icon ? (
+        <img
+          src={icon}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="size-full rounded-[6px] object-cover"
+        />
+      ) : (
+        <Package size={15} strokeWidth={1.9} />
+      )}
     </span>
   )
 }

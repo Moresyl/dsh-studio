@@ -4,11 +4,12 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use serde::Serialize;
 use tauri::State;
 
 use super::archive::Package;
 use super::registry::Detail;
-use super::{Change, PluginJobs, PluginState};
+use super::{Change, PluginIntents, PluginJobs, PluginState};
 use crate::error::{Error, Result};
 use crate::harness::commands::AppState;
 use crate::harness::supervisor::{Stream, Supervisor};
@@ -62,7 +63,11 @@ pub async fn plugin_recovery_retry(
             item_id,
             display_name,
         } => {
-            let detail = super::registry::preflight(&node()?, &spec).await?;
+            let (resolved_name, resolved_version) = super::split_spec(&spec);
+            let resolved_version = resolved_version.ok_or_else(|| {
+                Error::Plugin("the recovered market target is not an exact version".into())
+            })?;
+            let detail = reviewed_detail(&source_id, resolved_name, resolved_version, true).await?;
             if detail.install_spec != spec || detail.name != item_id {
                 return Err(Error::Plugin(
                     "the recovered package no longer resolves to the reviewed immutable version"
@@ -75,22 +80,6 @@ pub async fn plugin_recovery_retry(
                 .ok_or_else(|| {
                     Error::Plugin("the recovered catalog source is no longer active".into())
                 })?;
-            if source.id != "npm" {
-                let catalogued = super::catalog::search(&source.id, "")
-                    .await?
-                    .into_iter()
-                    .any(|item| {
-                        item.name == detail.name
-                            && item.version == detail.version
-                            && item.installable
-                    });
-                if !catalogued {
-                    return Err(Error::Plugin(
-                        "the recovered package is no longer present in its reviewed catalog"
-                            .into(),
-                    ));
-                }
-            }
             let receipt_profile = profile.clone();
             super::change_profile_finalize(
                 &profile,
@@ -169,12 +158,69 @@ pub async fn plugin_search(
 
 #[tauri::command]
 pub async fn plugin_detail(source_id: String, name: String, version: String) -> Result<Detail> {
+    reviewed_detail(&source_id, &name, &version, false).await
+}
+
+/// Resolve optional catalog imagery through the native restricted-media path.
+/// The renderer supplies identity only; the URL is re-read from the source.
+#[tauri::command]
+pub async fn plugin_media(
+    source_id: String,
+    name: String,
+    version: String,
+) -> Result<Option<super::media::Asset>> {
     if source_id == "npm" {
-        return super::registry::detail(&node()?, &name).await;
+        return Ok(None);
     }
-    let mut detail = super::registry::preflight(&node()?, &format!("{name}@{version}")).await?;
-    detail.source = super::catalog::label(&source_id);
-    Ok(detail)
+    let candidate = super::catalog::search(&source_id, "")
+        .await?
+        .into_iter()
+        .find(|item| item.name == name && item.version == version)
+        .and_then(|item| item.icon);
+    let Some(candidate) = candidate else {
+        return Ok(None);
+    };
+    // Optional media never makes a catalog item unusable.
+    Ok(super::media::fetch(&candidate).await.ok())
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallPreview {
+    token: String,
+    expires_in_seconds: u64,
+}
+
+/// Verify the exact registry and catalog identities, then issue one short-lived
+/// confirmation bound to the active profile.
+#[tauri::command]
+pub async fn plugin_preview(
+    spec: String,
+    source_id: String,
+    item_id: String,
+    display_name: String,
+    intents: State<'_, Arc<PluginIntents>>,
+) -> Result<InstallPreview> {
+    let (name, version) = super::split_spec(&spec);
+    let version = version
+        .ok_or_else(|| Error::Plugin("market installs require an exact package version".into()))?;
+    let detail = reviewed_detail(&source_id, name, version, true).await?;
+    if detail.install_spec != spec || detail.name != item_id {
+        return Err(Error::Plugin(
+            "the selected catalog item does not match the exact registry package".into(),
+        ));
+    }
+    let token = intents.issue(
+        crate::profiles::selected(),
+        spec,
+        source_id,
+        item_id,
+        display_name,
+    )?;
+    Ok(InstallPreview {
+        token,
+        expires_in_seconds: 2 * 60,
+    })
 }
 
 #[tauri::command]
@@ -212,14 +258,21 @@ pub async fn plugin_source_remove(id: String) -> Result<Vec<super::catalog::Sour
 /// on disk rather than from what it hoped the install would do.
 #[tauri::command]
 pub async fn plugin_add(
-    spec: String,
-    source_id: String,
-    item_id: String,
-    display_name: String,
+    token: String,
     state: State<'_, AppState>,
     jobs: State<'_, Arc<PluginJobs>>,
+    intents: State<'_, Arc<PluginIntents>>,
 ) -> Result<PluginState> {
-    let detail = super::registry::preflight(&node()?, &spec).await?;
+    let profile = crate::profiles::selected();
+    let intent = intents.consume(&token, &profile)?;
+    let spec = intent.spec;
+    let source_id = intent.source_id;
+    let item_id = intent.item_id;
+    let display_name = intent.display_name;
+    let (resolved_name, resolved_version) = super::split_spec(&spec);
+    let resolved_version = resolved_version
+        .ok_or_else(|| Error::Plugin("market installs require an exact package version".into()))?;
+    let detail = reviewed_detail(&source_id, resolved_name, resolved_version, true).await?;
     if spec != detail.install_spec {
         return Err(Error::Plugin(format!(
             "market installs require the exact immutable spec {}",
@@ -235,20 +288,6 @@ pub async fn plugin_add(
             "the selected catalog item does not match the resolved package".into(),
         ));
     }
-    if source.id != "npm" {
-        let catalogued = super::catalog::search(&source.id, "")
-            .await?
-            .into_iter()
-            .any(|item| {
-                item.name == detail.name && item.version == detail.version && item.installable
-            });
-        if !catalogued {
-            return Err(Error::Plugin(
-                "the exact package version is no longer present in the selected catalog".into(),
-            ));
-        }
-    }
-    let profile = crate::profiles::selected();
     let profile_dir = crate::paths::profile_dir(&profile);
     let retry = super::recovery::RetryPlan::Add {
         spec: spec.clone(),
@@ -450,6 +489,59 @@ fn node() -> Result<PathBuf> {
         .ok_or(Error::NoNodeRuntime {
             minimum: node_runtime::MINIMUM_SUPPORTED,
         })
+}
+
+async fn reviewed_detail(
+    source_id: &str,
+    name: &str,
+    version: &str,
+    enforce: bool,
+) -> Result<Detail> {
+    let spec = format!("{name}@{version}");
+    let mut detail = if enforce {
+        super::registry::preflight(&node()?, &spec).await?
+    } else if source_id == "npm" && version == "latest" {
+        super::registry::detail(&node()?, name).await?
+    } else {
+        super::registry::resolve(&node()?, &spec).await?
+    };
+    if source_id == "npm" {
+        // npm is the authority being compared with itself; no third-party
+        // catalog repository assertion exists in this view.
+        detail.repository_verified = true;
+        return Ok(detail);
+    }
+    let source = super::catalog::sources()
+        .into_iter()
+        .find(|source| source.id == source_id && source.active)
+        .ok_or_else(|| Error::Plugin("the selected catalog source is no longer active".into()))?;
+    detail.source = source.label;
+    let item = super::catalog::search(source_id, "")
+        .await?
+        .into_iter()
+        .find(|item| item.name == detail.name && item.version == detail.version && item.installable)
+        .ok_or_else(|| {
+            Error::Plugin(
+                "the exact package version is no longer present in the selected catalog".into(),
+            )
+        })?;
+    detail.repository_verified = item
+        .repository
+        .as_deref()
+        .and_then(super::registry::repository_identity)
+        .zip(
+            detail
+                .repository
+                .as_deref()
+                .and_then(super::registry::repository_identity),
+        )
+        .is_some_and(|(catalog, registry)| catalog == registry);
+    if enforce && !detail.repository_verified {
+        return Err(Error::Plugin(
+            "the npm package repository did not match the selected catalog".into(),
+        ));
+    }
+    Ok(detail)
 }
 
 #[cfg(test)]

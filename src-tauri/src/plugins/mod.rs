@@ -19,6 +19,7 @@ pub mod archive;
 pub mod catalog;
 pub mod commands;
 pub mod market;
+pub mod media;
 pub mod receipts;
 pub mod recovery;
 pub mod registry;
@@ -28,6 +29,8 @@ use std::collections::{BTreeSet, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use proc_guard::ProcessGuard;
 use serde::Serialize;
@@ -80,6 +83,89 @@ pub struct PluginState {
 #[derive(Debug, Default)]
 pub struct PluginJobs {
     pub busy: AtomicBool,
+}
+
+const INTENT_TTL: Duration = Duration::from_secs(2 * 60);
+const MAX_INTENTS: usize = 64;
+
+#[derive(Clone, Debug)]
+pub struct InstallIntent {
+    pub profile: String,
+    pub spec: String,
+    pub source_id: String,
+    pub item_id: String,
+    pub display_name: String,
+    expires_at: Instant,
+}
+
+/// One-shot native confirmations for market installs.
+#[derive(Debug, Default)]
+pub struct PluginIntents {
+    entries: Mutex<VecDeque<(String, InstallIntent)>>,
+}
+
+impl PluginIntents {
+    pub fn issue(
+        &self,
+        profile: String,
+        spec: String,
+        source_id: String,
+        item_id: String,
+        display_name: String,
+    ) -> Result<String> {
+        let mut random = [0_u8; 32];
+        getrandom::fill(&mut random)
+            .map_err(|_| Error::Plugin("could not create an install confirmation".into()))?;
+        let token: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| Error::Plugin("install confirmation state is unavailable".into()))?;
+        purge_intents(&mut entries);
+        entries.push_back((
+            token.clone(),
+            InstallIntent {
+                profile,
+                spec,
+                source_id,
+                item_id,
+                display_name,
+                expires_at: Instant::now() + INTENT_TTL,
+            },
+        ));
+        while entries.len() > MAX_INTENTS {
+            entries.pop_front();
+        }
+        Ok(token)
+    }
+
+    pub fn consume(&self, token: &str, profile: &str) -> Result<InstallIntent> {
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| Error::Plugin("install confirmation state is unavailable".into()))?;
+        purge_intents(&mut entries);
+        let index = entries
+            .iter()
+            .position(|(candidate, _)| candidate == token)
+            .ok_or_else(|| {
+                Error::Plugin(
+                    "the install confirmation expired or was already used; preview it again".into(),
+                )
+            })?;
+        let (_, intent) = entries.remove(index).expect("the intent index exists");
+        if intent.profile != profile {
+            return Err(Error::Plugin(
+                "the active profile changed after the install preview; preview it again".into(),
+            ));
+        }
+        Ok(intent)
+    }
+}
+
+fn purge_intents(entries: &mut VecDeque<(String, InstallIntent)>) {
+    let now = Instant::now();
+    entries.retain(|(_, intent)| intent.expires_at > now);
 }
 
 /// What a change does to the profile.
@@ -654,7 +740,7 @@ mod tests {
 
     #[cfg(windows)]
     use super::path_with;
-    use super::{forward, is_package_spec, list, split_spec, Stream};
+    use super::{forward, is_package_spec, list, split_spec, PluginIntents, Stream};
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
@@ -831,5 +917,37 @@ mod tests {
             format!("pnpm@{}", crate::harness::install::PNPM_VERSION)
         );
         assert!(!crate::harness::install::PNPM_SPEC.ends_with("@latest"));
+    }
+
+    #[test]
+    fn install_previews_are_profile_bound_and_consumed_once() {
+        let intents = PluginIntents::default();
+        let token = intents
+            .issue(
+                "web".into(),
+                "safe-plugin@1.2.3".into(),
+                "npm".into(),
+                "safe-plugin".into(),
+                "Safe Plugin".into(),
+            )
+            .expect("preview");
+        assert!(intents.consume(&token, "other").is_err());
+        assert!(
+            intents.consume(&token, "web").is_err(),
+            "mismatch consumes the token"
+        );
+
+        let token = intents
+            .issue(
+                "web".into(),
+                "safe-plugin@1.2.3".into(),
+                "npm".into(),
+                "safe-plugin".into(),
+                "Safe Plugin".into(),
+            )
+            .expect("second preview");
+        let intent = intents.consume(&token, "web").expect("consume once");
+        assert_eq!(intent.spec, "safe-plugin@1.2.3");
+        assert!(intents.consume(&token, "web").is_err());
     }
 }

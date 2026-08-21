@@ -18,6 +18,7 @@ vi.mock('@/lib/ipc', () => ({
   profileRoster: vi.fn(),
   profileSelect: vi.fn(),
   pluginSources: vi.fn(),
+  pluginPreview: vi.fn(),
   pluginAdd: vi.fn(),
   pluginRemove: vi.fn(),
   announce: vi.fn(),
@@ -141,17 +142,19 @@ group('answer', () => {
         { id: 'npm', active: true, label: 'npm registry' },
       ] as never)
       vi.mocked(ipc.pluginAdd).mockResolvedValue({ profile: 'web' } as never)
+      vi.mocked(ipc.pluginPreview).mockResolvedValue({ token: 'reviewed-once' } as never)
       vi.mocked(ipc.pluginRemove).mockResolvedValue({ profile: 'web' } as never)
 
       await answer(
         request('plugins.install', { name: '@vendor/tool', version: '1.2.3', displayName: 'Tool' }),
       )
-      expect(ipc.pluginAdd).toHaveBeenCalledWith(
+      expect(ipc.pluginPreview).toHaveBeenCalledWith(
         '@vendor/tool@1.2.3',
         'npm',
         '@vendor/tool',
         'Tool',
       )
+      expect(ipc.pluginAdd).toHaveBeenCalledWith('reviewed-once')
       await answer(request('plugins.remove', { name: '@vendor/tool' }))
       expect(ipc.pluginRemove).toHaveBeenCalledWith('@vendor/tool')
     })

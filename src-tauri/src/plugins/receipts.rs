@@ -299,6 +299,10 @@ mod tests {
             compatibility: Compatibility::Unknown,
             integrity: Some("sha512-YWJj".into()),
             bundle_patch: Some(serde_json::json!({"profile": {}})),
+            lifecycle_scripts: Vec::new(),
+            deprecated: None,
+            repository_verified: true,
+            integrity_verified: true,
         }
     }
 

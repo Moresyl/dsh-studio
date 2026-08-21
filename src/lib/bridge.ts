@@ -144,12 +144,13 @@ export async function answer({ method, params }: Call): Promise<unknown> {
       const sources = await ipc.pluginSources()
       const source = sources.find((candidate) => candidate.active)
       if (!source) throw new Error('no plugin catalog source is active')
-      const profile = await ipc.pluginAdd(
+      const preview = await ipc.pluginPreview(
         `${name}@${version}`,
         source.id,
         name,
         text(params.displayName).trim() || name,
       )
+      const profile = await ipc.pluginAdd(preview.token)
       await ipc.announce('profiles')
       return profile
     }

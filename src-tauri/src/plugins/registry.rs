@@ -48,11 +48,16 @@ pub struct Listing {
     pub weekly_downloads: u64,
     /// Somewhere to read more, if the package said where.
     pub link: Option<String>,
+    /// Source repository asserted by the catalog, separate from a homepage.
+    pub repository: Option<String>,
     pub source_id: String,
     pub source_label: String,
     pub installable: bool,
     #[serde(default)]
     pub categories: Vec<String>,
+    pub has_icon: bool,
+    #[serde(skip)]
+    pub(crate) icon: Option<super::media::Candidate>,
 }
 
 /// What the published manifest says about one package.
@@ -79,6 +84,14 @@ pub struct Detail {
     pub integrity: Option<String>,
     /// The profile patch itself, retained as provenance without executing it.
     pub bundle_patch: Option<serde_json::Value>,
+    /// Package-manager lifecycle hooks that would run local code during install.
+    pub lifecycle_scripts: Vec<String>,
+    /// Presence is a hard market block, even when the registry supplied no text.
+    pub deprecated: Option<String>,
+    /// Set by the catalog command after comparing npm metadata with its source.
+    pub repository_verified: bool,
+    /// True only for a complete SHA-512 Subresource Integrity value.
+    pub integrity_verified: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -135,6 +148,14 @@ pub async fn detail_with_source(node: &Path, name: &str, source: &str) -> Result
 
 /// Resolve and validate the exact package spec immediately before mutation.
 pub async fn preflight(node: &Path, spec: &str) -> Result<Detail> {
+    let detail = resolve(node, spec).await?;
+    validate_preflight(&detail)?;
+    Ok(detail)
+}
+
+/// Resolve an exact candidate for a review UI without weakening execution:
+/// [`preflight`] repeats the same fetch and applies every hard block again.
+pub async fn resolve(node: &Path, spec: &str) -> Result<Detail> {
     if !super::is_package_spec(spec) {
         return Err(Error::Plugin(format!("{spec} is not a package specifier")));
     }
@@ -155,17 +176,72 @@ pub async fn preflight(node: &Path, spec: &str) -> Result<Detail> {
             "preflight resolved {spec} but the registry returned no version"
         )));
     }
+    Ok(detail)
+}
+
+fn validate_preflight(detail: &Detail) -> Result<()> {
+    let version = semver::Version::parse(&detail.version).map_err(|_| {
+        Error::Plugin("the registry did not return a stable semantic version".into())
+    })?;
+    if !version.pre.is_empty() || !version.build.is_empty() {
+        return Err(Error::Plugin(
+            "market installs require a stable exact package version".into(),
+        ));
+    }
     if let Compatibility::Incompatible { reason, .. } = &detail.compatibility {
         return Err(Error::Plugin(format!(
-            "{name} is not compatible with Harness {}: {reason}",
+            "{} is not compatible with Harness {}: {reason}",
+            detail.name,
             crate::harness::install::VERSION
         )));
     }
-    Ok(detail)
+    if detail.deprecated.is_some() {
+        return Err(Error::Plugin(
+            "deprecated packages cannot be installed from the market".into(),
+        ));
+    }
+    if !detail.lifecycle_scripts.is_empty() {
+        return Err(Error::Plugin(format!(
+            "plugin packages with install lifecycle scripts are blocked: {}",
+            detail.lifecycle_scripts.join(", ")
+        )));
+    }
+    if !detail.integrity_verified {
+        return Err(Error::Plugin(
+            "the exact package has no verifiable SHA-512 registry integrity".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) -> Detail {
     let version = string(manifest, "version").unwrap_or_default();
+    let integrity = manifest
+        .pointer("/dist/integrity")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+        .or_else(|| {
+            manifest
+                .pointer("/dist/shasum")
+                .and_then(serde_json::Value::as_str)
+                .map(|value| format!("sha1hex-{value}"))
+        });
+    let lifecycle_scripts = ["preinstall", "install", "postinstall", "prepare"]
+        .into_iter()
+        .filter(|name| manifest.pointer(&format!("/scripts/{name}")).is_some())
+        .map(str::to_string)
+        .collect();
+    let deprecated = manifest.get("deprecated").map(|value| {
+        value
+            .as_str()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("deprecated by its publisher")
+            .chars()
+            .take(500)
+            .collect()
+    });
+    let integrity_verified = integrity.as_deref().is_some_and(valid_sha512_integrity);
     Detail {
         name: string(manifest, "name").unwrap_or_else(|| name.to_string()),
         install_spec: format!("{name}@{version}"),
@@ -185,27 +261,73 @@ fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) 
             .unwrap_or_default(),
         source: source.to_string(),
         compatibility: compatibility(manifest),
-        integrity: manifest
-            .pointer("/dist/integrity")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_string)
-            .or_else(|| {
-                manifest
-                    .pointer("/dist/shasum")
-                    .and_then(serde_json::Value::as_str)
-                    .map(|value| format!("sha1hex-{value}"))
-            }),
+        integrity,
         bundle_patch: manifest.pointer("/dsh/bundle/patch").cloned(),
+        lifecycle_scripts,
+        deprecated,
+        repository_verified: false,
+        integrity_verified,
     }
 }
 
+fn valid_sha512_integrity(value: &str) -> bool {
+    let Some(encoded) = value.strip_prefix("sha512-") else {
+        return false;
+    };
+    encoded.len() == 88
+        && encoded.ends_with("==")
+        && encoded
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'='))
+}
+
+/// Canonical HTTPS repository identity used for catalog backlink checks.
+pub(crate) fn repository_identity(value: &str) -> Option<String> {
+    let value = value.strip_prefix("git+").unwrap_or(value);
+    let mut url = url::Url::parse(value).ok()?;
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+        || url.port().is_some_and(|port| port != 443)
+    {
+        return None;
+    }
+    let mut path = url
+        .path()
+        .trim_end_matches('/')
+        .trim_end_matches(".git")
+        .to_string();
+    if path.is_empty() {
+        path = "/".into();
+    }
+    url.set_path(&path);
+    url.set_query(None);
+    Some(url.to_string().trim_end_matches('/').to_ascii_lowercase())
+}
+
 fn compatibility(manifest: &serde_json::Value) -> Compatibility {
-    let Some(requirement) = manifest
-        .pointer("/peerDependencies/@deepseek-ai~1dsh")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    else {
+    for field in ["dependencies", "peerDependencies", "optionalDependencies"] {
+        let Some(dependencies) = manifest.get(field).and_then(serde_json::Value::as_object) else {
+            continue;
+        };
+        if dependencies.contains_key("cordis") {
+            return Compatibility::Incompatible {
+                requirement: "legacy cordis".into(),
+                reason: "it depends on the legacy Cordis runtime".into(),
+            };
+        }
+    }
+    let requirement = ["peerDependencies", "dependencies", "optionalDependencies"]
+        .into_iter()
+        .find_map(|field| {
+            manifest
+                .pointer(&format!("/{field}/@deepseek-ai~1dsh"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        });
+    let Some(requirement) = requirement else {
         return Compatibility::Unknown;
     };
 
@@ -276,6 +398,7 @@ fn listing(entry: &serde_json::Value) -> Option<Listing> {
     let package = entry.get("package")?;
     let links = package.get("links");
 
+    let repository = links.and_then(|links| string(links, "repository"));
     Some(Listing {
         name: string(package, "name")?,
         version: string(package, "version").unwrap_or_default(),
@@ -295,10 +418,13 @@ fn listing(entry: &serde_json::Value) -> Option<Listing> {
                 .into_iter()
                 .find_map(|key| string(links, key))
         }),
+        repository,
         source_id: "npm".to_string(),
         source_label: "npm registry".to_string(),
         installable: true,
         categories: keywords(package),
+        has_icon: false,
+        icon: None,
     })
 }
 
@@ -329,7 +455,10 @@ fn string(value: &serde_json::Value, key: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{compatibility, detail_from_manifest, listing, Compatibility};
+    use super::{
+        compatibility, detail_from_manifest, listing, repository_identity, validate_preflight,
+        Compatibility,
+    };
 
     #[test]
     fn reads_one_search_result() {
@@ -353,6 +482,10 @@ mod tests {
             listing.link.as_deref(),
             Some("https://example.invalid/notes")
         );
+        assert_eq!(
+            listing.repository.as_deref(),
+            Some("https://example.invalid/notes")
+        );
     }
 
     #[test]
@@ -363,6 +496,7 @@ mod tests {
         assert_eq!(listing.name, "bare");
         assert_eq!(listing.weekly_downloads, 0);
         assert!(listing.link.is_none());
+        assert!(listing.repository.is_none());
     }
 
     #[test]
@@ -400,5 +534,60 @@ mod tests {
             "peerDependencies": { "@deepseek-ai/dsh": "not a range" }
         }));
         assert!(matches!(malformed, Compatibility::Incompatible { .. }));
+
+        let legacy = compatibility(&serde_json::json!({
+            "dependencies": { "cordis": "^3.0.0" }
+        }));
+        assert!(matches!(legacy, Compatibility::Incompatible { .. }));
+    }
+
+    #[test]
+    fn lifecycle_deprecation_and_weak_integrity_are_market_blocks() {
+        let integrity = format!("sha512-{}==", "A".repeat(86));
+        let safe = detail_from_manifest(
+            "safe-plugin",
+            "npm",
+            &serde_json::json!({
+                "name": "safe-plugin",
+                "version": "1.2.3",
+                "dist": { "integrity": integrity }
+            }),
+        );
+        assert!(validate_preflight(&safe).is_ok());
+
+        let scripted = detail_from_manifest(
+            "scripted-plugin",
+            "npm",
+            &serde_json::json!({
+                "name": "scripted-plugin",
+                "version": "1.2.3",
+                "scripts": { "postinstall": "node setup.js" },
+                "dist": { "integrity": format!("sha512-{}==", "A".repeat(86)) }
+            }),
+        );
+        assert!(validate_preflight(&scripted).is_err());
+        assert_eq!(scripted.lifecycle_scripts, ["postinstall"]);
+
+        let deprecated = detail_from_manifest(
+            "old-plugin",
+            "npm",
+            &serde_json::json!({
+                "name": "old-plugin",
+                "version": "1.2.3",
+                "deprecated": "use another package",
+                "dist": { "integrity": "sha1hex-deadbeef" }
+            }),
+        );
+        assert!(validate_preflight(&deprecated).is_err());
+    }
+
+    #[test]
+    fn repository_backlinks_compare_canonical_https_identity() {
+        assert_eq!(
+            repository_identity("git+https://GitHub.com/Owner/Repo.git"),
+            repository_identity("https://github.com/owner/repo/")
+        );
+        assert!(repository_identity("git://github.com/owner/repo.git").is_none());
+        assert!(repository_identity("https://user@github.com/owner/repo").is_none());
     }
 }

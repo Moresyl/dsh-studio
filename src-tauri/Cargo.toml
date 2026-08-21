@@ -120,6 +120,10 @@ tar = "0.4"
 # Diagnostic support archives are written on every platform, while the same
 # reader also unpacks official Node zip archives on Windows.
 zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+# Market images are decoded and re-encoded before crossing into the WebView;
+# this strips metadata and rejects files that only claim to be images.
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

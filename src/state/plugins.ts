@@ -42,6 +42,8 @@ interface PluginStore {
 
   searching: boolean
   loadingDetail: boolean
+  previewing: boolean
+  previewToken: string | null
   /** The package name a change is running against, or null when idle. */
   working: string | null
   error: string | null
@@ -58,7 +60,8 @@ interface PluginStore {
   selectSource: (id: string) => Promise<void>
   addSource: (label: string, endpoint: string) => Promise<boolean>
   removeSource: (id: string) => Promise<void>
-  add: (spec: string) => Promise<void>
+  preview: (spec: string) => Promise<boolean>
+  add: () => Promise<void>
   remove: (name: string) => Promise<void>
   /** Take an installed plugin out of the layer stack, or put it back. */
   toggle: (name: string, enabled: boolean) => Promise<void>
@@ -102,6 +105,8 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   detail: null,
   searching: false,
   loadingDetail: false,
+  previewing: false,
+  previewToken: null,
   working: null,
   error: null,
 
@@ -141,7 +146,13 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   select: async (name, sourceId = 'npm', version = 'latest') => {
     if (name === null) {
-      set({ selected: null, selectedSource: null, selectedVersion: null, detail: null })
+      set({
+        selected: null,
+        selectedSource: null,
+        selectedVersion: null,
+        detail: null,
+        previewToken: null,
+      })
       return
     }
 
@@ -151,6 +162,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       selectedVersion: version,
       detail: null,
       loadingDetail: true,
+      previewToken: null,
     })
     try {
       const detail = await ipc.pluginDetail(sourceId, name, version)
@@ -192,6 +204,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         selectedSource: null,
         selectedVersion: null,
         detail: null,
+        previewToken: null,
         error: null,
       })
     } catch (cause) {
@@ -202,7 +215,17 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   addSource: async (label, endpoint) => {
     try {
       const sources = await ipc.pluginSourceAdd(label, endpoint)
-      set({ sources, results: [], categories: [], total: 0, page: 0, error: null })
+      set({
+        sources,
+        results: [],
+        categories: [],
+        total: 0,
+        page: 0,
+        selected: null,
+        detail: null,
+        previewToken: null,
+        error: null,
+      })
       return true
     } catch (cause) {
       set({ error: describe(cause) })
@@ -221,6 +244,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         page: 0,
         selected: null,
         detail: null,
+        previewToken: null,
         error: null,
       })
     } catch (cause) {
@@ -228,17 +252,43 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     }
   },
 
-  add: async (spec) => {
-    if (get().working) return
+  preview: async (spec) => {
+    if (get().working || get().previewing) return false
     const selected = get().selected
     const sourceId = get().selectedSource
     if (!selected || !sourceId) {
       set({ error: 'The selected market item no longer exists.' })
+      return false
+    }
+    set({ previewing: true, previewToken: null, error: null })
+    try {
+      const preview = await ipc.pluginPreview(
+        spec,
+        sourceId,
+        selected,
+        get().detail?.name ?? selected,
+      )
+      set({ previewToken: preview.token })
+      return true
+    } catch (cause) {
+      set({ error: describe(cause) })
+      return false
+    } finally {
+      set({ previewing: false })
+    }
+  },
+
+  add: async () => {
+    if (get().working) return
+    const token = get().previewToken
+    if (!token) {
+      set({ error: 'The install preview expired. Review the package again.' })
       return
     }
-    set({ working: packageName(spec), error: null })
+    const selected = get().selected ?? 'plugin'
+    set({ working: packageName(selected), previewToken: null, error: null })
     try {
-      landed(set, await ipc.pluginAdd(spec, sourceId, selected, get().detail?.name ?? selected))
+      landed(set, await ipc.pluginAdd(token))
     } catch (cause) {
       set({ error: describe(cause) })
     } finally {

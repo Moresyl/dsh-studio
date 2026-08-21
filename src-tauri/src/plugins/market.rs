@@ -177,10 +177,13 @@ mod tests {
             updated: String::new(),
             weekly_downloads: downloads,
             link: None,
+            repository: None,
             source_id: "test".into(),
             source_label: "Test".into(),
             installable: true,
             categories: vec![category.into()],
+            has_icon: false,
+            icon: None,
         }
     }
 

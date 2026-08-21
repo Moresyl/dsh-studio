@@ -101,7 +101,7 @@ pub async fn add(label: &str, endpoint: &str) -> Result<Vec<Source>> {
     // Registration proves the endpoint answers the public contract before it
     // can become an active source.
     let value = restricted_json(endpoint.as_str()).await?;
-    parse_standard(&value, "registration", &label, "").map(|_| ())?;
+    parse_standard(&value, "registration", &label, "", endpoint.as_str()).map(|_| ())?;
 
     let mut settings = load();
     if settings.custom.len() >= MAX_CUSTOM {
@@ -162,17 +162,9 @@ pub async fn search(source_id: &str, query: &str) -> Result<Vec<Listing>> {
                 .find(|source| source.id == custom)
                 .ok_or_else(|| Error::Plugin(format!("unknown catalog source {custom}")))?;
             let value = restricted_json(&source.endpoint).await?;
-            parse_standard(&value, &source.id, &source.label, query)
+            parse_standard(&value, &source.id, &source.label, query, &source.endpoint)
         }
     }
-}
-
-pub fn label(id: &str) -> String {
-    sources()
-        .into_iter()
-        .find(|source| source.id == id)
-        .map(|source| source.label)
-        .unwrap_or_else(|| id.to_string())
 }
 
 async fn restricted_json(start: &str) -> Result<serde_json::Value> {
@@ -361,6 +353,8 @@ fn parse_store(value: &serde_json::Value, query: &str) -> Result<Vec<Listing>> {
         if !query.is_empty() && !haystack.contains(&query) {
             continue;
         }
+        let repository = safe_github(package.get("url").and_then(serde_json::Value::as_str));
+        let icon = store_icon(package, repository.as_deref());
         listings.push(Listing {
             name: name.to_string(),
             version: version.to_string(),
@@ -373,11 +367,14 @@ fn parse_store(value: &serde_json::Value, query: &str) -> Result<Vec<Listing>> {
                 .get("installs7d")
                 .and_then(serde_json::Value::as_u64)
                 .unwrap_or_default(),
-            link: safe_github(package.get("url").and_then(serde_json::Value::as_str)),
+            link: repository.clone(),
+            repository,
             source_id: STORE_ID.to_string(),
             source_label: STORE_LABEL.to_string(),
             installable: true,
             categories: categories(package),
+            has_icon: icon.is_some(),
+            icon,
         });
     }
     Ok(listings)
@@ -388,6 +385,7 @@ fn parse_standard(
     source_id: &str,
     source_label: &str,
     query: &str,
+    endpoint: &str,
 ) -> Result<Vec<Listing>> {
     if value
         .get("schemaVersion")
@@ -437,6 +435,11 @@ fn parse_standard(
         if !query.is_empty() && !haystack.contains(&query) {
             continue;
         }
+        let repository = item
+            .pointer("/repository/url")
+            .and_then(serde_json::Value::as_str)
+            .and_then(|value| safe_url(value).ok().map(|url| url.to_string()));
+        let icon = standard_icon(item, endpoint);
         listings.push(Listing {
             name: name.to_string(),
             version: version.to_string(),
@@ -444,17 +447,76 @@ fn parse_standard(
             publisher,
             updated: text(item, "updatedAt", 64).unwrap_or_default(),
             weekly_downloads: 0,
-            link: item
-                .pointer("/repository/url")
-                .and_then(serde_json::Value::as_str)
-                .and_then(|value| safe_url(value).ok().map(|url| url.to_string())),
+            link: repository.clone(),
+            repository,
             source_id: source_id.to_string(),
             source_label: source_label.to_string(),
             installable: true,
             categories: categories(item),
+            has_icon: icon.is_some(),
+            icon,
         });
     }
     Ok(listings)
+}
+
+fn standard_icon(item: &serde_json::Value, endpoint: &str) -> Option<super::media::Candidate> {
+    let raw = item.pointer("/media/icon/url")?.as_str()?;
+    let source = safe_url(endpoint).ok()?;
+    let icon = safe_url(raw).ok()?;
+    if icon.origin().ascii_serialization() != source.origin().ascii_serialization() {
+        return None;
+    }
+    Some(super::media::Candidate {
+        url: icon.to_string(),
+        allowed_hosts: vec![icon.host_str()?.to_ascii_lowercase()],
+    })
+}
+
+fn store_icon(
+    package: &serde_json::Value,
+    repository: Option<&str>,
+) -> Option<super::media::Candidate> {
+    if let Some(raw) = package
+        .pointer("/media/icon/url")
+        .and_then(serde_json::Value::as_str)
+    {
+        let icon = safe_url(raw).ok()?;
+        let host = icon.host_str()?.to_ascii_lowercase();
+        if matches!(
+            host.as_str(),
+            "deepseek1024.com" | "github.com" | "avatars.githubusercontent.com"
+        ) {
+            let allowed_hosts = if host == "github.com" {
+                vec!["github.com".into(), "avatars.githubusercontent.com".into()]
+            } else {
+                vec![host]
+            };
+            return Some(super::media::Candidate {
+                url: icon.to_string(),
+                allowed_hosts,
+            });
+        }
+    }
+    let repository = safe_url(repository?).ok()?;
+    if repository.host_str()? != "github.com" {
+        return None;
+    }
+    let owner = repository
+        .path_segments()?
+        .find(|segment| !segment.is_empty())?;
+    if owner.is_empty()
+        || owner.len() > 39
+        || !owner
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return None;
+    }
+    Some(super::media::Candidate {
+        url: format!("https://github.com/{owner}.png?size=96"),
+        allowed_hosts: vec!["github.com".into(), "avatars.githubusercontent.com".into()],
+    })
 }
 
 fn categories(value: &serde_json::Value) -> Vec<String> {
@@ -601,19 +663,59 @@ mod tests {
     #[test]
     fn standard_catalog_accepts_only_exact_npm_targets() {
         let value = serde_json::json!({ "schemaVersion": "1.0.0", "items": [
-            { "package": { "name": "safe-plugin" }, "latestVersion": "1.2.3", "summary": "Safe" },
+            { "package": { "name": "safe-plugin" }, "latestVersion": "1.2.3", "summary": "Safe",
+              "media": { "icon": { "url": "https://catalog.example/assets/safe.png" } } },
             { "package": { "name": "git+https://bad" }, "latestVersion": "main", "summary": "Bad" }
         ]});
-        let items = parse_standard(&value, "custom-a", "A", "").expect("catalog");
+        let items = parse_standard(
+            &value,
+            "custom-a",
+            "A",
+            "",
+            "https://catalog.example/plugins.json",
+        )
+        .expect("catalog");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].name, "safe-plugin");
         assert_eq!(items[0].source_id, "custom-a");
+        assert!(items[0].has_icon);
+        assert_eq!(
+            items[0].icon.as_ref().map(|icon| icon.url.as_str()),
+            Some("https://catalog.example/assets/safe.png")
+        );
+    }
+
+    #[test]
+    fn standard_catalog_omits_cross_origin_media_without_losing_the_item() {
+        let value = serde_json::json!({ "schemaVersion": "1.0.0", "items": [{
+            "package": { "name": "safe-plugin" },
+            "latestVersion": "1.2.3",
+            "media": { "icon": { "url": "https://tracker.example/pixel.png" } }
+        }]});
+        let items = parse_standard(
+            &value,
+            "custom-a",
+            "A",
+            "",
+            "https://catalog.example/plugins.json",
+        )
+        .expect("catalog");
+        assert_eq!(items.len(), 1);
+        assert!(!items[0].has_icon);
+        assert!(items[0].icon.is_none());
     }
 
     #[test]
     fn standard_catalog_rejects_unknown_contract_versions() {
         let value = serde_json::json!({ "schemaVersion": "2.0.0", "items": [] });
-        assert!(parse_standard(&value, "custom-a", "A", "").is_err());
+        assert!(parse_standard(
+            &value,
+            "custom-a",
+            "A",
+            "",
+            "https://catalog.example/plugins.json"
+        )
+        .is_err());
     }
 
     #[test]
