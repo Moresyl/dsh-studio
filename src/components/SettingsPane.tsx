@@ -6,6 +6,7 @@ import {
   CircleX,
   Keyboard,
   Power,
+  PanelsTopLeft,
   SunMoon,
   TriangleAlert,
   X,
@@ -19,6 +20,7 @@ import { t } from '@/lib/i18n'
 import { readCombination, spellCombination } from '@/lib/keys'
 import { isMac } from '@/lib/platform'
 import { useStartup } from '@/state/startup'
+import { usePresentation } from '@/state/presentation'
 
 /**
  * Settings that outlive the window.
@@ -42,6 +44,8 @@ export function SettingsPane() {
   const setAutostart = useStartup((store) => store.setAutostart)
   const setNotification = useStartup((store) => store.setNotification)
   const retry = useStartup((store) => store.retry)
+  const presentation = usePresentation((store) => store.mode)
+  const choosePresentation = usePresentation((store) => store.choose)
 
   // Asked again on every visit rather than once at launch: both of these can be
   // taken away from outside the app — the login item from Task Manager, the key
@@ -109,6 +113,23 @@ export function SettingsPane() {
               hint={t('settings.appearanceHint')}
             >
               <ThemeSwitch />
+            </Row>
+
+            <Row
+              icon={PanelsTopLeft}
+              label={t('settings.presentation')}
+              hint={t('settings.presentationHint')}
+            >
+              <select
+                value={presentation}
+                onChange={(event) =>
+                  choosePresentation(event.target.value as 'compatibility' | 'advanced')
+                }
+                className="h-[30px] rounded-control border border-line-strong bg-surface-2 px-2.5 text-[11.5px] text-text outline-none focus:border-brand"
+              >
+                <option value="compatibility">{t('settings.presentation.compatibility')}</option>
+                <option value="advanced">{t('settings.presentation.advanced')}</option>
+              </select>
             </Row>
 
             <Row

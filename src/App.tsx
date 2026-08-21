@@ -21,6 +21,7 @@ import { useDialog } from '@/state/dialog'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
 import { usePalette } from '@/state/palette'
+import { usePresentation } from '@/state/presentation'
 import { subscribeToProfiles } from '@/state/profiles'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { subscribeToTerminals } from '@/state/terminals'
@@ -46,11 +47,8 @@ export default function App() {
   const consider = useOnboarding((state) => state.consider)
   const origin = status.phase === 'ready' ? status.origin : null
 
-  // Which harness the user asked to look away from, rather than a bare boolean.
-  // Tying the request to an origin means a newly started harness is shown
-  // without an effect having to reach in and reset a flag — and a restart, which
-  // lands on a fresh port, is a new origin and so gets the same treatment.
-  const [panelFor, setPanelFor] = useState<string | null>(null)
+  const presentation = usePresentation((state) => state.mode)
+  const choosePresentation = usePresentation((state) => state.choose)
   const [view, setView] = useState<View>('console')
   // Held by the window rather than by the title bar that opens it: the manager
   // covers the window, and a modal inside a strip 36px tall would be positioned
@@ -74,9 +72,9 @@ export default function App() {
   const show = useCallback(
     (next: View) => {
       setView(next)
-      setPanelFor(origin)
+      choosePresentation('advanced')
     },
-    [origin],
+    [choosePresentation],
   )
 
   // The one look at the machine, owned here rather than by a pane, because two
@@ -220,7 +218,7 @@ export default function App() {
   }, [managing, stage, show])
 
   // With nothing serving there is nothing else to show.
-  const showPanel = origin === null || panelFor === origin
+  const showPanel = origin === null || presentation === 'advanced'
 
   return (
     // No ground of its own: the body is the window's ground, and where a
@@ -230,7 +228,7 @@ export default function App() {
         serving={origin !== null}
         panelOpen={showPanel}
         onTogglePanel={
-          origin ? () => setPanelFor((current) => (current === origin ? null : origin)) : undefined
+          origin ? () => choosePresentation(showPanel ? 'compatibility' : 'advanced') : undefined
         }
         // Not while the guide is up: which profile to work in is a question for
         // somebody who already has a harness to point at one.

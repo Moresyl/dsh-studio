@@ -769,7 +769,7 @@ export const windowOpen = (): Promise<void> => invoke('window_open')
  * shells are already emitted from Rust to every window, and echoing one of them
  * would be a second source of truth for something that has one.
  */
-export type Shared = 'theme' | 'profiles'
+export type Shared = 'theme' | 'profiles' | 'presentation'
 
 /** Channel the windows use to poke each other. */
 const SHARED_CHANNEL = 'shell://changed'

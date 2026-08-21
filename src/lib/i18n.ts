@@ -442,6 +442,11 @@ const en = {
   'settings.retake': 'Try again',
   'settings.appearance': 'Appearance',
   'settings.appearanceHint': 'Also on the title bar, next to the window controls.',
+  'settings.presentation': 'Default presentation',
+  'settings.presentationHint':
+    'Compatibility opens the upstream Harness UI. Advanced opens Studio tools and native framing.',
+  'settings.presentation.compatibility': 'Compatibility',
+  'settings.presentation.advanced': 'Advanced',
   'settings.turnCompleted': 'Turn completed',
   'settings.turnCompletedHint':
     'Notify when a direct user turn finishes while the app is in the background.',
@@ -963,6 +968,10 @@ const zh: Record<MessageKey, string> = {
   'settings.retake': '重试',
   'settings.appearance': '外观',
   'settings.appearanceHint': '标题栏上也有一份，就在窗口按钮旁边。',
+  'settings.presentation': '默认界面模式',
+  'settings.presentationHint': '兼容模式直接打开上游 Harness；高级模式打开 Studio 工具与原生框架。',
+  'settings.presentation.compatibility': '兼容模式',
+  'settings.presentation.advanced': '高级模式',
   'settings.turnCompleted': '用户回合完成',
   'settings.turnCompletedHint': '应用处于后台时，用户直接发起的回合完成后通知。',
   'settings.turnFailed': '用户回合需要处理',
