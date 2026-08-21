@@ -13,6 +13,7 @@ import { create } from 'zustand'
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type { Startup } from '@/lib/ipc'
+import type { NotificationPreference } from '@/lib/ipc'
 
 interface StartupStore {
   /** Null until the first read lands. */
@@ -25,6 +26,7 @@ interface StartupStore {
   setAutostart: (enabled: boolean) => Promise<void>
   /** `null` gives the key up. */
   setShortcut: (accelerator: string | null) => Promise<void>
+  setNotification: (kind: NotificationPreference, enabled: boolean) => Promise<void>
   /** Take the same key again after another program has let go of it. */
   retry: () => Promise<void>
 }
@@ -48,6 +50,10 @@ export const useStartup = create<StartupStore>((set, get) => ({
 
   setShortcut: async (accelerator) => {
     await change(set, get, () => ipc.startupShortcut(accelerator))
+  },
+
+  setNotification: async (kind, enabled) => {
+    await change(set, get, () => ipc.startupNotification(kind, enabled))
   },
 
   retry: async () => {

@@ -160,14 +160,16 @@ pub fn attention<R: Runtime>(
     if window.is_focused().unwrap_or(false) {
         return Ok(());
     }
-    let (title, body) = match kind {
+    let (title, body, attention) = match kind {
         "job-completed" => (
             crate::locale::pick("Background job completed", "后台任务已完成"),
             crate::locale::pick("A background job has finished.", "有一个后台任务已经结束。"),
+            crate::startup::Attention::JobCompleted,
         ),
         "job-failed" => (
             crate::locale::pick("Background job needs attention", "后台任务需要处理"),
             crate::locale::pick("A background job has failed.", "有一个后台任务执行失败。"),
+            crate::startup::Attention::JobFailed,
         ),
         _ => {
             return Err(Error::Desktop(
@@ -175,6 +177,9 @@ pub fn attention<R: Runtime>(
             ))
         }
     };
+    if !crate::startup::attention_enabled(attention) {
+        return Ok(());
+    }
     notify(app, title, body)?;
     let _ = window.request_user_attention(Some(UserAttentionType::Informational));
     Ok(())

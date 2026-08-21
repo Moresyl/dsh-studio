@@ -79,6 +79,37 @@ pub struct Startup {
     pub held: bool,
     /// What to offer when nothing is chosen yet.
     pub suggested: &'static str,
+    /// Which background outcomes are allowed to ask for attention.
+    pub notifications: Notifications,
+}
+
+/// Notification preferences owned by the desktop shell.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Notifications {
+    pub turn_completed: bool,
+    pub turn_failed: bool,
+    pub job_completed: bool,
+    pub job_failed: bool,
+}
+
+impl Default for Notifications {
+    fn default() -> Self {
+        Self {
+            turn_completed: true,
+            turn_failed: true,
+            job_completed: true,
+            job_failed: true,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum Attention {
+    TurnCompleted,
+    TurnFailed,
+    JobCompleted,
+    JobFailed,
 }
 
 /// Restore the shortcut the user chose last time.
@@ -156,9 +187,9 @@ pub fn startup_shortcut<R: Runtime>(
         keys.held.store(true, Ordering::Relaxed);
     }
 
-    write(&Saved {
-        shortcut: accelerator.clone(),
-    })?;
+    let mut saved = read();
+    saved.shortcut = accelerator.clone();
+    write(&saved)?;
     if let Ok(mut wanted) = keys.wanted.lock() {
         *wanted = accelerator;
     }
@@ -166,7 +197,45 @@ pub fn startup_shortcut<R: Runtime>(
     Ok(report(&app, &keys))
 }
 
+/// Change one notification preference without overwriting choices made by
+/// another window between its read and this write.
+#[tauri::command]
+pub fn startup_notification<R: Runtime>(
+    app: AppHandle<R>,
+    keys: State<'_, Keys>,
+    kind: String,
+    enabled: bool,
+) -> Result<Startup> {
+    let mut saved = read();
+    match kind.as_str() {
+        "turn-completed" => saved.notifications.turn_completed = enabled,
+        "turn-failed" => saved.notifications.turn_failed = enabled,
+        "job-completed" => saved.notifications.job_completed = enabled,
+        "job-failed" => saved.notifications.job_failed = enabled,
+        _ => {
+            return Err(Error::Startup(
+                "the notification preference is not supported".into(),
+            ))
+        }
+    }
+    write(&saved)?;
+    Ok(report(&app, &keys))
+}
+
+/// Read at the moment attention would be requested. Notifications are rare,
+/// and this makes changes from another window effective without a second cache.
+pub fn attention_enabled(attention: Attention) -> bool {
+    let notifications = read().notifications;
+    match attention {
+        Attention::TurnCompleted => notifications.turn_completed,
+        Attention::TurnFailed => notifications.turn_failed,
+        Attention::JobCompleted => notifications.job_completed,
+        Attention::JobFailed => notifications.job_failed,
+    }
+}
+
 fn report<R: Runtime>(app: &AppHandle<R>, keys: &Keys) -> Startup {
+    let saved = read();
     Startup {
         // Asked of the system rather than remembered, because the login item can
         // be taken away from outside this application — Task Manager's startup
@@ -175,6 +244,7 @@ fn report<R: Runtime>(app: &AppHandle<R>, keys: &Keys) -> Startup {
         shortcut: keys.wanted.lock().ok().and_then(|wanted| wanted.clone()),
         held: keys.held.load(Ordering::Relaxed),
         suggested: SUGGESTED,
+        notifications: saved.notifications,
     }
 }
 
@@ -249,6 +319,7 @@ fn summon<R: Runtime>(app: &AppHandle<R>) {
 #[serde(default, rename_all = "camelCase")]
 struct Saved {
     shortcut: Option<String>,
+    notifications: Notifications,
 }
 
 fn file() -> PathBuf {
@@ -334,5 +405,15 @@ mod tests {
     #[test]
     fn the_standby_flag_is_a_flag() {
         assert!(STANDBY_FLAG.starts_with("--"));
+    }
+
+    #[test]
+    fn notifications_default_on_and_old_files_migrate() {
+        let saved: Saved = serde_json::from_str(r#"{"shortcut":"Control+KeyD"}"#).unwrap();
+        assert_eq!(saved.notifications, Notifications::default());
+        assert!(saved.notifications.turn_completed);
+        assert!(saved.notifications.turn_failed);
+        assert!(saved.notifications.job_completed);
+        assert!(saved.notifications.job_failed);
     }
 }

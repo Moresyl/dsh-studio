@@ -414,7 +414,7 @@ const en = {
   'palette.close': 'Close',
 
   'settings.title': 'Settings',
-  'settings.subtitle': 'How this machine reaches DSH Studio',
+  'settings.subtitle': 'Desktop behavior and background attention',
   'settings.autostart': 'Start at login',
   'settings.autostartHint':
     'Wait in the tray as soon as you sign in. The harness is not started until you ask for it.',
@@ -431,6 +431,15 @@ const en = {
   'settings.retake': 'Try again',
   'settings.appearance': 'Appearance',
   'settings.appearanceHint': 'Also on the title bar, next to the window controls.',
+  'settings.turnCompleted': 'Turn completed',
+  'settings.turnCompletedHint':
+    'Notify when a direct user turn finishes while the app is in the background.',
+  'settings.turnFailed': 'Turn needs attention',
+  'settings.turnFailedHint': 'Notify when a direct user turn fails or reaches its token limit.',
+  'settings.jobCompleted': 'Background job completed',
+  'settings.jobCompletedHint': 'Notify when a Harness background job finishes.',
+  'settings.jobFailed': 'Background job failed',
+  'settings.jobFailedHint': 'Notify when a Harness background job fails.',
 
   'about.title': 'About',
   'about.subtitle': 'What this build is, and where it keeps things',
@@ -603,7 +612,8 @@ const zh: Record<MessageKey, string> = {
   'statusbar.reveal': '在文件管理器中显示',
   'workspace.choose': '选择工作区…',
   'workspace.restartTitle': '要重启 Harness 吗？',
-  'workspace.restartBody': '工作目录在 Harness 启动时确定。立即重启后，新会话和工具将使用这个工作区。',
+  'workspace.restartBody':
+    '工作目录在 Harness 启动时确定。立即重启后，新会话和工具将使用这个工作区。',
   'workspace.restartConfirm': '在这里重启',
 
   'log.empty': '暂无输出。',
@@ -914,7 +924,7 @@ const zh: Record<MessageKey, string> = {
   'palette.close': '关闭',
 
   'settings.title': '设置',
-  'settings.subtitle': '这台电脑如何找到 DSH Studio',
+  'settings.subtitle': '桌面行为与后台提醒',
   'settings.autostart': '开机自启',
   'settings.autostartHint': '登录后即在托盘待命。Harness 仍要由你启动，不会自行运行。',
   'settings.shortcut': '全局快捷键',
@@ -929,6 +939,14 @@ const zh: Record<MessageKey, string> = {
   'settings.retake': '重试',
   'settings.appearance': '外观',
   'settings.appearanceHint': '标题栏上也有一份，就在窗口按钮旁边。',
+  'settings.turnCompleted': '用户回合完成',
+  'settings.turnCompletedHint': '应用处于后台时，用户直接发起的回合完成后通知。',
+  'settings.turnFailed': '用户回合需要处理',
+  'settings.turnFailedHint': '用户直接发起的回合失败或达到令牌上限时通知。',
+  'settings.jobCompleted': '后台任务完成',
+  'settings.jobCompletedHint': 'Harness 后台任务完成后通知。',
+  'settings.jobFailed': '后台任务失败',
+  'settings.jobFailedHint': 'Harness 后台任务执行失败时通知。',
 
   'about.title': '关于',
   'about.subtitle': '这个版本是什么，以及它把东西放在哪里',

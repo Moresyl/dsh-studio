@@ -17,6 +17,16 @@ enum Outcome {
     Failed,
 }
 
+impl Outcome {
+    fn enabled(self) -> bool {
+        let attention = match self {
+            Outcome::Completed => crate::startup::Attention::TurnCompleted,
+            Outcome::Failed => crate::startup::Attention::TurnFailed,
+        };
+        crate::startup::attention_enabled(attention)
+    }
+}
+
 struct Observer {
     root: PathBuf,
     since: i64,
@@ -75,6 +85,9 @@ pub fn wire(app: &AppHandle) {
                 continue;
             }
             for outcome in outcomes {
+                if !outcome.enabled() {
+                    continue;
+                }
                 let (title, body) = copy(outcome);
                 let _ = crate::desktop::notify(&handle, title, body);
                 if let Some(window) = crate::window::front(&handle) {

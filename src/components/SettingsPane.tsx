@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType, KeyboardEvent, ReactNode } from 'react'
-import { Keyboard, Power, SunMoon, TriangleAlert, X } from 'lucide-react'
+import {
+  BellRing,
+  CircleCheck,
+  CircleX,
+  Keyboard,
+  Power,
+  SunMoon,
+  TriangleAlert,
+  X,
+} from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
@@ -12,7 +21,7 @@ import { isMac } from '@/lib/platform'
 import { useStartup } from '@/state/startup'
 
 /**
- * The three settings that outlive the window.
+ * Settings that outlive the window.
  *
  * Everything else this app can be told is a property of a profile, a session or
  * a plugin, and lives next to the thing it changes. What is left is the handful
@@ -31,6 +40,7 @@ export function SettingsPane() {
   const error = useStartup((store) => store.error)
   const refresh = useStartup((store) => store.refresh)
   const setAutostart = useStartup((store) => store.setAutostart)
+  const setNotification = useStartup((store) => store.setNotification)
   const retry = useStartup((store) => store.retry)
 
   // Asked again on every visit rather than once at launch: both of these can be
@@ -99,6 +109,62 @@ export function SettingsPane() {
               hint={t('settings.appearanceHint')}
             >
               <ThemeSwitch />
+            </Row>
+
+            <Row
+              icon={BellRing}
+              label={t('settings.turnCompleted')}
+              hint={t('settings.turnCompletedHint')}
+            >
+              <Switch
+                on={state?.notifications.turnCompleted ?? true}
+                busy={busy}
+                disabled={!ready}
+                label={t('settings.turnCompleted')}
+                onChange={(on) => void setNotification('turn-completed', on)}
+              />
+            </Row>
+
+            <Row
+              icon={CircleX}
+              label={t('settings.turnFailed')}
+              hint={t('settings.turnFailedHint')}
+            >
+              <Switch
+                on={state?.notifications.turnFailed ?? true}
+                busy={busy}
+                disabled={!ready}
+                label={t('settings.turnFailed')}
+                onChange={(on) => void setNotification('turn-failed', on)}
+              />
+            </Row>
+
+            <Row
+              icon={CircleCheck}
+              label={t('settings.jobCompleted')}
+              hint={t('settings.jobCompletedHint')}
+            >
+              <Switch
+                on={state?.notifications.jobCompleted ?? true}
+                busy={busy}
+                disabled={!ready}
+                label={t('settings.jobCompleted')}
+                onChange={(on) => void setNotification('job-completed', on)}
+              />
+            </Row>
+
+            <Row
+              icon={TriangleAlert}
+              label={t('settings.jobFailed')}
+              hint={t('settings.jobFailedHint')}
+            >
+              <Switch
+                on={state?.notifications.jobFailed ?? true}
+                busy={busy}
+                disabled={!ready}
+                label={t('settings.jobFailed')}
+                onChange={(on) => void setNotification('job-failed', on)}
+              />
             </Row>
           </div>
 

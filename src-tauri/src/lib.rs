@@ -154,6 +154,7 @@ pub fn run() {
             startup::startup_state,
             startup::startup_autostart,
             startup::startup_shortcut,
+            startup::startup_notification,
             material::window_material,
             window::window_open,
             desktop::commands::desktop_offer,

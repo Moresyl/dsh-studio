@@ -826,7 +826,18 @@ export interface Startup {
   held: boolean
   /** What to offer when nothing is chosen yet. */
   suggested: string
+  notifications: NotificationPreferences
 }
+
+export interface NotificationPreferences {
+  turnCompleted: boolean
+  turnFailed: boolean
+  jobCompleted: boolean
+  jobFailed: boolean
+}
+
+export type NotificationPreference =
+  'turn-completed' | 'turn-failed' | 'job-completed' | 'job-failed'
 
 export const startupState = (): Promise<Startup> => invoke('startup_state')
 
@@ -836,6 +847,11 @@ export const startupAutostart = (enabled: boolean): Promise<Startup> =>
 /** `null` gives up the key. Anything else is registered before it is saved. */
 export const startupShortcut = (accelerator: string | null): Promise<Startup> =>
   invoke('startup_shortcut', { accelerator })
+
+export const startupNotification = (
+  kind: NotificationPreference,
+  enabled: boolean,
+): Promise<Startup> => invoke('startup_notification', { kind, enabled })
 
 /* -------------------------------------------------------------------------- */
 /* About                                                                      */
