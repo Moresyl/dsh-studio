@@ -242,6 +242,20 @@ export interface PluginListing {
   sourceId: string
   sourceLabel: string
   installable: boolean
+  categories: string[]
+}
+
+export type PluginSort = 'relevance' | 'updated' | 'name' | 'downloads'
+
+export interface PluginPage {
+  items: PluginListing[]
+  categories: string[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+  /** Unix seconds when this source/query index was fetched. */
+  indexedAt: number
 }
 
 export interface CatalogSource {
@@ -286,8 +300,13 @@ export const pluginRecoveryNotice = (): Promise<PluginRecoveryNotice | null> =>
 
 export const pluginRecoveryAcknowledge = (): Promise<void> => invoke('plugin_recovery_acknowledge')
 
-export const pluginSearch = (query: string): Promise<PluginListing[]> =>
-  invoke('plugin_search', { query })
+export const pluginSearch = (
+  query: string,
+  category: string | null,
+  sort: PluginSort,
+  page: number,
+  refresh = false,
+): Promise<PluginPage> => invoke('plugin_search', { query, category, sort, page, refresh })
 
 export const pluginDetail = (
   sourceId: string,

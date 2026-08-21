@@ -2,12 +2,15 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNo
 import { open as pickFile } from '@tauri-apps/plugin-dialog'
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Info,
   Layers,
   Loader2,
   Package,
   PackagePlus,
+  RefreshCw,
   Search,
   Settings2,
   Trash2,
@@ -23,7 +26,7 @@ import { Switch } from '@/components/Switch'
 import { TabButton } from '@/components/TabButton'
 import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
-import type { InstalledPlugin, PluginListing } from '@/lib/ipc'
+import type { InstalledPlugin, PluginListing, PluginSort } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
 import { isInstalled, usePlugins } from '@/state/plugins'
@@ -59,6 +62,11 @@ type Tab = 'discover' | 'installed'
 export function PluginMarket() {
   const profile = usePlugins((state) => state.profile)
   const results = usePlugins((state) => state.results)
+  const categories = usePlugins((state) => state.categories)
+  const total = usePlugins((state) => state.total)
+  const landedPage = usePlugins((state) => state.page)
+  const pageSize = usePlugins((state) => state.pageSize)
+  const hasMore = usePlugins((state) => state.hasMore)
   const sources = usePlugins((state) => state.sources)
   const selected = usePlugins((state) => state.selected)
   const searching = usePlugins((state) => state.searching)
@@ -75,6 +83,9 @@ export function PluginMarket() {
 
   const [tab, setTab] = useState<Tab>('discover')
   const [query, setQuery] = useState('')
+  const [category, setCategory] = useState<string | null>(null)
+  const [sort, setSort] = useState<PluginSort>('relevance')
+  const [page, setPage] = useState(0)
   const [managingSources, setManagingSources] = useState(false)
   const field = useRef<HTMLInputElement>(null)
   const activeSource = sources.find((source) => source.active) ?? null
@@ -141,9 +152,12 @@ export function PluginMarket() {
   // The empty query is what fills the pane on arrival, so it runs immediately;
   // everything after it is somebody typing.
   useEffect(() => {
-    const timer = window.setTimeout(() => void search(query), query === '' ? 0 : DEBOUNCE)
+    const timer = window.setTimeout(
+      () => void search(query, category, sort, page),
+      query === '' ? 0 : DEBOUNCE,
+    )
     return () => window.clearTimeout(timer)
-  }, [query, search, activeSource?.id])
+  }, [query, category, sort, page, search, activeSource?.id])
 
   const installed = profile?.plugins ?? []
   const removable = installed.filter((plugin) => !plugin.builtin).length
@@ -188,72 +202,161 @@ export function PluginMarket() {
         </PaneHeader>
 
         {tab === 'discover' && (
-          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
-            <select
-              value={activeSource?.id ?? 'npm'}
-              onChange={(event) => void selectSource(event.target.value)}
-              aria-label={t('plugins.source')}
-              className="h-7 max-w-[150px] rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
-            >
-              {sources.map((source) => (
-                <option key={source.id} value={source.id}>
-                  {source.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={() => setManagingSources(true)}
-              data-hint={t('plugins.sources.manage')}
-              aria-label={t('plugins.sources.manage')}
-              className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text"
-            >
-              <Settings2 size={13} aria-hidden="true" />
-            </button>
-            <Search
-              size={14}
-              strokeWidth={2.1}
-              className="shrink-0 text-faint"
-              aria-hidden="true"
-            />
-            <input
-              ref={field}
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              // Escape empties a search field on every platform, and does it
-              // without taking the caret out of the field.
-              onKeyDown={(event) => {
-                if (event.key === 'Escape' && query !== '') {
-                  event.stopPropagation()
-                  setQuery('')
-                }
-              }}
-              placeholder={t('plugins.search')}
-              spellCheck={false}
-              autoComplete="off"
-              className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
-            />
-            {searching && (
-              <Loader2 size={13} className="shrink-0 animate-spin text-faint" aria-hidden="true" />
-            )}
-            {/* The browser's own clear button is hidden, so here is one that
-                matches the rest of the window — and clearing puts the caret
-                back where the typing was. */}
-            {query !== '' && !searching && (
+          <div className="shrink-0 border-b border-line">
+            <div className="flex h-11 items-center gap-2 px-4">
+              <select
+                value={activeSource?.id ?? 'npm'}
+                onChange={(event) => {
+                  setCategory(null)
+                  setPage(0)
+                  void selectSource(event.target.value)
+                }}
+                aria-label={t('plugins.source')}
+                className="h-7 max-w-[150px] rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
+              >
+                {sources.map((source) => (
+                  <option key={source.id} value={source.id}>
+                    {source.label}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
-                data-hint={t('action.clearSearch')}
-                aria-label={t('action.clearSearch')}
-                onClick={() => {
-                  setQuery('')
-                  field.current?.focus()
-                }}
-                className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
+                onClick={() => setManagingSources(true)}
+                data-hint={t('plugins.sources.manage')}
+                aria-label={t('plugins.sources.manage')}
+                className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text"
               >
-                <X size={11} strokeWidth={2.4} aria-hidden="true" />
+                <Settings2 size={13} aria-hidden="true" />
               </button>
-            )}
+              <Search
+                size={14}
+                strokeWidth={2.1}
+                className="shrink-0 text-faint"
+                aria-hidden="true"
+              />
+              <input
+                ref={field}
+                type="search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value)
+                  setPage(0)
+                }}
+                // Escape empties a search field on every platform, and does it
+                // without taking the caret out of the field.
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && query !== '') {
+                    event.stopPropagation()
+                    setQuery('')
+                  }
+                }}
+                placeholder={t('plugins.search')}
+                spellCheck={false}
+                autoComplete="off"
+                className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
+              />
+              {searching && (
+                <Loader2
+                  size={13}
+                  className="shrink-0 animate-spin text-faint"
+                  aria-hidden="true"
+                />
+              )}
+              {/* The browser's own clear button is hidden, so here is one that
+                matches the rest of the window — and clearing puts the caret
+                back where the typing was. */}
+              {query !== '' && !searching && (
+                <button
+                  type="button"
+                  data-hint={t('action.clearSearch')}
+                  aria-label={t('action.clearSearch')}
+                  onClick={() => {
+                    setQuery('')
+                    setPage(0)
+                    field.current?.focus()
+                  }}
+                  className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
+                >
+                  <X size={11} strokeWidth={2.4} aria-hidden="true" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex h-9 items-center gap-2 border-t border-line/70 px-4">
+              <select
+                value={category ?? ''}
+                onChange={(event) => {
+                  setCategory(event.target.value || null)
+                  setPage(0)
+                }}
+                aria-label={t('plugins.category.all')}
+                className="h-7 max-w-[170px] rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
+              >
+                <option value="">{t('plugins.category.all')}</option>
+                {categories.map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={sort}
+                onChange={(event) => {
+                  setSort(event.target.value as PluginSort)
+                  setPage(0)
+                }}
+                className="h-7 rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
+              >
+                {(['relevance', 'updated', 'name', 'downloads'] as const).map((value) => (
+                  <option key={value} value={value}>
+                    {t(`plugins.sort.${value}`)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  setPage(0)
+                  void search(query, category, sort, 0, true)
+                }}
+                disabled={searching}
+                data-hint={t('plugins.index.refresh')}
+                aria-label={t('plugins.index.refresh')}
+                className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
+              >
+                <RefreshCw
+                  size={12}
+                  className={searching ? 'animate-spin' : ''}
+                  aria-hidden="true"
+                />
+              </button>
+              <span className="min-w-0 flex-1 truncate text-[10.5px] text-faint">
+                {t('plugins.index.summary', {
+                  total,
+                  page: landedPage + 1,
+                  pages: Math.max(1, Math.ceil(total / pageSize)),
+                })}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage(Math.max(0, landedPage - 1))}
+                disabled={searching || landedPage === 0}
+                aria-label={t('plugins.page.previous')}
+                className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
+              >
+                <ChevronLeft size={13} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPage(landedPage + 1)}
+                disabled={searching || !hasMore}
+                aria-label={t('plugins.page.next')}
+                className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
+              >
+                <ChevronRight size={13} aria-hidden="true" />
+              </button>
+            </div>
           </div>
         )}
 

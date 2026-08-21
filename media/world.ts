@@ -146,7 +146,8 @@ const NPM_LISTING = {
   sourceId: 'npm',
   sourceLabel: 'npm registry',
   installable: true,
-} satisfies Pick<PluginListing, 'sourceId' | 'sourceLabel' | 'installable'>
+  categories: ['dsh'],
+} satisfies Pick<PluginListing, 'sourceId' | 'sourceLabel' | 'installable' | 'categories'>
 
 const DISCOVER: PluginListing[] = [
   {

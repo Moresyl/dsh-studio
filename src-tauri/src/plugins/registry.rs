@@ -11,7 +11,7 @@ use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tokio::sync::OnceCell;
 
@@ -28,7 +28,7 @@ const DEFAULT_REGISTRY: &str = "https://registry.npmjs.org";
 const DISCOVERY: &str = "dsh bundle";
 
 /// Enough to browse, few enough that the panel stays a panel.
-const RESULTS: &str = "40";
+const INDEX_RESULTS: &str = "250";
 
 /// Generous, because this may be a mirror on a slow link.
 const BUDGET: Duration = Duration::from_secs(20);
@@ -36,7 +36,7 @@ const BUDGET: Duration = Duration::from_secs(20);
 static REGISTRY: OnceCell<String> = OnceCell::const_new();
 
 /// One search result.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Listing {
     pub name: String,
@@ -51,10 +51,12 @@ pub struct Listing {
     pub source_id: String,
     pub source_label: String,
     pub installable: bool,
+    #[serde(default)]
+    pub categories: Vec<String>,
 }
 
 /// What the published manifest says about one package.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Detail {
     pub name: String,
@@ -73,6 +75,10 @@ pub struct Detail {
     /// Registry provenance shown before installation.
     pub source: String,
     pub compatibility: Compatibility,
+    /// Registry integrity for the exact tarball, retained in market receipts.
+    pub integrity: Option<String>,
+    /// The profile patch itself, retained as provenance without executing it.
+    pub bundle_patch: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -100,7 +106,7 @@ pub async fn search(node: &Path, query: &str) -> Result<Vec<Listing>> {
     endpoint
         .query_pairs_mut()
         .append_pair("text", text)
-        .append_pair("size", RESULTS);
+        .append_pair("size", INDEX_RESULTS);
 
     let body = fetch::json(node, endpoint.as_str(), BUDGET).await?;
     Ok(body
@@ -179,6 +185,11 @@ fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) 
             .unwrap_or_default(),
         source: source.to_string(),
         compatibility: compatibility(manifest),
+        integrity: manifest
+            .pointer("/dist/integrity")
+            .and_then(serde_json::Value::as_str)
+            .map(str::to_string),
+        bundle_patch: manifest.pointer("/dsh/bundle/patch").cloned(),
     }
 }
 
@@ -281,7 +292,29 @@ fn listing(entry: &serde_json::Value) -> Option<Listing> {
         source_id: "npm".to_string(),
         source_label: "npm registry".to_string(),
         installable: true,
+        categories: keywords(package),
     })
+}
+
+fn keywords(package: &serde_json::Value) -> Vec<String> {
+    let values: Vec<&str> = match package.get("keywords") {
+        Some(serde_json::Value::Array(values)) => values
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .collect(),
+        Some(serde_json::Value::String(value)) => value.split(',').collect(),
+        _ => Vec::new(),
+    };
+    let mut categories: Vec<String> = values
+        .into_iter()
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && value.len() <= 48)
+        .take(20)
+        .map(str::to_string)
+        .collect();
+    categories.sort_by_key(|value| value.to_ascii_lowercase());
+    categories.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    categories
 }
 
 fn string(value: &serde_json::Value, key: &str) -> Option<String> {

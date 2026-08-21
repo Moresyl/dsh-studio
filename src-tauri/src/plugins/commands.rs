@@ -7,7 +7,7 @@ use std::sync::Arc;
 use tauri::State;
 
 use super::archive::Package;
-use super::registry::{Detail, Listing};
+use super::registry::Detail;
 use super::{Change, PluginJobs, PluginState};
 use crate::error::{Error, Result};
 use crate::harness::commands::AppState;
@@ -30,16 +30,27 @@ pub fn plugin_recovery_acknowledge() -> Result<()> {
 }
 
 #[tauri::command]
-pub async fn plugin_search(query: String) -> Result<Vec<Listing>> {
+pub async fn plugin_search(
+    query: String,
+    category: Option<String>,
+    sort: String,
+    page: usize,
+    refresh: bool,
+) -> Result<super::market::Page> {
     let source = super::catalog::sources()
         .into_iter()
         .find(|source| source.active)
         .ok_or_else(|| Error::Plugin("no plugin catalog source is active".into()))?;
-    if source.id == "npm" {
-        super::registry::search(&node()?, &query).await
-    } else {
-        super::catalog::search(&source.id, &query).await
-    }
+    super::market::search(
+        &node()?,
+        &source.id,
+        &query,
+        category.as_deref(),
+        &sort,
+        page,
+        refresh,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -67,12 +78,18 @@ pub async fn plugin_source_add(
     label: String,
     endpoint: String,
 ) -> Result<Vec<super::catalog::Source>> {
-    super::catalog::add(&label, &endpoint).await
+    let sources = super::catalog::add(&label, &endpoint).await?;
+    if let Some(source) = sources.iter().find(|source| source.active) {
+        super::market::invalidate(&source.id).await;
+    }
+    Ok(sources)
 }
 
 #[tauri::command]
-pub fn plugin_source_remove(id: String) -> Result<Vec<super::catalog::Source>> {
-    super::catalog::remove(&id)
+pub async fn plugin_source_remove(id: String) -> Result<Vec<super::catalog::Source>> {
+    let sources = super::catalog::remove(&id)?;
+    super::market::invalidate(&id).await;
+    Ok(sources)
 }
 
 /// Install a plugin into the hosted profile.

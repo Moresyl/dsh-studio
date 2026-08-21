@@ -18,6 +18,7 @@
 pub mod archive;
 pub mod catalog;
 pub mod commands;
+pub mod market;
 pub mod recovery;
 pub mod registry;
 pub mod switches;

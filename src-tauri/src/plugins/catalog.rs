@@ -20,7 +20,6 @@ const STORE_ENDPOINT: &str = "https://deepseek1024.com/api/v1/plugins";
 const MAX_BODY: usize = 2 << 20;
 const MAX_ITEMS: usize = 10_000;
 const MAX_CUSTOM: usize = 12;
-const MAX_RESULTS: usize = 100;
 const MAX_REDIRECTS: usize = 3;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -378,10 +377,8 @@ fn parse_store(value: &serde_json::Value, query: &str) -> Result<Vec<Listing>> {
             source_id: STORE_ID.to_string(),
             source_label: STORE_LABEL.to_string(),
             installable: true,
+            categories: categories(package),
         });
-        if listings.len() == MAX_RESULTS {
-            break;
-        }
     }
     Ok(listings)
 }
@@ -454,12 +451,32 @@ fn parse_standard(
             source_id: source_id.to_string(),
             source_label: source_label.to_string(),
             installable: true,
+            categories: categories(item),
         });
-        if listings.len() == MAX_RESULTS {
-            break;
-        }
     }
     Ok(listings)
+}
+
+fn categories(value: &serde_json::Value) -> Vec<String> {
+    let mut categories: Vec<String> = ["categories", "tags", "keywords"]
+        .into_iter()
+        .filter_map(|key| value.get(key))
+        .flat_map(|value| match value {
+            serde_json::Value::Array(values) => values
+                .iter()
+                .filter_map(serde_json::Value::as_str)
+                .collect::<Vec<_>>(),
+            serde_json::Value::String(value) => value.split(',').collect(),
+            _ => Vec::new(),
+        })
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && value.len() <= 48)
+        .take(20)
+        .map(str::to_string)
+        .collect();
+    categories.sort_by_key(|value| value.to_ascii_lowercase());
+    categories.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+    categories
 }
 
 fn localized_description(value: Option<&serde_json::Value>) -> String {

@@ -19,6 +19,7 @@ import type {
   InstalledPlugin,
   PluginDetail,
   PluginListing,
+  PluginSort,
   PluginState,
 } from '@/lib/ipc'
 
@@ -26,6 +27,12 @@ interface PluginStore {
   /** The hosted profile as it is on disk. Null until the first read lands. */
   profile: PluginState | null
   results: PluginListing[]
+  categories: string[]
+  total: number
+  page: number
+  pageSize: number
+  hasMore: boolean
+  indexedAt: number
   sources: CatalogSource[]
   /** The package the detail rail is describing, if any. */
   selected: string | null
@@ -40,7 +47,13 @@ interface PluginStore {
   error: string | null
 
   refresh: () => Promise<void>
-  search: (query: string) => Promise<void>
+  search: (
+    query: string,
+    category: string | null,
+    sort: PluginSort,
+    page: number,
+    refresh?: boolean,
+  ) => Promise<void>
   select: (name: string | null, sourceId?: string, version?: string) => Promise<void>
   selectSource: (id: string) => Promise<void>
   addSource: (label: string, endpoint: string) => Promise<boolean>
@@ -76,6 +89,12 @@ const landed = (set: Write, profile: PluginState): void => {
 export const usePlugins = create<PluginStore>((set, get) => ({
   profile: null,
   results: [],
+  categories: [],
+  total: 0,
+  page: 0,
+  pageSize: 25,
+  hasMore: false,
+  indexedAt: 0,
   sources: [],
   selected: null,
   selectedSource: null,
@@ -95,14 +114,26 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     }
   },
 
-  search: async (query) => {
+  search: async (query, category, sort, page, refresh = false) => {
     const mine = ++generation
     set({ searching: true, error: null })
     try {
-      const results = await ipc.pluginSearch(query)
-      if (mine === generation) set({ results })
+      const answer = await ipc.pluginSearch(query, category, sort, page, refresh)
+      if (mine === generation) {
+        set({
+          results: answer.items,
+          categories: answer.categories,
+          total: answer.total,
+          page: answer.page,
+          pageSize: answer.pageSize,
+          hasMore: answer.hasMore,
+          indexedAt: answer.indexedAt,
+        })
+      }
     } catch (cause) {
-      if (mine === generation) set({ error: describe(cause), results: [] })
+      if (mine === generation) {
+        set({ error: describe(cause), results: [], total: 0, hasMore: false })
+      }
     } finally {
       if (mine === generation) set({ searching: false })
     }
@@ -153,6 +184,10 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       set({
         sources,
         results: [],
+        categories: [],
+        total: 0,
+        page: 0,
+        hasMore: false,
         selected: null,
         selectedSource: null,
         selectedVersion: null,
@@ -167,7 +202,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   addSource: async (label, endpoint) => {
     try {
       const sources = await ipc.pluginSourceAdd(label, endpoint)
-      set({ sources, results: [], error: null })
+      set({ sources, results: [], categories: [], total: 0, page: 0, error: null })
       return true
     } catch (cause) {
       set({ error: describe(cause) })
@@ -178,7 +213,16 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   removeSource: async (id) => {
     try {
       const sources = await ipc.pluginSourceRemove(id)
-      set({ sources, results: [], selected: null, detail: null, error: null })
+      set({
+        sources,
+        results: [],
+        categories: [],
+        total: 0,
+        page: 0,
+        selected: null,
+        detail: null,
+        error: null,
+      })
     } catch (cause) {
       set({ error: describe(cause) })
     }
