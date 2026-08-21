@@ -9,6 +9,39 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-21
+
+### Added
+
+- A secure multi-source plugin catalog with npm, a reviewed 1024Store adapter,
+  and user-managed Schema 1.0.0 HTTPS endpoints. Catalogs can suggest only an
+  exact npm target; SSRF destinations, cross-origin redirects, executable
+  commands, oversized replies and malformed metadata are rejected.
+- Durable plugin-mutation recovery, persistent redacted logs, panic evidence,
+  and diagnostics that report recovery and runtime compatibility.
+- Windows workspace admission checks for fixed NTFS/ReFS volumes, blocking
+  network, removable and FAT/exFAT workspaces before Harness starts.
+- Bilingual user, troubleshooting, architecture, plugin/catalog and community
+  documentation.
+
+### Changed
+
+- The managed upstream runtime is pinned to `@deepseek-ai/dsh@0.1.0-rc.8`,
+  pnpm is pinned to 11.7.0, and Node 22.19 is the minimum coherent runtime.
+- Harness installs now use a journaled staging/backup transaction and repair an
+  interrupted or incompatible managed runtime instead of launching it silently.
+- Formal releases now fail closed: updater signing, Windows Authenticode,
+  macOS Developer ID signing/notarization/stapling, bilingual detailed notes,
+  and the complete non-empty artifact matrix are mandatory gates.
+
+### Fixed
+
+- Replaced the obsolete rc.1 dependency graph that requested the unpublished
+  `@deepseek-ai/dsh-code-runtime-worker` package and surfaced misleading npm
+  mirror/authentication errors during plugin installation.
+- Plugin add/remove/import operations no longer leave half-written profile and
+  package state after a crash or forced shutdown.
+
 ## [0.5.0] — 2026-08-18
 
 This release turns the shell into a fuller desktop workspace: guided setup,
