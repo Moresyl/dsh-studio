@@ -191,15 +191,19 @@ pairing key appears in any of them.</sub>
 
 ## Install
 
-Grab an installer from [Releases]. Every tagged version is built by CI for four
+Grab an installer from [Releases]. Every tagged version is built by CI for five
 targets:
 
-| Platform            | Artifact                                                     |
-| ------------------- | ------------------------------------------------------------ |
-| Windows x64         | `.exe` (NSIS, per-user install — no admin prompt) and `.msi` |
-| macOS Apple Silicon | `.dmg`                                                       |
-| macOS Intel         | `.dmg`                                                       |
-| Linux x64           | `.AppImage`, `.deb`, `.rpm`                                  |
+| Platform            | Artifact                                                |
+| ------------------- | ------------------------------------------------------- |
+| Windows x64         | `.exe` (NSIS), `.msi`, and a standalone `-portable.exe` |
+| macOS Apple Silicon | `.dmg`                                                  |
+| macOS Intel         | `.dmg`                                                  |
+| macOS Universal     | One `.dmg` for both Intel and Apple Silicon             |
+| Linux x64           | `.AppImage`, `.deb`, `.rpm`                             |
+
+The Universal macOS image is the lightweight edition. Full / Offline images stay
+architecture-specific because their embedded Node runtime is native code.
 
 Or through a package manager. The manifests all live in [`packaging/`](packaging)
 and are generated from a real release, so the version and the SHA-256 in them are
@@ -254,7 +258,7 @@ about being unfinished.
 | Native context menus, saved window bounds    | ✅                                                                  |
 | Light and dark, following the system or not  | ✅                                                                  |
 | Silent self-update                           | ⏳ planned                                                          |
-| Packaged releases                            | ✅ automated for Windows, Linux, and macOS (Intel + Apple Silicon)  |
+| Packaged releases                            | ✅ Windows installer + portable, Linux, macOS native + Universal    |
 
 ## Design notes
 

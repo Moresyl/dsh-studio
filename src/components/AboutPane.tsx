@@ -6,9 +6,12 @@ import {
   Download,
   FileDown,
   FolderOpen,
+  Bug,
+  Lightbulb,
   Loader2,
   RefreshCw,
   Scale,
+  MessagesSquare,
 } from 'lucide-react'
 import { save as pickPath } from '@tauri-apps/plugin-dialog'
 import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
@@ -26,6 +29,9 @@ import { useUpdate } from '@/state/update'
 
 /** Where this build comes from. Our own repository, and the only link here. */
 const SOURCE = 'https://github.com/Moresyl/dsh-studio'
+const BUGS = `${SOURCE}/issues/new?template=bug_report.yml`
+const FEATURES = `${SOURCE}/issues/new?template=feature_request.yml`
+const DISCUSSIONS = `${SOURCE}/discussions`
 
 /**
  * What this build is, and where it put things.
@@ -262,6 +268,19 @@ export function AboutPane() {
             </div>
           </section>
 
+          <section className="flex flex-col gap-2">
+            <h4 className="caption">{t('about.community')}</h4>
+            <div className="grid grid-cols-3 gap-2">
+              <CommunityLink icon={Bug} label={t('about.reportBug')} url={BUGS} />
+              <CommunityLink icon={Lightbulb} label={t('about.requestFeature')} url={FEATURES} />
+              <CommunityLink
+                icon={MessagesSquare}
+                label={t('about.discussions')}
+                url={DISCUSSIONS}
+              />
+            </div>
+          </section>
+
           <div className="flex items-center gap-4 text-[11.5px] text-faint">
             <button
               type="button"
@@ -279,6 +298,27 @@ export function AboutPane() {
         </div>
       </div>
     </section>
+  )
+}
+
+function CommunityLink({
+  icon: Icon,
+  label,
+  url,
+}: {
+  icon: typeof Bug
+  label: string
+  url: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => void openUrl(url)}
+      className="flex items-center justify-center gap-2 rounded-control border border-line bg-canvas-deep/50 px-3 py-2.5 text-[11.5px] text-muted transition-colors hover:border-line-strong hover:text-brand"
+    >
+      <Icon size={13} strokeWidth={2.1} aria-hidden="true" />
+      {label}
+    </button>
   )
 }
 

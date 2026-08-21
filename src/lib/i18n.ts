@@ -487,6 +487,10 @@ const en = {
   'about.reportSave': 'Save as file',
   'about.reportTitle': 'Save the diagnostic report',
   'about.reportKind': 'Markdown document',
+  'about.community': 'Community and feedback',
+  'about.reportBug': 'Report a bug',
+  'about.requestFeature': 'Request a feature',
+  'about.discussions': 'Discussions',
 
   'update.available': 'Update {version}',
   'update.view': 'See what changed and install the update',
@@ -1011,6 +1015,10 @@ const zh: Record<MessageKey, string> = {
   'about.reportSave': '保存为文件',
   'about.reportTitle': '保存诊断报告',
   'about.reportKind': 'Markdown 文档',
+  'about.community': '社区与反馈',
+  'about.reportBug': '反馈问题',
+  'about.requestFeature': '提出需求',
+  'about.discussions': '社区讨论',
 
   'update.available': '新版本 {version}',
   'update.view': '查看更新内容并安装',

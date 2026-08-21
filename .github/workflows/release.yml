@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event.inputs.linux_only == 'true' && '[{"name":"Linux x64","os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","args":"--target x86_64-unknown-linux-gnu"}]' || '[{"name":"Linux x64","os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","args":"--target x86_64-unknown-linux-gnu"},{"name":"Windows x64","os":"windows-2025","target":"x86_64-pc-windows-msvc","args":"--target x86_64-pc-windows-msvc"},{"name":"macOS Apple Silicon","os":"macos-15","target":"aarch64-apple-darwin","args":"--target aarch64-apple-darwin"},{"name":"macOS Intel","os":"macos-15-intel","target":"x86_64-apple-darwin","args":"--target x86_64-apple-darwin"}]') }}
+        include: ${{ fromJSON(github.event.inputs.linux_only == 'true' && '[{"name":"Linux x64","os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","rustTargets":"x86_64-unknown-linux-gnu","args":"--target x86_64-unknown-linux-gnu"}]' || '[{"name":"Linux x64","os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","rustTargets":"x86_64-unknown-linux-gnu","args":"--target x86_64-unknown-linux-gnu"},{"name":"Windows x64","os":"windows-2025","target":"x86_64-pc-windows-msvc","rustTargets":"x86_64-pc-windows-msvc","args":"--target x86_64-pc-windows-msvc"},{"name":"macOS Apple Silicon","os":"macos-15","target":"aarch64-apple-darwin","rustTargets":"aarch64-apple-darwin","args":"--target aarch64-apple-darwin"},{"name":"macOS Intel","os":"macos-15-intel","target":"x86_64-apple-darwin","rustTargets":"x86_64-apple-darwin","args":"--target x86_64-apple-darwin"},{"name":"macOS Universal","os":"macos-15","target":"universal-apple-darwin","rustTargets":"aarch64-apple-darwin,x86_64-apple-darwin","args":"--target universal-apple-darwin"}]') }}
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -38,7 +38,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.rustTargets }}
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -263,11 +263,26 @@ jobs:
         shell: bash
         run: node .github/scripts/verify-packaged-app.mjs "src-tauri/target/${{ matrix.target }}/release/bundle"
 
+      - name: Publish Windows portable executable
+        if: runner.os == 'Windows'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="${GITHUB_REF_NAME:-v$(node -p 'require("./src-tauri/tauri.conf.json").version')}"
+          node .github/scripts/stage-portable.mjs "src-tauri/target/${{ matrix.target }}/release" portable-assets
+          portable="$(find portable-assets -maxdepth 1 -type f -name '*-portable.exe' -print -quit)"
+          test -n "$portable"
+          "$portable" --smoke-test
+          gh release upload "$tag" "$portable" --repo "$GITHUB_REPOSITORY" --clobber
+
       - name: Prepare verified Full / Offline runtime
+        if: matrix.target != 'universal-apple-darwin'
         shell: bash
         run: node .github/scripts/prepare-offline-runtime.mjs "${{ matrix.target }}" src-tauri/runtime-cache/offline
 
       - name: Build Full / Offline packages
+        if: matrix.target != 'universal-apple-darwin'
         shell: bash
         env:
           DSH_STUDIO_EDITION: full
@@ -277,12 +292,14 @@ jobs:
         run: pnpm tauri build --target "${{ matrix.target }}" --config src-tauri/tauri.full.conf.json
 
       - name: Verify Full / Offline packaged application and payload
+        if: matrix.target != 'universal-apple-darwin'
         shell: bash
         env:
           DSH_EXPECT_OFFLINE: '1'
         run: node .github/scripts/verify-packaged-app.mjs "src-tauri/target-full/${{ matrix.target }}/release/bundle"
 
       - name: Upload Full / Offline packages
+        if: matrix.target != 'universal-apple-darwin'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -300,7 +317,7 @@ jobs:
         if: runner.os == 'Windows' && env.WINDOWS_SIGNING_ENABLED == 'true'
         shell: pwsh
         run: |
-          $files = Get-ChildItem -Path src-tauri/target,src-tauri/target-full -Recurse -File | Where-Object { $_.FullName -match '\\bundle\\' -and $_.Extension -in '.exe', '.msi' }
+          $files = Get-ChildItem -Path src-tauri/target,src-tauri/target-full,portable-assets -Recurse -File | Where-Object { ($_.FullName -match '\\bundle\\' -or $_.FullName -match '\\portable-assets\\') -and $_.Extension -in '.exe', '.msi' }
           if (-not $files) { throw 'No Windows installer was produced.' }
           foreach ($file in $files) {
             $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
@@ -322,7 +339,9 @@ jobs:
             xcrun stapler validate "$dmg"
             images=$((images + 1))
           done < <(find src-tauri/target src-tauri/target-full -path '*/release/bundle/dmg/*.dmg' -print0)
-          test "$apps" -eq 2 && test "$images" -eq 2
+          expected=2
+          if [ "${{ matrix.target }}" = "universal-apple-darwin" ]; then expected=1; fi
+          test "$apps" -eq "$expected" && test "$images" -eq "$expected"
 
   # Signatures say who built an installer; these say the bytes are the ones that
   # were built. Worth having for the mirrors this project will be downloaded

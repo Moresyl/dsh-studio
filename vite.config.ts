@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -32,6 +32,9 @@ export default defineConfig({
         '**/*.md',
       ],
     },
+  },
+  test: {
+    exclude: [...configDefaults.exclude, '.github/scripts/**/*.test.mjs'],
   },
   // Both WebView2 and WKWebView are evergreen enough that transpiling further
   // down only costs bundle size.
