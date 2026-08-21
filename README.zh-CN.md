@@ -194,10 +194,9 @@ winget、Homebrew Cask 和 AUR 的清单已经写好并校验过，但还没提�
 registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每一个还差什么。
 
 > **签名。** 发布流水线会用 Apple Developer ID 给 macOS 构建签名、公证并装订票据，
-> 并通过 Azure Artifact Signing 给 Windows 安装包签名。正式发布缺少任一平台签名
-> 或更新签名凭据都会直接失败，不会生成未签名正式版。
-> **v0.4.0 及之前的版本是在这套流水线之前发的**——那些 macOS 包首次启动会被
-> Gatekeeper 拦下，需要到「系统设置 → 隐私与安全性」里放行。
+> 并在配置完整凭据时通过 Azure Artifact Signing 给 Windows 安装包签名。Tauri
+> 更新签名与完整非空产物矩阵始终是强制门禁；缺少平台证书时 CI 会给出明确警告，
+> Windows 可能显示“未知发布者”，macOS 可能需要到「系统设置 → 隐私与安全性」放行。
 
 从镜像而不是从 GitHub 下载的？每个 release 都带一份 `SHA256SUMS.txt`；
 [`packaging/MIRRORS.md`](packaging/MIRRORS.md) 讲了怎么拿它核对下载的文件，
@@ -224,7 +223,7 @@ registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每
 | Windows 11 实测通过                | ✅                                                            |
 | macOS / Linux 平台构建             | ✅ 已在平台 CI 矩阵编译与测试                                 |
 | 按需拉取并校验 Node runtime        | ✅ 无需系统 Node                                              |
-| 签名、公证、`SHA256SUMS.txt`       | ✅ 正式发布强制门禁                                           |
+| 更新签名与 `SHA256SUMS.txt`        | ✅ 强制门禁；配置平台凭据时同时签名、公证                     |
 | 下载页与五条打包渠道               | ✅ Scoop 已可用；另四条已写好，尚未提交                       |
 | 托盘图标、运行中关闭到托盘         | ✅                                                            |
 | 原生右键菜单、窗口位置记忆         | ✅                                                            |

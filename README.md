@@ -216,11 +216,10 @@ exactly what each one is still waiting on.
 
 > **Signing.** The release pipeline signs macOS builds with an Apple Developer ID,
 > notarizes and staples them, and signs the Windows installers through Azure
-> Artifact Signing. A formal release is blocked when any platform or updater
-> signing credential is absent. **Releases up to and
-> including v0.4.0 were cut before this existed** — on macOS the first launch is
-> blocked by Gatekeeper, so approve the app in System Settings → Privacy &
-> Security.
+> Artifact Signing when those credentials are configured. Tauri updater signing
+> and the complete non-empty artifact matrix are mandatory. Builds without
+> platform credentials carry an explicit CI warning; Windows may show an unknown
+> publisher and macOS may require approval in System Settings → Privacy & Security.
 
 Downloading from a mirror rather than from GitHub? Releases carry a
 `SHA256SUMS.txt`; [`packaging/MIRRORS.md`](packaging/MIRRORS.md) covers checking a
@@ -237,25 +236,25 @@ between versions is in the [changelog](CHANGELOG.md).
 Early. The Windows path is built and verified end to end; the rest is honest
 about being unfinished.
 
-|                                              |                                                                    |
-| -------------------------------------------- | ------------------------------------------------------------------ |
-| Environment detection, one-click install     | ✅                                                                 |
-| Supervisor, backoff restart, health probing  | ✅                                                                 |
-| Process-tree reclamation (Windows / Unix)    | ✅                                                                 |
-| Harness hosting, log console, English + 中文 | ✅                                                                 |
-| Plugin marketplace — install, switch, remove | ✅                                                                 |
-| Remote access, single-use QR, revocable keys | ✅                                                                 |
-| Signed in-app update, checked on a schedule  | ✅                                                                 |
-| Verified on Windows 11                       | ✅                                                                 |
-| macOS / Linux platform builds                | ✅ compiled and tested in the platform CI matrix                   |
-| Node runtime fetched and verified on demand  | ✅ no system Node needed                                           |
-| Code signing, notarization, `SHA256SUMS.txt` | ✅ mandatory release gates                                         |
-| Download page, five packaging channels       | ✅ Scoop live; four written, not yet submitted                     |
-| Tray icon, close-to-tray while serving       | ✅                                                                 |
-| Native context menus, saved window bounds    | ✅                                                                 |
-| Light and dark, following the system or not  | ✅                                                                 |
-| Silent self-update                           | ⏳ planned                                                         |
-| Packaged releases                            | ✅ automated for Windows, Linux, and macOS (Intel + Apple Silicon) |
+|                                              |                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------- |
+| Environment detection, one-click install     | ✅                                                                  |
+| Supervisor, backoff restart, health probing  | ✅                                                                  |
+| Process-tree reclamation (Windows / Unix)    | ✅                                                                  |
+| Harness hosting, log console, English + 中文 | ✅                                                                  |
+| Plugin marketplace — install, switch, remove | ✅                                                                  |
+| Remote access, single-use QR, revocable keys | ✅                                                                  |
+| Signed in-app update, checked on a schedule  | ✅                                                                  |
+| Verified on Windows 11                       | ✅                                                                  |
+| macOS / Linux platform builds                | ✅ compiled and tested in the platform CI matrix                    |
+| Node runtime fetched and verified on demand  | ✅ no system Node needed                                            |
+| Updater signatures and `SHA256SUMS.txt`      | ✅ mandatory; OS signing is applied when credentials are configured |
+| Download page, five packaging channels       | ✅ Scoop live; four written, not yet submitted                      |
+| Tray icon, close-to-tray while serving       | ✅                                                                  |
+| Native context menus, saved window bounds    | ✅                                                                  |
+| Light and dark, following the system or not  | ✅                                                                  |
+| Silent self-update                           | ⏳ planned                                                          |
+| Packaged releases                            | ✅ automated for Windows, Linux, and macOS (Intel + Apple Silicon)  |
 
 ## Design notes
 

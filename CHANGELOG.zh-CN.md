@@ -27,8 +27,8 @@
   Node 最低版本调整为同一兼容组合要求的 22.19。
 - Harness 安装改为带日志的 staging/backup 事务；中断或不兼容的旧运行时会进入修复，
   不再被静默启动。
-- 正式发布改为失败关闭：更新签名、Windows Authenticode、macOS Developer ID
-  签名/公证/装订、双语详细说明和完整非空产物矩阵全部成为强制门禁。
+- 正式发布对更新签名、双语详细说明和完整非空产物矩阵失败关闭；Windows Authenticode
+  与 macOS Developer ID 签名/公证/装订会在配置相应凭据时启用，不完整的凭据组合仍会被拒绝。
 
 ### 修复
 

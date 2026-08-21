@@ -95,8 +95,9 @@ jobs:
         run: |
           set -u
           if [ -z "$APPLE_CERTIFICATE" ]; then
-            echo "::error title=macOS signing required::APPLE_CERTIFICATE is required for every formal release."
-            exit 1
+            echo "MACOS_SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+            echo "::warning title=Unsigned macOS build::Apple Developer ID credentials are not configured. The updater artifact will still carry its required Tauri signature, but Gatekeeper may require manual approval."
+            exit 0
           fi
           if [ -z "$APPLE_CERTIFICATE_PASSWORD" ]; then
             echo "::error title=Incomplete macOS credentials::APPLE_CERTIFICATE is set but APPLE_CERTIFICATE_PASSWORD is empty. The bundler needs both to open the .p12, and it will not fall back to an unsigned build."
@@ -124,6 +125,7 @@ jobs:
             printf '%s\n' "$APPLE_PASSWORD"
             echo "DSH_SIGNING_SECRET"
             echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            echo "MACOS_SIGNING_ENABLED=true"
           } >> "$GITHUB_ENV"
           # No values: every one of them is a secret, and would print as ***.
           echo "A certificate and notarization credentials are configured; this build will be signed, notarized and stapled."
@@ -145,8 +147,9 @@ jobs:
         run: |
           set -u
           if [ -z "$AZURE_CLIENT_ID" ]; then
-            echo "::error title=Windows signing required::Azure Artifact Signing credentials are required for every formal release."
-            exit 1
+            echo "WINDOWS_SIGNING_ENABLED=false" >> "$GITHUB_ENV"
+            echo "::warning title=Unsigned Windows build::Azure Artifact Signing credentials are not configured. The updater artifact will still carry its required Tauri signature, but Windows may show an unknown-publisher warning."
+            exit 0
           fi
 
           missing=""
@@ -208,6 +211,7 @@ jobs:
             printf '%s\n' "$AZURE_CLIENT_SECRET"
             echo "DSH_SIGNING_SECRET"
             echo "AZURE_TENANT_ID=$AZURE_TENANT_ID"
+            echo "WINDOWS_SIGNING_ENABLED=true"
           } >> "$GITHUB_ENV"
 
       - name: Prepare release notes
@@ -238,7 +242,7 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Verify Windows Authenticode signatures
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && env.WINDOWS_SIGNING_ENABLED == 'true'
         shell: pwsh
         run: |
           $files = Get-ChildItem -Path src-tauri/target -Recurse -File | Where-Object { $_.FullName -match '\\bundle\\' -and $_.Extension -in '.exe', '.msi' }
@@ -249,7 +253,7 @@ jobs:
           }
 
       - name: Verify macOS signature, notarization and staple
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' && env.MACOS_SIGNING_ENABLED == 'true'
         run: |
           set -eu
           app="$(find src-tauri/target -maxdepth 8 -path '*/release/bundle/macos/*.app' -print -quit)"

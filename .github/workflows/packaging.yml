@@ -57,13 +57,10 @@ jobs:
           mkdir -p "$tap_root/Casks"
           cp packaging/homebrew/dsh-studio.rb "$tap_root/Casks/dsh-studio.rb"
           # This is an independent tap, not a submission to homebrew-cask, so
-          # core's popularity threshold is not part of its validity. Published
-          # releases additionally download the DMG and exercise Gatekeeper.
-          if [ "$GITHUB_EVENT_NAME" = release ]; then
-            brew audit --cask --strict --online moresyl/dsh/dsh-studio
-          else
-            brew audit --cask --strict moresyl/dsh/dsh-studio
-          fi
+          # core's popularity threshold is not part of its validity. Platform
+          # signing is optional until this repository has signing credentials,
+          # so validation must not turn Gatekeeper into a release prerequisite.
+          brew audit --cask --strict moresyl/dsh/dsh-studio
 
   aur:
     name: Validate AUR package

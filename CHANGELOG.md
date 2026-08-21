@@ -30,9 +30,10 @@ pre-1.0 caveat that anything may still move.
   pnpm is pinned to 11.7.0, and Node 22.19 is the minimum coherent runtime.
 - Harness installs now use a journaled staging/backup transaction and repair an
   interrupted or incompatible managed runtime instead of launching it silently.
-- Formal releases now fail closed: updater signing, Windows Authenticode,
-  macOS Developer ID signing/notarization/stapling, bilingual detailed notes,
-  and the complete non-empty artifact matrix are mandatory gates.
+- Formal releases now fail closed on updater signing, bilingual detailed notes,
+  and the complete non-empty artifact matrix. Windows Authenticode and macOS
+  Developer ID signing/notarization/stapling are applied when the corresponding
+  credentials are configured; partial credential sets are rejected.
 
 ### Fixed
 
