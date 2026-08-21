@@ -27,6 +27,8 @@ mod archive;
 mod catalog;
 mod http;
 
+pub(crate) use http::ensure_crypto_provider;
+
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 

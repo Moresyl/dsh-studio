@@ -177,6 +177,7 @@ pub fn label(id: &str) -> String {
 }
 
 async fn restricted_json(start: &str) -> Result<serde_json::Value> {
+    crate::node::ensure_crypto_provider();
     let original = safe_url(start)?;
     let origin = original.origin().ascii_serialization();
     let mut next = original;
@@ -202,6 +203,9 @@ async fn restricted_json(start: &str) -> Result<serde_json::Value> {
         }
         let pinned = addresses[0];
         let client = reqwest::Client::builder()
+            // A proxy would resolve the hostname a second time and undo the
+            // address we just admitted, reopening DNS rebinding around SSRF.
+            .no_proxy()
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(Duration::from_secs(8))
             .timeout(Duration::from_secs(30))
@@ -335,7 +339,7 @@ fn parse_store(value: &serde_json::Value, query: &str) -> Result<Vec<Listing>> {
                 if method.get("kind")?.as_str()? != "npm"
                     || method.get("verification")?.as_str()? != "verified"
                     || method.get("code")?.as_str()? != "repository_backlink"
-                    || method.get("requiresBuildAllowance")?.as_bool()? != false
+                    || method.get("requiresBuildAllowance")?.as_bool()?
                 {
                     return None;
                 }
@@ -513,10 +517,12 @@ fn load() -> Settings {
             custom: Vec::new(),
         });
     settings.custom.truncate(MAX_CUSTOM);
+    let mut seen_ids = BTreeSet::new();
     settings.custom.retain(|source| {
         source.id == custom_id(&source.endpoint)
             && plain(&source.label, 64).is_some()
             && safe_url(&source.endpoint).is_ok()
+            && seen_ids.insert(source.id.clone())
     });
     let active_is_valid = settings.active == "npm"
         || settings.active == STORE_ID
@@ -605,5 +611,16 @@ mod tests {
         let items = parse_store(&value, "").expect("catalog");
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].name, "good-plugin");
+    }
+
+    #[tokio::test]
+    #[ignore = "queries the live reviewed catalog"]
+    async fn live_reviewed_store_keeps_installable_results() {
+        let items = super::search(super::STORE_ID, "")
+            .await
+            .expect("live catalog");
+        assert!(!items.is_empty());
+        assert!(items.iter().all(|item| item.installable));
+        assert!(items.iter().all(|item| item.source_id == super::STORE_ID));
     }
 }

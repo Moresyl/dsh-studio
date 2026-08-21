@@ -42,7 +42,7 @@ const METADATA_TIMEOUT: Duration = Duration::from_secs(30);
 /// request, so this does the same thing, and the `Result` is dropped on purpose:
 /// installing twice fails, and whichever of the two got there first has already
 /// installed the provider this one was going to.
-fn ensure_crypto_provider() {
+pub(crate) fn ensure_crypto_provider() {
     if rustls::crypto::CryptoProvider::get_default().is_none() {
         let _ = rustls::crypto::ring::default_provider().install_default();
     }

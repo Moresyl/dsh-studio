@@ -161,12 +161,12 @@ pub async fn preflight(node: &Path, spec: &str) -> Result<Detail> {
 fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) -> Detail {
     let version = string(manifest, "version").unwrap_or_default();
     Detail {
-        name: string(&manifest, "name").unwrap_or_else(|| name.to_string()),
+        name: string(manifest, "name").unwrap_or_else(|| name.to_string()),
         install_spec: format!("{name}@{version}"),
         version,
-        description: string(&manifest, "description").unwrap_or_default(),
-        license: string(&manifest, "license").unwrap_or_default(),
-        homepage: string(&manifest, "homepage"),
+        description: string(manifest, "description").unwrap_or_default(),
+        license: string(manifest, "license").unwrap_or_default(),
+        homepage: string(manifest, "homepage"),
         repository: manifest
             .pointer("/repository/url")
             .and_then(serde_json::Value::as_str)
