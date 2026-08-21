@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join, resolve } from 'node:path'
 import test from 'node:test'
 
 import {
@@ -6,7 +9,9 @@ import {
   HARNESS_VERSION,
   NODE_VERSION,
   PNPM_VERSION,
+  copyRuntimeContract,
   requireExactVersion,
+  tarCreatePlan,
   targetPlan,
 } from './prepare-offline-runtime.mjs'
 
@@ -36,4 +41,29 @@ test('the offline package manager must execute as the pinned version', () => {
     () => requireExactVersion('10.30.2', PNPM_VERSION, 'offline pnpm'),
     /resolved 10\.30\.2, expected 11\.7\.0/,
   )
+})
+
+test('tar archive creation never passes an absolute output path', () => {
+  const archive = resolve('runtime-cache', 'offline', 'harness.tar.gz')
+  const source = resolve('scratch', 'harness')
+  assert.deepEqual(tarCreatePlan(archive, source), {
+    cwd: dirname(archive),
+    args: ['-czf', basename(archive), '-C', source, '.'],
+  })
+})
+
+test('copies the local integration package into the offline install context', async () => {
+  const scratch = await mkdtemp(join(tmpdir(), 'dsh-studio-runtime-contract-test-'))
+  const destination = join(scratch, 'harness')
+  try {
+    await mkdir(destination)
+    await copyRuntimeContract(destination)
+    await access(join(destination, 'package-lock.json'))
+    const integration = JSON.parse(
+      await readFile(join(destination, 'dsh-studio-integration', 'package.json'), 'utf8'),
+    )
+    assert.equal(integration.name, '@moresyl/dsh-studio-integration')
+  } finally {
+    await rm(scratch, { recursive: true, force: true })
+  }
 })

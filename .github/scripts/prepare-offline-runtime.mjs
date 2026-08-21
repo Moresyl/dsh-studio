@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import {
   access,
+  cp,
   copyFile,
   mkdir,
   mkdtemp,
@@ -85,13 +86,7 @@ export async function prepare(target, output) {
 
     const harnessRoot = join(scratch, 'harness')
     await mkdir(harnessRoot)
-    await Promise.all([
-      copyFile('src-tauri/runtime-contract/package.json', join(harnessRoot, 'package.json')),
-      copyFile(
-        'src-tauri/runtime-contract/package-lock.json',
-        join(harnessRoot, 'package-lock.json'),
-      ),
-    ])
+    await copyRuntimeContract(harnessRoot)
     await run(npm.node, [
       npm.cli,
       'ci',
@@ -121,7 +116,8 @@ export async function prepare(target, output) {
 
     const harnessFile = 'harness.tar.gz'
     const harnessArchive = join(destination, harnessFile)
-    await run('tar', ['-czf', harnessArchive, '-C', harnessRoot, '.'])
+    const archive = tarCreatePlan(harnessArchive, harnessRoot)
+    await run('tar', archive.args, archive.cwd)
     const harnessHash = await sha256(harnessArchive)
     const manifest = {
       schema: 1,
@@ -209,9 +205,29 @@ async function sha256(file) {
   return digest.digest('hex')
 }
 
-function run(command, args) {
+export function tarCreatePlan(archive, source) {
+  return {
+    // Windows tar treats the colon in an absolute archive path (for example,
+    // D:\\...) as a remote-host separator. Keep the archive argument local.
+    cwd: dirname(archive),
+    args: ['-czf', basename(archive), '-C', source, '.'],
+  }
+}
+
+export async function copyRuntimeContract(destination) {
+  const source = 'src-tauri/runtime-contract'
+  await Promise.all([
+    copyFile(join(source, 'package.json'), join(destination, 'package.json')),
+    copyFile(join(source, 'package-lock.json'), join(destination, 'package-lock.json')),
+    cp(join(source, 'dsh-studio-integration'), join(destination, 'dsh-studio-integration'), {
+      recursive: true,
+    }),
+  ])
+}
+
+function run(command, args, cwd) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit', windowsHide: true })
+    const child = spawn(command, args, { cwd, stdio: 'inherit', windowsHide: true })
     child.on('error', reject)
     child.on('exit', (code, signal) => {
       if (code === 0) resolve()
