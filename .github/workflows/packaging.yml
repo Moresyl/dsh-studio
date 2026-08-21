@@ -23,6 +23,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: package-channel-manifests
+          include-hidden-files: true
           path: |
             bucket/dsh-studio.json
             packaging/winget

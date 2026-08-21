@@ -293,7 +293,10 @@ ManifestVersion: ${WINGET_SCHEMA}
  * publishing the tap is a copy rather than a rewrite.
  */
 function homebrew({ version, files }) {
-  return `# ${GENERATED}
+  return `# typed: strict
+# frozen_string_literal: true
+
+# ${GENERATED}
 cask "dsh-studio" do
   arch arm: "aarch64", intel: "x64"
 
