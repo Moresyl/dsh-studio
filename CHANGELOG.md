@@ -9,6 +9,44 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-22
+
+### Added
+
+- A Full / Offline edition that carries SHA-256-pinned Node, Harness and pnpm
+  payloads, plus a Windows Lite portable executable and a macOS Universal Lite
+  image.
+- Native workspace folder selection and drop, independently configurable turn
+  and background-job notifications, and persistent Compatibility/Advanced
+  presentation modes.
+- A paged, filtered and sorted plugin catalog index with durable market receipts
+  for exact source, version and registry integrity.
+- Protocol 2 desktop profile/plugin services and a pinned terminal toolchain;
+  packaged macOS/Linux launches recover an allowlisted login-shell environment.
+
+### Changed
+
+- Packaged applications must execute a smoke test before publication, Windows
+  installers must pass an upgrade regression, and release verification now
+  requires the portable and Universal artifacts.
+- Profile startup validates the selected profile before launch and offers a
+  last-known-good recovery path with explicit faulty-plugin isolation.
+- Desktop services revalidate exact versions and catalog membership at the
+  native boundary; the bridge remains restricted to the active loopback Harness
+  origin.
+
+### Fixed
+
+- A damaged or deleted selected profile no longer strands startup in a repeated
+  failure loop; Studio can restore the last known good profile or disable the
+  plugin implicated by the failed launch.
+- Packaged GUI launches on macOS/Linux no longer lose development tool paths
+  configured by supported login shells, while credential variables remain
+  excluded.
+- Installer upgrades preserve application data and can launch the upgraded
+  binary; background completion/failure no longer goes unnoticed when the
+  Studio window is not focused.
+
 ## [0.6.0] — 2026-08-21
 
 ### Added
@@ -391,7 +429,9 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...v0.3.0

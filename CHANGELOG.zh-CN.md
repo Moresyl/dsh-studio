@@ -9,6 +9,36 @@
 
 ## [未发布]
 
+## [0.7.0] —— 2026-08-22
+
+### 新增
+
+- 完整离线版内置按 SHA-256 固定的 Node、Harness 与 pnpm 载荷；同时新增 Windows
+  轻量便携版和 macOS 通用轻量版。
+- 原生工作区目录选择与拖放、可分别控制的用户轮次/后台任务通知，以及持久化的
+  兼容模式与高级模式。
+- 支持分页、分类筛选和排序的插件目录索引，并为精确来源、版本与 registry 完整性
+  保存持久市场回执。
+- Protocol 2 桌面 Profile/插件公共服务与固定终端工具链；打包后的 macOS/Linux
+  会从登录 Shell 恢复允许列表内的开发环境变量。
+
+### 变更
+
+- 打包应用必须真实执行 smoke test 后才允许发布，Windows 安装包必须通过升级回归，
+  发布完整性门禁新增便携版与 macOS 通用版。
+- Profile 启动前校验当前选择；失败时提供最近可用配置恢复与明确的故障插件隔离路径。
+- 桌面服务会在原生边界重新验证精确版本和目录成员身份；桥接仍只接受当前受监管的
+  回环 Harness 来源。
+
+### 修复
+
+- 当前 Profile 损坏或被删除后不再陷入重复启动失败；可恢复最近可用 Profile，
+  或停用失败启动所指向的插件。
+- macOS/Linux 图形界面启动不再丢失受支持登录 Shell 配置的开发工具路径，
+  同时继续排除凭据变量。
+- 安装器升级会保留应用数据并验证升级后程序可启动；Studio 窗口不在前台时，
+  用户轮次和后台任务的完成/失败不再静默无提示。
+
 ## [0.6.0] —— 2026-08-21
 
 ### 新增
@@ -335,7 +365,9 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Moresyl/dsh-studio/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Moresyl/dsh-studio/compare/v0.2.0...v0.3.0

@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "dsh-studio"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "dirs 6.0.0",
  "flate2",
@@ -2494,7 +2494,7 @@ dependencies = [
 
 [[package]]
 name = "node-runtime"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "dirs 6.0.0",
  "proc-guard",
@@ -3111,7 +3111,7 @@ checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
 name = "proc-guard"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "libc",
  "tokio",
