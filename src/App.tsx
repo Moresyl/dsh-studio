@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 
 import { CommandPalette } from '@/components/CommandPalette'
 import { ContextMenu } from '@/components/ContextMenu'
@@ -13,6 +14,7 @@ import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
 import { Workbench, SETTINGS, VIEWS, type View } from '@/components/Workbench'
+import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import { standby } from '@/lib/platform'
 import { useDialog } from '@/state/dialog'
@@ -23,6 +25,7 @@ import { subscribeToProfiles } from '@/state/profiles'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { subscribeToTerminals } from '@/state/terminals'
 import { watchForUpdates } from '@/state/update'
+import { switchWorkspace } from '@/state/workspace'
 
 /**
  * The window: a title bar, a status bar, and whichever view is between them.
@@ -56,6 +59,15 @@ export default function App() {
   // Stable, because the palette rebuilds its command list from its props and
   // this window re-renders on every line the harness prints.
   const manage = useCallback(() => setManaging(true), [])
+  const chooseWorkspace = useCallback(async () => {
+    const chosen = await openDialog({
+      title: t('workspace.choose'),
+      defaultPath: useHarness.getState().environment?.workspace,
+      directory: true,
+      multiple: false,
+    })
+    if (typeof chosen === 'string') await switchWorkspace(chosen)
+  }, [])
 
   // Showing a pane always means putting it in front. Anything else answers a
   // keystroke by changing something the user cannot see.
@@ -140,6 +152,20 @@ export default function App() {
   // should keep its schedule while the user is reading a pane, and a component
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
+
+  // A folder dropped anywhere on the native shell is an explicit workspace
+  // choice. Files and multi-item drops are ignored; the backend canonicalizes
+  // and validates the one path before it persists anything.
+  useEffect(() => {
+    const pending = getCurrentWindow().onDragDropEvent((event) => {
+      if (event.payload.type !== 'drop' || event.payload.paths.length !== 1) return
+      const [path] = event.payload.paths
+      if (path) void switchWorkspace(path)
+    })
+    return () => {
+      void pending.then((unlisten) => unlisten())
+    }
+  }, [])
 
   // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, Ctrl+comma for settings, and
   // Ctrl+Shift+N for another window. Every application with a fixed set of views
@@ -227,7 +253,12 @@ export default function App() {
         </div>
       )}
 
-      <StatusBar status={status} environment={environment} onOpenUpdate={() => show('about')} />
+      <StatusBar
+        status={status}
+        environment={environment}
+        onOpenUpdate={() => show('about')}
+        onChangeWorkspace={() => void chooseWorkspace()}
+      />
 
       {managing && <ProfileManager onClose={() => setManaging(false)} />}
       <PluginRecoveryDialog />

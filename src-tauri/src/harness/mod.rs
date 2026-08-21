@@ -61,7 +61,7 @@ pub fn environment() -> Environment {
     let harness_installed = harness_entry.is_file() && harness_version.is_some();
     let harness_compatible = install::runtime_compatible(&paths::harness_dir());
 
-    let workspace = paths::default_workspace_dir();
+    let workspace = crate::workspace::selected();
     let workspace_admission = crate::workspace::inspect(&workspace);
     Environment {
         node,

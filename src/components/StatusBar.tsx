@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react'
-import { ArrowUpCircle, Copy, FolderOpen, X } from 'lucide-react'
+import { ArrowUpCircle, Copy, FolderOpen, FolderSearch2, X } from 'lucide-react'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { StatusDot } from '@/components/StatusDot'
@@ -28,9 +28,15 @@ interface StatusBarProps {
   status: Status
   environment: Environment | null
   onOpenUpdate: () => void
+  onChangeWorkspace: () => void
 }
 
-export function StatusBar({ status, environment, onOpenUpdate }: StatusBarProps) {
+export function StatusBar({
+  status,
+  environment,
+  onOpenUpdate,
+  onChangeWorkspace,
+}: StatusBarProps) {
   const node = environment?.node ?? null
 
   return (
@@ -69,9 +75,14 @@ export function StatusBar({ status, environment, onOpenUpdate }: StatusBarProps)
         // The workspace is where the agent's files land, so the segment that
         // names it is also the way to go and look at them.
         <Segment
-          hint={`${environment.workspace}\n${t('statusbar.reveal')}`}
-          onClick={() => void revealItemInDir(environment.workspace)}
+          hint={`${environment.workspace}\n${t('workspace.choose')}`}
+          onClick={onChangeWorkspace}
           onContextMenu={contextMenu([
+            {
+              label: t('workspace.choose'),
+              icon: FolderSearch2,
+              run: onChangeWorkspace,
+            },
             {
               label: t('statusbar.reveal'),
               icon: FolderOpen,

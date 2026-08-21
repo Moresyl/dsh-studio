@@ -79,6 +79,11 @@ const en = {
   'statusbar.open': 'Open in your browser',
   'statusbar.copied': 'Copied',
   'statusbar.reveal': 'Show in file manager',
+  'workspace.choose': 'Choose workspace…',
+  'workspace.restartTitle': 'Restart the Harness?',
+  'workspace.restartBody':
+    'The working directory is fixed when Harness starts. Restart now to use this workspace for new sessions and tools.',
+  'workspace.restartConfirm': 'Restart here',
 
   'log.empty': 'No output yet.',
   'log.title': 'Harness output',
@@ -596,6 +601,10 @@ const zh: Record<MessageKey, string> = {
   'statusbar.open': '在浏览器中打开',
   'statusbar.copied': '已复制',
   'statusbar.reveal': '在文件管理器中显示',
+  'workspace.choose': '选择工作区…',
+  'workspace.restartTitle': '要重启 Harness 吗？',
+  'workspace.restartBody': '工作目录在 Harness 启动时确定。立即重启后，新会话和工具将使用这个工作区。',
+  'workspace.restartConfirm': '在这里重启',
 
   'log.empty': '暂无输出。',
   'log.title': 'Harness 输出',

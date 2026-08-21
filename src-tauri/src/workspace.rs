@@ -2,9 +2,14 @@
 //! harness and its tools rely on. Network and removable filesystems are not a
 //! safe place for atomic package writes, links or process-owned lock files.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+use crate::error::{Error, Result};
+use crate::paths;
+
+const SELECTION_FILE: &str = "workspace.json";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,6 +17,95 @@ pub struct Admission {
     pub state: &'static str,
     pub filesystem: Option<String>,
     pub reason: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Selection {
+    path: PathBuf,
+}
+
+#[derive(Clone)]
+struct Store {
+    file: PathBuf,
+    fallback: PathBuf,
+}
+
+impl Store {
+    fn managed() -> Self {
+        Self {
+            file: paths::app_data_dir().join(SELECTION_FILE),
+            fallback: paths::default_workspace_dir(),
+        }
+    }
+
+    fn selected(&self) -> PathBuf {
+        std::fs::read(&self.file)
+            .ok()
+            .and_then(|body| serde_json::from_slice::<Selection>(&body).ok())
+            .map(|selection| selection.path)
+            .unwrap_or_else(|| self.fallback.clone())
+    }
+
+    fn choose(&self, path: &Path) -> Result<PathBuf> {
+        let canonical = path.canonicalize().map_err(|cause| {
+            Error::Workspace(format!("{} could not be opened: {cause}", path.display()))
+        })?;
+        let canonical = node_runtime::plain_path(canonical);
+        let admission = inspect(&canonical);
+        if admission.blocked() {
+            return Err(Error::Workspace(admission.reason.unwrap_or_else(|| {
+                "the selected directory is not a safe workspace".into()
+            })));
+        }
+
+        if let Some(parent) = self.file.parent() {
+            std::fs::create_dir_all(parent).map_err(|cause| {
+                Error::Workspace(format!(
+                    "{} could not be created: {cause}",
+                    parent.display()
+                ))
+            })?;
+        }
+        let mut body = serde_json::to_vec_pretty(&Selection {
+            path: canonical.clone(),
+        })
+        .map_err(|cause| Error::Workspace(format!("workspace state is invalid: {cause}")))?;
+        body.push(b'\n');
+        let temporary = self.file.with_extension("dsh-studio.tmp");
+        std::fs::write(&temporary, body).map_err(|cause| {
+            Error::Workspace(format!(
+                "{} could not be written: {cause}",
+                temporary.display()
+            ))
+        })?;
+        if self.file.exists() {
+            std::fs::remove_file(&self.file).map_err(|cause| {
+                Error::Workspace(format!(
+                    "{} could not be replaced: {cause}",
+                    self.file.display()
+                ))
+            })?;
+        }
+        std::fs::rename(&temporary, &self.file).map_err(|cause| {
+            Error::Workspace(format!(
+                "{} could not be committed: {cause}",
+                self.file.display()
+            ))
+        })?;
+        Ok(canonical)
+    }
+}
+
+/// Workspace selected for the next Harness start.
+pub fn selected() -> PathBuf {
+    Store::managed().selected()
+}
+
+/// Validate and remember a workspace selected by a native picker or folder drop.
+#[tauri::command]
+pub fn workspace_select(path: PathBuf) -> Result<Admission> {
+    let selected = Store::managed().choose(&path)?;
+    Ok(inspect(&selected))
 }
 
 impl Admission {
@@ -143,12 +237,31 @@ fn classify(filesystem: &str) -> Admission {
 
 #[cfg(test)]
 mod tests {
-    use super::inspect;
+    use super::{inspect, Store};
 
     #[test]
     fn a_missing_workspace_is_blocked() {
         let path = std::env::temp_dir().join("dsh-studio-workspace-that-must-not-exist");
         assert!(inspect(&path).blocked());
+    }
+
+    #[test]
+    fn a_selected_workspace_survives_a_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-workspace-selection-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let workspace = root.join("project");
+        std::fs::create_dir_all(&workspace).expect("workspace");
+        let store = Store {
+            file: root.join("state/workspace.json"),
+            fallback: root.join("fallback"),
+        };
+
+        let selected = store.choose(&workspace).expect("selected");
+        assert_eq!(store.selected(), selected);
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[cfg(windows)]

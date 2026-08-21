@@ -197,6 +197,10 @@ export const remoteForget = (id: string): Promise<RemoteStatus> => invoke('remot
 export const onRemoteChange = (handler: () => void): Promise<UnlistenFn> =>
   listen(REMOTE_CHANNEL, () => handler())
 
+/** Validate and remember the working directory used by the next Harness start. */
+export const workspaceSelect = (path: string): Promise<Environment['workspaceAdmission']> =>
+  invoke('workspace_select', { path })
+
 /* -------------------------------------------------------------------------- */
 /* Plugins                                                                    */
 /* -------------------------------------------------------------------------- */
