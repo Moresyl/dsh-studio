@@ -216,8 +216,8 @@ exactly what each one is still waiting on.
 
 > **Signing.** The release pipeline signs macOS builds with an Apple Developer ID,
 > notarizes and staples them, and signs the Windows installers through Azure
-> Artifact Signing. Both are conditional on the credentials being configured, so a
-> fork's build comes out unsigned rather than broken. **Releases up to and
+> Artifact Signing. A formal release is blocked when any platform or updater
+> signing credential is absent. **Releases up to and
 > including v0.4.0 were cut before this existed** — on macOS the first launch is
 > blocked by Gatekeeper, so approve the app in System Settings → Privacy &
 > Security.
@@ -247,9 +247,9 @@ about being unfinished.
 | Remote access, single-use QR, revocable keys | ✅                                                                 |
 | Signed in-app update, checked on a schedule  | ✅                                                                 |
 | Verified on Windows 11                       | ✅                                                                 |
-| macOS / Linux rendering                      | ⏳ not yet run                                                     |
+| macOS / Linux platform builds                | ✅ compiled and tested in the platform CI matrix                   |
 | Node runtime fetched and verified on demand  | ✅ no system Node needed                                           |
-| Code signing, notarization, `SHA256SUMS.txt` | ✅ in the pipeline, from the next release on                       |
+| Code signing, notarization, `SHA256SUMS.txt` | ✅ mandatory release gates                                         |
 | Download page, five packaging channels       | ✅ Scoop live; four written, not yet submitted                     |
 | Tray icon, close-to-tray while serving       | ✅                                                                 |
 | Native context menus, saved window bounds    | ✅                                                                 |
@@ -285,7 +285,7 @@ one of those credentials can be taken back on its own, mid-connection.
 
 ## Requirements
 
-- **Nothing you have to install first.** DSH Studio needs Node.js 20 or newer to
+- **Nothing you have to install first.** DSH Studio needs Node.js 22.19 or newer to
   run the harness, and it finds one if you have it — including the ones a version
   manager installed but never put on `PATH`. If you do not, it downloads and
   verifies one into its own data directory. The harness itself is installed for
@@ -326,6 +326,9 @@ specific to this app — they are two small crates that answer two questions any
 desktop app wrapping a Node service has to answer.
 
 ## FAQ
+
+Detailed guides: [User guide](docs/user-guide.md) · [Troubleshooting](docs/troubleshooting.md) ·
+[Architecture](docs/architecture.md) · [Plugin and catalog development](docs/plugin-development.md).
 
 **Does this replace the harness UI?**
 No. The harness is loaded from its own service, unmodified. What the shell adds
@@ -396,6 +399,9 @@ API keys is upstream's business, not this project's.
 | [Ask for a feature](https://github.com/Moresyl/dsh-studio/issues/new?template=feature_request.yml) | Including "the harness can do this from a terminal and the window cannot".                       |
 | [Report something privately](https://github.com/Moresyl/dsh-studio/security/advisories/new)        | Anything about the gateway, the pairing keys, or the supervisor. See [SECURITY.md](SECURITY.md). |
 | [The harness itself](https://github.com/deepseek-ai/deepseek-harness/issues)                       | The agent, its UI, its models. This repository is only the window around it.                     |
+
+Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md)
+([中文](CODE_OF_CONDUCT.zh-CN.md)).
 
 Issues in Chinese are welcome and get answered in Chinese — the app, the README,
 the changelog and the contributing guide are all bilingual, and so is triage.

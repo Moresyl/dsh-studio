@@ -15,13 +15,13 @@ when it does not, and rewrites every manifest below. Five registries want the sa
 three facts — version, URL, digest — in five different shapes, and a hand-edited
 one is how a bucket ends up installing last month's build.
 
-| Channel       | Manifest                                              | State                                |
-| ------------- | ----------------------------------------------------- | ------------------------------------ |
-| Scoop         | [`bucket/dsh-studio.json`](../bucket/dsh-studio.json) | live from this repository            |
-| winget        | [`winget/`](winget)                                   | validated, needs a pull request      |
-| Homebrew Cask | [`homebrew/dsh-studio.rb`](homebrew/dsh-studio.rb)    | needs its own tap repository         |
-| AUR           | [`aur/`](aur)                                         | needs an upload to aur.archlinux.org |
-| Flathub       | [`flathub/`](flathub)                                 | **never built** — see below          |
+| Channel       | Manifest                                              | State                                       |
+| ------------- | ----------------------------------------------------- | ------------------------------------------- |
+| Scoop         | [`bucket/dsh-studio.json`](../bucket/dsh-studio.json) | live from this repository                   |
+| winget        | [`winget/`](winget)                                   | validated, needs a pull request             |
+| Homebrew Cask | [`homebrew/dsh-studio.rb`](homebrew/dsh-studio.rb)    | needs its own tap repository                |
+| AUR           | [`aur/`](aur)                                         | needs an upload to aur.archlinux.org        |
+| Flathub       | [`flathub/`](flathub)                                 | locally buildable; sandbox limits CLI tools |
 
 ## Publishing
 
@@ -82,20 +82,14 @@ namcap PKGBUILD
 makepkg -si   # actually install it once before publishing
 ```
 
-**Flathub** is not ready, and the manifest says so at the top of the file. Two
-things need settling on a Linux machine before it is submitted:
-
-1. The Debian package declares `libwebkit2gtk-4.1-0`, the GTK 3 build. Recent
-   `org.gnome.Platform` runtimes ship the GTK 4 one instead, so the manifest pins
-   an older runtime — and a runtime without 4.1 produces an app that installs and
-   then does not start.
-2. The sandbox. This app exists to run a tool that executes shell commands in the
-   user's own project directories, which is close to the opposite of what a
-   sandbox is for. `--filesystem=home` is the honest minimum and a reviewer may
-   well argue with it.
-
-Flathub also requires at least one screenshot in the AppStream metadata, and the
-generated `metainfo.xml` has none.
+**Flathub** uses GNOME 49, which supplies the WebKitGTK 4.1 ABI used by Tauri,
+and the AppStream metadata includes a real application screenshot. CI builds the
+manifest. It deliberately requests `--filesystem=home`, because projects are the
+application's input. The remaining product boundary is tool execution: a
+Flatpak-installed Harness sees the sandbox's commands, not every compiler and
+CLI on the host. Until a reviewed host-tool bridge exists, this channel must not
+be advertised as equivalent to the native `.deb`/AppImage and should not be
+submitted merely to increase a channel count.
 
 ## Mirrors
 

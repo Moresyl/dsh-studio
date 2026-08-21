@@ -7,7 +7,7 @@
 
 ## 搭环境
 
-你需要 **Node.js 20+**、**pnpm 10**，以及**稳定版 Rust 工具链**。
+你需要 **Node.js 22.19+**、**pnpm 10**，以及**稳定版 Rust 工具链**。
 Windows 上还需要 MSVC 生成工具；Linux 上需要 WebKitGTK 的开发包：
 
 ```sh

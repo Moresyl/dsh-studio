@@ -1,0 +1,27 @@
+# 故障排查
+
+[English](troubleshooting.md)
+
+## 安装插件出现 404 / No authorization header
+
+如果日志指向 `@deepseek-ai/dsh@0.0.1-rc.1`，并提示 `@deepseek-ai/dsh-code-runtime-worker` 在镜像中不存在，问题来自旧版上游依赖图，不是你的登录状态。当前 Studio 固定使用已验证的 `0.1.0-rc.8` 家族；在环境页点击「修复」即可原子替换旧运行时。若仍报错：
+
+1. 检查 npm registry 是否被设为不完整的镜像；作用域私有包才需要认证，公开包不应依赖 Authorization 头。
+2. 切回 `https://registry.npmjs.org/` 后重试。
+3. 不要直接删除正在使用的 Profile；先退出 Studio，再导出诊断报告。
+
+## 安装中断
+
+Harness 安装发生在 staging 目录，校验成功后才替换当前运行时。插件操作也保存变更前副本。重启时应用会自动恢复；如果环境页显示恢复失败，点击「修复」并附上诊断报告提交 issue。
+
+## 工作区被拒绝
+
+Windows 上请把项目移到本地 NTFS/ReFS 固定磁盘。网络映射盘、U 盘、FAT32 和 exFAT 不能可靠提供包管理器需要的链接、锁和原子替换，因此会在进程启动前被阻止。
+
+## macOS/Windows 阻止安装包
+
+只从正式 Release 或列出的包管理器渠道安装，并核对 `SHA256SUMS.txt`。正式版本必须通过平台签名验证；若系统仍显示未知发布者，请不要绕过提示，先提交 issue 并附上安装包名称与哈希。
+
+## 找不到 Node
+
+环境页可以安装官方 Node 运行时。若公司网络拦截下载，可手动安装满足页面所示最低版本的 Node，再重新检查环境。

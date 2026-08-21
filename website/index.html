@@ -30,6 +30,7 @@
         <nav>
           <a href="#download">Download</a>
           <a href="#features">What it does</a>
+          <a href="#ecosystem">Ecosystem</a>
           <a href="#verify">Verify</a>
           <a href="https://github.com/Moresyl/dsh-studio">Source</a>
           <a href="zh.html" lang="zh-Hans">中文</a>
@@ -415,16 +416,56 @@ scoop install dsh-studio</pre>
               >
             </div>
             <div class="channel">
-              <span class="state pending">unbuilt</span>
+              <span class="state pending">build verified</span>
               <strong>Flathub</strong>
               <span
                 >Manifest in
                 <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/flathub"
                   >packaging/flathub</a
-                >. Written but never built: a sandboxed app that runs your shell commands needs a
-                careful look first.</span
+                >. The GNOME 49 manifest builds successfully, but sandboxed sessions cannot use
+                every compiler and CLI installed on the host yet.</span
               >
             </div>
+          </div>
+        </section>
+
+        <section id="ecosystem">
+          <div class="section-head">
+            <h2>One host, an open ecosystem</h2>
+            <p>
+              Studio keeps the desktop boundary small and extends Harness through its published
+              contracts.
+            </p>
+          </div>
+          <div class="verify">
+            <article class="card">
+              <h3>Harness upstream</h3>
+              <p>
+                The agent, web interface and model integrations stay upstream, so Studio can update
+                without maintaining a private fork.
+              </p>
+              <a href="https://github.com/deepseek-ai/deepseek-harness">Open upstream source</a>
+            </article>
+            <article class="card">
+              <h3>Plugin catalogs</h3>
+              <p>
+                Discover through npm, a reviewed 1024Store adapter or a restricted public Schema.
+                Installation is independently checked against npm.
+              </p>
+              <a href="https://github.com/Moresyl/dsh-studio/blob/main/docs/plugin-development.md"
+                >Build a plugin or catalog</a
+              >
+            </article>
+            <article class="card">
+              <h3>Operate and contribute</h3>
+              <p>
+                Start with the user and troubleshooting guides, then join issues and pull requests
+                under the bilingual community rules.
+              </p>
+              <a href="https://github.com/Moresyl/dsh-studio/blob/main/docs/user-guide.md"
+                >Read the guides</a
+              >
+            </article>
           </div>
         </section>
 
@@ -484,6 +525,7 @@ scoop install dsh-studio</pre>
           <a href="https://github.com/Moresyl/dsh-studio">Source</a>
           <a href="https://github.com/Moresyl/dsh-studio/releases">Releases</a>
           <a href="https://github.com/Moresyl/dsh-studio/issues">Report a problem</a>
+          <a href="https://github.com/Moresyl/dsh-studio/blob/main/docs/user-guide.md">Docs</a>
           <a href="https://github.com/Moresyl/dsh-studio/blob/main/CONTRIBUTING.md">Contributing</a>
           <a href="zh.html" lang="zh-Hans">中文</a>
         </div>

@@ -426,33 +426,15 @@ pkgname = dsh-studio-bin
 /* ---------- flathub ---------- */
 
 /*
- * UNVERIFIED. This manifest has never been built — flatpak-builder does not run
- * on Windows, and nothing in CI builds it yet. It is here so the submission
- * starts from something rather than nothing, and two things in particular need
- * checking on a Linux machine before it is offered to anyone:
- *
- *   1. WebKitGTK. The Debian package declares libwebkit2gtk-4.1-0, which is the
- *      GTK 3 build. Recent org.gnome.Platform runtimes ship the GTK 4 one
- *      instead, so this pins a runtime old enough to still carry 4.1 — and that
- *      pin needs checking against whatever Flathub currently accepts, because a
- *      runtime without it produces an app that installs and then does not start.
- *   2. The sandbox. The whole point of this app is running a tool that executes
- *      shell commands in the user's own project directory, which is close to the
- *      opposite of what a sandbox is for. `--filesystem=home` below is the
- *      honest minimum, and a reviewer may well argue with it.
- *
- * Flathub also requires at least one screenshot in the AppStream metadata, and
- * the metainfo emitted alongside this has none: the ones in the repository are
- * stale and the replacements are not shot yet. Add them before submitting.
+ * GNOME 49 carries the GTK 3 WebKitGTK 4.1 ABI Tauri links against. The broad
+ * home permission is intentional and visible: this is an agent workspace, not
+ * a document viewer, and hiding that fact behind a portal would be misleading.
  */
 function flatpak({ files }) {
   return `# ${GENERATED}
-#
-# UNVERIFIED: never built. See the note in packaging/generate.mjs before
-# submitting this anywhere.
 app-id: ${IDENTIFIER}
 runtime: org.gnome.Platform
-runtime-version: '45'
+runtime-version: '49'
 sdk: org.gnome.Sdk
 command: dsh-studio
 separate-locales: false
@@ -534,6 +516,17 @@ function metainfo({ version, date }) {
   <url type="homepage">https://github.com/${OWNER}/${REPO}</url>
   <url type="bugtracker">https://github.com/${OWNER}/${REPO}/issues</url>
   <url type="vcs-browser">https://github.com/${OWNER}/${REPO}</url>
+
+  <developer id="io.github.moresyl">
+    <name>Moresyl</name>
+  </developer>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/${OWNER}/${REPO}/main/assets/console.png</image>
+      <caption>The environment checks and supervised Harness console</caption>
+    </screenshot>
+  </screenshots>
 
   <provides>
     <binary>dsh-studio</binary>

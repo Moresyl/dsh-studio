@@ -1,0 +1,91 @@
+name: Package channels
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    name: Regenerate manifests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - run: node packaging/generate.mjs "${{ github.event.release.tag_name }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-channel-manifests
+          path: |
+            bucket/dsh-studio.json
+            packaging/winget
+            packaging/homebrew
+            packaging/aur
+            packaging/flathub
+
+  winget:
+    name: Validate WinGet
+    needs: generate
+    runs-on: windows-2025
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-channel-manifests
+      - run: winget validate --manifest packaging\winget
+
+  homebrew:
+    name: Validate Homebrew Cask
+    needs: generate
+    runs-on: macos-15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-channel-manifests
+      - run: brew style packaging/homebrew/dsh-studio.rb
+      - name: Audit Cask from a temporary tap
+        run: |
+          brew tap-new --no-git moresyl/dsh
+          tap_root="$(brew --repository moresyl/dsh)"
+          mkdir -p "$tap_root/Casks"
+          cp packaging/homebrew/dsh-studio.rb "$tap_root/Casks/dsh-studio.rb"
+          brew audit --cask --online --new-cask moresyl/dsh/dsh-studio
+
+  aur:
+    name: Validate AUR package
+    needs: generate
+    runs-on: ubuntu-22.04
+    container: archlinux:base-devel
+    steps:
+      - run: pacman -Syu --noconfirm git namcap
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-channel-manifests
+      - run: |
+          useradd --create-home builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+          runuser -u builder -- sh -c 'cd packaging/aur && makepkg --printsrcinfo > generated.SRCINFO'
+          diff -u packaging/aur/.SRCINFO packaging/aur/generated.SRCINFO
+          namcap packaging/aur/PKGBUILD
+
+  flatpak:
+    name: Build Flatpak manifest
+    needs: generate
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-channel-manifests
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.gnome.Platform//49 org.gnome.Sdk//49
+          flatpak-builder --user --force-clean --disable-rofiles-fuse build-dir packaging/flathub/io.github.moresyl.dshstudio.yml
+      - run: appstreamcli validate --no-net packaging/flathub/io.github.moresyl.dshstudio.metainfo.xml

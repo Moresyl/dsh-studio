@@ -194,8 +194,8 @@ winget、Homebrew Cask 和 AUR 的清单已经写好并校验过，但还没提�
 registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每一个还差什么。
 
 > **签名。** 发布流水线会用 Apple Developer ID 给 macOS 构建签名、公证并装订票据，
-> 并通过 Azure Artifact Signing 给 Windows 安装包签名。两者都以凭证是否配置为条件，
-> 所以 fork 出去的构建是「没签名」，而不是「构建失败」。
+> 并通过 Azure Artifact Signing 给 Windows 安装包签名。正式发布缺少任一平台签名
+> 或更新签名凭据都会直接失败，不会生成未签名正式版。
 > **v0.4.0 及之前的版本是在这套流水线之前发的**——那些 macOS 包首次启动会被
 > Gatekeeper 拦下，需要到「系统设置 → 隐私与安全性」里放行。
 
@@ -222,9 +222,9 @@ registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每
 | 远程访问：一次性配对码、每设备密钥 | ✅                                                            |
 | 签名应用内更新、定时自动检查       | ✅                                                            |
 | Windows 11 实测通过                | ✅                                                            |
-| macOS / Linux 渲染                 | ⏳ 尚未验证                                                   |
+| macOS / Linux 平台构建             | ✅ 已在平台 CI 矩阵编译与测试                                 |
 | 按需拉取并校验 Node runtime        | ✅ 无需系统 Node                                              |
-| 签名、公证、`SHA256SUMS.txt`       | ✅ 已进流水线，从下一个版本起生效                             |
+| 签名、公证、`SHA256SUMS.txt`       | ✅ 正式发布强制门禁                                           |
 | 下载页与五条打包渠道               | ✅ Scoop 已可用；另四条已写好，尚未提交                       |
 | 托盘图标、运行中关闭到托盘         | ✅                                                            |
 | 原生右键菜单、窗口位置记忆         | ✅                                                            |
@@ -257,7 +257,7 @@ registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每
 
 ## 环境要求
 
-- **不需要你先装任何东西。** DSH Studio 需要 Node.js 20 或更新版本来跑 harness，
+- **不需要你先装任何东西。** DSH Studio 需要 Node.js 22.19 或更新版本来跑 harness，
   你有的话它就去找出来——包括版本管理器装了、但从没加进 `PATH` 的那些。
   你没有的话，它会下载一个、校验过之后放进自己的数据目录。
   harness 本身两种情况下都由它替你安装。
@@ -296,6 +296,9 @@ src-tauri/crates/
 它们是两个小 crate，回答的是「任何包装 Node 服务的桌面应用」都绕不开的两个问题。
 
 ## 常见问题
+
+详细文档：[使用指南](docs/user-guide.zh-CN.md) · [故障排查](docs/troubleshooting.zh-CN.md) ·
+[架构](docs/architecture.zh-CN.md) · [插件与目录开发](docs/plugin-development.zh-CN.md)。
 
 **它会替换掉 harness 的界面吗？**
 不会。harness 从它自己的服务加载，未经任何修改。
@@ -351,6 +354,8 @@ supervisor 再从服务自己打印的就绪行里把真实端口读回来。
 至于 harness 本身怎么处理你的 API key，那是上游的事，不归这个项目管。
 
 ## 社区
+
+参与社区须遵守[社区行为准则](CODE_OF_CONDUCT.zh-CN.md)（[English](CODE_OF_CONDUCT.md)）。
 
 | 去哪儿                                                                                      | 做什么                                                                      |
 | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |

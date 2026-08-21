@@ -8,7 +8,7 @@ not have to discover them in review.
 
 ## Getting set up
 
-You need **Node.js 20+**, **pnpm 10**, and a **stable Rust toolchain**. On
+You need **Node.js 22.19+**, **pnpm 10**, and a **stable Rust toolchain**. On
 Windows that also means the MSVC build tools; on Linux, the WebKitGTK
 development packages:
 

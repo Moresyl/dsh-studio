@@ -30,6 +30,7 @@
         <nav>
           <a href="#download">下载</a>
           <a href="#features">它做什么</a>
+          <a href="#ecosystem">生态</a>
           <a href="#verify">校验</a>
           <a href="https://github.com/Moresyl/dsh-studio">源码</a>
           <a href="index.html" lang="en">English</a>
@@ -401,16 +402,48 @@ scoop install dsh-studio</pre>
               >
             </div>
             <div class="channel">
-              <span class="state pending">未构建</span>
+              <span class="state pending">构建已验证</span>
               <strong>Flathub</strong>
               <span
                 >清单在
                 <a href="https://github.com/Moresyl/dsh-studio/tree/main/packaging/flathub"
                   >packaging/flathub</a
-                >。 写好了但从未构建过：一个要替你执行 shell
-                命令的应用装进沙箱，需要先仔细验证。</span
+                >。 GNOME 49 清单已实际构建通过，但沙箱内会话目前还不能使用宿主机安装的全部 编译器和
+                CLI。</span
               >
             </div>
+          </div>
+        </section>
+
+        <section id="ecosystem">
+          <div class="section-head">
+            <h2>一个宿主，开放生态</h2>
+            <p>Studio 把桌面信任边界保持得足够小，并通过 Harness 已发布的契约进行扩展。</p>
+          </div>
+          <div class="verify">
+            <article class="card">
+              <h3>Harness 上游</h3>
+              <p>Agent、Web 界面与模型集成留在上游；Studio 不维护私有 fork，也能持续跟进更新。</p>
+              <a href="https://github.com/deepseek-ai/deepseek-harness">查看上游源码</a>
+            </article>
+            <article class="card">
+              <h3>插件目录</h3>
+              <p>
+                从 npm、受约束的 1024Store 适配器或公开 Schema 发现插件，安装时仍会独立回到 npm
+                校验。
+              </p>
+              <a
+                href="https://github.com/Moresyl/dsh-studio/blob/main/docs/plugin-development.zh-CN.md"
+                >开发插件或目录</a
+              >
+            </article>
+            <article class="card">
+              <h3>使用与参与</h3>
+              <p>从使用和排障指南开始，再按双语社区规范参与 Issue 与 Pull Request。</p>
+              <a href="https://github.com/Moresyl/dsh-studio/blob/main/docs/user-guide.zh-CN.md"
+                >阅读指南</a
+              >
+            </article>
           </div>
         </section>
 
@@ -466,6 +499,9 @@ scoop install dsh-studio</pre>
           <a href="https://github.com/Moresyl/dsh-studio">源码</a>
           <a href="https://github.com/Moresyl/dsh-studio/releases">版本</a>
           <a href="https://github.com/Moresyl/dsh-studio/issues">反馈问题</a>
+          <a href="https://github.com/Moresyl/dsh-studio/blob/main/docs/user-guide.zh-CN.md"
+            >文档</a
+          >
           <a href="https://github.com/Moresyl/dsh-studio/blob/main/CONTRIBUTING.md">参与贡献</a>
           <a href="index.html" lang="en">English</a>
         </div>
