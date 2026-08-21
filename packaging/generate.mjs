@@ -441,6 +441,11 @@ sdk: org.gnome.Sdk
 command: dsh-studio
 separate-locales: false
 
+# Ubuntu 22.04 ships flatpak-builder 1.2, whose automatic composer is
+# unavailable inside a GNOME 49 build sandbox. AppStream is validated as a
+# separate workflow gate; Flathub's current builder composes it on submission.
+appstream-compose: false
+
 finish-args:
   - --share=ipc
   - --socket=wayland
