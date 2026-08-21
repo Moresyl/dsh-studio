@@ -83,7 +83,9 @@ Unix 上则单独建进程组、按组发信号。关掉窗口不留任何残余
 **是承载 harness，不是取代它。**
 harness 的界面加载在外壳自绘标题栏下方的一个 frame 里，
 所以窗口始终可拖动、可关闭，切回控制面板也不会丢掉正在进行的会话。
-上游项目没有被打补丁，也没有被 vendor 进来。
+Studio 不维护上游 fork，也不把 Harness 源码 vendor 进来。安装托管的精确版本客户端时，
+只会确定性加入一处原生 Workspace 集成；运行时合同会验证这个已知 seam，未来上游若移动
+它就进入「修复」，而不是静默修改未知版本。
 
 **扩展它，走的是它自己的插件系统。**
 窗口里就有一个插件市场：搜索 npm registry、在决定装之前先看清这个包声明了什么，
@@ -305,7 +307,8 @@ src-tauri/crates/
 ## 常见问题
 
 详细文档：[使用指南](docs/user-guide.zh-CN.md) · [故障排查](docs/troubleshooting.zh-CN.md) ·
-[架构](docs/architecture.zh-CN.md) · [插件与目录开发](docs/plugin-development.zh-CN.md)。
+[架构](docs/architecture.zh-CN.md) · [插件与目录开发](docs/plugin-development.zh-CN.md) ·
+[插件互操作合同](docs/plugin-interoperability.zh-CN.md) · [Protocol 3 SDK](sdk/README.md)。
 
 **它会替换掉 harness 的界面吗？**
 不会。harness 从它自己的服务加载，未经任何修改。

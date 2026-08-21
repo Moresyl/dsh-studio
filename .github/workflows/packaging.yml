@@ -6,7 +6,11 @@ on:
     types: [published]
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: package-channels-${{ github.event.release.tag_name || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   generate:
@@ -98,3 +102,34 @@ jobs:
           flatpak run --user --filesystem="$GITHUB_WORKSPACE" \
             --command=flatpak-builder-lint org.flatpak.Builder \
             appstream "$GITHUB_WORKSPACE/packaging/flathub/io.github.moresyl.dshstudio.metainfo.xml"
+
+  commit:
+    name: Publish generated manifests to main
+    if: github.repository == 'Moresyl/dsh-studio'
+    needs: [winget, homebrew, aur, flatpak]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/download-artifact@v4
+        with:
+          name: package-channel-manifests
+      - name: Commit only validated channel manifests
+        run: |
+          git add -- \
+            bucket/dsh-studio.json \
+            packaging/winget \
+            packaging/homebrew \
+            packaging/aur \
+            packaging/flathub
+          if git diff --cached --quiet; then
+            echo "Channel manifests already match the published release."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          version="${{ github.event.release.tag_name }}"
+          if [ -z "$version" ]; then version="latest release"; fi
+          git commit -m "chore: update package channels for $version"
+          git push origin HEAD:main

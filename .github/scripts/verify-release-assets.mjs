@@ -30,6 +30,7 @@ const required = [
   ['Linux Full RPM package', (name) => /full-x86_64-unknown-linux-gnu\.rpm$/i.test(name)],
   ['macOS Full Apple Silicon image', (name) => /full-aarch64-apple-darwin\.dmg$/i.test(name)],
   ['macOS Full Intel image', (name) => /full-x86_64-apple-darwin\.dmg$/i.test(name)],
+  ['Protocol 3 SDK package', (name) => /^moresyl-dsh-studio-sdk-\d+\.\d+\.\d+\.tgz$/i.test(name)],
 ]
 for (const [label, matches] of required) {
   if (!names.some(matches)) throw new Error(`release is missing ${label}`)

@@ -353,6 +353,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Publish the typed Protocol 3 SDK package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          fi
+          mkdir -p sdk-assets
+          npm pack ./sdk --pack-destination sdk-assets
+          sdk_package="$(find sdk-assets -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+          test -n "$sdk_package"
+          gh release upload "$tag" "$sdk_package" --repo "$GITHUB_REPOSITORY" --clobber
+
       - name: Sum every artifact on the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

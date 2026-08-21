@@ -25,8 +25,11 @@ one is how a bucket ends up installing last month's build.
 
 ## Publishing
 
-Only Scoop is served from here. The rest each need one manual step, once; after
-that, keeping them current is re-running the generator and pushing.
+Only Scoop is served from here until the external registries receive their
+one-time submissions. Every published release runs the generator, validates all
+five manifests on their native toolchains and commits the validated files back
+to `main`. After a channel has been registered, its maintainer can consume those
+committed files without recalculating release URLs or digests by hand.
 
 **Scoop** needs nothing. A bucket is a repository with a `bucket/` directory, so
 this one already is:

@@ -19,27 +19,35 @@ pre-1.0 caveat that anything may still move.
 - A Full / Offline edition that carries SHA-256-pinned Node, Harness and pnpm
   payloads, plus a Windows Lite portable executable and a macOS Universal Lite
   image.
-- Native workspace folder selection and drop, independently configurable turn
-  and background-job notifications, and persistent Compatibility/Advanced
-  presentation modes.
+- Native workspace folder selection and drop that create/open real upstream
+  Harness workspaces, independently configurable turn and background-job
+  notifications, and persistent Compatibility/Advanced presentation modes.
 - A paged, filtered and sorted plugin catalog index with durable market receipts
-  for exact source, version and registry integrity.
-- Protocol 2 desktop profile/plugin services and a pinned terminal toolchain;
-  packaged macOS/Linux launches recover an allowlisted login-shell environment.
+  for exact source, version and registry integrity, plus restricted catalog
+  images, a two-phase native install review, and a rate-limited reviewed
+  dshfind adapter that accepts only verified stable npm targets.
+- Protocol 3 desktop profile/plugin/workspace services, a pinned terminal
+  toolchain, and a managed Harness client integration; packaged macOS/Linux
+  launches recover an allowlisted login-shell environment.
 
 ### Changed
 
 - Lite and Full now share one immutable runtime lock committed to the repository.
-  Versions, registry URLs and integrity for its 510 packages come from the same
+  Every package version, registry URL and integrity value comes from the same
   contract, so online first-run and offline payloads no longer solve separately.
 - Packaged applications must execute a smoke test before publication, Windows
   installers must pass an upgrade regression, and release verification now
   requires the portable and Universal artifacts.
-- Profile startup validates the selected profile before launch and offers a
-  last-known-good recovery path with explicit faulty-plugin isolation.
+- Profile startup validates the selected profile before launch and offers one
+  guarded recovery center for last-known-good fallback, exact faulty-plugin
+  isolation, retry and bounded diagnostic export.
 - Desktop services revalidate exact versions and catalog membership at the
-  native boundary; the bridge remains restricted to the active loopback Harness
-  origin.
+  native boundary. Market installs additionally block lifecycle scripts,
+  deprecated packages, weak integrity and mismatched repository backlinks; the
+  bridge remains restricted to the active loopback Harness origin.
+- CI enforces at least 80% statements, branches, functions and lines for the
+  deterministic browser logic, and at least 80% line coverage for every listed
+  critical Rust safety module, including the LAN gateway.
 
 ### Fixed
 
@@ -56,6 +64,8 @@ pre-1.0 caveat that anything may still move.
 - Installer upgrades preserve application data and can launch the upgraded
   binary; background completion/failure no longer goes unnoticed when the
   Studio window is not focused.
+- Catalog media can no longer make the renderer fetch arbitrary remote URLs;
+  admitted images are bounded, decoded and re-encoded locally before display.
 
 ## [0.6.0] — 2026-08-21
 

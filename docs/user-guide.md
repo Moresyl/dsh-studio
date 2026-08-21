@@ -13,13 +13,13 @@ Choose **Lite** for the smallest download, or **Full / Offline** when first-run 
 
 ## Plugins
 
-Discovery can use npm, DSH 1024Store, or a custom standard catalog. Results are indexed for ten minutes and support category filters, sorting and 25-item pages. A catalog can only suggest an exact npm target. Before any mutation, Studio resolves that version again through npm and checks package syntax and the Harness peer range. A successful market install writes a receipt with the exact source, version and integrity; the managed badge is shown only while the installed version still matches that receipt. Plugin changes have a durable before-image; an interrupted operation is rolled back on the next launch and reported in the UI.
+Discovery can use npm, DSH 1024Store, the rate-limited reviewed dshfind catalog, or a custom standard catalog. Results are indexed for ten minutes and support category filters, sorting and 25-item pages. A catalog can only suggest an exact npm target. Before any mutation, Studio resolves that version again through npm and checks package syntax and the Harness peer range. A successful market install writes a receipt with the exact source, version and integrity; the managed badge is shown only while the installed version still matches that receipt. Plugin changes have a durable before-image; an interrupted operation is rolled back on the next launch and reported in the UI.
 
 ## Presentation and desktop integration
 
 **Compatibility** mode opens the upstream Harness interface directly. **Advanced** mode opens Studio's workspace, and the preference is shared by every window. The built-in terminal receives the selected profile/workspace plus the managed Node, Harness and pnpm tools on `PATH`. Packaged macOS and Linux builds recover only an allowlisted set of development variables from the login shell; credentials are never imported.
 
-Harness pages can feature-detect the frozen Protocol 2 `window.dshStudio` API for notifications, pickers, badges, deep links, profile listing/selection and exact-version plugin installation/removal. The bridge accepts only the currently supervised loopback Harness origin and never exposes raw Tauri IPC or shell execution.
+Harness pages can feature-detect the frozen Protocol 3 `window.dshStudio` API for notifications, pickers, badges, deep links, profile listing/selection, exact-version plugin installation/removal, and native workspace admission/drop signals. The bridge accepts only the currently supervised loopback Harness origin and never exposes raw Tauri IPC or shell execution.
 
 Completion/failure notifications for user turns and background jobs can be enabled independently in Settings. Workspace selection uses the native folder picker and also accepts a dropped folder.
 

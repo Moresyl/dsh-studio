@@ -17,6 +17,12 @@ use crate::error::{Error, Result};
 const STORE_ID: &str = "dsh-1024store";
 const STORE_LABEL: &str = "DSH 1024Store";
 const STORE_ENDPOINT: &str = "https://deepseek1024.com/api/v1/plugins";
+pub(crate) const DSHFIND_ID: &str = "dshfind";
+const DSHFIND_LABEL: &str = "dshfind";
+const DSHFIND_ENDPOINT: &str = "https://api.dshfind.com/v1/plugins";
+const DSHFIND_PAGE_SIZE: usize = 100;
+const DSHFIND_MAX_PAGES: usize = 100;
+const DSHFIND_PAGE_DELAY: Duration = Duration::from_millis(2_100);
 const MAX_BODY: usize = 2 << 20;
 const MAX_ITEMS: usize = 10_000;
 const MAX_CUSTOM: usize = 12;
@@ -68,6 +74,14 @@ pub fn sources() -> Vec<Source> {
             endpoint: Some(STORE_ENDPOINT.to_string()),
             built_in: true,
             active: settings.active == STORE_ID,
+        },
+        Source {
+            id: DSHFIND_ID.to_string(),
+            label: DSHFIND_LABEL.to_string(),
+            kind: "reviewed-http".to_string(),
+            endpoint: Some(DSHFIND_ENDPOINT.to_string()),
+            built_in: true,
+            active: settings.active == DSHFIND_ID,
         },
     ];
     sources.extend(settings.custom.into_iter().map(|custom| Source {
@@ -151,6 +165,7 @@ pub async fn search(source_id: &str, query: &str) -> Result<Vec<Listing>> {
             let value = restricted_json(STORE_ENDPOINT).await?;
             parse_store(&value, query)
         }
+        DSHFIND_ID => fetch_dshfind(query).await,
         "npm" => Err(Error::Plugin(
             "npm discovery is handled by the configured registry".into(),
         )),
@@ -380,6 +395,288 @@ fn parse_store(value: &serde_json::Value, query: &str) -> Result<Vec<Listing>> {
     Ok(listings)
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DshfindDataset {
+    total: usize,
+    total_pages: usize,
+    data_version: String,
+    as_of: String,
+}
+
+#[derive(Debug)]
+struct DshfindPage {
+    data: Vec<serde_json::Value>,
+    dataset: DshfindDataset,
+}
+
+/// Fetch one immutable dshfind dataset without exceeding its anonymous
+/// 30-request/minute contract. Every later page is pinned to page one's
+/// `data_version`, so a catalog refresh cannot splice two generations together.
+async fn fetch_dshfind(query: &str) -> Result<Vec<Listing>> {
+    let mut page_number = 1usize;
+    let mut dataset: Option<DshfindDataset> = None;
+    let mut ids = BTreeSet::new();
+    let mut packages = BTreeSet::new();
+    let mut listings = Vec::new();
+
+    loop {
+        let endpoint = dshfind_page_url(
+            page_number,
+            dataset.as_ref().map(|item| item.data_version.as_str()),
+        )?;
+        let page = parse_dshfind_page(&restricted_json(endpoint.as_str()).await?, page_number)?;
+        if let Some(expected) = &dataset {
+            if expected != &page.dataset {
+                return Err(Error::Network(
+                    "dshfind dataset changed during pagination".into(),
+                ));
+            }
+        } else {
+            dataset = Some(page.dataset.clone());
+        }
+
+        for item in page.data {
+            if let Some(id) = text(&item, "full_name", 160) {
+                if !ids.insert(id.to_ascii_lowercase()) {
+                    return Err(Error::Network(
+                        "dshfind catalog contains duplicate item IDs".into(),
+                    ));
+                }
+            }
+            let Some(listing) = parse_dshfind_item(&item, query) else {
+                continue;
+            };
+            if packages.insert(listing.name.clone()) {
+                listings.push(listing);
+            }
+        }
+
+        let total_pages = dataset.as_ref().map_or(0, |item| item.total_pages);
+        if total_pages == 0 || page_number >= total_pages {
+            break;
+        }
+        if page_number >= DSHFIND_MAX_PAGES {
+            return Err(Error::Network(
+                "dshfind catalog exceeded the page limit".into(),
+            ));
+        }
+        tokio::time::sleep(DSHFIND_PAGE_DELAY).await;
+        page_number += 1;
+    }
+    Ok(listings)
+}
+
+fn dshfind_page_url(page: usize, data_version: Option<&str>) -> Result<url::Url> {
+    let mut endpoint = safe_url(DSHFIND_ENDPOINT)?;
+    {
+        let mut query = endpoint.query_pairs_mut();
+        query.append_pair("page", &page.to_string());
+        query.append_pair("per_page", &DSHFIND_PAGE_SIZE.to_string());
+        if let Some(data_version) = data_version {
+            query.append_pair("data_version", data_version);
+        }
+    }
+    Ok(endpoint)
+}
+
+fn parse_dshfind_page(value: &serde_json::Value, expected_page: usize) -> Result<DshfindPage> {
+    let data = value
+        .get("data")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| Error::Network("dshfind response has no data array".into()))?;
+    let page = dshfind_usize(value, "page")?;
+    let per_page = dshfind_usize(value, "per_page")?;
+    let total = dshfind_usize(value, "total")?;
+    let total_pages = dshfind_usize(value, "total_pages")?;
+    if page != expected_page {
+        return Err(Error::Network(
+            "dshfind response page did not match the request".into(),
+        ));
+    }
+    if per_page != DSHFIND_PAGE_SIZE {
+        return Err(Error::Network(
+            "dshfind response changed the requested page size".into(),
+        ));
+    }
+    if total > MAX_ITEMS || total_pages > DSHFIND_MAX_PAGES {
+        return Err(Error::Network(
+            "dshfind catalog exceeded the item or page limit".into(),
+        ));
+    }
+    let calculated_pages = total.div_ceil(DSHFIND_PAGE_SIZE);
+    if total_pages != calculated_pages || (total_pages > 0 && page > total_pages) {
+        return Err(Error::Network(
+            "dshfind response page metadata is inconsistent".into(),
+        ));
+    }
+    let expected_items = if total_pages == 0 {
+        0
+    } else if page < total_pages {
+        DSHFIND_PAGE_SIZE
+    } else {
+        total - (page - 1) * DSHFIND_PAGE_SIZE
+    };
+    if data.len() != expected_items || data.len() > DSHFIND_PAGE_SIZE {
+        return Err(Error::Network(
+            "dshfind response item count did not match page metadata".into(),
+        ));
+    }
+    let data_version = text(value, "data_version", 71)
+        .filter(|version| {
+            version.strip_prefix("sha256:").is_some_and(|hash| {
+                hash.len() == 64
+                    && hash
+                        .bytes()
+                        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+            })
+        })
+        .ok_or_else(|| Error::Network("dshfind data_version is invalid".into()))?;
+    let as_of = text(value, "as_of", 64)
+        .filter(|date| date.contains('T') && date.ends_with('Z'))
+        .ok_or_else(|| Error::Network("dshfind as_of is invalid".into()))?;
+
+    Ok(DshfindPage {
+        data: data.clone(),
+        dataset: DshfindDataset {
+            total,
+            total_pages,
+            data_version,
+            as_of,
+        },
+    })
+}
+
+fn dshfind_usize(value: &serde_json::Value, key: &str) -> Result<usize> {
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|number| usize::try_from(number).ok())
+        .ok_or_else(|| Error::Network(format!("dshfind {key} is invalid")))
+}
+
+fn parse_dshfind_item(value: &serde_json::Value, query: &str) -> Option<Listing> {
+    if value.get("is_risky").and_then(serde_json::Value::as_bool) == Some(true) {
+        return None;
+    }
+    let (repository, owner) = dshfind_repository(value)?;
+    let (name, version) = dshfind_npm_target(value)?;
+    let display_name = text(value, "name", 120).unwrap_or_else(|| name.clone());
+    let description = text(value, "description", 5_000).unwrap_or_else(|| display_name.clone());
+    let publisher = text(value, "owner", 120)
+        .filter(|candidate| candidate.eq_ignore_ascii_case(&owner))
+        .unwrap_or(owner);
+    let needle = query.trim().to_ascii_lowercase();
+    if !needle.is_empty()
+        && !format!("{name} {display_name} {description} {publisher}")
+            .to_ascii_lowercase()
+            .contains(&needle)
+    {
+        return None;
+    }
+    let mut item_categories = categories(value);
+    if let Some(category) = text(value, "category", 48) {
+        item_categories.push(category);
+        item_categories.sort_by_key(|item| item.to_ascii_lowercase());
+        item_categories.dedup_by(|left, right| left.eq_ignore_ascii_case(right));
+        item_categories.truncate(20);
+    }
+    let icon = store_icon(value, Some(&repository));
+    Some(Listing {
+        name,
+        version,
+        description,
+        publisher,
+        updated: text(value, "pushed_at", 64).unwrap_or_default(),
+        weekly_downloads: 0,
+        link: Some(repository.clone()),
+        repository: Some(repository),
+        source_id: DSHFIND_ID.to_string(),
+        source_label: DSHFIND_LABEL.to_string(),
+        installable: true,
+        categories: item_categories,
+        has_icon: icon.is_some(),
+        icon,
+    })
+}
+
+fn dshfind_repository(value: &serde_json::Value) -> Option<(String, String)> {
+    let raw = value.get("repository_url")?.as_str()?;
+    let url = safe_url(raw).ok()?;
+    if !url.host_str()?.eq_ignore_ascii_case("github.com") || url.query().is_some() {
+        return None;
+    }
+    let segments: Vec<_> = url
+        .path_segments()?
+        .filter(|part| !part.is_empty())
+        .collect();
+    if segments.len() != 2 {
+        return None;
+    }
+    let owner = segments[0];
+    let repository = segments[1].strip_suffix(".git").unwrap_or(segments[1]);
+    if !github_part(owner, 100, false) || !github_part(repository, 100, true) {
+        return None;
+    }
+    let full_name = text(value, "full_name", 160)?;
+    if !full_name.eq_ignore_ascii_case(&format!("{owner}/{repository}")) {
+        return None;
+    }
+    Some((
+        format!("https://github.com/{owner}/{repository}"),
+        owner.to_string(),
+    ))
+}
+
+fn github_part(value: &str, max: usize, dot: bool) -> bool {
+    !value.is_empty()
+        && value.len() <= max
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' || (dot && byte == b'.')
+        })
+}
+
+fn dshfind_npm_target(value: &serde_json::Value) -> Option<(String, String)> {
+    let install = value.get("install")?;
+    let declared = install.get("pkg_name").and_then(serde_json::Value::as_str);
+    let methods = install.get("methods")?.as_array()?;
+    let mut targets = BTreeSet::new();
+    for method in methods {
+        if method.get("kind").and_then(serde_json::Value::as_str) != Some("npm")
+            || method
+                .get("verification")
+                .and_then(serde_json::Value::as_str)
+                != Some("verified")
+            || method.get("code").and_then(serde_json::Value::as_str) != Some("repository_backlink")
+            || method
+                .get("requiresBuildAllowance")
+                .and_then(serde_json::Value::as_bool)
+                != Some(false)
+        {
+            continue;
+        }
+        let Some(name) = method.get("spec").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        let Some(raw_version) = method.get("revision").and_then(serde_json::Value::as_str) else {
+            continue;
+        };
+        let Ok(version) = semver::Version::parse(raw_version) else {
+            continue;
+        };
+        if !super::is_package_name(name)
+            || !version.pre.is_empty()
+            || !version.build.is_empty()
+            || declared.is_some_and(|candidate| candidate != name)
+        {
+            continue;
+        }
+        targets.insert((name.to_string(), raw_version.to_string()));
+    }
+    (targets.len() == 1)
+        .then(|| targets.into_iter().next())
+        .flatten()
+}
+
 fn parse_standard(
     value: &serde_json::Value,
     source_id: &str,
@@ -605,6 +902,7 @@ fn load() -> Settings {
     });
     let active_is_valid = settings.active == "npm"
         || settings.active == STORE_ID
+        || settings.active == DSHFIND_ID
         || settings
             .custom
             .iter()
@@ -647,7 +945,10 @@ fn default_active() -> String {
 mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-    use super::{blocked, parse_standard, parse_store, safe_url};
+    use super::{
+        blocked, dshfind_page_url, parse_dshfind_item, parse_dshfind_page, parse_standard,
+        parse_store, safe_url,
+    };
 
     #[test]
     fn catalog_network_rejects_credentials_ports_and_private_addresses() {
@@ -732,6 +1033,81 @@ mod tests {
         assert_eq!(items[0].name, "good-plugin");
     }
 
+    fn dshfind_item() -> serde_json::Value {
+        serde_json::json!({
+            "full_name": "example/safe-plugin",
+            "name": "safe-plugin",
+            "owner": "example",
+            "repository_url": "https://github.com/example/safe-plugin",
+            "description": "A reviewed plugin",
+            "tags": ["agent", "tools"],
+            "category": "agent",
+            "pushed_at": "2026-08-21T00:00:00Z",
+            "is_risky": false,
+            "install": {
+                "pkg_name": "@example/safe-plugin",
+                "methods": [{
+                    "kind": "npm",
+                    "verification": "verified",
+                    "code": "repository_backlink",
+                    "requiresBuildAllowance": false,
+                    "spec": "@example/safe-plugin",
+                    "revision": "1.2.3"
+                }]
+            }
+        })
+    }
+
+    #[test]
+    fn dshfind_accepts_only_one_stable_reviewed_npm_target_with_a_matching_repository() {
+        let item = parse_dshfind_item(&dshfind_item(), "safe").expect("reviewed item");
+        assert_eq!(item.name, "@example/safe-plugin");
+        assert_eq!(item.version, "1.2.3");
+        assert_eq!(item.source_id, super::DSHFIND_ID);
+        assert_eq!(
+            item.repository.as_deref(),
+            Some("https://github.com/example/safe-plugin")
+        );
+        assert!(item.categories.contains(&"agent".to_string()));
+
+        let mut risky = dshfind_item();
+        risky["is_risky"] = serde_json::json!(true);
+        assert!(parse_dshfind_item(&risky, "").is_none());
+
+        let mut prerelease = dshfind_item();
+        prerelease["install"]["methods"][0]["revision"] = serde_json::json!("1.2.3-rc.1");
+        assert!(parse_dshfind_item(&prerelease, "").is_none());
+
+        let mut mismatched = dshfind_item();
+        mismatched["full_name"] = serde_json::json!("someone/else");
+        assert!(parse_dshfind_item(&mismatched, "").is_none());
+    }
+
+    #[test]
+    fn dshfind_pages_are_bounded_and_pinned_to_a_dataset_identity() {
+        let hash = "a".repeat(64);
+        let value = serde_json::json!({
+            "data": [dshfind_item()],
+            "page": 1,
+            "per_page": 100,
+            "total": 1,
+            "total_pages": 1,
+            "data_version": format!("sha256:{hash}"),
+            "as_of": "2026-08-21T00:00:00Z"
+        });
+        let page = parse_dshfind_page(&value, 1).expect("page");
+        assert_eq!(page.data.len(), 1);
+        assert_eq!(page.dataset.total_pages, 1);
+
+        let mut inconsistent = value.clone();
+        inconsistent["total_pages"] = serde_json::json!(2);
+        assert!(parse_dshfind_page(&inconsistent, 1).is_err());
+
+        let url = dshfind_page_url(2, Some(&format!("sha256:{hash}"))).expect("URL");
+        assert!(url.as_str().contains("page=2"));
+        assert!(url.as_str().contains("data_version=sha256%3A"));
+    }
+
     #[tokio::test]
     #[ignore = "queries the live reviewed catalog"]
     async fn live_reviewed_store_keeps_installable_results() {
@@ -741,5 +1117,16 @@ mod tests {
         assert!(!items.is_empty());
         assert!(items.iter().all(|item| item.installable));
         assert!(items.iter().all(|item| item.source_id == super::STORE_ID));
+    }
+
+    #[tokio::test]
+    #[ignore = "scans the live rate-limited reviewed catalog"]
+    async fn live_dshfind_scan_keeps_only_installable_results() {
+        let items = super::search(super::DSHFIND_ID, "")
+            .await
+            .expect("live catalog");
+        assert!(!items.is_empty());
+        assert!(items.iter().all(|item| item.installable));
+        assert!(items.iter().all(|item| item.source_id == super::DSHFIND_ID));
     }
 }

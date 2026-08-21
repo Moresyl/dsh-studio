@@ -1,0 +1,45 @@
+{
+  "name": "@moresyl/dsh-studio-sdk",
+  "version": "0.7.0",
+  "description": "Typed feature detection and Protocol 3 contracts for DSH Studio plugins",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.19"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Moresyl/dsh-studio.git",
+    "directory": "sdk"
+  },
+  "homepage": "https://github.com/Moresyl/dsh-studio/tree/main/sdk#readme",
+  "bugs": {
+    "url": "https://github.com/Moresyl/dsh-studio/issues"
+  },
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "desktop"
+  ],
+  "author": "Moresyl",
+  "license": "MIT"
+}

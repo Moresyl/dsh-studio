@@ -93,8 +93,10 @@ shell — and streams the output into the window while it works.
 **Hosts the harness instead of replacing it.**
 The harness UI is loaded in a frame under the shell's own title bar, so the
 window stays movable and closable, and switching to the control panel does not
-throw away a running session. Nothing about the upstream project is patched or
-vendored.
+throw away a running session. Studio does not maintain an upstream fork or
+vendor Harness source. Its managed, exact-version client receives one
+deterministic native-workspace integration at install time; the runtime contract
+verifies that known seam and enters Repair if a future upstream version moves it.
 
 **Extends it through its own plugin system.**
 There is a marketplace in the window: search the npm registry, read what a
@@ -337,7 +339,9 @@ desktop app wrapping a Node service has to answer.
 ## FAQ
 
 Detailed guides: [User guide](docs/user-guide.md) · [Troubleshooting](docs/troubleshooting.md) ·
-[Architecture](docs/architecture.md) · [Plugin and catalog development](docs/plugin-development.md).
+[Architecture](docs/architecture.md) · [Plugin and catalog development](docs/plugin-development.md) ·
+[Plugin interoperability contract](docs/plugin-interoperability.md) ·
+[Protocol 3 SDK](sdk/README.md).
 
 **Does this replace the harness UI?**
 No. The harness is loaded from its own service, unmodified. What the shell adds

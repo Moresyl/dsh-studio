@@ -123,11 +123,12 @@ pub fn record(
         integrity,
         bundle_patch: detail.bundle_patch.clone(),
         source_record_id: source_id.to_string(),
-        provider_id: if source_id == "npm" {
-            "npm".to_string()
-        } else {
-            "standard-http-v1".to_string()
-        },
+        provider_id: match source_id {
+            "npm" => "npm",
+            super::catalog::DSHFIND_ID => "com.dshfind.catalog",
+            _ => "standard-http-v1",
+        }
+        .to_string(),
         item_id: item_id.to_string(),
         display_name: clean_display(display_name, &detail.name),
         installed_at,
