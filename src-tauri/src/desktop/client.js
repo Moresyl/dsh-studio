@@ -93,4 +93,53 @@
       return () => listeners.delete(handler)
     },
   })
+
+  // Only the Harness frame directly below the native shell owns this stream.
+  // Nested plugin frames get the public desktop API but must not each create a
+  // duplicate job observer. The event endpoint is same-origin and downlink-only.
+  if (
+    window.parent === window.top &&
+    window.location &&
+    (window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '::1') &&
+    typeof window.WebSocket === 'function'
+  ) {
+    const jobs = new Map()
+    let stopped = false
+
+    const watchJobs = () => {
+      if (stopped) return
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const socket = new window.WebSocket(`${protocol}//${window.location.host}/api/events.mux`)
+
+      socket.onmessage = (message) => {
+        try {
+          const frame = JSON.parse(message.data).payload
+          if (!frame || frame.type !== 'session/jobs' || !Array.isArray(frame.jobs)) return
+          for (const job of frame.jobs) {
+            if (!job || typeof job.id !== 'string' || typeof job.status !== 'string') continue
+            const key = `${frame.sessionId}:${job.id}`
+            const previous = jobs.get(key)
+            jobs.set(key, job.status)
+            if (previous !== 'running' && previous !== 'stopping') continue
+            if (job.status === 'completed')
+              void call('attention', { kind: 'job-completed' }).catch(() => {})
+            if (job.status === 'failed')
+              void call('attention', { kind: 'job-failed' }).catch(() => {})
+          }
+        } catch {
+          // A malformed push belongs to the transport, not to the native shell.
+        }
+      }
+      socket.onclose = () => {
+        if (!stopped) window.setTimeout(watchJobs, 2000)
+      }
+    }
+
+    window.addEventListener('beforeunload', () => {
+      stopped = true
+    })
+    watchJobs()
+  }
 })()

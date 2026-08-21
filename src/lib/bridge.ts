@@ -109,6 +109,15 @@ export async function answer({ method, params }: Call): Promise<unknown> {
       return {}
     }
 
+    case 'attention': {
+      const kind = text(params.kind)
+      if (kind !== 'job-completed' && kind !== 'job-failed') {
+        throw new Error('the desktop attention kind is not supported')
+      }
+      await ipc.desktopAttention(kind)
+      return {}
+    }
+
     case 'pick':
       // Null and not an error: choosing nothing is an answer.
       return { path: await pick(params) }

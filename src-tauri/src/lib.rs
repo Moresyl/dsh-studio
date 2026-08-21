@@ -158,6 +158,7 @@ pub fn run() {
             window::window_open,
             desktop::commands::desktop_offer,
             desktop::commands::desktop_notify,
+            desktop::commands::desktop_attention,
             desktop::commands::desktop_badge,
             about::app_about,
             diagnostics::report_build,

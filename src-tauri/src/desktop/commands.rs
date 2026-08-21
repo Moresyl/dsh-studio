@@ -5,7 +5,7 @@
 //! `src/lib/bridge.ts`. A command that made its own decisions would be a third
 //! place to look.
 
-use tauri::AppHandle;
+use tauri::{AppHandle, WebviewWindow};
 
 use crate::error::Result;
 
@@ -22,6 +22,12 @@ pub fn desktop_offer(app: AppHandle) -> Offer {
 #[tauri::command]
 pub async fn desktop_notify(app: AppHandle, title: String, body: String) -> Result<()> {
     super::notify(&app, &title, &body)
+}
+
+/// Used by the injected same-origin job observer, not part of the public API.
+#[tauri::command]
+pub async fn desktop_attention(app: AppHandle, window: WebviewWindow, kind: String) -> Result<()> {
+    super::attention(&app, &window, &kind)
 }
 
 /// Asynchronous for the same reason, plus one of its own: the badge is drawn

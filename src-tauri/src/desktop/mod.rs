@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime, UserAttentionType, WebviewWindow};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_notification::NotificationExt;
 use url::Url;
@@ -149,6 +149,35 @@ pub fn notify<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) -> Result
         .body(clip(body, BODY_LIMIT))
         .show()
         .map_err(|error| Error::Desktop(error.to_string()))
+}
+
+/// Generic background attention, suppressed while this window has focus.
+pub fn attention<R: Runtime>(
+    app: &AppHandle<R>,
+    window: &WebviewWindow<R>,
+    kind: &str,
+) -> Result<()> {
+    if window.is_focused().unwrap_or(false) {
+        return Ok(());
+    }
+    let (title, body) = match kind {
+        "job-completed" => (
+            crate::locale::pick("Background job completed", "后台任务已完成"),
+            crate::locale::pick("A background job has finished.", "有一个后台任务已经结束。"),
+        ),
+        "job-failed" => (
+            crate::locale::pick("Background job needs attention", "后台任务需要处理"),
+            crate::locale::pick("A background job has failed.", "有一个后台任务执行失败。"),
+        ),
+        _ => {
+            return Err(Error::Desktop(
+                "the desktop attention kind is not supported".into(),
+            ))
+        }
+    };
+    notify(app, title, body)?;
+    let _ = window.request_user_attention(Some(UserAttentionType::Informational));
+    Ok(())
 }
 
 /// Put a count where the window is not.

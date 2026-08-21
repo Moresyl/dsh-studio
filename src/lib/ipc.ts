@@ -799,6 +799,10 @@ export const desktopOffer = (): Promise<DesktopOffer> => invoke('desktop_offer')
 export const desktopNotify = (title: string, body: string): Promise<void> =>
   invoke('desktop_notify', { title, body })
 
+/** Internal generic attention emitted from the Harness's job event stream. */
+export const desktopAttention = (kind: 'job-completed' | 'job-failed'): Promise<void> =>
+  invoke('desktop_attention', { kind })
+
 /** Put a count on the tray and the taskbar, or zero to take it off. */
 export const desktopBadge = (count: number): Promise<void> => invoke('desktop_badge', { count })
 

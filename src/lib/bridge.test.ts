@@ -13,6 +13,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({ open: openDialog, save: saveDialog
 vi.mock('@/lib/ipc', () => ({
   desktopOffer: vi.fn(),
   desktopNotify: vi.fn(),
+  desktopAttention: vi.fn(),
   desktopBadge: vi.fn(),
   onDesktopLink: vi.fn(),
 }))
@@ -113,6 +114,18 @@ group('answer', () => {
       await expect(answer(request('notify', { title: '   ' }))).rejects.toThrow()
       await expect(answer(request('notify', { title: 42 }))).rejects.toThrow()
       expect(ipc.desktopNotify).not.toHaveBeenCalled()
+    })
+  })
+
+  group('background attention', () => {
+    it('accepts only the two privacy-safe job outcomes', async () => {
+      await answer(request('attention', { kind: 'job-completed' }))
+      await answer(request('attention', { kind: 'job-failed' }))
+      expect(ipc.desktopAttention).toHaveBeenNthCalledWith(1, 'job-completed')
+      expect(ipc.desktopAttention).toHaveBeenNthCalledWith(2, 'job-failed')
+
+      await expect(answer(request('attention', { kind: 'running' }))).rejects.toThrow()
+      expect(ipc.desktopAttention).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -246,13 +259,35 @@ interface Client {
  * edited as the program it is — and so this can execute the same text the app
  * injects, rather than a copy of it that drifts.
  */
-function load() {
+function load({ observeJobs = false } = {}) {
   const sent: Posted[] = []
   const listeners: ((event: { data: unknown; source: unknown }) => void)[] = []
   const top = { postMessage: (data: Posted) => void sent.push(data) }
+  const sockets: JobSocket[] = []
+
+  class JobSocket {
+    onmessage: ((message: { data: string }) => void) | null = null
+    onclose: (() => void) | null = null
+
+    constructor(readonly url: string) {
+      sockets.push(this)
+    }
+
+    push(payload: unknown) {
+      this.onmessage?.({ data: JSON.stringify({ payload }) })
+    }
+  }
 
   const frame = {
     top,
+    ...(observeJobs
+      ? {
+          parent: top,
+          location: { protocol: 'http:', hostname: '127.0.0.1', host: '127.0.0.1:57652' },
+          WebSocket: JobSocket,
+          setTimeout: vi.fn(),
+        }
+      : {}),
     addEventListener: (
       name: string,
       handler: (event: { data: unknown; source: unknown }) => void,
@@ -264,6 +299,7 @@ function load() {
 
   return {
     sent,
+    sockets,
     client: () => {
       const client = frame.dshStudio
       if (!client) throw new Error('the client script installed nothing')
@@ -304,6 +340,31 @@ group('the injected client', () => {
 
     desk.deliver({ dsh: PROTOCOL, id: 'dsh-1', ok: true, value: {} })
     await expect(pending).resolves.toEqual({})
+  })
+
+  it('observes background job transitions once from the direct Harness frame', () => {
+    const desk = load({ observeJobs: true })
+    expect(desk.sockets[0]?.url).toBe('ws://127.0.0.1:57652/api/events.mux')
+
+    desk.sockets[0]?.push({
+      type: 'session/jobs',
+      sessionId: 'one',
+      jobs: [{ id: 'bash-1', status: 'running' }],
+    })
+    desk.sockets[0]?.push({
+      type: 'session/jobs',
+      sessionId: 'one',
+      jobs: [{ id: 'bash-1', status: 'completed' }],
+    })
+
+    expect(desk.sent).toEqual([
+      {
+        dsh: PROTOCOL,
+        id: 'dsh-1',
+        method: 'attention',
+        params: { kind: 'job-completed' },
+      },
+    ])
   })
 
   it('gives every call in flight its own name', async () => {
