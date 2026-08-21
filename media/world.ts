@@ -77,6 +77,7 @@ const about: About = {
   version: '0.4.0',
   platform: 'windows',
   arch: 'x86_64',
+  edition: 'lite',
   appData: APP_DATA,
   harnessDir: HARNESS_DIR,
   profileDir: `${HOME}\\.dsh\\profiles\\${PROFILE}`,

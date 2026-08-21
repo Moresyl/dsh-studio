@@ -51,6 +51,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - run: pnpm test:packaging
       - run: pnpm test
       - run: pnpm build
       - run: cargo test --manifest-path src-tauri/Cargo.toml --workspace

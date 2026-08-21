@@ -4,6 +4,8 @@
 
 ## First launch
 
+Choose **Lite** for the smallest download, or **Full / Offline** when first-run setup must work without a network. Both editions use the same application identity and data directories. Full carries SHA-256-pinned Node and Harness archives; it still verifies them immediately before extraction.
+
 1. The Environment pane finds Node.js 22.19 or newer. The app can download and verify an official runtime when none is installed.
 2. The exact supported `@deepseek-ai/dsh` release is installed in app data, never into global npm.
 3. The workspace must exist. On Windows, local NTFS/ReFS volumes are admitted; network, removable and FAT/exFAT volumes are blocked before launch.
@@ -20,6 +22,8 @@ Export a diagnostic report from About. It includes versions, runtime, profile, r
 ## Updates
 
 The app reads `latest.json` from GitHub Releases and accepts only updater artifacts verified by its embedded public key. Formal release jobs require Windows Authenticode, macOS Developer ID signing/notarization/stapling, and Tauri updater signatures.
+
+The updater follows the ordinary Lite channel. A runtime already installed from Full remains in app data across application updates.
 
 ## Remote access
 

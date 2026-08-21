@@ -861,6 +861,7 @@ export interface About {
   version: string
   platform: string
   arch: string
+  edition: 'lite' | 'full'
   appData: string
   harnessDir: string
   profileDir: string

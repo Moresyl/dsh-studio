@@ -23,6 +23,10 @@ const SUFFIXES = {
   'linux-appimage': '_amd64.AppImage',
   'linux-deb': '_amd64.deb',
   'linux-rpm': '-1.x86_64.rpm',
+  'win-full': 'full-x86_64-pc-windows-msvc.exe',
+  'mac-arm-full': 'full-aarch64-apple-darwin.dmg',
+  'mac-intel-full': 'full-x86_64-apple-darwin.dmg',
+  'linux-full': 'full-x86_64-unknown-linux-gnu.AppImage',
 }
 
 /* Which download the big button offers, per detected platform. */

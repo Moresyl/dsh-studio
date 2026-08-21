@@ -23,7 +23,7 @@
 
 pub mod commands;
 
-mod archive;
+pub(crate) mod archive;
 mod catalog;
 mod http;
 
@@ -132,6 +132,71 @@ where
     R: Fn(Progress),
 {
     provision_into(&paths::managed_node_dir(), report).await
+}
+
+/// Install the runtime carried by a Full package without touching the network.
+pub async fn provision_bundled<R>(
+    artifact: crate::offline::Artifact,
+    report: R,
+) -> Result<NodeInstallation>
+where
+    R: Fn(Progress) + Send + 'static,
+{
+    let root = paths::managed_node_dir();
+    let destination = root.join(&artifact.version);
+    if let Some(installed) = installation_at(&destination) {
+        report(Progress::Installed {
+            version: artifact.version,
+        });
+        return Ok(installed);
+    }
+
+    report(Progress::Chosen {
+        version: artifact.version.clone(),
+        url: "bundled://dsh-studio-full/node".into(),
+    });
+    report(Progress::Verifying {
+        version: artifact.version.clone(),
+    });
+    let version = artifact.version.clone();
+    report(Progress::Extracting {
+        version: version.clone(),
+    });
+
+    let installed = tokio::task::spawn_blocking(move || {
+        crate::offline::verify(&artifact)
+            .map_err(|cause| Error::NodeProvision(cause.to_string()))?;
+        std::fs::create_dir_all(&root).map_err(|cause| {
+            Error::NodeProvision(format!(
+                "the runtime directory could not be created: {cause}"
+            ))
+        })?;
+        let staging = root.join(".offline-staging");
+        let _ = std::fs::remove_dir_all(&staging);
+        let unpacked = archive::unpack(&artifact.file, &staging)?;
+        let _ = std::fs::remove_dir_all(&destination);
+        std::fs::rename(&unpacked, &destination).map_err(|cause| {
+            Error::NodeProvision(format!(
+                "the bundled runtime could not be activated: {cause}"
+            ))
+        })?;
+        let _ = std::fs::remove_dir_all(&staging);
+        installation_at(&destination).ok_or_else(|| {
+            let _ = std::fs::remove_dir_all(&destination);
+            Error::NodeProvision(
+                "the bundled Node runtime was verified but will not run on this system".into(),
+            )
+        })
+    })
+    .await
+    .map_err(|cause| {
+        Error::NodeProvision(format!(
+            "installing the bundled runtime did not finish: {cause}"
+        ))
+    })??;
+
+    report(Progress::Installed { version });
+    Ok(installed)
 }
 
 /// The same, into a caller-chosen store. Separate so it can be tested somewhere

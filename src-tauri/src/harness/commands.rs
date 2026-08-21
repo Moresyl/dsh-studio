@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use super::install;
 use super::supervisor::{Status, Stream, Supervisor};
@@ -94,11 +94,11 @@ pub async fn harness_stop(state: State<'_, AppState>) -> Result<()> {
 /// the progress a user sees in the meantime is npm's own output, relayed
 /// through the same log everything else in the shell writes to.
 #[tauri::command]
-pub async fn harness_install(state: State<'_, AppState>) -> Result<()> {
+pub async fn harness_install(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
     if state.installing.swap(true, Ordering::SeqCst) {
         return Err(Error::AlreadyInstalling);
     }
-    let outcome = perform_install(&state).await;
+    let outcome = perform_install(&app, &state).await;
     state.installing.store(false, Ordering::SeqCst);
 
     match &outcome {
@@ -110,7 +110,25 @@ pub async fn harness_install(state: State<'_, AppState>) -> Result<()> {
     outcome
 }
 
-async fn perform_install(state: &State<'_, AppState>) -> Result<()> {
+async fn perform_install(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
+    if let Some(payload) = crate::offline::payload(app)? {
+        state.supervisor.note(
+            Stream::Stdout,
+            format!(
+                "installing bundled {}@{} from the Full package",
+                install::PACKAGE,
+                install::VERSION
+            ),
+        );
+        return tauri::async_runtime::spawn_blocking(move || {
+            install::run_bundled(&payload.harness)
+        })
+        .await
+        .map_err(|cause| {
+            Error::Install(format!("offline installation did not finish: {cause}"))
+        })?;
+    }
+
     let plan = super::install_plan()?;
     let supervisor = Arc::clone(&state.supervisor);
     supervisor.note(

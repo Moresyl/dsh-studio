@@ -154,7 +154,9 @@ export function AboutPane() {
                 DSH Studio
               </h3>
               <p className="selectable font-mono text-[11.5px] text-muted tabular-nums">
-                {about ? `${about.version} · ${about.platform}-${about.arch}` : '—'}
+                {about
+                  ? `${about.version} · ${about.platform}-${about.arch} · ${t(`about.edition.${about.edition}`)}`
+                  : '—'}
               </p>
             </div>
           </div>

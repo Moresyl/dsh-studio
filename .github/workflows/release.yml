@@ -263,11 +263,44 @@ jobs:
         shell: bash
         run: node .github/scripts/verify-packaged-app.mjs "src-tauri/target/${{ matrix.target }}/release/bundle"
 
+      - name: Prepare verified Full / Offline runtime
+        shell: bash
+        run: node .github/scripts/prepare-offline-runtime.mjs "${{ matrix.target }}" src-tauri/runtime-cache/offline
+
+      - name: Build Full / Offline packages
+        shell: bash
+        env:
+          DSH_STUDIO_EDITION: full
+          CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target-full
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
+        run: pnpm tauri build --target "${{ matrix.target }}" --config src-tauri/tauri.full.conf.json
+
+      - name: Verify Full / Offline packaged application and payload
+        shell: bash
+        env:
+          DSH_EXPECT_OFFLINE: '1'
+        run: node .github/scripts/verify-packaged-app.mjs "src-tauri/target-full/${{ matrix.target }}/release/bundle"
+
+      - name: Upload Full / Offline packages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          fi
+          rm -rf full-assets
+          node .github/scripts/stage-full-assets.mjs "src-tauri/target-full/${{ matrix.target }}/release/bundle" "${{ matrix.target }}" full-assets
+          gh release upload "$tag" full-assets/* --repo "$GITHUB_REPOSITORY" --clobber
+
       - name: Verify Windows Authenticode signatures
         if: runner.os == 'Windows' && env.WINDOWS_SIGNING_ENABLED == 'true'
         shell: pwsh
         run: |
-          $files = Get-ChildItem -Path src-tauri/target -Recurse -File | Where-Object { $_.FullName -match '\\bundle\\' -and $_.Extension -in '.exe', '.msi' }
+          $files = Get-ChildItem -Path src-tauri/target,src-tauri/target-full -Recurse -File | Where-Object { $_.FullName -match '\\bundle\\' -and $_.Extension -in '.exe', '.msi' }
           if (-not $files) { throw 'No Windows installer was produced.' }
           foreach ($file in $files) {
             $signature = Get-AuthenticodeSignature -LiteralPath $file.FullName
@@ -278,12 +311,18 @@ jobs:
         if: runner.os == 'macOS' && env.MACOS_SIGNING_ENABLED == 'true'
         run: |
           set -eu
-          app="$(find src-tauri/target -maxdepth 8 -path '*/release/bundle/macos/*.app' -print -quit)"
-          dmg="$(find src-tauri/target -maxdepth 8 -path '*/release/bundle/dmg/*.dmg' -print -quit)"
-          test -n "$app" && test -n "$dmg"
-          codesign --verify --deep --strict --verbose=2 "$app"
-          spctl --assess --type execute --verbose=2 "$app"
-          xcrun stapler validate "$dmg"
+          apps=0
+          images=0
+          while IFS= read -r -d '' app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose=2 "$app"
+            apps=$((apps + 1))
+          done < <(find src-tauri/target src-tauri/target-full -path '*/release/bundle/macos/*.app' -print0)
+          while IFS= read -r -d '' dmg; do
+            xcrun stapler validate "$dmg"
+            images=$((images + 1))
+          done < <(find src-tauri/target src-tauri/target-full -path '*/release/bundle/dmg/*.dmg' -print0)
+          test "$apps" -eq 2 && test "$images" -eq 2
 
   # Signatures say who built an installer; these say the bytes are the ones that
   # were built. Worth having for the mirrors this project will be downloaded

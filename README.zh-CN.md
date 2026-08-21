@@ -260,6 +260,9 @@ registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每
   你有的话它就去找出来——包括版本管理器装了、但从没加进 `PATH` 的那些。
   你没有的话，它会下载一个、校验过之后放进自己的数据目录。
   harness 本身两种情况下都由它替你安装。
+- Release 同时提供两个版本：**轻量版**安装包更小，需要时才下载并校验运行时；
+  **完整离线版**内置当前平台的 Node.js 与经过测试的完整 DSH 依赖闭包，
+  解压前会再次校验，两项首次配置都可以在断网环境完成。
 - Windows 10/11，需要 WebView2（Windows 11 默认自带）。
 
 ## 从源码构建
@@ -268,6 +271,8 @@ registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每
 pnpm install
 pnpm tauri dev      # 运行
 pnpm tauri build    # 为当前平台产出安装包
+# 正式流水线会准备 src-tauri/runtime-cache/offline，并合并
+# src-tauri/tauri.full.conf.json 产出完整离线版。
 ```
 
 检查：

@@ -6,6 +6,7 @@ node_modules/
 dist/
 dist-ssr/
 src-tauri/target/
+src-tauri/target-*/
 src-tauri/gen/
 
 # Runtime artifacts staged for packaging

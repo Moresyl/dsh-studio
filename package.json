@@ -31,7 +31,8 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write src media website packaging .github",
     "test": "vitest run",
-    "test:release": "node .github/scripts/release-notes.mjs && cargo test --manifest-path src-tauri/Cargo.toml --workspace && pnpm lint && pnpm test && pnpm build",
+    "test:packaging": "node --test .github/scripts/*.test.mjs",
+    "test:release": "node .github/scripts/release-notes.mjs && pnpm test:packaging && cargo test --manifest-path src-tauri/Cargo.toml --workspace && pnpm lint && pnpm test && pnpm build",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -62,6 +63,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
     "prettier": "^3.8.3",
+    "semver": "^7.8.5",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^6.4.1",

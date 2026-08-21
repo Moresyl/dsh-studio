@@ -10,6 +10,7 @@ mod locale;
 mod logging;
 mod material;
 mod node;
+mod offline;
 mod paths;
 mod plugins;
 mod presets;

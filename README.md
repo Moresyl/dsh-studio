@@ -289,6 +289,10 @@ one of those credentials can be taken back on its own, mid-connection.
   manager installed but never put on `PATH`. If you do not, it downloads and
   verifies one into its own data directory. The harness itself is installed for
   you either way.
+- Releases provide two editions. **Lite** is the smaller installer and downloads
+  verified runtimes only when needed. **Full / Offline** carries the platform's
+  Node.js archive and the complete tested DSH dependency closure, verifies both
+  again before extraction, and can finish first-run setup without a network.
 - Windows 10/11 with WebView2 (present on Windows 11 by default).
 
 ## Building from source
@@ -297,6 +301,8 @@ one of those credentials can be taken back on its own, mid-connection.
 pnpm install
 pnpm tauri dev      # run it
 pnpm tauri build    # produce installers for the current platform
+# The release workflow prepares src-tauri/runtime-cache/offline and merges
+# src-tauri/tauri.full.conf.json to produce the Full / Offline edition.
 ```
 
 Checks:

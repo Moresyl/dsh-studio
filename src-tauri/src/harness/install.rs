@@ -155,17 +155,64 @@ where
 
     require_expected_runtime(&staging)?;
 
+    promote(live, &staging, &backup, &journal)
+}
+
+/// Restore a Full package's pre-resolved dependency closure without npm.
+pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
+    recover_managed_install()?;
+
+    let live = crate::paths::harness_dir();
+    let staging = crate::paths::harness_staging_dir();
+    let backup = crate::paths::harness_backup_dir();
+    let journal = crate::paths::harness_install_journal();
+    remove_dir_if_exists(&staging)?;
+    remove_dir_if_exists(&backup)?;
+    write_journal(&journal)?;
+
+    let prepared = (|| {
+        crate::offline::verify(artifact)?;
+        std::fs::create_dir_all(&staging).map_err(|cause| {
+            Error::Install(format!(
+                "could not create the offline install directory: {cause}"
+            ))
+        })?;
+        let file = std::fs::File::open(&artifact.file).map_err(|cause| {
+            Error::Install(format!(
+                "could not open the offline Harness archive: {cause}"
+            ))
+        })?;
+        let decoded = flate2::read::GzDecoder::new(std::io::BufReader::new(file));
+        tar::Archive::new(decoded)
+            .unpack(&staging)
+            .map_err(|cause| {
+                Error::Install(format!(
+                    "the offline Harness archive could not be unpacked: {cause}"
+                ))
+            })?;
+        require_expected_runtime(&staging)
+    })();
+    if let Err(failure) = prepared {
+        let _ = remove_dir_if_exists(&staging);
+        let _ = std::fs::remove_file(&journal);
+        return Err(failure);
+    }
+
+    promote(&live, &staging, &backup, &journal)
+}
+
+fn promote(live: &Path, staging: &Path, backup: &Path, journal: &Path) -> Result<()> {
     if live.exists() {
-        std::fs::rename(live, &backup).map_err(|cause| {
+        std::fs::rename(live, backup).map_err(|cause| {
             Error::Install(format!(
                 "could not preserve the current Harness runtime before upgrading: {cause}"
             ))
         })?;
     }
 
-    if let Err(cause) = std::fs::rename(&staging, live) {
+    if let Err(cause) = std::fs::rename(staging, live) {
         if backup.exists() && !live.exists() {
-            let _ = std::fs::rename(&backup, live);
+            let _ = std::fs::rename(backup, live);
         }
         return Err(Error::Install(format!(
             "could not activate the verified Harness runtime: {cause}"
@@ -175,13 +222,13 @@ where
     if let Err(failure) = require_expected_runtime(live) {
         let _ = remove_dir_if_exists(live);
         if backup.exists() {
-            let _ = std::fs::rename(&backup, live);
+            let _ = std::fs::rename(backup, live);
         }
         return Err(failure);
     }
 
-    remove_dir_if_exists(&backup)?;
-    std::fs::remove_file(&journal).map_err(|cause| {
+    remove_dir_if_exists(backup)?;
+    std::fs::remove_file(journal).map_err(|cause| {
         Error::Install(format!(
             "the Harness runtime is ready but its install journal could not be cleared: {cause}"
         ))

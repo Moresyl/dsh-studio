@@ -42,7 +42,11 @@ pub async fn node_provision(
         }
     };
 
-    let outcome = provision(report).await;
+    let outcome = match crate::offline::payload(&app) {
+        Ok(Some(payload)) => super::provision_bundled(payload.node, report).await,
+        Ok(None) => provision(report).await,
+        Err(failure) => Err(failure),
+    };
     jobs.busy.store(false, Ordering::SeqCst);
 
     // Same treatment the harness install gets: a failure is said out loud in the

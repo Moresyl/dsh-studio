@@ -84,6 +84,9 @@ importers:
       prettier:
         specifier: ^3.8.3
         version: 3.9.6
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       tailwindcss:
         specifier: ^4.2.1
         version: 4.3.3

@@ -1,6 +1,8 @@
-import { access, chmod, mkdir, mkdtemp, readdir, rm } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { createReadStream } from 'node:fs'
+import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import process from 'node:process'
 import { spawn } from 'node:child_process'
 
@@ -27,12 +29,14 @@ async function verifyWindows(files) {
 
   const msiRoot = join(scratch, 'msi')
   await run('msiexec.exe', ['/a', msi, '/qn', `TARGETDIR=${msiRoot}`])
+  await verifyOffline(msiRoot)
   await smoke(await installedExecutable(msiRoot))
 
   const nsisRoot = join(scratch, 'nsis')
   // NSIS requires /D to be the final argument. spawn() passes it as one value,
   // so spaces in the temporary path are never interpreted by a shell.
   await run(nsis, ['/S', `/D=${nsisRoot}`])
+  await verifyOffline(nsisRoot)
   await smoke(await installedExecutable(nsisRoot))
   const uninstaller = (await walk(nsisRoot)).find(
     (file) => basename(file).toLowerCase() === 'uninstall.exe',
@@ -86,6 +90,7 @@ async function verifyMac(files) {
       (file) => file.includes('.app/Contents/MacOS/') && basename(file) === 'dsh-studio',
     )
     if (!executable) throw new Error('DMG contains no DSH Studio application executable')
+    await verifyOffline(mount)
     await smoke(executable)
   } finally {
     await run('hdiutil', ['detach', mount])
@@ -101,14 +106,17 @@ async function verifyLinux(files) {
   await chmod(appImage, 0o755)
   const appImageRoot = join(scratch, 'appimage')
   await run(appImage, ['--appimage-extract'], { cwd: appImageRoot, createCwd: true })
+  await verifyOffline(appImageRoot)
   await smoke(await installedExecutable(appImageRoot))
 
   const debRoot = join(scratch, 'deb')
   await run('dpkg-deb', ['--extract', deb, debRoot])
+  await verifyOffline(debRoot)
   await smoke(await installedExecutable(debRoot))
 
   const rpmRoot = join(scratch, 'rpm')
   await extractRpm(rpm, rpmRoot)
+  await verifyOffline(rpmRoot)
   await smoke(await installedExecutable(rpmRoot))
   console.log('extracted AppImage, DEB and RPM and executed every packaged application binary')
 }
@@ -150,6 +158,50 @@ async function installedExecutable(directory) {
 
 async function smoke(executable) {
   await run(executable, ['--smoke-test'], { timeout: 30_000 })
+}
+
+async function verifyOffline(directory) {
+  if (process.env.DSH_EXPECT_OFFLINE !== '1') return
+  const files = await walk(directory)
+  const manifestPath = files.find((file) =>
+    file.replaceAll('\\', '/').endsWith('/offline/manifest.json'),
+  )
+  if (!manifestPath) throw new Error(`Full package has no offline/manifest.json under ${directory}`)
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const expectedOs = { win32: 'windows', darwin: 'macos', linux: 'linux' }[process.platform]
+  if (manifest.schema !== 1 || manifest.os !== expectedOs) {
+    throw new Error(`Full package has an invalid offline manifest for ${process.platform}`)
+  }
+  const root = dirname(manifestPath)
+  for (const [name, artifact] of Object.entries({
+    node: manifest.node,
+    harness: manifest.harness,
+  })) {
+    if (
+      !artifact ||
+      basename(artifact.file) !== artifact.file ||
+      !/^[a-f0-9]{64}$/i.test(artifact.sha256)
+    ) {
+      throw new Error(`Full package has invalid ${name} artifact metadata`)
+    }
+    const file = join(root, artifact.file)
+    await access(file)
+    const actual = await sha256(file)
+    if (actual !== artifact.sha256.toLowerCase()) {
+      throw new Error(`Full package ${name} artifact failed its SHA-256 check`)
+    }
+  }
+}
+
+async function sha256(file) {
+  const hash = createHash('sha256')
+  await new Promise((resolve, reject) => {
+    createReadStream(file)
+      .on('data', (chunk) => hash.update(chunk))
+      .on('end', resolve)
+      .on('error', reject)
+  })
+  return hash.digest('hex')
 }
 
 function requireOne(files, predicate, label) {
