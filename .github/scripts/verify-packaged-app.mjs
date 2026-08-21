@@ -40,7 +40,25 @@ async function verifyWindows(files) {
   if (!uninstaller) throw new Error('NSIS installation contains no uninstaller')
   await run(uninstaller, ['/S'])
   await waitUntilRemoved(nsisRoot)
+  if (process.env.DSH_PREVIOUS_INSTALLER) {
+    await verifyWindowsUpgrade(process.env.DSH_PREVIOUS_INSTALLER, nsis)
+  }
   console.log('verified MSI extraction and NSIS installation by executing both packaged binaries')
+}
+
+async function verifyWindowsUpgrade(previous, current) {
+  const root = join(scratch, 'upgrade')
+  await run(previous, ['/S', `/D=${root}`])
+  await installedExecutable(root)
+  await run(current, ['/S', `/D=${root}`])
+  await smoke(await installedExecutable(root))
+  const uninstaller = (await walk(root)).find(
+    (file) => basename(file).toLowerCase() === 'uninstall.exe',
+  )
+  if (!uninstaller) throw new Error('upgraded NSIS installation contains no uninstaller')
+  await run(uninstaller, ['/S'])
+  await waitUntilRemoved(root)
+  console.log(`upgraded ${basename(previous)} in place and executed the new application binary`)
 }
 
 async function waitUntilRemoved(path) {

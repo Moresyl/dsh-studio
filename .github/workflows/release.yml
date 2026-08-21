@@ -224,6 +224,24 @@ jobs:
             echo 'DSH_RELEASE_NOTES'
           } >> "$GITHUB_OUTPUT"
 
+      - name: Download previous Windows installer for upgrade smoke
+        if: runner.os == 'Windows' && github.ref_type == 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq '.[].tagName' | grep -Fxv "$GITHUB_REF_NAME" | head -n 1)"
+          if [ -z "$previous" ]; then
+            echo "No previous release exists; this is the only release where upgrade smoke is not applicable."
+            exit 0
+          fi
+          mkdir -p previous-release
+          gh release download "$previous" --repo "$GITHUB_REPOSITORY" --pattern '*-setup.exe' --dir previous-release
+          installer="$(find previous-release -maxdepth 1 -type f -name '*-setup.exe' -print -quit)"
+          test -n "$installer"
+          echo "DSH_PREVIOUS_INSTALLER=$PWD/$installer" >> "$GITHUB_ENV"
+          echo "Will verify an in-place upgrade from $previous."
+
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
