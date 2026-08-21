@@ -150,7 +150,8 @@ export async function prepare(target, output) {
 async function unpackedNpm(nodeArchive, scratch, plan) {
   const root = join(scratch, 'node-toolchain')
   await mkdir(root)
-  await run('tar', ['-xf', nodeArchive, '-C', root])
+  const archive = tarExtractPlan(nodeArchive, root)
+  await run('tar', archive.args, archive.cwd)
   const entries = await readdir(root, { withFileTypes: true })
   const releases = entries.filter((entry) => entry.isDirectory())
   if (releases.length !== 1) throw new Error('Node archive does not contain one release directory')
@@ -211,6 +212,13 @@ export function tarCreatePlan(archive, source) {
     // D:\\...) as a remote-host separator. Keep the archive argument local.
     cwd: dirname(archive),
     args: ['-czf', basename(archive), '-C', source, '.'],
+  }
+}
+
+export function tarExtractPlan(archive, destination) {
+  return {
+    cwd: dirname(archive),
+    args: ['-xf', basename(archive), '-C', destination],
   }
 }
 

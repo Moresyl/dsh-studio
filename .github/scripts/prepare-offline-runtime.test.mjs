@@ -12,6 +12,7 @@ import {
   copyRuntimeContract,
   requireExactVersion,
   tarCreatePlan,
+  tarExtractPlan,
   targetPlan,
 } from './prepare-offline-runtime.mjs'
 
@@ -49,6 +50,15 @@ test('tar archive creation never passes an absolute output path', () => {
   assert.deepEqual(tarCreatePlan(archive, source), {
     cwd: dirname(archive),
     args: ['-czf', basename(archive), '-C', source, '.'],
+  })
+})
+
+test('tar extraction never passes an absolute archive path', () => {
+  const archive = resolve('runtime-cache', 'offline', 'node.zip')
+  const destination = resolve('scratch', 'node-toolchain')
+  assert.deepEqual(tarExtractPlan(archive, destination), {
+    cwd: dirname(archive),
+    args: ['-xf', basename(archive), '-C', destination],
   })
 })
 
