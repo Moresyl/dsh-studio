@@ -9,8 +9,7 @@ cask "dsh-studio" do
   sha256 arm:   "d2238524a7858c80302de20980fabf98e89627b829724ca9d82a5cd949a1c93a",
          intel: "64cdc8d5b89876f8aa2b572fa6ba292bf61a4dc53bf16dc3f236e692d50ec06a"
 
-  url "https://github.com/Moresyl/dsh-studio/releases/download/v#{version}/DSH.Studio_#{version}_#{arch}.dmg",
-      verified: "github.com/Moresyl/dsh-studio/"
+  url "https://github.com/Moresyl/dsh-studio/releases/download/v#{version}/DSH.Studio_#{version}_#{arch}.dmg"
   name "DSH Studio"
   desc "Native desktop shell for DeepSeek Harness"
   homepage "https://github.com/Moresyl/dsh-studio"

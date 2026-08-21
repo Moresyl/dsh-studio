@@ -304,8 +304,7 @@ cask "dsh-studio" do
   sha256 arm:   "${files.macArm.sha256}",
          intel: "${files.macIntel.sha256}"
 
-  url "https://github.com/${OWNER}/${REPO}/releases/download/v#{version}/DSH.Studio_#{version}_#{arch}.dmg",
-      verified: "github.com/${OWNER}/${REPO}/"
+  url "https://github.com/${OWNER}/${REPO}/releases/download/v#{version}/DSH.Studio_#{version}_#{arch}.dmg"
   name "DSH Studio"
   desc "${SHORT_DESCRIPTION.replace(/\.$/, '')}"
   homepage "https://github.com/${OWNER}/${REPO}"

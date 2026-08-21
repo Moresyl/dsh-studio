@@ -56,7 +56,14 @@ jobs:
           tap_root="$(brew --repository moresyl/dsh)"
           mkdir -p "$tap_root/Casks"
           cp packaging/homebrew/dsh-studio.rb "$tap_root/Casks/dsh-studio.rb"
-          brew audit --cask --new moresyl/dsh/dsh-studio
+          # This is an independent tap, not a submission to homebrew-cask, so
+          # core's popularity threshold is not part of its validity. Published
+          # releases additionally download the DMG and exercise Gatekeeper.
+          if [ "$GITHUB_EVENT_NAME" = release ]; then
+            brew audit --cask --strict --online moresyl/dsh/dsh-studio
+          else
+            brew audit --cask --strict moresyl/dsh/dsh-studio
+          fi
 
   aur:
     name: Validate AUR package
@@ -85,7 +92,7 @@ jobs:
           name: package-channel-manifests
       - run: |
           sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
+          sudo apt-get install -y appstream-compose flatpak flatpak-builder
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.gnome.Platform//49 org.gnome.Sdk//49
           flatpak-builder --user --force-clean --disable-rofiles-fuse build-dir packaging/flathub/io.github.moresyl.dshstudio.yml
