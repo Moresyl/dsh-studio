@@ -56,7 +56,7 @@ jobs:
           tap_root="$(brew --repository moresyl/dsh)"
           mkdir -p "$tap_root/Casks"
           cp packaging/homebrew/dsh-studio.rb "$tap_root/Casks/dsh-studio.rb"
-          brew audit --cask --online --new-cask moresyl/dsh/dsh-studio
+          brew audit --cask --new moresyl/dsh/dsh-studio
 
   aur:
     name: Validate AUR package
