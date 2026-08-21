@@ -15,6 +15,12 @@ vi.mock('@/lib/ipc', () => ({
   desktopNotify: vi.fn(),
   desktopAttention: vi.fn(),
   desktopBadge: vi.fn(),
+  profileRoster: vi.fn(),
+  profileSelect: vi.fn(),
+  pluginSources: vi.fn(),
+  pluginAdd: vi.fn(),
+  pluginRemove: vi.fn(),
+  announce: vi.fn(),
   onDesktopLink: vi.fn(),
 }))
 
@@ -58,7 +64,7 @@ group('accepts', () => {
   })
 
   it('ignores messages that are not this protocol', () => {
-    expect(accepts(SERVING, SERVING, { ...message, dsh: 2 })).toBeNull()
+    expect(accepts(SERVING, SERVING, { ...message, dsh: 99 })).toBeNull()
     expect(accepts(SERVING, SERVING, { id: 'x', method: 'hello' })).toBeNull()
     expect(accepts(SERVING, SERVING, 'webpackHotUpdate')).toBeNull()
     expect(accepts(SERVING, SERVING, null)).toBeNull()
@@ -114,6 +120,40 @@ group('answer', () => {
       await expect(answer(request('notify', { title: '   ' }))).rejects.toThrow()
       await expect(answer(request('notify', { title: 42 }))).rejects.toThrow()
       expect(ipc.desktopNotify).not.toHaveBeenCalled()
+    })
+  })
+
+  group('public profile and plugin services', () => {
+    it('lists profiles and marks a selected profile as restart-bound', async () => {
+      vi.mocked(ipc.profileRoster).mockResolvedValue({ selected: 'web' } as never)
+      vi.mocked(ipc.profileSelect).mockResolvedValue({ selected: 'lab' } as never)
+
+      await expect(answer(request('profiles.list'))).resolves.toMatchObject({ selected: 'web' })
+      await expect(answer(request('profiles.select', { name: 'lab' }))).resolves.toMatchObject({
+        restartRequired: true,
+        roster: { selected: 'lab' },
+      })
+      expect(ipc.announce).toHaveBeenCalledWith('profiles')
+    })
+
+    it('installs an exact item through the active catalog and removes it through Desktop', async () => {
+      vi.mocked(ipc.pluginSources).mockResolvedValue([
+        { id: 'npm', active: true, label: 'npm registry' },
+      ] as never)
+      vi.mocked(ipc.pluginAdd).mockResolvedValue({ profile: 'web' } as never)
+      vi.mocked(ipc.pluginRemove).mockResolvedValue({ profile: 'web' } as never)
+
+      await answer(
+        request('plugins.install', { name: '@vendor/tool', version: '1.2.3', displayName: 'Tool' }),
+      )
+      expect(ipc.pluginAdd).toHaveBeenCalledWith(
+        '@vendor/tool@1.2.3',
+        'npm',
+        '@vendor/tool',
+        'Tool',
+      )
+      await answer(request('plugins.remove', { name: '@vendor/tool' }))
+      expect(ipc.pluginRemove).toHaveBeenCalledWith('@vendor/tool')
     })
   })
 
@@ -250,6 +290,14 @@ interface Client {
   pick(options: unknown): Promise<unknown>
   badge(count: number): Promise<unknown>
   onLink(handler: (link: unknown) => void): () => void
+  profiles: {
+    list(): Promise<unknown>
+    select(name: string): Promise<unknown>
+  }
+  plugins: {
+    install(request: unknown): Promise<unknown>
+    remove(name: string): Promise<unknown>
+  }
 }
 
 /**
@@ -318,7 +366,18 @@ group('the injected client', () => {
 
     expect(client.protocol).toBe(PROTOCOL)
     expect(Object.isFrozen(client)).toBe(true)
-    expect(Object.keys(client).sort()).toEqual(['badge', 'hello', 'notify', 'onLink', 'pick', 'protocol']) // prettier-ignore
+    expect(Object.keys(client).sort()).toEqual([
+      'badge',
+      'hello',
+      'notify',
+      'onLink',
+      'pick',
+      'plugins',
+      'profiles',
+      'protocol',
+    ])
+    expect(Object.isFrozen(client.profiles)).toBe(true)
+    expect(Object.isFrozen(client.plugins)).toBe(true)
   })
 
   it('stays out of the way in the window that has no window above it', () => {

@@ -106,6 +106,12 @@ pub async fn plugin_add(
     jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<PluginState> {
     let detail = super::registry::preflight(&node()?, &spec).await?;
+    if spec != detail.install_spec {
+        return Err(Error::Plugin(format!(
+            "market installs require the exact immutable spec {}",
+            detail.install_spec
+        )));
+    }
     let source = super::catalog::sources()
         .into_iter()
         .find(|source| source.id == source_id && source.active)
@@ -114,6 +120,19 @@ pub async fn plugin_add(
         return Err(Error::Plugin(
             "the selected catalog item does not match the resolved package".into(),
         ));
+    }
+    if source.id != "npm" {
+        let catalogued = super::catalog::search(&source.id, "")
+            .await?
+            .into_iter()
+            .any(|item| {
+                item.name == detail.name && item.version == detail.version && item.installable
+            });
+        if !catalogued {
+            return Err(Error::Plugin(
+                "the exact package version is no longer present in the selected catalog".into(),
+            ));
+        }
     }
     let profile = crate::profiles::selected();
     let profile_dir = crate::paths::profile_dir(&profile);

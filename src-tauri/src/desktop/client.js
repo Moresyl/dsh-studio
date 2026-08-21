@@ -87,6 +87,18 @@
     /** Put a count on the tray and the taskbar, or zero to take it off. */
     badge: (count) => call('badge', { count }),
 
+    /** Profile discovery and selection. Selection takes effect after restart. */
+    profiles: Object.freeze({
+      list: () => call('profiles.list'),
+      select: (name) => call('profiles.select', { name }),
+    }),
+
+    /** Recoverable, exact-version plugin changes through the Desktop package gate. */
+    plugins: Object.freeze({
+      install: (request) => call('plugins.install', request),
+      remove: (name) => call('plugins.remove', { name }),
+    }),
+
     /** Hear `dsh://` links as they arrive. Returns the way to stop hearing them. */
     onLink: (handler) => {
       listeners.add(handler)

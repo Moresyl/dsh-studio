@@ -33,7 +33,7 @@ import * as ipc from '@/lib/ipc'
  * refuse each other. `bridge.test.ts` reads the Rust file and fails if they
  * ever stop agreeing.
  */
-export const PROTOCOL = 1
+export const PROTOCOL = 2
 
 /** How far down the frame tree a pushed message is carried. */
 const DEPTH = 8
@@ -125,6 +125,42 @@ export async function answer({ method, params }: Call): Promise<unknown> {
     case 'badge':
       await ipc.desktopBadge(counted(params.count))
       return {}
+
+    case 'profiles.list':
+      return await ipc.profileRoster()
+
+    case 'profiles.select': {
+      const name = text(params.name).trim()
+      if (!name) throw new Error('a profile selection needs a name')
+      const roster = await ipc.profileSelect(name)
+      await ipc.announce('profiles')
+      return { roster, restartRequired: true }
+    }
+
+    case 'plugins.install': {
+      const name = text(params.name).trim()
+      const version = text(params.version).trim()
+      if (!name || !version) throw new Error('a plugin install needs an exact name and version')
+      const sources = await ipc.pluginSources()
+      const source = sources.find((candidate) => candidate.active)
+      if (!source) throw new Error('no plugin catalog source is active')
+      const profile = await ipc.pluginAdd(
+        `${name}@${version}`,
+        source.id,
+        name,
+        text(params.displayName).trim() || name,
+      )
+      await ipc.announce('profiles')
+      return profile
+    }
+
+    case 'plugins.remove': {
+      const name = text(params.name).trim()
+      if (!name) throw new Error('a plugin removal needs a package name')
+      const profile = await ipc.pluginRemove(name)
+      await ipc.announce('profiles')
+      return profile
+    }
 
     default:
       throw new Error(`the desktop has no method named ${method}`)

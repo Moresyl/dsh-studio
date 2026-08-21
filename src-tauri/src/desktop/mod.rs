@@ -35,7 +35,7 @@ use crate::window;
 ///
 /// One number for the whole surface rather than one per capability: a plugin
 /// author has to be able to answer "will this work" before writing the call.
-const PROTOCOL: u32 = 1;
+const PROTOCOL: u32 = 2;
 
 /// The scheme this app answers to. Registered by the installer, and at runtime
 /// in a development build where no installer has run.
@@ -134,7 +134,7 @@ pub fn offer<R: Runtime>(app: &AppHandle<R>) -> Offer {
         version: app.package_info().version.to_string(),
         platform: std::env::consts::OS.to_string(),
         scheme: SCHEME.to_string(),
-        capabilities: vec!["notify", "pick", "badge", "link"],
+        capabilities: vec!["notify", "pick", "badge", "link", "profiles", "plugins"],
         link: app
             .try_state::<Desk>()
             .and_then(|desk| desk.pending.lock().ok()?.take()),
