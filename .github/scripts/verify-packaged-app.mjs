@@ -131,31 +131,12 @@ async function verifyLinux(files) {
 
 async function extractRpm(rpm, directory) {
   await mkdir(directory, { recursive: true })
-  const unpack = spawn('rpm2cpio', [rpm], { stdio: ['ignore', 'pipe', 'inherit'] })
-  const cpio = spawn('cpio', ['-idm', '--quiet'], {
-    cwd: directory,
-    stdio: ['pipe', 'inherit', 'inherit'],
-  })
-  connectChildPipeline(unpack, cpio)
-  const [unpackStatus, cpioStatus] = await Promise.all([
-    childStatus(unpack, 'rpm2cpio'),
-    childStatus(cpio, 'cpio'),
-  ])
-  const failures = [unpackStatus, cpioStatus].filter((status) => status.code !== 0)
-  if (failures.length) {
-    throw new Error(failures.map(({ label, code }) => `${label} exited with ${code}`).join('; '))
-  }
+  await run('bsdtar', rpmExtractArgs(rpm, directory))
 }
 
-export function connectChildPipeline(source, destination) {
-  source.stdout.pipe(destination.stdin)
-}
-
-function childStatus(child, label) {
-  return new Promise((resolve, reject) => {
-    child.on('error', reject)
-    child.on('exit', (code, signal) => resolve({ label, code: code ?? signal }))
-  })
+export function rpmExtractArgs(rpm, directory) {
+  if (!rpm || !directory) throw new Error('RPM archive and extraction directory are required')
+  return ['-xf', rpm, '-C', directory]
 }
 
 async function installedExecutable(directory) {
