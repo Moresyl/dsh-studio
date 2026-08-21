@@ -114,7 +114,8 @@ export async function prepare(target, output) {
     const pnpmEntry = join(harnessRoot, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs')
     await access(pnpmEntry)
     await run(npm.node, [harnessEntry, '--help'])
-    await run(npm.node, [pnpmEntry, '--version'])
+    const actualPnpm = (await capture(npm.node, [pnpmEntry, '--version'], harnessRoot)).trim()
+    requireExactVersion(actualPnpm, PNPM_VERSION, 'offline pnpm')
 
     const harnessFile = 'harness.tar.gz'
     const harnessArchive = join(destination, harnessFile)
@@ -134,6 +135,9 @@ export async function prepare(target, output) {
         sha256: harnessHash,
         package: HARNESS_PACKAGE,
         version: HARNESS_VERSION,
+      },
+      pnpm: {
+        version: PNPM_VERSION,
       },
     }
     await writeFile(join(destination, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
@@ -324,6 +328,31 @@ function run(command, args) {
       else reject(new Error(`${command} exited with ${code ?? signal}`))
     })
   })
+}
+
+function capture(command, args, cwd) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd, windowsHide: true })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8').on('data', (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.setEncoding('utf8').on('data', (chunk) => {
+      stderr += chunk
+    })
+    child.on('error', reject)
+    child.on('exit', (code, signal) => {
+      if (code === 0) resolve(stdout)
+      else reject(new Error(`${command} exited with ${code ?? signal}: ${stderr.trim()}`))
+    })
+  })
+}
+
+export function requireExactVersion(actual, expected, label) {
+  if (actual !== expected) {
+    throw new Error(`${label} resolved ${actual || 'no version'}, expected ${expected}`)
+  }
 }
 
 const invoked = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)

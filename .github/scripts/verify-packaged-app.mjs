@@ -172,6 +172,9 @@ async function verifyOffline(directory) {
   if (manifest.schema !== 1 || manifest.os !== expectedOs) {
     throw new Error(`Full package has an invalid offline manifest for ${process.platform}`)
   }
+  if (manifest.pnpm?.version !== '11.7.0') {
+    throw new Error('Full package does not carry the pinned pnpm 11.7.0 runtime')
+  }
   const root = dirname(manifestPath)
   for (const [name, artifact] of Object.entries({
     node: manifest.node,

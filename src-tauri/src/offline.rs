@@ -42,6 +42,7 @@ struct Manifest {
     arch: String,
     node: DeclaredArtifact,
     harness: DeclaredHarness,
+    pnpm: DeclaredPnpm,
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,6 +59,11 @@ struct DeclaredHarness {
     file: String,
     sha256: String,
     package: String,
+    version: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DeclaredPnpm {
     version: String,
 }
 
@@ -110,9 +116,10 @@ fn read(root: &Path) -> Result<Payload> {
     }
     if manifest.harness.package != crate::harness::install::PACKAGE
         || manifest.harness.version != crate::harness::install::VERSION
+        || manifest.pnpm.version != crate::harness::install::PNPM_VERSION
     {
         return Err(Error::Install(
-            "offline Harness runtime does not match this DSH Studio build".into(),
+            "offline Harness/pnpm runtime does not match this DSH Studio build".into(),
         ));
     }
     if node_runtime::Version::parse(&manifest.node.version).is_none() {
@@ -210,12 +217,13 @@ mod tests {
 
     fn manifest(node_file: &str, harness_version: &str) -> String {
         format!(
-            r#"{{"schema":1,"os":"{}","arch":"{}","node":{{"file":"{node_file}","sha256":"{}","version":"v22.19.0"}},"harness":{{"file":"harness.tar.gz","sha256":"{}","package":"{}","version":"{harness_version}"}}}}"#,
+            r#"{{"schema":1,"os":"{}","arch":"{}","node":{{"file":"{node_file}","sha256":"{}","version":"v22.19.0"}},"harness":{{"file":"harness.tar.gz","sha256":"{}","package":"{}","version":"{harness_version}"}},"pnpm":{{"version":"{}"}}}}"#,
             std::env::consts::OS,
             std::env::consts::ARCH,
             "0".repeat(64),
             "1".repeat(64),
             crate::harness::install::PACKAGE,
+            crate::harness::install::PNPM_VERSION,
         )
     }
 
@@ -249,6 +257,13 @@ mod tests {
 
         fs::write(root.join("node.tar.gz"), b"node").unwrap();
         fs::write(root.join("manifest.json"), manifest("node.tar.gz", "0.0.0")).unwrap();
+        assert!(read(&root).is_err());
+
+        let wrong_pnpm = manifest("node.tar.gz", crate::harness::install::VERSION).replace(
+            crate::harness::install::PNPM_VERSION,
+            "0.0.0",
+        );
+        fs::write(root.join("manifest.json"), wrong_pnpm).unwrap();
         assert!(read(&root).is_err());
         fs::remove_dir_all(root).unwrap();
     }
