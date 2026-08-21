@@ -94,6 +94,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y appstream-compose flatpak flatpak-builder
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.gnome.Platform//49 org.gnome.Sdk//49
+          flatpak install --user -y flathub org.flatpak.Builder org.gnome.Platform//49 org.gnome.Sdk//49
           flatpak-builder --user --force-clean --disable-rofiles-fuse build-dir packaging/flathub/io.github.moresyl.dshstudio.yml
-      - run: appstreamcli validate --no-net packaging/flathub/io.github.moresyl.dshstudio.metainfo.xml
+      - name: Validate AppStream with Flathub's linter
+        run: |
+          flatpak run --user --filesystem="$GITHUB_WORKSPACE" \
+            --command=flatpak-builder-lint org.flatpak.Builder \
+            appstream "$GITHUB_WORKSPACE/packaging/flathub/io.github.moresyl.dshstudio.metainfo.xml"
