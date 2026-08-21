@@ -2,21 +2,29 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { spawn } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
 
-const root = process.argv[2]
-if (!root) throw new Error('usage: node verify-packaged-app.mjs <tauri-bundle-directory>')
+let scratch
+const invoked = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (invoked) {
+  const root = resolveBundleRoot(process.argv[2])
+  scratch = await mkdtemp(join(tmpdir(), 'dsh-studio-package-smoke-'))
+  try {
+    const files = await walk(root)
+    if (process.platform === 'win32') await verifyWindows(files)
+    else if (process.platform === 'darwin') await verifyMac(files)
+    else await verifyLinux(files)
+  } finally {
+    await rm(scratch, { recursive: true, force: true })
+  }
+}
 
-const scratch = await mkdtemp(join(tmpdir(), 'dsh-studio-package-smoke-'))
-try {
-  const files = await walk(root)
-  if (process.platform === 'win32') await verifyWindows(files)
-  else if (process.platform === 'darwin') await verifyMac(files)
-  else await verifyLinux(files)
-} finally {
-  await rm(scratch, { recursive: true, force: true })
+export function resolveBundleRoot(root) {
+  if (!root) throw new Error('usage: node verify-packaged-app.mjs <tauri-bundle-directory>')
+  return resolve(root)
 }
 
 async function verifyWindows(files) {

@@ -66,7 +66,8 @@ pre-1.0 caveat that anything may still move.
   Studio window is not focused.
 - Full / Offline archives no longer let Windows `tar` interpret an absolute
   drive path as a remote host or retain a broken local Studio integration link;
-  the complete integration package is now materialized in every payload.
+  the complete integration package is now materialized in every payload, and
+  Linux smoke tests retain the absolute AppImage path while changing directory.
 - Catalog media can no longer make the renderer fetch arbitrary remote URLs;
   admitted images are bounded, decoded and re-encoded locally before display.
 
