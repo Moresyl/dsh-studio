@@ -2,6 +2,7 @@
   "name": "dsh-studio-managed-runtime",
   "private": true,
   "dependencies": {
+    "@moresyl/dsh-studio-integration": "file:dsh-studio-integration",
     "@deepseek-ai/cordis-plugin-group": "1.0.1",
     "@deepseek-ai/dsh": "0.1.0-rc.8",
     "@deepseek-ai/dsh-anonymous-user-id": "0.1.0-rc.8",

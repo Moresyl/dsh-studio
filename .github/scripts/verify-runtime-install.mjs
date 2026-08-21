@@ -1,4 +1,4 @@
-import { copyFile, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { copyFile, cp, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -18,6 +18,11 @@ try {
   await Promise.all([
     copyFile('src-tauri/runtime-contract/package.json', join(directory, 'package.json')),
     copyFile('src-tauri/runtime-contract/package-lock.json', join(directory, 'package-lock.json')),
+    cp(
+      'src-tauri/runtime-contract/dsh-studio-integration',
+      join(directory, 'dsh-studio-integration'),
+      { recursive: true },
+    ),
   ])
   await run(npm.command, [
     ...npm.args,
@@ -41,6 +46,30 @@ try {
   )
   if (pnpm.version !== expectedPnpm) {
     throw new Error(`installed pnpm ${pnpm.version ?? 'unknown'}, expected ${expectedPnpm}`)
+  }
+  await stat(
+    join(directory, 'node_modules', '@moresyl', 'dsh-studio-integration', 'lib', 'client.js'),
+  )
+  const picker = await readFile(
+    join(
+      directory,
+      'node_modules',
+      '@deepseek-ai',
+      'dsh-client-ui-directory-picker-browse',
+      'lib',
+      'client.js',
+    ),
+    'utf8',
+  )
+  for (const seam of [
+    'function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen, onClose, busy, t }) {',
+    'const parentInert = busy || folderDraft !== null;',
+    'if (targetPath !== null) onOpen(targetPath);',
+    'createDirectory: (path, name) => ctx.workspaces.createDirectory(path, name),',
+  ]) {
+    if (picker.split(seam).length !== 2) {
+      throw new Error(`qualified directory picker seam changed: ${seam}`)
+    }
   }
   await run(process.execPath, [entry, '--help'], { timeout: 120_000 })
   console.log(`cold-installed and executed the pinned ${manifest.name}@${expected} runtime graph`)

@@ -108,6 +108,7 @@ pub fn launch_plan() -> Result<LaunchPlan> {
         ));
     }
     let profile = crate::profiles::selected();
+    crate::profiles::ensure_studio_integration(&profile)?;
     if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {
         return Err(Error::Plugin(problem));
     }

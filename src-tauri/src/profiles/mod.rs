@@ -59,6 +59,12 @@ const WORKSPACE: &str = "pnpm-workspace.yaml";
 /// put in it. The array is the part its loader reads, and a new profile has
 /// nothing to say in there yet.
 const EMPTY_PATCH: &str = "[]\n";
+const STUDIO_INTEGRATION: &str = "@moresyl/dsh-studio-integration";
+const WEB_APP_BUNDLE: &str = "@deepseek-ai/dsh-web-app";
+const WEB_PROFILE_BUNDLES: [&str; 3] =
+    ["@deepseek-ai/dsh-base", WEB_APP_BUNDLE, STUDIO_INTEGRATION];
+const PROFILE_WORKSPACE: &str =
+    "packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n";
 
 /// What an exported profile is, so a file picked by mistake is caught before
 /// anything is written.
@@ -198,6 +204,53 @@ pub fn selected() -> String {
 pub fn select(name: &str) -> Result<()> {
     let name = expect_profile(name)?;
     selection::choose(&name)
+}
+
+/// Ensure a Web profile composes the browser half owned by this exact runtime.
+///
+/// The integration package resolves from the managed Harness installation, so
+/// this changes no user dependency and performs no network operation. Headless
+/// profiles are left untouched because they have no browser surface to bridge.
+pub fn ensure_studio_integration(name: &str) -> Result<()> {
+    let dir = paths::profile_dir(name);
+    ensure_integration_in(&dir, name == DEFAULT)
+}
+
+fn ensure_integration_in(dir: &Path, bootstrap_web: bool) -> Result<()> {
+    if !dir.join(MANIFEST).is_file() {
+        if !bootstrap_web {
+            return Ok(());
+        }
+        let bundles = WEB_PROFILE_BUNDLES.map(str::to_string);
+        return initialize(dir, &bundles, EMPTY_PATCH, Some(PROFILE_WORKSPACE));
+    }
+
+    let Some(mut manifest) = plugins::read_manifest(dir) else {
+        return Err(Error::Profile(format!(
+            "{} has an invalid profile manifest",
+            dir.display()
+        )));
+    };
+    let Some(bundles) = manifest
+        .pointer_mut("/dsh/profile/bundles")
+        .and_then(Value::as_array_mut)
+    else {
+        return Err(Error::Profile(format!(
+            "{} has no profile bundle list",
+            dir.display()
+        )));
+    };
+    if !bundles.iter().any(|bundle| bundle == WEB_APP_BUNDLE)
+        || bundles.iter().any(|bundle| bundle == STUDIO_INTEGRATION)
+    {
+        return Ok(());
+    }
+    let after_web = bundles
+        .iter()
+        .position(|bundle| bundle == WEB_APP_BUNDLE)
+        .map_or(bundles.len(), |index| index + 1);
+    bundles.insert(after_web, Value::from(STUDIO_INTEGRATION));
+    write_manifest(dir, &manifest)
 }
 
 /// Make a profile with the interface bundles in it and nothing else.
@@ -924,6 +977,49 @@ mod tests {
         );
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn web_profiles_gain_the_runtime_integration_once() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-integration-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        initialize(
+            &root,
+            &["@deepseek-ai/dsh-base".into(), WEB_APP_BUNDLE.into()],
+            EMPTY_PATCH,
+            Some(PROFILE_WORKSPACE),
+        )
+        .expect("profile");
+
+        ensure_integration_in(&root, false).expect("first integration");
+        ensure_integration_in(&root, false).expect("idempotent integration");
+        let manifest = plugins::read_manifest(&root).expect("manifest");
+        assert_eq!(
+            bundles(&manifest),
+            ["@deepseek-ai/dsh-base", WEB_APP_BUNDLE, STUDIO_INTEGRATION]
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_missing_web_profile_bootstraps_with_the_managed_bundle() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-bootstrap-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+
+        ensure_integration_in(&root, true).expect("bootstrap");
+        let manifest = plugins::read_manifest(&root).expect("manifest");
+        assert_eq!(bundles(&manifest), WEB_PROFILE_BUNDLES);
+        assert_eq!(
+            std::fs::read_to_string(root.join(WORKSPACE)).expect("workspace"),
+            PROFILE_WORKSPACE
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     /// A profile with no workspace file of its own is written without one, and

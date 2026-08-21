@@ -108,6 +108,12 @@ pub fn workspace_select(path: PathBuf) -> Result<Admission> {
     Ok(inspect(&selected))
 }
 
+/// Validate a candidate chosen by an embedded Harness UI without persisting it.
+#[tauri::command]
+pub fn workspace_inspect(path: PathBuf) -> Admission {
+    inspect(&path)
+}
+
 impl Admission {
     pub fn blocked(&self) -> bool {
         self.state == "blocked"
@@ -237,12 +243,13 @@ fn classify(filesystem: &str) -> Admission {
 
 #[cfg(test)]
 mod tests {
-    use super::{inspect, Store};
+    use super::{inspect, workspace_inspect, Store};
 
     #[test]
     fn a_missing_workspace_is_blocked() {
         let path = std::env::temp_dir().join("dsh-studio-workspace-that-must-not-exist");
         assert!(inspect(&path).blocked());
+        assert!(workspace_inspect(path).blocked());
     }
 
     #[test]

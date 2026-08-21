@@ -27,6 +27,7 @@
   /** Calls waiting for an answer, by the id they were sent under. */
   const waiting = new Map()
   const listeners = new Set()
+  const workspaceDropListeners = new Set()
   let sent = 0
 
   window.addEventListener('message', (event) => {
@@ -39,6 +40,11 @@
 
     if (message.event === 'link') {
       for (const listener of listeners) listener(message.link)
+      return
+    }
+
+    if (message.event === 'workspace-drop' && typeof message.path === 'string') {
+      for (const listener of workspaceDropListeners) listener(message.path)
       return
     }
 
@@ -66,6 +72,14 @@
       // message to `window.top` can have.
       window.top.postMessage({ dsh: PROTOCOL, id, method, params: params || {} }, '*')
     })
+
+  const pickDirectory = async () => (await call('pick', { mode: 'directory' })).path
+  const validateDirectory = async (path) => (await call('workspace.validate', { path })).allowed
+
+  // Compatibility globals consumed by the patched upstream browse flow. They
+  // are intentionally two narrow functions rather than the Tauri command API.
+  window.__DSH_DESKTOP_PICK_DIRECTORY__ = pickDirectory
+  window.__DSH_DESKTOP_VALIDATE_DIRECTORY__ = validateDirectory
 
   window.dshStudio = Object.freeze({
     protocol: PROTOCOL,
@@ -97,6 +111,15 @@
     plugins: Object.freeze({
       install: (request) => call('plugins.install', request),
       remove: (name) => call('plugins.remove', { name }),
+    }),
+
+    /** Native workspace admission and folder drops for the upstream UI. */
+    workspace: Object.freeze({
+      validate: (path) => call('workspace.validate', { path }),
+      onDrop: (handler) => {
+        workspaceDropListeners.add(handler)
+        return () => workspaceDropListeners.delete(handler)
+      },
     }),
 
     /** Hear `dsh://` links as they arrive. Returns the way to stop hearing them. */

@@ -21,6 +21,7 @@ vi.mock('@/lib/ipc', () => ({
   pluginPreview: vi.fn(),
   pluginAdd: vi.fn(),
   pluginRemove: vi.fn(),
+  workspaceInspect: vi.fn(),
   announce: vi.fn(),
   onDesktopLink: vi.fn(),
 }))
@@ -157,6 +158,27 @@ group('answer', () => {
       expect(ipc.pluginAdd).toHaveBeenCalledWith('reviewed-once')
       await answer(request('plugins.remove', { name: '@vendor/tool' }))
       expect(ipc.pluginRemove).toHaveBeenCalledWith('@vendor/tool')
+    })
+  })
+
+  group('workspace admission', () => {
+    it('returns the backend decision without persisting the candidate', async () => {
+      vi.mocked(ipc.workspaceInspect).mockResolvedValue({
+        state: 'blocked',
+        filesystem: 'exFAT',
+        reason: 'unsafe filesystem',
+      })
+
+      await expect(answer(request('workspace.validate', { path: ' E:\\repo ' }))).resolves.toEqual({
+        allowed: false,
+        reason: 'unsafe filesystem',
+      })
+      expect(ipc.workspaceInspect).toHaveBeenCalledWith('E:\\repo')
+    })
+
+    it('rejects an empty candidate before crossing the native boundary', async () => {
+      await expect(answer(request('workspace.validate', { path: '   ' }))).rejects.toThrow()
+      expect(ipc.workspaceInspect).not.toHaveBeenCalled()
     })
   })
 
@@ -301,6 +323,10 @@ interface Client {
     install(request: unknown): Promise<unknown>
     remove(name: string): Promise<unknown>
   }
+  workspace: {
+    validate(path: string): Promise<unknown>
+    onDrop(handler: (path: string) => void): () => void
+  }
 }
 
 /**
@@ -378,9 +404,35 @@ group('the injected client', () => {
       'plugins',
       'profiles',
       'protocol',
+      'workspace',
     ])
     expect(Object.isFrozen(client.profiles)).toBe(true)
     expect(Object.isFrozen(client.plugins)).toBe(true)
+    expect(Object.isFrozen(client.workspace)).toBe(true)
+  })
+
+  it('validates and publishes native workspace drops through the narrow seam', async () => {
+    const desk = load()
+    const dropped = vi.fn()
+    const dispose = desk.client().workspace.onDrop(dropped)
+    const validation = desk.client().workspace.validate('D:\\repo')
+
+    expect(desk.sent).toEqual([
+      {
+        dsh: PROTOCOL,
+        id: 'dsh-1',
+        method: 'workspace.validate',
+        params: { path: 'D:\\repo' },
+      },
+    ])
+    desk.deliver({ dsh: PROTOCOL, event: 'workspace-drop', path: 'D:\\repo' })
+    expect(dropped).toHaveBeenCalledWith('D:\\repo')
+    dispose()
+    desk.deliver({ dsh: PROTOCOL, event: 'workspace-drop', path: 'D:\\other' })
+    expect(dropped).toHaveBeenCalledTimes(1)
+
+    desk.deliver({ dsh: PROTOCOL, id: 'dsh-1', ok: true, value: { allowed: true } })
+    await expect(validation).resolves.toEqual({ allowed: true })
   })
 
   it('stays out of the way in the window that has no window above it', () => {

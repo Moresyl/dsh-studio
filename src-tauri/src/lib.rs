@@ -174,6 +174,7 @@ pub fn run() {
             diagnostics::report_archive,
             diagnostics::report_frontend_crash,
             workspace::workspace_select,
+            workspace::workspace_inspect,
         ])
         .run(tauri::generate_context!())
         .expect("dsh-studio failed to start");

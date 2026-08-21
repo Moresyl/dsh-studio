@@ -14,6 +14,7 @@ import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
 import { Workbench, SETTINGS, VIEWS, type View } from '@/components/Workbench'
 import { t } from '@/lib/i18n'
+import { pushWorkspaceDrop } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
 import { standby } from '@/lib/platform'
 import { useDialog } from '@/state/dialog'
@@ -48,6 +49,8 @@ export default function App() {
 
   const presentation = usePresentation((state) => state.mode)
   const choosePresentation = usePresentation((state) => state.choose)
+  // With nothing serving there is nothing else to show.
+  const showPanel = origin === null || presentation === 'advanced'
   const [view, setView] = useState<View>('console')
   // Held by the window rather than by the title bar that opens it: the manager
   // covers the window, and a modal inside a strip 36px tall would be positioned
@@ -150,19 +153,23 @@ export default function App() {
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
 
-  // A folder dropped anywhere on the native shell is an explicit workspace
-  // choice. Files and multi-item drops are ignored; the backend canonicalizes
-  // and validates the one path before it persists anything.
+  // A native drop belongs to the surface the user can see. In the Studio
+  // workbench it changes the next Harness working directory; in compatibility
+  // presentation it is handed to the upstream Workspace service so it creates
+  // a real Workspace row and session there instead of changing an unrelated
+  // shell setting.
   useEffect(() => {
     const pending = getCurrentWindow().onDragDropEvent((event) => {
       if (event.payload.type !== 'drop' || event.payload.paths.length !== 1) return
       const [path] = event.payload.paths
-      if (path) void switchWorkspace(path)
+      if (!path) return
+      if (!showPanel && origin) pushWorkspaceDrop(path, origin)
+      else void switchWorkspace(path)
     })
     return () => {
       void pending.then((unlisten) => unlisten())
     }
-  }, [])
+  }, [origin, showPanel])
 
   // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, Ctrl+comma for settings, and
   // Ctrl+Shift+N for another window. Every application with a fixed set of views
@@ -215,9 +222,6 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [managing, stage, show])
-
-  // With nothing serving there is nothing else to show.
-  const showPanel = origin === null || presentation === 'advanced'
 
   return (
     // No ground of its own: the body is the window's ground, and where a

@@ -33,7 +33,7 @@ import * as ipc from '@/lib/ipc'
  * refuse each other. `bridge.test.ts` reads the Rust file and fails if they
  * ever stop agreeing.
  */
-export const PROTOCOL = 2
+export const PROTOCOL = 3
 
 /** How far down the frame tree a pushed message is carried. */
 const DEPTH = 8
@@ -122,6 +122,16 @@ export async function answer({ method, params }: Call): Promise<unknown> {
       // Null and not an error: choosing nothing is an answer.
       return { path: await pick(params) }
 
+    case 'workspace.validate': {
+      const path = text(params.path).trim()
+      if (!path) throw new Error('workspace validation needs a path')
+      const admission = await ipc.workspaceInspect(path)
+      return {
+        allowed: admission.state !== 'blocked',
+        reason: admission.reason,
+      }
+    }
+
     case 'badge':
       await ipc.desktopBadge(counted(params.count))
       return {}
@@ -200,6 +210,13 @@ export async function serveDesktop(origin: string): Promise<() => void> {
     window.removeEventListener('message', onMessage)
     unlisten()
   }
+}
+
+/** Hand one native folder drop to the visible Harness UI, and nowhere else. */
+export function pushWorkspaceDrop(path: string, origin: string): void {
+  const selected = path.trim()
+  if (!selected || !origin) return
+  tell({ dsh: PROTOCOL, event: 'workspace-drop', path: selected }, origin)
 }
 
 /** Answer one request, whichever way it went. */

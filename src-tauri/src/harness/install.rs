@@ -30,10 +30,20 @@ pub const VERSION: &str = "0.1.0-rc.8";
 pub const SPEC: &str = "@deepseek-ai/dsh@0.1.0-rc.8";
 pub const PNPM_VERSION: &str = "11.7.0";
 pub const PNPM_SPEC: &str = "pnpm@11.7.0";
+const RUNTIME_SCHEMA: u8 = 2;
+const INTEGRATION_PACKAGE: &str = "@moresyl/dsh-studio-integration";
 
 const JOURNAL_VERSION: u8 = 1;
 const RUNTIME_PACKAGE: &[u8] = include_bytes!("../../runtime-contract/package.json");
 const RUNTIME_LOCK: &[u8] = include_bytes!("../../runtime-contract/package-lock.json");
+const INTEGRATION_MANIFEST: &[u8] =
+    include_bytes!("../../runtime-contract/dsh-studio-integration/package.json");
+const INTEGRATION_PATCH: &[u8] =
+    include_bytes!("../../runtime-contract/dsh-studio-integration/cordis.patch.yml");
+const INTEGRATION_NODE: &[u8] =
+    include_bytes!("../../runtime-contract/dsh-studio-integration/lib/index.js");
+const INTEGRATION_CLIENT: &[u8] =
+    include_bytes!("../../runtime-contract/dsh-studio-integration/lib/client.js");
 
 #[derive(Debug, Deserialize, Serialize)]
 struct InstallJournal {
@@ -203,6 +213,7 @@ where
     std::fs::write(plan.target.join("package.json"), RUNTIME_PACKAGE)
         .and_then(|_| std::fs::write(plan.target.join("package-lock.json"), RUNTIME_LOCK))
         .map_err(|cause| Error::Install(format!("could not stage the runtime lock: {cause}")))?;
+    stage_integration(&plan.target)?;
 
     let mut command = plan.to_locked_command();
     let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
@@ -218,7 +229,109 @@ where
     if !status.success() {
         return Err(Error::Install(format!("npm ci exited with {status}")));
     }
+    qualify_runtime(&plan.target)?;
     Ok(())
+}
+
+fn stage_integration(target: &Path) -> Result<()> {
+    let root = target.join("dsh-studio-integration");
+    std::fs::create_dir_all(root.join("lib"))
+        .and_then(|_| std::fs::write(root.join("package.json"), INTEGRATION_MANIFEST))
+        .and_then(|_| std::fs::write(root.join("cordis.patch.yml"), INTEGRATION_PATCH))
+        .and_then(|_| std::fs::write(root.join("lib/index.js"), INTEGRATION_NODE))
+        .and_then(|_| std::fs::write(root.join("lib/client.js"), INTEGRATION_CLIENT))
+        .map_err(|cause| Error::Install(format!("could not stage the Studio integration: {cause}")))
+}
+
+fn qualify_runtime(target: &Path) -> Result<()> {
+    let client = target
+        .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
+    let mut body = std::fs::read_to_string(&client).map_err(|cause| {
+        Error::Install(format!(
+            "the qualified directory picker could not be read: {cause}"
+        ))
+    })?;
+
+    body = replace_once(
+        body,
+        "function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen, onClose, busy, t }) {",
+        "function DirectoryBrowser({ open, listDirectory, createDirectory, pickNativeDirectory, validateDirectory, onOpen, onClose, busy, t }) {",
+        "directory browser arguments",
+    )?;
+    body = replace_once(
+        body,
+        "\t\t\tconst [createError, setCreateError] = (0, react.useState)(null);",
+        "\t\t\tconst [createError, setCreateError] = (0, react.useState)(null);\n\t\t\tconst [nativePicking, setNativePicking] = (0, react.useState)(false);\n\t\t\tconst [validatingDirectory, setValidatingDirectory] = (0, react.useState)(false);",
+        "directory browser native state",
+    )?;
+    body = replace_once(
+        body,
+        "\t\t\tconst parentInert = busy || folderDraft !== null;\n\t\t\tconst draftPending = pathDraft !== null;",
+        "\t\t\tconst parentInert = busy || folderDraft !== null || nativePicking || validatingDirectory;\n\t\t\tconst openDirectory = (path) => {\n\t\t\t\tif (validateDirectory === void 0) {\n\t\t\t\t\tonOpen(path);\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\tsetError(null);\n\t\t\t\tsetValidatingDirectory(true);\n\t\t\t\tvalidateDirectory(path).then((allowed) => {\n\t\t\t\t\tsetValidatingDirectory(false);\n\t\t\t\t\tif (allowed) onOpen(path);\n\t\t\t\t}, (reason) => {\n\t\t\t\t\tsetValidatingDirectory(false);\n\t\t\t\t\tsetError(failureText(reason));\n\t\t\t\t});\n\t\t\t};\n\t\t\tconst pickFromSystem = () => {\n\t\t\t\tif (pickNativeDirectory === void 0) return;\n\t\t\t\tsetError(null);\n\t\t\t\tsetNativePicking(true);\n\t\t\t\tpickNativeDirectory().then((path) => {\n\t\t\t\t\tsetNativePicking(false);\n\t\t\t\t\tif (path !== null) openDirectory(path);\n\t\t\t\t}, (reason) => {\n\t\t\t\t\tsetNativePicking(false);\n\t\t\t\t\tsetError(failureText(reason));\n\t\t\t\t});\n\t\t\t};\n\t\t\tconst draftPending = pathDraft !== null;",
+        "directory browser native actions",
+    )?;
+    body = replace_once(
+        body,
+        "\t\t\t\t\tif (folderDraft === null && !busy) onClose();",
+        "\t\t\t\t\tif (!parentInert) onClose();",
+        "directory browser close guard",
+    )?;
+    body = replace_once(
+        body,
+        "\t\t\t\t\t\t\t\t(0, react_jsx_runtime.jsxs)(\"button\", {\n\t\t\t\t\t\t\t\t\ttype: \"button\",\n\t\t\t\t\t\t\t\t\tclassName: clsx(DirectoryBrowser_module_css_default.showHiddenToggle, showHidden && DirectoryBrowser_module_css_default.showHiddenToggleActive),",
+        "\t\t\t\t\t\t\t\tpickNativeDirectory !== void 0 && (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.Button, {\n\t\t\t\t\t\t\t\t\tvariant: \"outline\",\n\t\t\t\t\t\t\t\t\ticon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpen16, { size: 16 }),\n\t\t\t\t\t\t\t\t\tdisabled: parentInert,\n\t\t\t\t\t\t\t\t\tonClick: pickFromSystem,\n\t\t\t\t\t\t\t\t\tchildren: t(\"browser.nativePicker\")\n\t\t\t\t\t\t\t\t}),\n\t\t\t\t\t\t\t\t(0, react_jsx_runtime.jsxs)(\"button\", {\n\t\t\t\t\t\t\t\t\ttype: \"button\",\n\t\t\t\t\t\t\t\t\tclassName: clsx(DirectoryBrowser_module_css_default.showHiddenToggle, showHidden && DirectoryBrowser_module_css_default.showHiddenToggleActive),",
+        "directory browser native button",
+    )?;
+    body = replace_once(
+        body,
+        "if (targetPath !== null) onOpen(targetPath);",
+        "if (targetPath !== null) openDirectory(targetPath);",
+        "directory browser open validation",
+    )?;
+    body = replace_once(
+        body,
+        "\t\t\t\tcreateDirectory: props.createDirectory,\n\t\t\t\tt: props.t,",
+        "\t\t\t\tcreateDirectory: props.createDirectory,\n\t\t\t\tpickNativeDirectory: props.pickNativeDirectory,\n\t\t\t\tvalidateDirectory: props.validateDirectory,\n\t\t\t\tt: props.t,",
+        "browse flow native properties",
+    )?;
+    body = replace_once(
+        body,
+        "\"browser.showHidden\": \"显示隐藏文件\"",
+        "\"browser.showHidden\": \"显示隐藏文件\",\n\t\t\t\t\t\"browser.nativePicker\": \"使用系统选择文件夹\"",
+        "Chinese directory picker copy",
+    )?;
+    body = replace_once(
+        body,
+        "\"browser.showHidden\": \"Show hidden files\"",
+        "\"browser.showHidden\": \"Show hidden files\",\n\t\t\t\t\t\"browser.nativePicker\": \"Choose with system dialog\"",
+        "English directory picker copy",
+    )?;
+    body = replace_once(
+        body,
+        "\t\t\t\tcreateDirectory: (path, name) => ctx.workspaces.createDirectory(path, name),\n\t\t\t\tt: ctx.locale.bind(LOCALE_NS)",
+        "\t\t\t\tcreateDirectory: (path, name) => ctx.workspaces.createDirectory(path, name),\n\t\t\t\tpickNativeDirectory: typeof window.__DSH_DESKTOP_PICK_DIRECTORY__ === \"function\" ? () => window.__DSH_DESKTOP_PICK_DIRECTORY__() : void 0,\n\t\t\t\tvalidateDirectory: typeof window.__DSH_DESKTOP_VALIDATE_DIRECTORY__ === \"function\" ? (path) => window.__DSH_DESKTOP_VALIDATE_DIRECTORY__(path) : void 0,\n\t\t\t\tt: ctx.locale.bind(LOCALE_NS)",
+        "directory picker desktop injection",
+    )?;
+
+    std::fs::write(&client, body).map_err(|cause| {
+        Error::Install(format!(
+            "the qualified directory picker could not be written: {cause}"
+        ))
+    })?;
+    std::fs::write(
+        target.join("dsh-studio-runtime.json"),
+        format!("{{\"schema\":{RUNTIME_SCHEMA}}}\n"),
+    )
+    .map_err(|cause| Error::Install(format!("could not mark the runtime contract: {cause}")))
+}
+
+fn replace_once(body: String, from: &str, to: &str, label: &str) -> Result<String> {
+    if body.matches(from).count() != 1 {
+        return Err(Error::Install(format!(
+            "the qualified Harness no longer has the expected {label} seam"
+        )));
+    }
+    Ok(body.replacen(from, to, 1))
 }
 
 /// Restore a Full package's pre-resolved dependency closure without npm.
@@ -368,6 +481,9 @@ pub fn runtime_compatible(target: &Path) -> bool {
         && entry(target).is_file()
         && pnpm_version(target).as_deref() == Some(PNPM_VERSION)
         && pnpm_entry(target).is_file()
+        && runtime_schema(target) == Some(RUNTIME_SCHEMA)
+        && integration_entry(target).is_file()
+        && qualified_picker(target)
 }
 
 fn runtime_complete(target: &Path) -> bool {
@@ -394,6 +510,27 @@ fn pnpm_entry(target: &Path) -> PathBuf {
     target.join("node_modules/pnpm/bin/pnpm.cjs")
 }
 
+fn integration_entry(target: &Path) -> PathBuf {
+    target.join("node_modules/@moresyl/dsh-studio-integration/lib/client.js")
+}
+
+fn runtime_schema(target: &Path) -> Option<u8> {
+    let raw = std::fs::read_to_string(target.join("dsh-studio-runtime.json")).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    value.get("schema")?.as_u64()?.try_into().ok()
+}
+
+fn qualified_picker(target: &Path) -> bool {
+    std::fs::read_to_string(
+        target
+            .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js"),
+    )
+    .is_ok_and(|body| {
+        body.contains("__DSH_DESKTOP_PICK_DIRECTORY__")
+            && body.contains("__DSH_DESKTOP_VALIDATE_DIRECTORY__")
+    })
+}
+
 fn require_expected_runtime(target: &Path) -> Result<()> {
     let actual = runtime_version(target).unwrap_or_else(|| "missing".to_string());
     let actual_pnpm = pnpm_version(target).unwrap_or_else(|| "missing".to_string());
@@ -401,9 +538,12 @@ fn require_expected_runtime(target: &Path) -> Result<()> {
         || !entry(target).is_file()
         || actual_pnpm != PNPM_VERSION
         || !pnpm_entry(target).is_file()
+        || runtime_schema(target) != Some(RUNTIME_SCHEMA)
+        || !integration_entry(target).is_file()
+        || !qualified_picker(target)
     {
         return Err(Error::Install(format!(
-            "npm finished but the verified runtime is not {PACKAGE}@{VERSION} with pnpm {PNPM_VERSION} (found {actual} with pnpm {actual_pnpm})"
+            "npm finished but the verified runtime is not Studio contract {RUNTIME_SCHEMA} with {PACKAGE}@{VERSION}, {INTEGRATION_PACKAGE}, and pnpm {PNPM_VERSION} (found {actual} with pnpm {actual_pnpm})"
         )));
     }
     Ok(())
@@ -511,8 +651,9 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        remove_dir_if_exists, runtime_compatible, runtime_version, PACKAGE, PNPM_SPEC,
-        PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, SPEC, VERSION,
+        qualify_runtime, remove_dir_if_exists, runtime_compatible, runtime_version,
+        INTEGRATION_PACKAGE, PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE,
+        RUNTIME_SCHEMA, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -534,6 +675,22 @@ mod tests {
         )
         .expect("pnpm manifest");
         fs::write(pnpm.join("bin/pnpm.cjs"), "").expect("pnpm entry");
+        let integration = root.join("node_modules/@moresyl/dsh-studio-integration/lib");
+        fs::create_dir_all(&integration).expect("integration directory");
+        fs::write(integration.join("client.js"), "").expect("integration client");
+        let picker = root
+            .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
+        fs::create_dir_all(picker.parent().expect("picker parent")).expect("picker directory");
+        fs::write(
+            picker,
+            "__DSH_DESKTOP_PICK_DIRECTORY__ __DSH_DESKTOP_VALIDATE_DIRECTORY__",
+        )
+        .expect("qualified picker");
+        fs::write(
+            root.join("dsh-studio-runtime.json"),
+            format!(r#"{{"schema":{RUNTIME_SCHEMA}}}"#),
+        )
+        .expect("runtime marker");
     }
 
     #[test]
@@ -553,6 +710,10 @@ mod tests {
             .expect("runtime dependencies");
         assert_eq!(dependencies[PACKAGE], VERSION);
         assert_eq!(dependencies["pnpm"], PNPM_VERSION);
+        assert_eq!(
+            dependencies[INTEGRATION_PACKAGE],
+            "file:dsh-studio-integration"
+        );
         assert!(dependencies
             .values()
             .all(|version| version.as_str().is_some_and(|version| {
@@ -586,6 +747,10 @@ mod tests {
         assert_eq!(runtime_version(&root).as_deref(), Some(VERSION));
         assert!(runtime_compatible(&root));
 
+        fs::remove_file(root.join("dsh-studio-runtime.json")).expect("remove marker");
+        assert!(!runtime_compatible(&root));
+        write_runtime(&root, VERSION, true);
+
         write_runtime(&root, "0.0.1-rc.1", true);
         assert!(!runtime_compatible(&root));
         write_runtime(&root, VERSION, false);
@@ -603,5 +768,29 @@ mod tests {
         assert!(remove_dir_if_exists(&path).is_err());
         assert!(path.is_file(), "the refused target must remain untouched");
         fs::remove_file(path).expect("cleanup");
+    }
+
+    #[test]
+    fn the_locally_installed_locked_picker_accepts_the_qualification() {
+        let source = crate::paths::harness_dir()
+            .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
+        if !source.is_file() {
+            return;
+        }
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-picker-qualification-{}",
+            std::process::id()
+        ));
+        let target = root
+            .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(target.parent().expect("picker parent")).expect("picker directory");
+        fs::copy(source, &target).expect("copy locked picker");
+
+        qualify_runtime(&root).expect("qualify locked picker");
+        let patched = fs::read_to_string(target).expect("patched picker");
+        assert!(patched.contains("__DSH_DESKTOP_PICK_DIRECTORY__"));
+        assert!(patched.contains("openDirectory(targetPath)"));
+        let _ = fs::remove_dir_all(root);
     }
 }

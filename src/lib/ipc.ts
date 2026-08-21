@@ -201,6 +201,10 @@ export const onRemoteChange = (handler: () => void): Promise<UnlistenFn> =>
 export const workspaceSelect = (path: string): Promise<Environment['workspaceAdmission']> =>
   invoke('workspace_select', { path })
 
+/** Inspect a candidate without changing the working directory for the next start. */
+export const workspaceInspect = (path: string): Promise<Environment['workspaceAdmission']> =>
+  invoke('workspace_inspect', { path })
+
 /* -------------------------------------------------------------------------- */
 /* Plugins                                                                    */
 /* -------------------------------------------------------------------------- */
