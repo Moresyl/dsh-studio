@@ -122,6 +122,79 @@ pub fn report_frontend_crash(message: String, stack: String, url: String) -> Res
     crate::logging::write_frontend_crash(&message, &stack, &url)
 }
 
+/// Export the evidence already on disk without constructing any application state.
+///
+/// This is deliberately synchronous and Tauri-free: it is called when startup is
+/// broken badly enough that no runtime, Harness process or recovery window should
+/// be trusted to exist.
+pub(crate) fn export_headless(version: &str) -> Result<PathBuf> {
+    let taken = stamp(now_millis());
+    let directory = headless_export_directory()?;
+    let destination = directory.join(headless_archive_name(&taken));
+    let logs = crate::logging::log_files();
+    let crashes = crate::logging::crash_files();
+    let report = headless_report(version, &taken, logs.len(), crashes.len());
+    write_archive(&destination, &report, &logs, &crashes)?;
+    Ok(destination)
+}
+
+fn headless_export_directory() -> Result<PathBuf> {
+    if let Some(downloads) = dirs::download_dir().filter(|path| real_directory(path)) {
+        return Ok(downloads);
+    }
+    let fallback = crate::paths::app_data_dir();
+    std::fs::create_dir_all(&fallback).map_err(|cause| {
+        Error::Report(format!(
+            "could not create diagnostic export directory: {cause}"
+        ))
+    })?;
+    if !fallback.is_absolute() || !real_directory(&fallback) {
+        return Err(Error::Report(
+            "no safe absolute diagnostic export directory is available".into(),
+        ));
+    }
+    Ok(fallback)
+}
+
+fn real_directory(path: &Path) -> bool {
+    std::fs::symlink_metadata(path)
+        .map(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
+        .unwrap_or(false)
+}
+
+fn headless_archive_name(taken: &str) -> String {
+    let timestamp = taken
+        .trim_end_matches('Z')
+        .chars()
+        .map(|character| match character {
+            ':' | '/' | '\\' => '-',
+            'T' => '_',
+            character => character,
+        })
+        .collect::<String>();
+    format!("dsh-studio-diagnostics-{timestamp}.zip")
+}
+
+fn headless_report(version: &str, taken: &str, logs: usize, crashes: usize) -> String {
+    redact(&format!(
+        "# dsh-studio headless diagnostics\n\n\
+         Taken {taken}. This package was exported before Tauri, a window, or Harness started.\n\n\
+         ## Build\n\n\
+         version: {version}\n\
+         platform: {}-{}\n\n\
+         ## Locations\n\n\
+         application data: {}\n\
+         DSH home: {}\n\n\
+         ## Evidence\n\n\
+         persistent logs: {logs}\n\
+         crash files: {crashes}\n",
+        std::env::consts::OS,
+        std::env::consts::ARCH,
+        crate::paths::app_data_dir().display(),
+        crate::paths::dsh_home().display(),
+    ))
+}
+
 fn write_archive(path: &Path, report: &str, logs: &[PathBuf], crashes: &[PathBuf]) -> Result<()> {
     if !path.is_absolute() {
         return Err(Error::Report(
@@ -802,6 +875,24 @@ mod tests {
             .unwrap();
         assert_eq!(dump, [0_u8, 1, 2, 3]);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn headless_report_is_redacted_and_states_that_runtime_was_not_started() {
+        let report = headless_report("0.7.1", "2026-08-22T07:30:00Z", 2, 1);
+        assert!(report.contains("before Tauri, a window, or Harness started"));
+        assert!(report.contains("version: 0.7.1"));
+        assert!(report.contains("persistent logs: 2"));
+        if let Some(home) = dirs::home_dir() {
+            assert!(!report.contains(&home.display().to_string()));
+        }
+    }
+
+    #[test]
+    fn headless_archive_names_are_unique_safe_timestamped_leaves() {
+        let name = headless_archive_name("2026-08-22T07:30:15.123Z");
+        assert_eq!(name, "dsh-studio-diagnostics-2026-08-22_07-30-15.123.zip");
+        assert!(!name.contains(['/', '\\', ':']));
     }
 
     #[test]

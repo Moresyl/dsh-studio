@@ -180,6 +180,12 @@ pub fn run() {
         .expect("dsh-studio failed to start");
 }
 
+/// Export bounded, redacted evidence without starting Tauri, Harness or a window.
+pub fn export_diagnostics_cli() -> std::result::Result<std::path::PathBuf, String> {
+    logging::install_panic_hook();
+    diagnostics::export_headless(env!("CARGO_PKG_VERSION")).map_err(|cause| cause.to_string())
+}
+
 /// Relay supervisor events to the frontend for as long as the app is running.
 ///
 /// Also the one place the tray learns anything: it reads the same stream the UI
