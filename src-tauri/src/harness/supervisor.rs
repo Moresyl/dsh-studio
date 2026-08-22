@@ -31,6 +31,16 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(120);
 /// Backoff schedule for unexpected exits. Running out means giving up.
 const RESTART_DELAYS_MS: [u64; 5] = [500, 1_000, 2_000, 5_000, 10_000];
 
+/// A profile import can briefly lose the shared fallback while a previously
+/// started runtime transaction is settling. Retry only that exact failure;
+/// configuration and plugin errors still fail on their first attempt.
+const INITIAL_MODULE_RETRY_DELAYS_MS: [u64; 2] = [250, 750];
+
+/// Enough startup stderr to identify a loader failure without retaining an
+/// unbounded process log in a detached pump task.
+const STARTUP_STDERR_LINES: usize = 160;
+const STARTUP_STDERR_DRAIN_TIMEOUT: Duration = Duration::from_secs(1);
+
 /// Gap between health probes once the harness is serving.
 const HEALTH_INTERVAL: Duration = Duration::from_secs(10);
 
@@ -250,7 +260,7 @@ impl Supervisor {
         self.stopping.store(false, Ordering::SeqCst);
         self.publish(Status::Starting);
 
-        let started = Arc::clone(&self).launch_once(&plan).await;
+        let started = Arc::clone(&self).launch_initial(&plan).await;
         match started {
             Ok((child, origin)) => {
                 let pid = child.id().unwrap_or_default();
@@ -279,6 +289,53 @@ impl Supervisor {
         self.publish(Status::Stopped);
     }
 
+    /// Wait until the supervision task has observed the terminated process.
+    /// Runtime promotion must not rename the directory while that task can
+    /// still restart a child against it.
+    pub(crate) async fn wait_until_inactive(&self) -> Result<()> {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while self.active.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .map_err(|_| {
+            Error::Install(
+                "the running Harness did not stop before its runtime was replaced".into(),
+            )
+        })
+    }
+
+    /// Retry only the transient profile-to-runtime module fallback failure.
+    async fn launch_initial(self: Arc<Self>, plan: &LaunchPlan) -> Result<(Child, String)> {
+        let attempts = INITIAL_MODULE_RETRY_DELAYS_MS
+            .iter()
+            .copied()
+            .map(Some)
+            .chain(std::iter::once(None));
+        for retry_delay_ms in attempts {
+            match Arc::clone(&self).launch_once(plan).await {
+                Ok(started) => return Ok(started),
+                Err(failure) => {
+                    let retry = transient_profile_module_resolution_failure(&failure.to_string())
+                        .then_some(retry_delay_ms)
+                        .flatten();
+                    let Some(delay_ms) = retry else {
+                        return Err(failure);
+                    };
+                    self.record(
+                        Stream::Stderr,
+                        format!(
+                            "the managed profile module fallback was temporarily unavailable; retrying startup in {delay_ms} ms"
+                        ),
+                    );
+                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                }
+            }
+        }
+        unreachable!("the bounded startup loop always returns")
+    }
+
     /// Run one launch attempt to readiness.
     async fn launch_once(self: Arc<Self>, plan: &LaunchPlan) -> Result<(Child, String)> {
         let mut command = plan.to_command();
@@ -288,8 +345,9 @@ impl Supervisor {
         let stderr = child.stderr.take().expect("stderr was piped");
         let (ready_tx, ready_rx) = oneshot::channel();
 
-        tokio::spawn(Arc::clone(&self).pump(stdout, Stream::Stdout, Some(ready_tx)));
-        tokio::spawn(Arc::clone(&self).pump(stderr, Stream::Stderr, None));
+        tokio::spawn(Arc::clone(&self).pump(stdout, Stream::Stdout, Some(ready_tx), false));
+        let mut stderr_task =
+            tokio::spawn(Arc::clone(&self).pump(stderr, Stream::Stderr, None, true));
 
         let outcome = tokio::select! {
             announced = ready_rx => match announced {
@@ -314,7 +372,20 @@ impl Supervisor {
             Ok(origin) => Ok((child, origin)),
             Err(failure) => {
                 let _ = child.kill().await;
-                Err(failure)
+                let _ = child.wait().await;
+                let stderr = match tokio::time::timeout(
+                    STARTUP_STDERR_DRAIN_TIMEOUT,
+                    &mut stderr_task,
+                )
+                .await
+                {
+                    Ok(Ok(stderr)) => stderr,
+                    _ => {
+                        stderr_task.abort();
+                        Vec::new()
+                    }
+                };
+                Err(with_startup_stderr(failure, &stderr))
             }
         }
     }
@@ -325,9 +396,12 @@ impl Supervisor {
         pipe: R,
         stream: Stream,
         mut ready: Option<oneshot::Sender<Ready>>,
-    ) where
+        capture_tail: bool,
+    ) -> Vec<String>
+    where
         R: tokio::io::AsyncRead + Unpin,
     {
+        let mut tail = VecDeque::with_capacity(STARTUP_STDERR_LINES);
         let mut lines = BufReader::new(pipe).lines();
         while let Ok(Some(line)) = lines.next_line().await {
             if ready.is_some() {
@@ -339,8 +413,15 @@ impl Supervisor {
                     }
                 }
             }
+            if capture_tail {
+                if tail.len() == STARTUP_STDERR_LINES {
+                    tail.pop_front();
+                }
+                tail.push_back(line.clone());
+            }
             self.record(stream, line);
         }
+        tail.into_iter().collect()
     }
 
     /// Watch a ready harness and bring it back if it dies — or goes quiet.
@@ -466,6 +547,23 @@ impl Supervisor {
     }
 }
 
+fn with_startup_stderr(failure: Error, stderr: &[String]) -> Error {
+    if stderr.is_empty() {
+        return failure;
+    }
+    Error::Readiness(format!("{failure}\n{}", stderr.join("\n")))
+}
+
+/// This is deliberately narrower than a general `ERR_MODULE_NOT_FOUND` retry.
+/// A missing user plugin or a broken package must remain actionable; only an
+/// installation-owned package imported through the profile parent fallback is
+/// known to recover once the stable managed-runtime target is visible again.
+fn transient_profile_module_resolution_failure(detail: &str) -> bool {
+    detail.contains("ERR_MODULE_NOT_FOUND")
+        && detail.contains("Cannot find package '@deepseek-ai/")
+        && (detail.contains("\\profiles\\") || detail.contains("/profiles/"))
+}
+
 impl Drop for Supervisor {
     /// Stop the supervision loop from reviving a harness the app no longer owns.
     ///
@@ -514,5 +612,21 @@ mod tests {
                 "0",
             ]
         );
+    }
+
+    #[test]
+    fn only_managed_packages_missing_from_a_profile_are_transient() {
+        let windows = r#"Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-client-ui-renderer' imported from C:\Users\person\.dsh\profiles\web\"#;
+        assert!(transient_profile_module_resolution_failure(windows));
+
+        let unix = "Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-file-reference-local' imported from /home/person/.dsh/profiles/web/";
+        assert!(transient_profile_module_resolution_failure(unix));
+
+        assert!(!transient_profile_module_resolution_failure(
+            "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'third-party-plugin' imported from C:\\Users\\person\\.dsh\\profiles\\web\\"
+        ));
+        assert!(!transient_profile_module_resolution_failure(
+            "Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-client-ui-renderer' imported from C:\\runtime\\node_modules\\"
+        ));
     }
 }

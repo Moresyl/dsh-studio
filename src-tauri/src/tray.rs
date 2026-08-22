@@ -19,7 +19,7 @@ use tauri::{AppHandle, Manager, Runtime, WindowEvent};
 
 use crate::desktop::badge;
 use crate::harness::commands::AppState;
-use crate::harness::supervisor::{Status, Stream, Supervisor};
+use crate::harness::supervisor::{Status, Stream};
 use crate::locale::pick;
 use crate::window;
 
@@ -249,34 +249,22 @@ fn toggle_harness<R: Runtime>(app: &AppHandle<R>) {
     let supervisor = Arc::clone(&state.supervisor);
 
     if running(&supervisor.status()) {
-        tauri::async_runtime::spawn(async move { supervisor.stop().await });
+        let handle = app.clone();
+        tauri::async_runtime::spawn(async move {
+            let state = handle.state::<AppState>();
+            let _ = crate::harness::commands::stop_managed(&state).await;
+        });
         return;
     }
 
-    // Whatever is missing needs a sentence to explain it, so the window comes
-    // back to say it rather than the click appearing to do nothing.
-    let plan = match crate::harness::launch_plan() {
-        Ok(plan) => plan,
-        Err(reason) => {
-            supervisor.note(Stream::Stderr, reason.to_string());
-            open_window(app);
-            return;
-        }
-    };
-
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        if start(supervisor, plan).await.is_err() {
+        let state = handle.state::<AppState>();
+        if let Err(failure) = crate::harness::commands::start_managed(&state).await {
+            state.supervisor.note(Stream::Stderr, failure.to_string());
             open_window(&handle);
         }
     });
-}
-
-async fn start(
-    supervisor: Arc<Supervisor>,
-    plan: crate::harness::supervisor::LaunchPlan,
-) -> Result<String, crate::error::Error> {
-    supervisor.start(plan).await
 }
 
 /// Starting and restarting both count: the harness is on its way up, and asking

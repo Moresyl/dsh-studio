@@ -8,6 +8,7 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 
 use proc_guard::ProcessGuard;
@@ -43,6 +44,49 @@ const PIPE_DRAIN_TIMEOUT: Duration = Duration::from_secs(3);
 const JOURNAL_VERSION: u8 = 1;
 const RUNTIME_PACKAGE: &[u8] = include_bytes!("../../runtime-contract/package.json");
 const RUNTIME_LOCK: &[u8] = include_bytes!("../../runtime-contract/package-lock.json");
+
+/// Environment probes are allowed to recover a transaction left by a crashed
+/// process, but must never mistake this process's live staging journal for a
+/// crash. The command-layer guard prevents duplicate clicks; this lower-level
+/// guard also covers Full/offline callers and every direct environment probe.
+const MANAGED_RUNTIME_IDLE: u8 = 0;
+const MANAGED_RUNTIME_INSTALLING: u8 = 1;
+const MANAGED_RUNTIME_RECOVERING: u8 = 2;
+static MANAGED_RUNTIME_ACTIVITY: AtomicU8 = AtomicU8::new(MANAGED_RUNTIME_IDLE);
+
+struct ManagedInstallActivity;
+
+impl ManagedInstallActivity {
+    fn begin_install() -> Result<Self> {
+        MANAGED_RUNTIME_ACTIVITY
+            .compare_exchange(
+                MANAGED_RUNTIME_IDLE,
+                MANAGED_RUNTIME_INSTALLING,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .map_err(|_| Error::AlreadyInstalling)?;
+        Ok(Self)
+    }
+
+    fn begin_recovery() -> Option<Self> {
+        MANAGED_RUNTIME_ACTIVITY
+            .compare_exchange(
+                MANAGED_RUNTIME_IDLE,
+                MANAGED_RUNTIME_RECOVERING,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .ok()
+            .map(|_| Self)
+    }
+}
+
+impl Drop for ManagedInstallActivity {
+    fn drop(&mut self) {
+        MANAGED_RUNTIME_ACTIVITY.store(MANAGED_RUNTIME_IDLE, Ordering::SeqCst);
+    }
+}
 const INTEGRATION_MANIFEST: &[u8] =
     include_bytes!("../../runtime-contract/dsh-studio-integration/package.json");
 const INTEGRATION_PATCH: &[u8] =
@@ -191,7 +235,8 @@ where
             "managed runtime install did not use the qualified Harness contract".into(),
         ));
     }
-    recover_managed_install()?;
+    let _activity = ManagedInstallActivity::begin_install()?;
+    recover_managed_install_inner()?;
 
     let live = &plan.target;
     let staging = crate::paths::harness_staging_dir();
@@ -448,7 +493,8 @@ fn replace_once(body: String, from: &str, to: &str, label: &str) -> Result<Strin
 
 /// Restore a Full package's pre-resolved dependency closure without npm.
 pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
-    recover_managed_install()?;
+    let _activity = ManagedInstallActivity::begin_install()?;
+    recover_managed_install_inner()?;
 
     let live = crate::paths::harness_dir();
     let staging = crate::paths::harness_staging_dir();
@@ -529,6 +575,13 @@ fn promote(live: &Path, staging: &Path, backup: &Path, journal: &Path) -> Result
 /// Returns `true` when a journal was present. It is safe to call on every
 /// environment probe; without the marker it performs no filesystem writes.
 pub fn recover_managed_install() -> Result<bool> {
+    let Some(_activity) = ManagedInstallActivity::begin_recovery() else {
+        return Ok(false);
+    };
+    recover_managed_install_inner()
+}
+
+fn recover_managed_install_inner() -> Result<bool> {
     let journal = crate::paths::harness_install_journal();
     if !journal.exists() {
         return Ok(false);

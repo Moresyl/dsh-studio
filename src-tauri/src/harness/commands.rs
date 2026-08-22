@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{AppHandle, State};
+use tokio::sync::Mutex;
 
 use super::install;
 use super::supervisor::{Status, Stream, Supervisor};
@@ -17,6 +18,11 @@ pub struct AppState {
     /// Set while an install is running, so a second click cannot start another
     /// npm against the same directory.
     installing: AtomicBool,
+    /// Serializes every operation that can observe or replace the managed
+    /// runtime. In particular, composition preflight belongs to startup: two
+    /// callers must not both heal the profile module fallback before the
+    /// supervisor's later `active` guard is reached.
+    lifecycle: Mutex<()>,
 }
 
 impl AppState {
@@ -24,6 +30,7 @@ impl AppState {
         Self {
             supervisor,
             installing: AtomicBool::new(false),
+            lifecycle: Mutex::new(()),
         }
     }
 }
@@ -37,8 +44,9 @@ pub struct LogLine {
 
 /// What this machine can run, and what it is missing.
 #[tauri::command]
-pub fn harness_environment() -> Environment {
-    super::environment()
+pub async fn harness_environment(state: State<'_, AppState>) -> Result<Environment> {
+    let _lifecycle = state.lifecycle.lock().await;
+    Ok(super::environment())
 }
 
 #[tauri::command]
@@ -49,6 +57,15 @@ pub fn harness_status(state: State<'_, AppState>) -> Status {
 /// Start the harness and return the origin it is serving on.
 #[tauri::command]
 pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
+    start_managed(&state).await
+}
+
+/// Start through the one managed-runtime lifecycle gate.
+///
+/// Kept separate from the Tauri wrapper because the tray owns the same action
+/// and must not bypass preflight or race an install.
+pub(crate) async fn start_managed(state: &AppState) -> Result<String> {
+    let _lifecycle = state.lifecycle.lock().await;
     let shell = super::shell_environment::resolve().await;
     state.supervisor.note(
         Stream::Stdout,
@@ -101,6 +118,11 @@ pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
 
 #[tauri::command]
 pub async fn harness_stop(state: State<'_, AppState>) -> Result<()> {
+    stop_managed(&state).await
+}
+
+pub(crate) async fn stop_managed(state: &AppState) -> Result<()> {
+    let _lifecycle = state.lifecycle.lock().await;
     state.supervisor.stop().await;
     Ok(())
 }
@@ -115,6 +137,7 @@ pub async fn harness_install(app: AppHandle, state: State<'_, AppState>) -> Resu
     if state.installing.swap(true, Ordering::SeqCst) {
         return Err(Error::AlreadyInstalling);
     }
+    let _lifecycle = state.lifecycle.lock().await;
     let outcome = perform_install(&app, &state).await;
     state.installing.store(false, Ordering::SeqCst);
 
@@ -128,6 +151,12 @@ pub async fn harness_install(app: AppHandle, state: State<'_, AppState>) -> Resu
 }
 
 async fn perform_install(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
+    // Every shared fallback junction points into the live runtime. Leave no
+    // supervised process resolving through those junctions while the verified
+    // staging directory is promoted over the live directory.
+    state.supervisor.stop().await;
+    state.supervisor.wait_until_inactive().await?;
+
     if let Some(payload) = crate::offline::payload(app)? {
         state.supervisor.note(
             Stream::Stdout,
