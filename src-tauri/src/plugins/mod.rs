@@ -453,7 +453,7 @@ where
             crate::harness::install::VERSION
         )));
     }
-    let manager = ensure_package_manager(&node.path, guard, report.clone()).await?;
+    let manager = ensure_package_manager(&node.path, report.clone()).await?;
 
     let mut command = Command::new(&node.path);
     command
@@ -590,11 +590,7 @@ pub fn package_manager_available() -> bool {
 ///
 /// Returns the directory to prepend to the child's PATH, or `None` when the
 /// machine already had pnpm and nothing needs prepending.
-async fn ensure_package_manager<R>(
-    node: &Path,
-    guard: &ProcessGuard,
-    report: R,
-) -> Result<Option<PathBuf>>
+async fn ensure_package_manager<R>(node: &Path, report: R) -> Result<Option<PathBuf>>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
@@ -609,7 +605,7 @@ where
         ),
     );
     let plan = install::plan(node, paths::tools_dir(), install::PNPM_SPEC.to_string())?;
-    install::run(&plan, guard, report).await?;
+    install::run(&plan, report).await?;
 
     managed_manager().map(Some).ok_or_else(|| {
         Error::Plugin("the package manager installed but left no executable behind".into())

@@ -148,10 +148,7 @@ async fn perform_install(app: &AppHandle, state: &State<'_, AppState>) -> Result
     );
 
     let reporter = Arc::clone(&supervisor);
-    install::run_transactional(&plan, supervisor.guard(), move |stream, line| {
-        reporter.note(stream, line)
-    })
-    .await?;
+    install::run_transactional(&plan, move |stream, line| reporter.note(stream, line)).await?;
 
     // npm can exit successfully having installed something other than what we
     // need — a scope typo, a package that moved. Believe the file, not the

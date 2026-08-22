@@ -8,11 +8,14 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use proc_guard::ProcessGuard;
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::mpsc;
+use tokio::time::Instant;
 
 use super::supervisor::Stream;
 use crate::error::{Error, Result};
@@ -32,6 +35,10 @@ pub const PNPM_VERSION: &str = "11.7.0";
 pub const PNPM_SPEC: &str = "pnpm@11.7.0";
 const RUNTIME_SCHEMA: u8 = 2;
 const INTEGRATION_PACKAGE: &str = "@moresyl/dsh-studio-integration";
+const OFFICIAL_REGISTRY: &str = "https://registry.npmjs.org/";
+const INSTALL_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+const INSTALL_TOTAL_TIMEOUT: Duration = Duration::from_secs(20 * 60);
+const PIPE_DRAIN_TIMEOUT: Duration = Duration::from_secs(3);
 
 const JOURNAL_VERSION: u8 = 1;
 const RUNTIME_PACKAGE: &[u8] = include_bytes!("../../runtime-contract/package.json");
@@ -78,6 +85,9 @@ impl InstallPlan {
             // about vulnerabilities and funding is noise in our log.
             .arg("--no-audit")
             .arg("--no-fund")
+            // Lifecycle scripts include the native terminal dependencies. Keep
+            // their stage and failure visible instead of leaving the UI silent.
+            .arg("--foreground-scripts")
             // Without a TTY npm draws no progress bar; this is what keeps the
             // console moving during a download measured in hundreds of MB.
             .arg("--loglevel=http")
@@ -104,7 +114,14 @@ impl InstallPlan {
             .arg("--legacy-peer-deps")
             .arg("--no-audit")
             .arg("--no-fund")
+            .arg("--foreground-scripts")
             .arg("--loglevel=http")
+            // The lock was qualified against the public registry. npm otherwise
+            // rewrites even locked tarball hosts to a user-configured mirror,
+            // which can be incomplete or indefinitely stale.
+            .arg(format!("--registry={OFFICIAL_REGISTRY}"))
+            .arg("--fetch-retries=2")
+            .arg("--fetch-timeout=60000")
             .current_dir(&self.target)
             .env("PATH", path_with_node(&self.node))
             .env("npm_config_update_notifier", "false")
@@ -127,7 +144,7 @@ pub fn plan(node: &Path, target: PathBuf, spec: String) -> Result<InstallPlan> {
 }
 
 /// Run the install, reporting every line npm produces.
-pub async fn run<R>(plan: &InstallPlan, guard: &ProcessGuard, report: R) -> Result<()>
+pub async fn run<R>(plan: &InstallPlan, report: R) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
@@ -138,26 +155,7 @@ where
         ))
     })?;
 
-    let mut command = plan.to_command();
-    // Guarded, so quitting mid-install does not leave npm and its download
-    // workers running against a directory nobody owns any more.
-    let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
-
-    let stdout = child.stdout.take().expect("stdout was piped");
-    let stderr = child.stderr.take().expect("stderr was piped");
-    let out = tokio::spawn(forward(stdout, Stream::Stdout, report.clone()));
-    let err = tokio::spawn(forward(stderr, Stream::Stderr, report));
-
-    let status = child
-        .wait()
-        .await
-        .map_err(|cause| Error::Install(format!("npm could not be waited on: {cause}")))?;
-    let _ = tokio::join!(out, err);
-
-    if !status.success() {
-        return Err(Error::Install(format!("npm exited with {status}")));
-    }
-    Ok(())
+    run_command(plan.to_command(), report, "npm install").await
 }
 
 /// Install into an isolated sibling, verify it, then promote it in one rename.
@@ -165,7 +163,7 @@ where
 /// The journal deliberately has no changing phase field. Recovery derives the
 /// truth from the three directories, so a crash can never leave a phase that
 /// claims a rename happened when the filesystem says otherwise.
-pub async fn run_transactional<R>(plan: &InstallPlan, guard: &ProcessGuard, report: R) -> Result<()>
+pub async fn run_transactional<R>(plan: &InstallPlan, report: R) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
@@ -189,7 +187,7 @@ where
         target: staging.clone(),
         ..plan.clone()
     };
-    if let Err(failure) = run_locked(&staged_plan, guard, report).await {
+    if let Err(failure) = run_locked(&staged_plan, report).await {
         let _ = remove_dir_if_exists(&staging);
         let _ = std::fs::remove_file(&journal);
         return Err(failure);
@@ -200,7 +198,7 @@ where
     promote(live, &staging, &backup, &journal)
 }
 
-async fn run_locked<R>(plan: &InstallPlan, guard: &ProcessGuard, report: R) -> Result<()>
+async fn run_locked<R>(plan: &InstallPlan, report: R) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
@@ -215,21 +213,109 @@ where
         .map_err(|cause| Error::Install(format!("could not stage the runtime lock: {cause}")))?;
     stage_integration(&plan.target)?;
 
-    let mut command = plan.to_locked_command();
+    run_command(plan.to_locked_command(), report, "npm ci").await?;
+    qualify_runtime(&plan.target)?;
+    Ok(())
+}
+
+async fn run_command<R>(command: Command, report: R, label: &'static str) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    run_command_with_limits(
+        command,
+        report,
+        label,
+        INSTALL_IDLE_TIMEOUT,
+        INSTALL_TOTAL_TIMEOUT,
+        PIPE_DRAIN_TIMEOUT,
+    )
+    .await
+}
+
+async fn run_command_with_limits<R>(
+    mut command: Command,
+    report: R,
+    label: &'static str,
+    idle_timeout: Duration,
+    total_timeout: Duration,
+    pipe_drain_timeout: Duration,
+) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    // Installation gets its own job/process group. A timeout can therefore
+    // reclaim npm's whole lifecycle tree without terminating a running Harness
+    // owned by the supervisor's independent guard.
+    let guard = ProcessGuard::new().map_err(Error::Spawn)?;
     let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
     let stdout = child.stdout.take().expect("stdout was piped");
     let stderr = child.stderr.take().expect("stderr was piped");
-    let out = tokio::spawn(forward(stdout, Stream::Stdout, report.clone()));
-    let err = tokio::spawn(forward(stderr, Stream::Stderr, report));
-    let status = child
-        .wait()
-        .await
-        .map_err(|cause| Error::Install(format!("npm ci could not be waited on: {cause}")))?;
-    let _ = tokio::join!(out, err);
-    if !status.success() {
-        return Err(Error::Install(format!("npm ci exited with {status}")));
+    let (activity, mut observed) = mpsc::unbounded_channel();
+    let mut out = tokio::spawn(forward(
+        stdout,
+        Stream::Stdout,
+        report.clone(),
+        activity.clone(),
+    ));
+    let mut err = tokio::spawn(forward(stderr, Stream::Stderr, report, activity.clone()));
+    drop(activity);
+
+    let idle = tokio::time::sleep(idle_timeout);
+    let total = tokio::time::sleep(total_timeout);
+    tokio::pin!(idle, total);
+    let mut observing = true;
+    let status = loop {
+        tokio::select! {
+            biased;
+            result = child.wait() => {
+                break result.map_err(|cause| {
+                    Error::Install(format!("{label} could not be waited on: {cause}"))
+                })?;
+            }
+            activity = observed.recv(), if observing => {
+                match activity {
+                    Some(()) => idle.as_mut().reset(Instant::now() + idle_timeout),
+                    None => observing = false,
+                }
+            }
+            _ = &mut idle => {
+                let _ = guard.terminate_all();
+                let _ = child.wait().await;
+                out.abort();
+                err.abort();
+                return Err(Error::Install(format!(
+                    "{label} produced no output for 120 seconds and was stopped; retry on a working connection or use Full / Offline"
+                )));
+            }
+            _ = &mut total => {
+                let _ = guard.terminate_all();
+                let _ = child.wait().await;
+                out.abort();
+                err.abort();
+                return Err(Error::Install(format!(
+                    "{label} exceeded the 20 minute safety limit and was stopped; retry on a working connection or use Full / Offline"
+                )));
+            }
+        }
+    };
+
+    // A lifecycle-script descendant can inherit the output handles after npm
+    // itself exits on Windows. Drain normal output briefly, but never turn a
+    // successful or failed npm exit into a permanently spinning UI.
+    if tokio::time::timeout(pipe_drain_timeout, async {
+        let _ = tokio::join!(&mut out, &mut err);
+    })
+    .await
+    .is_err()
+    {
+        out.abort();
+        err.abort();
     }
-    qualify_runtime(&plan.target)?;
+
+    if !status.success() {
+        return Err(Error::Install(format!("{label} exited with {status}")));
+    }
     Ok(())
 }
 
@@ -605,13 +691,14 @@ fn remove_dir_if_exists(path: &Path) -> Result<()> {
         .map_err(|cause| Error::Install(format!("could not remove {}: {cause}", path.display())))
 }
 
-async fn forward<P, R>(pipe: P, stream: Stream, report: R)
+async fn forward<P, R>(pipe: P, stream: Stream, report: R, activity: mpsc::UnboundedSender<()>)
 where
     P: tokio::io::AsyncRead + Unpin,
     R: Fn(Stream, String),
 {
     let mut lines = BufReader::new(pipe).lines();
     while let Ok(Some(line)) = lines.next_line().await {
+        let _ = activity.send(());
         report(stream, line);
     }
 }
@@ -649,11 +736,14 @@ fn path_with_node(node: &Path) -> OsString {
 mod tests {
     use std::fs;
     use std::path::Path;
+    use std::time::Duration;
+
+    use tokio::process::Command;
 
     use super::{
-        qualify_runtime, remove_dir_if_exists, runtime_compatible, runtime_version,
-        INTEGRATION_PACKAGE, PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE,
-        RUNTIME_SCHEMA, SPEC, VERSION,
+        qualify_runtime, remove_dir_if_exists, run_command_with_limits, runtime_compatible,
+        runtime_version, InstallPlan, INTEGRATION_PACKAGE, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC,
+        PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -699,6 +789,68 @@ mod tests {
         assert!(!SPEC.ends_with("@latest"));
         assert!(!VERSION.starts_with(['^', '~']));
         assert_eq!(PNPM_SPEC, format!("pnpm@{PNPM_VERSION}"));
+    }
+
+    #[test]
+    fn managed_install_uses_the_official_registry_and_exposes_lifecycle_progress() {
+        let plan = InstallPlan {
+            node: Path::new("node").to_path_buf(),
+            npm_cli: Path::new("npm-cli.js").to_path_buf(),
+            target: Path::new("runtime").to_path_buf(),
+            spec: SPEC.to_string(),
+        };
+        let locked = plan.to_locked_command();
+        let arguments = locked
+            .as_std()
+            .get_args()
+            .map(|value| value.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(arguments.contains(&"--foreground-scripts".to_string()));
+        assert!(arguments.contains(&format!("--registry={OFFICIAL_REGISTRY}")));
+        assert!(arguments.contains(&"--fetch-timeout=60000".to_string()));
+
+        let plugin = plan.to_command();
+        let plugin_arguments = plugin
+            .as_std()
+            .get_args()
+            .map(|value| value.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        assert!(plugin_arguments.contains(&"--foreground-scripts".to_string()));
+        assert!(!plugin_arguments
+            .iter()
+            .any(|value| value.starts_with("--registry=")));
+    }
+
+    #[test]
+    fn silent_install_fixture() {
+        if std::env::var_os("DSH_STUDIO_SILENT_INSTALL_FIXTURE").is_some() {
+            std::thread::sleep(Duration::from_secs(10));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_silent_install_is_stopped_instead_of_waiting_forever() {
+        let mut command = Command::new(std::env::current_exe().expect("test executable"));
+        command
+            .arg("--exact")
+            .arg("harness::install::tests::silent_install_fixture")
+            .arg("--nocapture")
+            .env("DSH_STUDIO_SILENT_INSTALL_FIXTURE", "1")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+
+        let failure = run_command_with_limits(
+            command,
+            |_, _| {},
+            "npm ci",
+            Duration::from_millis(500),
+            Duration::from_secs(5),
+            Duration::from_millis(100),
+        )
+        .await
+        .expect_err("silent fixture should time out");
+        assert!(failure.to_string().contains("produced no output"));
     }
 
     #[test]
