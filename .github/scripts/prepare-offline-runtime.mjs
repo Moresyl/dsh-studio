@@ -87,18 +87,7 @@ export async function prepare(target, output) {
     const harnessRoot = join(scratch, 'harness')
     await mkdir(harnessRoot)
     await copyRuntimeContract(harnessRoot)
-    await run(npm.node, [
-      npm.cli,
-      'ci',
-      '--prefix',
-      harnessRoot,
-      '--no-audit',
-      '--no-fund',
-      '--ignore-scripts=false',
-      // The committed lock records the qualified peer graph. npm must use the
-      // same peer mode that produced it instead of trying to solve it again.
-      '--legacy-peer-deps',
-    ])
+    await run(npm.node, [npm.cli, ...offlineNpmCiArgs(harnessRoot)])
     const packageRoot = join(harnessRoot, 'node_modules', '@deepseek-ai', 'dsh')
     const installed = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
     if (installed.name !== HARNESS_PACKAGE || installed.version !== HARNESS_VERSION) {
@@ -240,6 +229,24 @@ export async function copyRuntimeContract(destination) {
       recursive: true,
     }),
   ])
+}
+
+export function offlineNpmCiArgs(prefix) {
+  return [
+    'ci',
+    '--prefix',
+    prefix,
+    '--no-audit',
+    '--no-fund',
+    '--ignore-scripts=false',
+    // The committed lock records the qualified peer graph. npm must use the
+    // same peer mode that produced it instead of trying to solve it again.
+    '--legacy-peer-deps',
+    // The contract's bundled Studio integration is a local file dependency.
+    // Materialize it exactly as online install and cold verification do; npm's
+    // default link representation is not compatible with this qualified lock.
+    '--install-links',
+  ]
 }
 
 function run(command, args, cwd) {

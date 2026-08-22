@@ -10,6 +10,7 @@ import {
   NODE_VERSION,
   PNPM_VERSION,
   copyRuntimeContract,
+  offlineNpmCiArgs,
   requireExactVersion,
   tarCreatePlan,
   tarCommand,
@@ -43,6 +44,20 @@ test('the offline package manager must execute as the pinned version', () => {
     () => requireExactVersion('10.30.2', PNPM_VERSION, 'offline pnpm'),
     /resolved 10\.30\.2, expected 11\.7\.0/,
   )
+})
+
+test('offline install materializes the bundled Studio integration', () => {
+  const prefix = resolve('scratch', 'harness')
+  assert.deepEqual(offlineNpmCiArgs(prefix), [
+    'ci',
+    '--prefix',
+    prefix,
+    '--no-audit',
+    '--no-fund',
+    '--ignore-scripts=false',
+    '--legacy-peer-deps',
+    '--install-links',
+  ])
 })
 
 test('tar archive creation never passes an absolute output path', () => {
