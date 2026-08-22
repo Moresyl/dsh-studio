@@ -116,6 +116,11 @@ impl InstallPlan {
             .arg("--no-fund")
             .arg("--foreground-scripts")
             .arg("--loglevel=http")
+            // npm otherwise represents the bundled Studio integration as a
+            // junction on Windows. The link can be observed as incomplete by
+            // the verifier (and later breaks if its source is cleaned up), so
+            // install the local file dependency as an ordinary directory.
+            .arg("--install-links")
             // The lock was qualified against the public registry. npm otherwise
             // rewrites even locked tarball hosts to a user-configured mirror,
             // which can be incomplete or indefinitely stale.
@@ -563,13 +568,7 @@ pub fn runtime_version(target: &Path) -> Option<String> {
 
 /// Whether the installed runtime is exactly the family this application tested.
 pub fn runtime_compatible(target: &Path) -> bool {
-    runtime_version(target).as_deref() == Some(VERSION)
-        && entry(target).is_file()
-        && pnpm_version(target).as_deref() == Some(PNPM_VERSION)
-        && pnpm_entry(target).is_file()
-        && runtime_schema(target) == Some(RUNTIME_SCHEMA)
-        && integration_entry(target).is_file()
-        && qualified_picker(target)
+    runtime_contract_failures(target).is_empty()
 }
 
 fn runtime_complete(target: &Path) -> bool {
@@ -620,19 +619,40 @@ fn qualified_picker(target: &Path) -> bool {
 fn require_expected_runtime(target: &Path) -> Result<()> {
     let actual = runtime_version(target).unwrap_or_else(|| "missing".to_string());
     let actual_pnpm = pnpm_version(target).unwrap_or_else(|| "missing".to_string());
-    if actual != VERSION
-        || !entry(target).is_file()
-        || actual_pnpm != PNPM_VERSION
-        || !pnpm_entry(target).is_file()
-        || runtime_schema(target) != Some(RUNTIME_SCHEMA)
-        || !integration_entry(target).is_file()
-        || !qualified_picker(target)
-    {
+    let failures = runtime_contract_failures(target);
+    if !failures.is_empty() {
         return Err(Error::Install(format!(
-            "npm finished but the verified runtime is not Studio contract {RUNTIME_SCHEMA} with {PACKAGE}@{VERSION}, {INTEGRATION_PACKAGE}, and pnpm {PNPM_VERSION} (found {actual} with pnpm {actual_pnpm})"
+            "npm finished but the verified runtime is not Studio contract {RUNTIME_SCHEMA} with {PACKAGE}@{VERSION}, {INTEGRATION_PACKAGE}, and pnpm {PNPM_VERSION} (found {actual} with pnpm {actual_pnpm}; failed: {})",
+            failures.join(", ")
         )));
     }
     Ok(())
+}
+
+fn runtime_contract_failures(target: &Path) -> Vec<&'static str> {
+    let mut failures = Vec::new();
+    if runtime_version(target).as_deref() != Some(VERSION) {
+        failures.push("Harness version");
+    }
+    if !entry(target).is_file() {
+        failures.push("Harness entry point");
+    }
+    if pnpm_version(target).as_deref() != Some(PNPM_VERSION) {
+        failures.push("pnpm version");
+    }
+    if !pnpm_entry(target).is_file() {
+        failures.push("pnpm entry point");
+    }
+    if runtime_schema(target) != Some(RUNTIME_SCHEMA) {
+        failures.push("runtime marker");
+    }
+    if !integration_entry(target).is_file() {
+        failures.push("Studio integration");
+    }
+    if !qualified_picker(target) {
+        failures.push("qualified directory picker");
+    }
+    failures
 }
 
 fn write_journal(path: &Path) -> Result<()> {
@@ -741,9 +761,10 @@ mod tests {
     use tokio::process::Command;
 
     use super::{
-        qualify_runtime, remove_dir_if_exists, run_command_with_limits, runtime_compatible,
-        runtime_version, InstallPlan, INTEGRATION_PACKAGE, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC,
-        PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
+        qualify_runtime, remove_dir_if_exists, require_expected_runtime, run_command_with_limits,
+        runtime_compatible, runtime_version, InstallPlan, INTEGRATION_PACKAGE, OFFICIAL_REGISTRY,
+        PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC,
+        VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -806,6 +827,7 @@ mod tests {
             .map(|value| value.to_string_lossy().into_owned())
             .collect::<Vec<_>>();
         assert!(arguments.contains(&"--foreground-scripts".to_string()));
+        assert!(arguments.contains(&"--install-links".to_string()));
         assert!(arguments.contains(&format!("--registry={OFFICIAL_REGISTRY}")));
         assert!(arguments.contains(&"--fetch-timeout=60000".to_string()));
 
@@ -908,6 +930,23 @@ mod tests {
         write_runtime(&root, VERSION, false);
         let _ = fs::remove_file(root.join("node_modules/@deepseek-ai/dsh/lib/bin.js"));
         assert!(!runtime_compatible(&root));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn contract_failure_names_the_missing_studio_integration() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-runtime-contract-failure-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        write_runtime(&root, VERSION, true);
+        fs::remove_file(root.join("node_modules/@moresyl/dsh-studio-integration/lib/client.js"))
+            .expect("remove integration entry");
+
+        let failure = require_expected_runtime(&root).expect_err("contract should fail");
+        assert!(failure.to_string().contains("failed: Studio integration"));
+
         fs::remove_dir_all(root).expect("cleanup");
     }
 

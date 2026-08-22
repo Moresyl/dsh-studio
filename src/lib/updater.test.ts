@@ -46,6 +46,12 @@ describe('checkForUpdate', () => {
     await expect(checkForUpdate()).rejects.toThrow()
     expect(close).toHaveBeenCalledOnce()
   })
+
+  it('turns a feed outage into an actionable bilingual error', async () => {
+    check.mockRejectedValue(new Error('error sending request for url'))
+
+    await expect(checkForUpdate()).rejects.toThrow(/HTTPS_PROXY.*无法连接/s)
+  })
 })
 
 describe('installUpdate', () => {
@@ -77,7 +83,7 @@ describe('installUpdate', () => {
     downloadAndInstall.mockRejectedValue(new Error('network lost'))
     check.mockResolvedValue({ downloadAndInstall, close })
 
-    await expect(installUpdate(vi.fn())).rejects.toThrow('network lost')
+    await expect(installUpdate(vi.fn())).rejects.toThrow(/Full \/ Offline.*network lost/s)
     expect(relaunch).not.toHaveBeenCalled()
     expect(close).toHaveBeenCalledOnce()
   })

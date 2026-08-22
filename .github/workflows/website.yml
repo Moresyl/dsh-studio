@@ -42,6 +42,7 @@ jobs:
         run: |
           mkdir -p site
           cp website/*.html website/*.css website/*.js site/
+          cp website/latest.json site/
 
           # The brand mark has one source of truth at the repository root, and
           # the page references it as assets/brand/icon.svg. Copied at publish

@@ -23,6 +23,8 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { normalizeUpdaterManifest } from './updater-manifest.mjs'
+
 const OWNER = 'Moresyl'
 const REPO = 'dsh-studio'
 const IDENTIFIER = 'io.github.moresyl.dshstudio'
@@ -44,18 +46,35 @@ const WANTED = {
 /* ---------- release ---------- */
 
 async function github(path) {
-  const response = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/${path}`, {
-    headers: {
-      Accept: 'application/vnd.github+json',
-      // Raises the rate limit from 60 an hour to 5000 when a token happens to be
-      // in the environment, which it is on a runner. Not required locally.
-      ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}),
+  const url = `https://api.github.com/repos/${OWNER}/${REPO}/${path}`
+  const response = await fetchWithRetry(
+    url,
+    {
+      headers: {
+        Accept: 'application/vnd.github+json',
+        // Raises the rate limit from 60 an hour to 5000 when a token happens to be
+        // in the environment, which it is on a runner. Not required locally.
+        ...(process.env.GITHUB_TOKEN
+          ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` }
+          : {}),
+      },
     },
-  })
-  if (!response.ok) {
-    throw new Error(`GitHub API ${response.status} for ${path}: ${await response.text()}`)
-  }
+    `GitHub API ${path}`,
+  )
   return response.json()
+}
+
+async function fetchWithRetry(url, options = {}, label = url, attempt = 1) {
+  try {
+    const response = await fetch(url, { redirect: 'follow', ...options })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return response
+  } catch (cause) {
+    if (attempt >= 4) throw new Error(`${label} could not be read: ${cause.message}`, { cause })
+    console.log(`  retrying ${label} (${attempt}/3): ${cause.message}`)
+    await new Promise((resume) => setTimeout(resume, attempt * 1500))
+    return fetchWithRetry(url, options, label, attempt + 1)
+  }
 }
 
 /*
@@ -84,12 +103,19 @@ async function resolve(tag) {
   const release = await github(tag ? `releases/tags/${tag}` : 'releases/latest')
   const version = release.tag_name.replace(/^v/, '')
 
+  const updaterAsset = release.assets.find((asset) => asset.name === 'latest.json')
+  if (!updaterAsset) throw new Error(`Release ${release.tag_name} has no latest.json`)
+  const updaterResponse = await fetchWithRetry(updaterAsset.browser_download_url, {}, 'latest.json')
+  const updaterManifest = normalizeUpdaterManifest(await updaterResponse.text(), version)
+
   /* SHA256SUMS.txt, when present, is one small download instead of four large
      ones — and it is the digest the build itself recorded. */
   const sums = new Map()
   const sumsAsset = release.assets.find((a) => a.name === 'SHA256SUMS.txt')
   if (sumsAsset) {
-    const text = await (await fetch(sumsAsset.browser_download_url)).text()
+    const text = await (
+      await fetchWithRetry(sumsAsset.browser_download_url, {}, 'SHA256SUMS.txt')
+    ).text()
     for (const line of text.split('\n')) {
       const match = line.match(/^([0-9a-f]{64})\s+\*?(.+?)\s*$/)
       if (match) sums.set(match[2], match[1])
@@ -125,6 +151,7 @@ async function resolve(tag) {
     // The date only, in the form winget and AppStream both want.
     date: release.published_at.slice(0, 10),
     files,
+    updaterManifest,
   }
 }
 
@@ -564,6 +591,7 @@ await emit('packaging/aur/PKGBUILD', pkgbuild(release))
 await emit('packaging/aur/.SRCINFO', srcinfo(release))
 await emit(`packaging/flathub/${IDENTIFIER}.yml`, flatpak(release))
 await emit(`packaging/flathub/${IDENTIFIER}.metainfo.xml`, metainfo(release))
+await emit('website/latest.json', release.updaterManifest)
 
 for (const path of written) console.log(`  ${path}`)
 console.log(`\n${written.length} files written for ${release.tag}.`)

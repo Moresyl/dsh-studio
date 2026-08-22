@@ -2,6 +2,8 @@ import type { DownloadEvent } from '@tauri-apps/plugin-updater'
 
 const RELEASES = 'https://github.com/Moresyl/dsh-studio/releases'
 const CHECK_TIMEOUT_MS = 15_000
+const UPDATE_NETWORK_HELP =
+  'Could not reach the signed update feed. Check GitHub access or HTTPS_PROXY, then retry; Full / Offline installers are available from the Releases page. / 无法连接已签名更新源，请检查 GitHub 网络或 HTTPS_PROXY 后重试；也可从 Releases 页面下载 Full / Offline 安装包。'
 
 export interface Release {
   /** The published version, without a leading `v`. */
@@ -20,7 +22,7 @@ export interface DownloadProgress {
 /** Ask the signed manifest whether this build has a successor. */
 export async function checkForUpdate(): Promise<Release | null> {
   const { check } = await import('@tauri-apps/plugin-updater')
-  const update = await check({ timeout: CHECK_TIMEOUT_MS })
+  const update = await checkSignedUpdate(check)
   if (!update) return null
 
   try {
@@ -44,7 +46,7 @@ export async function installUpdate(
     import('@tauri-apps/plugin-updater'),
     import('@tauri-apps/plugin-process'),
   ])
-  const update = await check({ timeout: CHECK_TIMEOUT_MS })
+  const update = await checkSignedUpdate(check)
   if (!update) return false
 
   let downloaded = 0
@@ -62,12 +64,31 @@ export async function installUpdate(
   }
 
   try {
-    await update.downloadAndInstall(report)
+    try {
+      await update.downloadAndInstall(report)
+    } catch (cause) {
+      throw updaterNetworkError(cause)
+    }
     await relaunch()
     return true
   } finally {
     await update.close()
   }
+}
+
+async function checkSignedUpdate<T>(
+  check: (options: { timeout: number }) => Promise<T>,
+): Promise<T> {
+  try {
+    return await check({ timeout: CHECK_TIMEOUT_MS })
+  } catch (cause) {
+    throw updaterNetworkError(cause)
+  }
+}
+
+function updaterNetworkError(cause: unknown): Error {
+  const detail = cause instanceof Error ? cause.message.trim() : String(cause).trim()
+  return new Error(detail ? `${UPDATE_NETWORK_HELP}\n${detail}` : UPDATE_NETWORK_HELP, { cause })
 }
 
 /** Pick the locale-specific block and turn its small Markdown subset into UI text. */
