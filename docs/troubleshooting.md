@@ -12,6 +12,10 @@ If it continues, check whether npm is configured to use an incomplete mirror. Pu
 
 Harness is installed into staging and promoted only after validation. Plugin mutations also preserve a before-image. Restart Studio to run recovery. If Environment reports that recovery failed, use Repair and attach the exported diagnostic report to an issue.
 
+## Harness remains on “Installing”
+
+Studio installs its qualified runtime from the official npm registry and shows native lifecycle stages in the console. A request that produces no output for 120 seconds, or an install that exceeds 20 minutes, is stopped instead of spinning forever. Check the displayed failure, retry on a working connection, or use Full / Offline. If the window cannot start, run the executable with `--export-diagnostics` and attach the resulting ZIP.
+
 ## Workspace was refused
 
 On Windows, move the project to a fixed local NTFS/ReFS volume. Mapped network drives, removable media, FAT32 and exFAT cannot reliably preserve the links, locks and atomic replacements package tools require.

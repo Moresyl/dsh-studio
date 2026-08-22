@@ -9,6 +9,29 @@
 
 ## [未发布]
 
+## [0.7.1] —— 2026-08-22
+
+### 新增
+
+- 新增无界面的 `--export-diagnostics` 命令：它会在 Tauri、窗口和 Harness 启动前，
+  从已有日志与崩溃证据生成限额诊断 ZIP，并输出压缩包的绝对路径。
+
+### 变更
+
+- 无界面导出复用现有脱敏、证据数量和 50 MiB 归档限制；默认在下载目录写入带唯一
+  时间戳的文件，下载目录不可用时安全回退到应用数据目录。
+- 托管 Harness 安装固定使用合格锁文件记录的官方 registry，不再允许 npm 把已锁定的
+  包地址改写到不完整的用户镜像；日志会显示原生生命周期脚本阶段，并为下载重试、
+  静默时间和总时长设置明确上限。
+
+### 修复
+
+- 启动故障不再阻止用户收集排障所需证据；无界面参数后误带其他参数时会立即以非零
+  状态退出，不会意外启动桌面应用。
+- 修复 [#2](https://github.com/Moresyl/dsh-studio/issues/2)：包解析完成后，Harness 安装
+  不会再永久卡在「安装中」。长时间无输出的 npm 会被终止并显示可操作错误；Windows
+  子进程继承输出句柄时，也不会在 npm 已退出后继续让界面无限等待。
+
 ## [0.7.0] —— 2026-08-22
 
 ### 新增
@@ -383,7 +406,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...v0.5.0

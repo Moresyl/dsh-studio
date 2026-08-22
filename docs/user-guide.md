@@ -27,6 +27,8 @@ Completion/failure notifications for user turns and background jobs can be enabl
 
 About can copy a public-safe diagnostic summary or export a 50 MiB-bounded ZIP. The ZIP contains build, runtime, profile and recovery state, recent redacted logs, Rust/WebView crash evidence, and native minidumps written for Studio panics on Windows; safe, bounded system crash reports already present on Windows/macOS are included too. Nothing is uploaded automatically. Binary dumps may contain process memory, so inspect the archive before sharing it.
 
+If Studio cannot reach a window, run its executable with `--export-diagnostics`. The command exits before Tauri or Harness starts and prints the absolute path of a uniquely named ZIP. For example, use `.\dsh-studio.exe --export-diagnostics` beside the Windows portable executable, `"/Applications/DSH Studio.app/Contents/MacOS/dsh-studio" --export-diagnostics` on macOS, or `dsh-studio --export-diagnostics` on Linux.
+
 Persistent logs live in the app data `logs` directory. A file rotates at 10 MiB, logs older than seven days are removed, and the directory is capped at 200 MiB. Settings can select Debug, Info, Warning or Error persistence; the live console is never filtered.
 
 ## Updates

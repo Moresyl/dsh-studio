@@ -32,7 +32,7 @@ test('catalog schema validates its native security limits', () => {
 
 test('release and SDK versions stay aligned', () => {
   assert.doesNotThrow(() =>
-    validateVersions({ version: '0.7.0' }, { version: '0.7.0' }, { version: '0.7.0' }),
+    validateVersions({ version: '0.7.1' }, { version: '0.7.1' }, { version: '0.7.1' }),
   )
   assert.throws(
     () => validateVersions({ version: '0.7.0' }, { version: '0.7.1' }, { version: '0.7.0' }),
@@ -46,5 +46,5 @@ test('release and SDK versions stay aligned', () => {
 
 test('repository public contracts agree end to end', async () => {
   const result = await verifyPublicContracts()
-  assert.deepEqual(result, { protocol: 3, schema: '1.0.0', version: '0.7.0' })
+  assert.deepEqual(result, { protocol: 3, schema: '1.0.0', version: '0.7.1' })
 })

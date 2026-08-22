@@ -9,6 +9,34 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-08-22
+
+### Added
+
+- A headless `--export-diagnostics` command that creates a bounded diagnostic
+  ZIP from existing logs and crash evidence before Tauri, a window or Harness
+  starts, then prints the archive's absolute path.
+
+### Changed
+
+- Headless export uses the existing redaction, evidence-count and 50 MiB archive
+  limits. It writes a unique timestamped file to Downloads, with a safe
+  application-data fallback when Downloads is unavailable.
+- Managed Harness installation now uses the official registry recorded by the
+  qualified lock instead of allowing npm to rewrite locked tarballs through an
+  incomplete user mirror. Native lifecycle stages are visible in the log, with
+  bounded fetch retries and explicit idle/total safety limits.
+
+### Fixed
+
+- Startup failures no longer prevent users from collecting the evidence needed
+  to diagnose them. Headless flags with extra arguments fail immediately with a
+  non-zero exit code instead of accidentally launching the desktop application.
+- Fixed [#2](https://github.com/Moresyl/dsh-studio/issues/2): Harness installation
+  can no longer stay on “Installing” forever after package resolution. A silent
+  npm process is terminated with an actionable error, and inherited Windows
+  output handles cannot keep the UI waiting after npm has exited.
+
 ## [0.7.0] — 2026-08-22
 
 ### Added
@@ -456,7 +484,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Moresyl/dsh-studio/compare/v0.4.0...v0.5.0

@@ -27,6 +27,8 @@ Harness 页面可以探测冻结的 Protocol 3 `window.dshStudio` API，调用�
 
 「关于」页可以复制适合公开粘贴的诊断摘要，也可以导出限额 50 MiB 的诊断 ZIP。ZIP 包含版本、运行时、Profile、恢复状态、近期脱敏日志、Rust/WebView 崩溃证据，以及 Windows 上由 Studio panic 写出的原生 minidump；系统已有的 Windows/macOS 崩溃报告也会在安全且未超限时收集。应用不会自动上传任何内容。二进制转储可能含进程内存片段，分享前必须检查。
 
+如果 Studio 已无法打开窗口，可给可执行文件传入 `--export-diagnostics`。命令会在 Tauri 和 Harness 启动前退出，并打印唯一命名 ZIP 的绝对路径。例如在 Windows 便携版目录运行 `.\dsh-studio.exe --export-diagnostics`，macOS 运行 `"/Applications/DSH Studio.app/Contents/MacOS/dsh-studio" --export-diagnostics`，Linux 运行 `dsh-studio --export-diagnostics`。
+
 持久化日志位于应用数据目录的 `logs` 子目录。单文件达到 10 MiB 会轮转，七天前的日志会删除，日志总量限制为 200 MiB；设置页可选择 Debug、Info、Warning 或 Error 阈值，实时控制台不受该阈值影响。
 
 ## 更新
