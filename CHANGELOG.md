@@ -43,7 +43,8 @@ pre-1.0 caveat that anything may still move.
   fallbacks were being refreshed. Runtime inspection, installation and startup
   now share one lifecycle gate, wait for supervised shutdown, and narrowly retry
   only transient managed-package resolution failures.
-
+- Fixed manually dispatched releases uploading the Windows portable build to a
+  nonexistent `main` tag instead of the configured version tag.
 
 ## [0.7.4] — 2026-08-22
 

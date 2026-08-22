@@ -269,7 +269,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${GITHUB_REF_NAME:-v$(node -p 'require("./src-tauri/tauri.conf.json").version')}"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          fi
           node .github/scripts/stage-portable.mjs "src-tauri/target/${{ matrix.target }}/release" portable-assets
           portable="$(find portable-assets -maxdepth 1 -type f -name '*-portable.exe' -print -quit)"
           test -n "$portable"
