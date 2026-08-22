@@ -200,6 +200,10 @@ const en = {
     'Only the public catalog Schema is accepted. Private addresses, credentials, cross-origin redirects, oversized responses and executable install commands are rejected.',
   'plugins.sources.addAction': 'Validate and add',
   'plugins.sources.validating': 'Validating…',
+  'plugins.hub.open': 'Open DSH Hub',
+  'plugins.hub.title': 'DSH Hub community directory',
+  'plugins.hub.detail':
+    'Browse community plugins and copy their npm package names here. DSH Hub is a website directory, not a standard catalog endpoint, so Studio never scrapes it or bypasses the install security review.',
   'plugins.profile': 'Profile',
   'plugins.pick': 'Pick a package to see what it declares.',
   'plugins.detailFailed': 'Could not read the published manifest.',
@@ -796,6 +800,10 @@ const zh: Record<MessageKey, string> = {
     '只接受公开目录 Schema；内网地址、凭据、跨源跳转、超大响应和可执行安装命令都会被拒绝。',
   'plugins.sources.addAction': '验证并添加',
   'plugins.sources.validating': '正在验证…',
+  'plugins.hub.open': '打开 DSH Hub',
+  'plugins.hub.title': 'DSH Hub 社区目录',
+  'plugins.hub.detail':
+    '浏览社区插件后，可把 npm 包名带回此处搜索。DSH Hub 是网站目录而非标准目录接口，因此 Studio 不会抓取页面，也不会绕过安装安全检查。',
   'plugins.profile': '配置',
   'plugins.pick': '选择一个扩展包，查看它声明了什么。',
   'plugins.detailFailed': '无法读取已发布的清单。',

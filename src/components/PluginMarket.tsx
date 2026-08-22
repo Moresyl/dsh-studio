@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { open as pickFile } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import {
   Check,
   ChevronLeft,
   ChevronRight,
   Download,
   Database,
+  ExternalLink,
   Info,
   Layers,
   Loader2,
@@ -36,6 +38,7 @@ import { isInstalled, usePlugins } from '@/state/plugins'
 /** Long enough that typing a scoped name is one request, short enough to feel live. */
 const DEBOUNCE = 320
 const ICONS = new Map<string, string | null>()
+const DSH_HUB = 'https://dsh-hub.org/'
 
 type Tab = 'discover' | 'installable' | 'installed' | 'sources'
 
@@ -467,10 +470,20 @@ function Sources({ sources, working, onSelect, onManage }: SourcesProps) {
             {t('plugins.sources.subtitle')}
           </p>
         </div>
-        <Button variant="secondary" onClick={onManage} disabled={working}>
-          <Settings2 size={13} aria-hidden="true" />
-          {t('plugins.sources.manage')}
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="secondary" onClick={() => void openUrl(DSH_HUB)}>
+            <ExternalLink size={13} aria-hidden="true" />
+            {t('plugins.hub.open')}
+          </Button>
+          <Button variant="secondary" onClick={onManage} disabled={working}>
+            <Settings2 size={13} aria-hidden="true" />
+            {t('plugins.sources.manage')}
+          </Button>
+        </div>
+      </div>
+      <div className="mb-3 rounded-control border border-line bg-canvas-deep/50 px-3 py-2.5">
+        <p className="text-[11.5px] font-medium text-text">{t('plugins.hub.title')}</p>
+        <p className="mt-1 text-[10.5px] leading-relaxed text-faint">{t('plugins.hub.detail')}</p>
       </div>
       <ul className="overflow-hidden rounded-control border border-line">
         {sources.map((source) => (
