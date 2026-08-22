@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
 
 PackageIdentifier: Moresyl.DSHStudio
-PackageVersion: 0.7.4
+PackageVersion: 0.7.5
 PackageLocale: en-US
 Publisher: Moresyl
 PublisherUrl: https://github.com/Moresyl
@@ -22,6 +22,6 @@ Tags:
   - developer-tools
   - harness
   - tauri
-ReleaseNotesUrl: https://github.com/Moresyl/dsh-studio/releases/tag/v0.7.4
+ReleaseNotesUrl: https://github.com/Moresyl/dsh-studio/releases/tag/v0.7.5
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0
