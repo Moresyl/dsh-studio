@@ -11,6 +11,7 @@ use super::install;
 use super::supervisor::{Status, Stream, Supervisor};
 use super::Environment;
 use crate::error::{Error, Result};
+use crate::node::NodeJobs;
 
 /// Application-wide state handed to every command.
 pub struct AppState {
@@ -133,12 +134,16 @@ pub(crate) async fn stop_managed(state: &AppState) -> Result<()> {
 /// the progress a user sees in the meantime is npm's own output, relayed
 /// through the same log everything else in the shell writes to.
 #[tauri::command]
-pub async fn harness_install(app: AppHandle, state: State<'_, AppState>) -> Result<()> {
+pub async fn harness_install(
+    app: AppHandle,
+    node_jobs: State<'_, Arc<NodeJobs>>,
+    state: State<'_, AppState>,
+) -> Result<()> {
     if state.installing.swap(true, Ordering::SeqCst) {
         return Err(Error::AlreadyInstalling);
     }
     let _lifecycle = state.lifecycle.lock().await;
-    let outcome = perform_install(&app, &state).await;
+    let outcome = perform_install(&app, &node_jobs, &state).await;
     state.installing.store(false, Ordering::SeqCst);
 
     match &outcome {
@@ -150,7 +155,11 @@ pub async fn harness_install(app: AppHandle, state: State<'_, AppState>) -> Resu
     outcome
 }
 
-async fn perform_install(app: &AppHandle, state: &State<'_, AppState>) -> Result<()> {
+async fn perform_install(
+    app: &AppHandle,
+    node_jobs: &NodeJobs,
+    state: &State<'_, AppState>,
+) -> Result<()> {
     // Every shared fallback junction points into the live runtime. Leave no
     // supervised process resolving through those junctions while the verified
     // staging directory is promoted over the live directory.
@@ -175,7 +184,18 @@ async fn perform_install(app: &AppHandle, state: &State<'_, AppState>) -> Result
         })?;
     }
 
-    let plan = super::install_plan()?;
+    let plan = match super::install_plan() {
+        Ok(plan) => plan,
+        Err(Error::NpmMissing) => {
+            state.supervisor.note(
+                Stream::Stdout,
+                "the selected Node installation has no working npm; installing a complete Studio-managed Node runtime".into(),
+            );
+            crate::node::commands::provision_managed(app, node_jobs, &state.supervisor).await?;
+            super::install_plan()?
+        }
+        Err(failure) => return Err(failure),
+    };
     let supervisor = Arc::clone(&state.supervisor);
     supervisor.note(
         Stream::Stdout,

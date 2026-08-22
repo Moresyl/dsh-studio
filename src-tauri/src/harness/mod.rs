@@ -137,9 +137,23 @@ pub fn launch_plan() -> Result<LaunchPlan> {
 
 /// Work out how to install — or reinstall at the latest release — the harness.
 pub fn install_plan() -> Result<InstallPlan> {
-    let node = environment().node.ok_or(Error::NoNodeRuntime {
-        minimum: node_runtime::MINIMUM_SUPPORTED,
-    })?;
+    let environment = environment();
+    let supported = environment
+        .all_node_runtimes
+        .iter()
+        .filter(|install| install.version >= node_runtime::MINIMUM_SUPPORTED)
+        .collect::<Vec<_>>();
+    if supported.is_empty() {
+        return Err(Error::NoNodeRuntime {
+            minimum: node_runtime::MINIMUM_SUPPORTED,
+        });
+    }
+    // Launching only needs Node, but installing needs that exact runtime's npm.
+    // A newer Node-only package must not hide an older complete installation.
+    let node = supported
+        .into_iter()
+        .find(|install| install::npm_cli(&install.path).is_some())
+        .ok_or(Error::NpmMissing)?;
 
     install::plan(&node.path, paths::harness_dir(), install::SPEC.to_string())
 }

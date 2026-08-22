@@ -453,7 +453,18 @@ where
             crate::harness::install::VERSION
         )));
     }
-    let manager = ensure_package_manager(&node.path, report.clone()).await?;
+    let manager_node = environment
+        .all_node_runtimes
+        .iter()
+        .find(|install| {
+            install.version >= node_runtime::MINIMUM_SUPPORTED
+                && install::npm_cli(&install.path).is_some()
+        })
+        .map(|install| install.path.as_path())
+        .unwrap_or(node.path.as_path());
+    let manager = ensure_package_manager(manager_node, report.clone()).await?;
+    let profile_dir = paths::profile_dir(profile);
+    let store = profile_store_dir(&profile_dir);
 
     let mut command = Command::new(&node.path);
     command
@@ -468,6 +479,10 @@ where
         // the app happened to be launched from.
         .current_dir(paths::app_data_dir())
         .env("PATH", path_with(&node.path, manager.as_deref()))
+        // pnpm otherwise follows whichever global config happens to be active
+        // in the GUI environment. Preserve the store an existing profile is
+        // already linked to; give a new profile one stable Studio-owned store.
+        .env("npm_config_store_dir", &store)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -630,6 +645,31 @@ fn managed_manager() -> Option<PathBuf> {
     executable_in(&directory, "pnpm").map(|_| directory)
 }
 
+/// Keep an existing profile attached to the store recorded by pnpm itself.
+///
+/// pnpm 10 writes `.modules.yaml` as JSON; older releases used YAML. The JSON
+/// path is exact and the small scalar fallback deliberately accepts only an
+/// absolute path, never flags or shell text. A missing or unreadable marker is
+/// a new profile and gets Studio's stable store.
+fn profile_store_dir(profile_dir: &Path) -> PathBuf {
+    let marker = profile_dir.join("node_modules/.modules.yaml");
+    let recorded = std::fs::read_to_string(marker).ok().and_then(|raw| {
+        serde_json::from_str::<serde_json::Value>(&raw)
+            .ok()
+            .and_then(|value| value.get("storeDir")?.as_str().map(PathBuf::from))
+            .or_else(|| {
+                raw.lines().find_map(|line| {
+                    let value = line.trim().strip_prefix("storeDir:")?.trim();
+                    let value = value.trim_matches(['\'', '"']);
+                    (!value.is_empty()).then(|| PathBuf::from(value))
+                })
+            })
+    });
+    recorded
+        .filter(|path| path.is_absolute())
+        .unwrap_or_else(paths::plugin_store_dir)
+}
+
 fn executable_in(directory: &Path, stem: &str) -> Option<PathBuf> {
     // Windows resolves a bare name through PATHEXT, so the launcher may carry
     // any of these; everywhere else the name is the whole story.
@@ -727,16 +767,19 @@ fn is_name_segment(segment: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
 
     #[cfg(windows)]
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     use std::collections::BTreeSet;
 
     #[cfg(windows)]
     use super::path_with;
-    use super::{forward, is_package_spec, list, split_spec, PluginIntents, Stream};
+    use super::{
+        forward, is_package_spec, list, profile_store_dir, split_spec, PluginIntents, Stream,
+    };
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
@@ -913,6 +956,35 @@ mod tests {
             format!("pnpm@{}", crate::harness::install::PNPM_VERSION)
         );
         assert!(!crate::harness::install::PNPM_SPEC.ends_with("@latest"));
+    }
+
+    #[test]
+    fn an_existing_profile_keeps_the_store_pnpm_recorded() {
+        let profile = std::env::temp_dir().join(format!(
+            "dsh-studio-pnpm-store-profile-{}",
+            std::process::id()
+        ));
+        let modules = profile.join("node_modules");
+        let recorded = std::env::temp_dir().join("the-existing-pnpm-store");
+        let _ = std::fs::remove_dir_all(&profile);
+        std::fs::create_dir_all(&modules).expect("modules directory");
+        std::fs::write(
+            modules.join(".modules.yaml"),
+            serde_json::json!({ "storeDir": recorded }).to_string(),
+        )
+        .expect("pnpm marker");
+
+        assert_eq!(profile_store_dir(&profile), recorded);
+        std::fs::remove_dir_all(profile).expect("test profile cleanup");
+    }
+
+    #[test]
+    fn a_new_profile_uses_the_stable_studio_store() {
+        let profile = PathBuf::from("profile-without-node-modules");
+        assert_eq!(
+            profile_store_dir(&profile),
+            crate::paths::plugin_store_dir()
+        );
     }
 
     #[test]

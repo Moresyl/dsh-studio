@@ -56,6 +56,13 @@ pub fn tools_dir() -> PathBuf {
     app_data_dir().join("tools")
 }
 
+/// Stable pnpm content-addressed store used by profiles created on this
+/// machine. Existing profiles keep the store recorded in their modules state
+/// so an application update never strands their already-linked dependencies.
+pub fn plugin_store_dir() -> PathBuf {
+    tools_dir().join("pnpm-store")
+}
+
 /// Persistent application logs, separate from user-owned Harness state.
 pub fn logs_dir() -> PathBuf {
     app_data_dir().join("logs")

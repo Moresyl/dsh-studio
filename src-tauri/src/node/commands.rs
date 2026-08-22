@@ -24,13 +24,23 @@ pub async fn node_provision(
     jobs: State<'_, Arc<NodeJobs>>,
     state: State<'_, AppState>,
 ) -> Result<NodeInstallation> {
+    provision_managed(&app, &jobs, &state.supervisor).await
+}
+
+/// Provision a complete Studio-owned Node for both the explicit Environment
+/// action and Harness installation's automatic fallback.
+pub(crate) async fn provision_managed(
+    app: &AppHandle,
+    jobs: &NodeJobs,
+    supervisor: &Arc<crate::harness::supervisor::Supervisor>,
+) -> Result<NodeInstallation> {
     if jobs.busy.swap(true, Ordering::SeqCst) {
         return Err(Error::NodeProvisionBusy);
     }
 
     let report = {
         let app = app.clone();
-        let supervisor = Arc::clone(&state.supervisor);
+        let supervisor = Arc::clone(supervisor);
         move |progress: Progress| {
             // Two audiences. The event drives the progress card, which is gone
             // the moment this finishes; the log is what is still there afterwards
@@ -42,7 +52,7 @@ pub async fn node_provision(
         }
     };
 
-    let outcome = match crate::offline::payload(&app) {
+    let outcome = match crate::offline::payload(app) {
         Ok(Some(payload)) => super::provision_bundled(payload.node, report).await,
         Ok(None) => provision(report).await,
         Err(failure) => Err(failure),
@@ -53,7 +63,7 @@ pub async fn node_provision(
     // log as well as returned, because the log is where the lines leading up to
     // it are.
     if let Err(failure) = &outcome {
-        state.supervisor.note(Stream::Stderr, failure.to_string());
+        supervisor.note(Stream::Stderr, failure.to_string());
     }
     outcome
 }

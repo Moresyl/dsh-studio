@@ -803,15 +803,52 @@ where
 /// different runtime from PATH, and on Windows it avoids invoking `npm.cmd`
 /// through the command processor.
 pub(crate) fn npm_cli(node: &Path) -> Option<PathBuf> {
-    let directory = node.parent()?;
-    [
+    npm_cli_candidates(node)
+        .into_iter()
+        .find(|candidate| candidate.is_file() && npm_cli_works(node, candidate))
+}
+
+/// Layouts used by the official archive, version managers and Homebrew.
+///
+/// Homebrew exposes `node` through `<prefix>/bin`, but canonicalising that
+/// symlink (which runtime discovery intentionally does) produces
+/// `<prefix>/Cellar/node/<version>/bin/node`. npm is then either formula-owned
+/// under `libexec`, or shared under the Homebrew prefix. Keep both candidates:
+/// Apple Silicon and Intel Homebrew use the same Cellar shape with different
+/// prefixes.
+fn npm_cli_candidates(node: &Path) -> Vec<PathBuf> {
+    let Some(directory) = node.parent() else {
+        return Vec::new();
+    };
+    vec![
         // Windows: npm sits beside node.exe.
         directory.join("node_modules/npm/bin/npm-cli.js"),
-        // Unix: node is in `bin/`, npm one level up in `lib/`.
+        // Official Unix archives, nvm, fnm and Volta.
         directory.join("../lib/node_modules/npm/bin/npm-cli.js"),
+        // Homebrew formula-owned npm from a canonical Cellar node path.
+        directory.join("../libexec/lib/node_modules/npm/bin/npm-cli.js"),
+        // Homebrew prefix-owned npm from a canonical Cellar node path.
+        directory.join("../../../../lib/node_modules/npm/bin/npm-cli.js"),
     ]
-    .into_iter()
-    .find(|candidate| candidate.is_file())
+}
+
+/// Prove the entry script belongs to a working npm by executing it with the
+/// exact Node runtime Studio selected. A same-named shim elsewhere on PATH is
+/// never consulted.
+fn npm_cli_works(node: &Path, npm_cli: &Path) -> bool {
+    let mut command = std::process::Command::new(node);
+    command
+        .arg(npm_cli)
+        .arg("--version")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    proc_guard::hide_console(&mut command);
+    command
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .is_some_and(|output| !output.stdout.iter().all(u8::is_ascii_whitespace))
 }
 
 /// `PATH` with the chosen Node's directory in front.
@@ -835,10 +872,10 @@ mod tests {
     use tokio::process::Command;
 
     use super::{
-        qualify_runtime, remove_dir_if_exists, replace_once, require_expected_runtime,
-        run_command_with_limits, runtime_compatible, runtime_version, InstallPlan,
-        INTEGRATION_PACKAGE, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK,
-        RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
+        npm_cli_candidates, qualify_runtime, remove_dir_if_exists, replace_once,
+        require_expected_runtime, run_command_with_limits, runtime_compatible, runtime_version,
+        InstallPlan, INTEGRATION_PACKAGE, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC, PNPM_VERSION,
+        RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -884,6 +921,35 @@ mod tests {
         assert!(!SPEC.ends_with("@latest"));
         assert!(!VERSION.starts_with(['^', '~']));
         assert_eq!(PNPM_SPEC, format!("pnpm@{PNPM_VERSION}"));
+    }
+
+    #[test]
+    fn npm_candidates_cover_official_and_version_manager_layouts() {
+        let node = Path::new("/Users/person/.nvm/versions/node/v24.19.0/bin/node");
+        let candidates = npm_cli_candidates(node);
+        assert!(candidates.contains(&Path::new(
+            "/Users/person/.nvm/versions/node/v24.19.0/bin/../lib/node_modules/npm/bin/npm-cli.js"
+        ).to_path_buf()));
+    }
+
+    #[test]
+    fn npm_candidates_cover_both_homebrew_prefixes_after_canonicalization() {
+        for prefix in ["/opt/homebrew", "/usr/local"] {
+            let node = Path::new(prefix).join("Cellar/node/26.7.0/bin/node");
+            let candidates = npm_cli_candidates(&node);
+            assert!(candidates.contains(
+                &node
+                    .parent()
+                    .expect("bin")
+                    .join("../libexec/lib/node_modules/npm/bin/npm-cli.js")
+            ));
+            assert!(candidates.contains(
+                &node
+                    .parent()
+                    .expect("bin")
+                    .join("../../../../lib/node_modules/npm/bin/npm-cli.js")
+            ));
+        }
     }
 
     #[test]
