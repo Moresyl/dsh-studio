@@ -9,6 +9,30 @@
 
 ## [未发布]
 
+## [0.7.2] —— 2026-08-22
+
+### 新增
+
+- 为已签名更新清单新增经过验证的 GitHub Pages 备用源；包渠道生成流程只有在
+  `latest.json` 的版本、HTTPS 制品地址和每个平台 Tauri 签名全部通过校验后，才会把它
+  同步到官网。
+- 运行时合同失败现在会指出具体缺失条件，不再只显示已经存在的 Harness 与 pnpm 版本。
+
+### 变更
+
+- 托管安装通过 npm `--install-links` 把随附 Studio integration 物化为普通目录；Windows
+  不再依赖临时目录 Junction 在校验、启用和清理期间始终可用。
+- 检查更新会先请求 GitHub Release，再回退到官方 Pages 更新源；更新清单和包渠道元数据
+  遇到瞬时网络故障会执行有上限的重试，下载的应用制品仍必须通过内置 Tauri 公钥校验。
+
+### 修复
+
+- 修复 npm 已成功安装全部 511 个包后，Studio 因本地 integration 被表示成 Windows
+  Junction 而拒绝 Contract 2 的问题；首次安装、更新和「修复」现在使用同一份已物化合同。
+- 一键更新在 GitHub 主清单不可达时，不再只显示 `error sending request for url`；它会尝试
+  Pages 备用源，全部线路都失败时则用中英文说明 GitHub/`HTTPS_PROXY` 恢复方式和
+  Full / Offline 选择。
+
 ## [0.7.1] —— 2026-08-22
 
 ### 新增
@@ -406,7 +430,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...v0.6.0

@@ -33,7 +33,7 @@ Persistent logs live in the app data `logs` directory. A file rotates at 10 MiB,
 
 ## Updates
 
-The app reads `latest.json` from GitHub Releases and accepts only updater artifacts verified by its embedded public key. Formal release jobs require Tauri updater signatures. Windows Authenticode and macOS Developer ID signing/notarization/stapling are added when the complete platform credentials are configured; partial credential sets fail closed.
+The app reads `latest.json` from GitHub Releases and falls back to the validated official Pages manifest when the primary feed is unavailable. It accepts only updater artifacts verified by its embedded public key. Formal release jobs require Tauri updater signatures. Windows Authenticode and macOS Developer ID signing/notarization/stapling are added when the complete platform credentials are configured; partial credential sets fail closed.
 
 The updater follows the ordinary Lite channel. A runtime already installed from Full remains in app data across application updates.
 

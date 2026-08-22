@@ -33,7 +33,7 @@ Harness 页面可以探测冻结的 Protocol 3 `window.dshStudio` API，调用�
 
 ## 更新
 
-应用读取 GitHub Release 的 `latest.json`，只安装通过内置公钥验证的更新。正式发布流水线强制要求 Tauri 更新签名。完整配置平台凭据时会额外应用 Windows Authenticode 或 macOS Developer ID 签名、公证与票据装订；凭据只配置一部分时会失败关闭。
+应用读取 GitHub Release 的 `latest.json`；主源不可达时会回退到经过验证的官方 Pages 清单。应用只安装通过内置公钥验证的更新。正式发布流水线强制要求 Tauri 更新签名。完整配置平台凭据时会额外应用 Windows Authenticode 或 macOS Developer ID 签名、公证与票据装订；凭据只配置一部分时会失败关闭。
 
 应用内更新继续使用普通轻量版通道；从完整离线版安装到应用数据目录的运行时不会因应用更新而丢失。
 

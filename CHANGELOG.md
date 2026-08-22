@@ -9,6 +9,36 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-08-22
+
+### Added
+
+- A validated GitHub Pages fallback for the signed updater manifest. Package
+  channel generation now copies `latest.json` only after its version, HTTPS
+  artifact URLs and every Tauri signature pass validation.
+- Runtime contract failures now identify the exact missing condition instead of
+  reporting only the Harness and pnpm versions that happened to be present.
+
+### Changed
+
+- Managed installation materializes the bundled Studio integration as an
+  ordinary directory with npm `--install-links`; Windows no longer depends on a
+  temporary directory junction surviving verification, promotion or cleanup.
+- Update checks try the GitHub Release feed and then the official Pages feed.
+  Feed and package-manifest downloads retry bounded transient failures, while
+  downloaded application artifacts still require the embedded Tauri public key.
+
+### Fixed
+
+- Fixed a post-install Contract 2 failure where npm successfully installed all
+  511 packages but Studio rejected the runtime because its local integration
+  was represented by a Windows junction. First install, update and Repair now
+  use the same materialized integration contract.
+- One-click update no longer exposes only `error sending request for url` when
+  the primary GitHub manifest is unreachable. It falls back to Pages and, if
+  every route fails, explains GitHub/`HTTPS_PROXY` recovery and the Full /
+  Offline option in Chinese and English.
+
 ## [0.7.1] — 2026-08-22
 
 ### Added
@@ -484,7 +514,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Moresyl/dsh-studio/compare/v0.5.0...v0.6.0
