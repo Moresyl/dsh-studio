@@ -61,10 +61,15 @@ const WORKSPACE: &str = "pnpm-workspace.yaml";
 const EMPTY_PATCH: &str = "[]\n";
 const STUDIO_INTEGRATION: &str = "@moresyl/dsh-studio-integration";
 const WEB_APP_BUNDLE: &str = "@deepseek-ai/dsh-web-app";
-const WEB_PROFILE_BUNDLES: [&str; 3] =
-    ["@deepseek-ai/dsh-base", WEB_APP_BUNDLE, STUDIO_INTEGRATION];
+const WEB_PROFILE_BUNDLES: [&str; 2] = ["@deepseek-ai/dsh-base", WEB_APP_BUNDLE];
 const PROFILE_WORKSPACE: &str =
     "packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n";
+const STUDIO_MODULE_FILES: [&str; 4] = [
+    "package.json",
+    "cordis.patch.yml",
+    "lib/index.js",
+    "lib/client.js",
+];
 
 /// What an exported profile is, so a file picked by mistake is caught before
 /// anything is written.
@@ -206,23 +211,30 @@ pub fn select(name: &str) -> Result<()> {
     selection::choose(&name)
 }
 
-/// Ensure a Web profile composes the browser half owned by this exact runtime.
+/// Prepare a profile for the runtime-owned Studio patch layer.
 ///
-/// The integration package resolves from the managed Harness installation, so
-/// this changes no user dependency and performs no network operation. Headless
-/// profiles are left untouched because they have no browser surface to bridge.
-pub fn ensure_studio_integration(name: &str) -> Result<()> {
+/// Older Studio releases persisted the integration package in the user's
+/// bundle stack. That made a runtime concern part of user state and allowed the
+/// same patch to be composed twice. The launcher now supplies the patch for
+/// each process, so this migration removes only that managed entry. User
+/// bundles, dependencies and their order stay untouched.
+pub fn prepare_for_studio(name: &str) -> Result<bool> {
     let dir = paths::profile_dir(name);
-    ensure_integration_in(&dir, name == DEFAULT)
+    let serves_studio = prepare_for_studio_in(&dir, name == DEFAULT)?;
+    if serves_studio {
+        sync_studio_runtime_module()?;
+    }
+    Ok(serves_studio)
 }
 
-fn ensure_integration_in(dir: &Path, bootstrap_web: bool) -> Result<()> {
+fn prepare_for_studio_in(dir: &Path, bootstrap_web: bool) -> Result<bool> {
     if !dir.join(MANIFEST).is_file() {
         if !bootstrap_web {
-            return Ok(());
+            return Ok(false);
         }
         let bundles = WEB_PROFILE_BUNDLES.map(str::to_string);
-        return initialize(dir, &bundles, EMPTY_PATCH, Some(PROFILE_WORKSPACE));
+        initialize(dir, &bundles, EMPTY_PATCH, Some(PROFILE_WORKSPACE))?;
+        return Ok(true);
     }
 
     let Some(mut manifest) = plugins::read_manifest(dir) else {
@@ -240,17 +252,86 @@ fn ensure_integration_in(dir: &Path, bootstrap_web: bool) -> Result<()> {
             dir.display()
         )));
     };
-    if !bundles.iter().any(|bundle| bundle == WEB_APP_BUNDLE)
-        || bundles.iter().any(|bundle| bundle == STUDIO_INTEGRATION)
-    {
-        return Ok(());
+    let serves_studio = bundles.iter().any(|bundle| bundle == WEB_APP_BUNDLE);
+    let before = bundles.len();
+    bundles.retain(|bundle| bundle.as_str() != Some(STUDIO_INTEGRATION));
+    if bundles.len() != before {
+        write_manifest(dir, &manifest)?;
     }
-    let after_web = bundles
-        .iter()
-        .position(|bundle| bundle == WEB_APP_BUNDLE)
-        .map_or(bundles.len(), |index| index + 1);
-    bundles.insert(after_web, Value::from(STUDIO_INTEGRATION));
-    write_manifest(dir, &manifest)
+    Ok(serves_studio)
+}
+
+/// Make the runtime-owned package resolvable through Node's ordinary parent
+/// lookup from every profile. Upstream maintains the same shared
+/// `$DSH_HOME/profiles/node_modules` fallback for its own dependency closure;
+/// Studio adds only its private package, which is outside that closure.
+fn sync_studio_runtime_module() -> Result<()> {
+    let source = paths::harness_dir()
+        .join("node_modules")
+        .join("@moresyl")
+        .join("dsh-studio-integration");
+    let target = paths::profiles_dir()
+        .join(SHARED_MODULES)
+        .join("@moresyl")
+        .join("dsh-studio-integration");
+    sync_runtime_module_in(&source, &target)
+}
+
+fn sync_runtime_module_in(source: &Path, target: &Path) -> Result<()> {
+    if let Ok(metadata) = std::fs::symlink_metadata(target) {
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(Error::Profile(format!(
+                "{} is not a safe Studio module directory",
+                target.display()
+            )));
+        }
+    }
+
+    for relative in STUDIO_MODULE_FILES {
+        let source_file = source.join(relative);
+        let source_metadata = std::fs::symlink_metadata(&source_file).map_err(|cause| {
+            Error::Profile(format!(
+                "the managed Studio module is incomplete at {}: {cause}",
+                source_file.display()
+            ))
+        })?;
+        if source_metadata.file_type().is_symlink() || !source_metadata.is_file() {
+            return Err(Error::Profile(format!(
+                "the managed Studio module has an unsafe file at {}",
+                source_file.display()
+            )));
+        }
+
+        let target_file = target.join(relative);
+        if let Ok(metadata) = std::fs::symlink_metadata(&target_file) {
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                return Err(Error::Profile(format!(
+                    "{} is not a safe Studio module file",
+                    target_file.display()
+                )));
+            }
+        }
+        let parent = target_file.parent().expect("a module file has a parent");
+        std::fs::create_dir_all(parent).map_err(|cause| {
+            Error::Profile(format!(
+                "{} could not be created: {cause}",
+                parent.display()
+            ))
+        })?;
+        let body = std::fs::read(&source_file).map_err(|cause| {
+            Error::Profile(format!(
+                "{} could not be read: {cause}",
+                source_file.display()
+            ))
+        })?;
+        std::fs::write(&target_file, body).map_err(|cause| {
+            Error::Profile(format!(
+                "{} could not be written: {cause}",
+                target_file.display()
+            ))
+        })?;
+    }
+    Ok(())
 }
 
 /// Make a profile with the interface bundles in it and nothing else.
@@ -980,7 +1061,7 @@ mod tests {
     }
 
     #[test]
-    fn web_profiles_gain_the_runtime_integration_once() {
+    fn old_web_profiles_drop_only_the_persisted_runtime_integration() {
         let root = std::env::temp_dir().join(format!(
             "dsh-studio-profile-integration-{}",
             std::process::id()
@@ -988,37 +1069,94 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         initialize(
             &root,
-            &["@deepseek-ai/dsh-base".into(), WEB_APP_BUNDLE.into()],
+            &[
+                "@deepseek-ai/dsh-base".into(),
+                WEB_APP_BUNDLE.into(),
+                STUDIO_INTEGRATION.into(),
+                "third-party-one".into(),
+                STUDIO_INTEGRATION.into(),
+                "third-party-two".into(),
+            ],
             EMPTY_PATCH,
             Some(PROFILE_WORKSPACE),
         )
         .expect("profile");
 
-        ensure_integration_in(&root, false).expect("first integration");
-        ensure_integration_in(&root, false).expect("idempotent integration");
+        assert!(prepare_for_studio_in(&root, false).expect("migration"));
+        assert!(prepare_for_studio_in(&root, false).expect("idempotent migration"));
         let manifest = plugins::read_manifest(&root).expect("manifest");
         assert_eq!(
             bundles(&manifest),
-            ["@deepseek-ai/dsh-base", WEB_APP_BUNDLE, STUDIO_INTEGRATION]
+            [
+                "@deepseek-ai/dsh-base",
+                WEB_APP_BUNDLE,
+                "third-party-one",
+                "third-party-two",
+            ]
         );
         let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
-    fn a_missing_web_profile_bootstraps_with_the_managed_bundle() {
+    fn a_missing_web_profile_bootstraps_without_runtime_owned_layers() {
         let root = std::env::temp_dir().join(format!(
             "dsh-studio-profile-bootstrap-{}",
             std::process::id()
         ));
         let _ = std::fs::remove_dir_all(&root);
 
-        ensure_integration_in(&root, true).expect("bootstrap");
+        assert!(prepare_for_studio_in(&root, true).expect("bootstrap"));
         let manifest = plugins::read_manifest(&root).expect("manifest");
         assert_eq!(bundles(&manifest), WEB_PROFILE_BUNDLES);
         assert_eq!(
             std::fs::read_to_string(root.join(WORKSPACE)).expect("workspace"),
             PROFILE_WORKSPACE
         );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_headless_profile_gets_no_studio_runtime_layer() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-headless-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        initialize(&root, &["@deepseek-ai/dsh-base".into()], EMPTY_PATCH, None).expect("profile");
+
+        assert!(!prepare_for_studio_in(&root, false).expect("headless profile"));
+        let manifest = plugins::read_manifest(&root).expect("manifest");
+        assert_eq!(bundles(&manifest), ["@deepseek-ai/dsh-base"]);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn the_private_runtime_module_is_materialized_in_the_shared_fallback() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-runtime-module-{}",
+            std::process::id()
+        ));
+        let source = root.join("source");
+        let target = root.join("profiles/node_modules/@moresyl/dsh-studio-integration");
+        let _ = std::fs::remove_dir_all(&root);
+        for (index, relative) in STUDIO_MODULE_FILES.iter().enumerate() {
+            let file = source.join(relative);
+            std::fs::create_dir_all(file.parent().expect("source parent"))
+                .expect("source directory");
+            std::fs::write(file, format!("generation-one-{index}")).expect("source module file");
+        }
+
+        sync_runtime_module_in(&source, &target).expect("first materialization");
+        std::fs::write(source.join("lib/client.js"), "generation-two").expect("updated source");
+        sync_runtime_module_in(&source, &target).expect("idempotent update");
+
+        assert_eq!(
+            std::fs::read_to_string(target.join("lib/client.js")).expect("copied client"),
+            "generation-two"
+        );
+        assert!(STUDIO_MODULE_FILES
+            .iter()
+            .all(|relative| target.join(relative).is_file()));
         let _ = std::fs::remove_dir_all(root);
     }
 

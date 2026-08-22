@@ -87,6 +87,9 @@ pub struct LaunchPlan {
     /// Profile to boot: which layer stack the harness composes, and therefore
     /// which plugins the session has.
     pub profile: String,
+    /// Runtime-owned patch layers. They are supplied for this process instead
+    /// of being persisted in the user's profile bundle stack.
+    pub patches: Vec<PathBuf>,
     /// Working directory inherited by agent sessions and their tools.
     pub workspace: PathBuf,
     /// Interface to bind. Loopback unless the user opts into remote access.
@@ -98,7 +101,7 @@ pub struct LaunchPlan {
 }
 
 impl LaunchPlan {
-    fn to_command(&self) -> Command {
+    fn launcher_command(&self) -> Command {
         let mut command = Command::new(&self.node);
         command
             .arg(&self.entry)
@@ -108,18 +111,44 @@ impl LaunchPlan {
             // everything after it on. `web` would say all of this for exactly one
             // profile.
             .arg("--profile")
-            .arg(&self.profile)
+            .arg(&self.profile);
+        for patch in &self.patches {
+            command.arg("--patch").arg(patch);
+        }
+        command
+            .current_dir(&self.workspace)
+            // Lets harness plugins detect that a native shell owns the session.
+            .env("DSH_DESKTOP", "1");
+        command.envs(&self.environment);
+        command
+    }
+
+    fn to_command(&self) -> Command {
+        let mut command = self.launcher_command();
+        command
+            // The Web surface opens the operating-system browser by default.
+            // Studio owns presentation inside its Tauri window, so every boot
+            // and restart must explicitly suppress that handoff.
+            .arg("--no-open")
             .arg("--host")
             .arg(&self.host)
             .arg("--port")
             .arg(self.port.to_string())
-            .current_dir(&self.workspace)
-            // Lets harness plugins detect that a native shell owns the session.
-            .env("DSH_DESKTOP", "1")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
-        command.envs(&self.environment);
+        command
+    }
+
+    /// Ask the Harness launcher to compose the exact profile without booting
+    /// its plugins. Used to reject loader conflicts before startup log noise.
+    pub(super) fn dump_command(&self) -> Command {
+        let mut command = self.launcher_command();
+        command
+            .arg("--dump-config")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
         command
     }
 }
@@ -434,5 +463,46 @@ impl Drop for Supervisor {
     /// whether or not this runs — that is the point of the guard.
     fn drop(&mut self) {
         self.stopping.store(true, Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_patches_are_launcher_flags_before_web_application_arguments() {
+        let plan = LaunchPlan {
+            node: PathBuf::from("node"),
+            entry: PathBuf::from("dsh/bin.js"),
+            profile: "web".into(),
+            patches: vec![PathBuf::from("studio.patch.yml")],
+            workspace: PathBuf::from("workspace"),
+            host: "127.0.0.1".into(),
+            port: 0,
+            environment: BTreeMap::new(),
+        };
+        let command = plan.to_command();
+        let args = command
+            .as_std()
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            args,
+            [
+                "dsh/bin.js",
+                "--profile",
+                "web",
+                "--patch",
+                "studio.patch.yml",
+                "--no-open",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "0",
+            ]
+        );
     }
 }

@@ -417,6 +417,13 @@ fn qualify_runtime(target: &Path) -> Result<()> {
 }
 
 fn replace_once(body: String, from: &str, to: &str, label: &str) -> Result<String> {
+    // Qualification runs after every managed install and may also inspect an
+    // already-qualified runtime recovered from an interrupted promotion. Some
+    // replacements deliberately retain `from` inside `to`, so checking the
+    // completed replacement first is what makes the operation truly idempotent.
+    if body.matches(to).count() == 1 {
+        return Ok(body);
+    }
     if body.matches(from).count() != 1 {
         return Err(Error::Install(format!(
             "the qualified Harness no longer has the expected {label} seam"
@@ -761,10 +768,10 @@ mod tests {
     use tokio::process::Command;
 
     use super::{
-        qualify_runtime, remove_dir_if_exists, require_expected_runtime, run_command_with_limits,
-        runtime_compatible, runtime_version, InstallPlan, INTEGRATION_PACKAGE, OFFICIAL_REGISTRY,
-        PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC,
-        VERSION,
+        qualify_runtime, remove_dir_if_exists, replace_once, require_expected_runtime,
+        run_command_with_limits, runtime_compatible, runtime_version, InstallPlan,
+        INTEGRATION_PACKAGE, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK,
+        RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -959,6 +966,20 @@ mod tests {
         assert!(remove_dir_if_exists(&path).is_err());
         assert!(path.is_file(), "the refused target must remain untouched");
         fs::remove_file(path).expect("cleanup");
+    }
+
+    #[test]
+    fn qualification_replacement_is_idempotent_even_when_it_keeps_the_seam() {
+        let once = replace_once(
+            "before seam after".into(),
+            "seam",
+            "addition seam",
+            "fixture",
+        )
+        .expect("first qualification");
+        let twice = replace_once(once.clone(), "seam", "addition seam", "fixture")
+            .expect("second qualification");
+        assert_eq!(twice, once);
     }
 
     #[test]

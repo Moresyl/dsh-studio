@@ -60,6 +60,9 @@ pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
     let environment = shell.updates;
     let mut plan = super::launch_plan()?;
     plan.environment = environment.clone();
+    for notice in super::composition::preflight(&plan).await? {
+        state.supervisor.note(Stream::Stderr, notice);
+    }
     let attempted = plan.profile.clone();
     match Arc::clone(&state.supervisor).start(plan).await {
         Ok(origin) => {
@@ -80,6 +83,9 @@ pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
             );
             let mut fallback = super::launch_plan()?;
             fallback.environment = environment;
+            for notice in super::composition::preflight(&fallback).await? {
+                state.supervisor.note(Stream::Stderr, notice);
+            }
             match Arc::clone(&state.supervisor).start(fallback).await {
                 Ok(origin) => {
                     crate::profiles::mark_healthy(&recovered)?;

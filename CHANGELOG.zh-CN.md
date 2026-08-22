@@ -9,6 +9,30 @@
 
 ## [未发布]
 
+## [0.7.3] —— 2026-08-22
+
+### 新增
+
+- 启动插件前会通过 Harness 自己的 `--dump-config` 路径预检最终 Loader 树；发现重复入口 ID
+  时会同时指出它们分别来自哪些层。
+
+### 变更
+
+- Studio integration 改为由启动器拥有的运行时补丁，并通过 Profile 公共模块回退目录解析，
+  不再作为 bundle 永久写入用户 Profile。旧条目会在不改变第三方插件顺序的前提下迁移，
+  headless Profile 也不会再被注入 Web 集成层。
+
+### 修复
+
+- 修复启动时报 `duplicate loader entry id: code-runtime`，随后又显示
+  `harness closed its output without announcing a port` 的问题。若 rc.8 内置入口与一个已安装且
+  正在启用的第三方 bundle 冲突，Studio 只会停用该第三方插件、保存可逆开关并重新组合；
+  内置层、Studio 层或用户补丁之间的冲突仍会安全拒绝启动。
+- 「修复」再次检查已经合格的目录选择器时，运行时资格补丁现在保持幂等，不会把补丁保留的
+  原始 seam 误判为需要再补一次。
+- 修复启动 Studio 时 Harness 按 Web CLI 默认行为额外弹出系统浏览器页面的问题；首次启动与
+  自动重启现在都会显式禁用浏览器交接，只保留 Studio 窗口内的页面。
+
 ## [0.7.2] —— 2026-08-22
 
 ### 新增
@@ -430,7 +454,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0

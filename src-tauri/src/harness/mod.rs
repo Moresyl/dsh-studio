@@ -1,6 +1,7 @@
 //! Everything about running the DeepSeek Harness as a supervised local service.
 
 pub mod commands;
+pub mod composition;
 pub mod health;
 pub mod install;
 pub mod readiness;
@@ -108,7 +109,7 @@ pub fn launch_plan() -> Result<LaunchPlan> {
         ));
     }
     let profile = crate::profiles::selected();
-    crate::profiles::ensure_studio_integration(&profile)?;
+    let serves_studio = crate::profiles::prepare_for_studio(&profile)?;
     if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {
         return Err(Error::Plugin(problem));
     }
@@ -117,6 +118,16 @@ pub fn launch_plan() -> Result<LaunchPlan> {
         node: node.path,
         entry: environment.harness_entry,
         profile,
+        patches: serves_studio
+            .then(|| {
+                paths::harness_dir()
+                    .join("node_modules")
+                    .join("@moresyl")
+                    .join("dsh-studio-integration")
+                    .join("cordis.patch.yml")
+            })
+            .into_iter()
+            .collect(),
         workspace: environment.workspace,
         host: BIND_HOST.to_string(),
         port: EPHEMERAL_PORT,

@@ -9,6 +9,35 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-08-22
+
+### Added
+
+- Startup now preflights the exact composed loader tree with the Harness's own
+  `--dump-config` path before any plugin is booted. Duplicate entry ids include
+  their owning layers in the diagnostic.
+
+### Changed
+
+- The Studio integration is now a launcher-owned runtime patch, resolved from
+  the shared profile module fallback, instead of a bundle persisted in user
+  profiles. Existing profile entries are migrated without reordering user
+  plugins, and headless profiles receive no Web integration layer.
+
+### Fixed
+
+- Fixed startup aborting with `duplicate loader entry id: code-runtime` and the
+  secondary `harness closed its output without announcing a port`. When an
+  active installed third-party bundle conflicts with rc.8 core ids, Studio
+  disables only that bundle, records the reversible switch, recomposes, and
+  starts normally. Core, Studio and user-patch conflicts still fail closed.
+- Runtime qualification is idempotent when Repair examines an already-qualified
+  directory picker, instead of treating its retained source seam as a second
+  patch opportunity.
+- Fixed Studio startup opening an external browser through the Web CLI default.
+  Initial launch and supervised restarts now explicitly suppress browser
+  handoff and keep the surface inside the Studio window.
+
 ## [0.7.2] — 2026-08-22
 
 ### Added
@@ -514,7 +543,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/Moresyl/dsh-studio/compare/v0.6.0...v0.7.0
