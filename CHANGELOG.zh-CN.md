@@ -9,6 +9,34 @@
 
 ## [未发布]
 
+## [0.7.5] —— 2026-08-22
+
+### 新增
+
+- 插件「来源」页新增 DSH Hub 社区目录入口，并明确安全使用方式：从 Hub 获取 npm 包名后回到
+  Studio 搜索，安装仍须经过现有的精确版本安全检查。
+
+### 变更
+
+- 安装 Harness 时改为选择“带有可用 npm 的最高兼容 Node”，避免一个版本更高但不完整的
+  Node 遮住机器上已有的完整运行时。
+- npm 入口在使用前会由精确选中的 Node 实际执行验证。插件操作会沿用现有 Profile 已记录的
+  pnpm store；新 Profile 使用稳定的 Studio 私有 store，不再受 GUI Shell 配置变化影响。
+- DSH Hub 仍是外部网站目录，而不是安装权威；Studio 不抓取其 HTML，也不会把首页当作自定义
+  Schema 1.0.0 目录接口。
+
+### 修复
+
+- 修复 [#3](https://github.com/Moresyl/dsh-studio/issues/3)：Homebrew 的 `node` 软链接解析为
+  Cellar 真实路径后仍能找到 npm，同时覆盖 Apple Silicon 与 Intel Mac 的公式 `libexec` 和
+  Homebrew 前缀共享 npm 布局。
+- 支持版本的 Node 如果确实不带 npm，不再阻塞在线 Harness 安装；Studio 会自动下载并校验
+  自己管理的完整 Node，然后继续原来的 Harness 安装流程。
+- 修复环境检查、托盘和窗口启动并发时，偶发在托管 Harness 切换期间读到不完整 Profile 模块
+  回退的问题。运行时检查、安装与启动现在共用生命周期锁，安装前会等待受监管进程完全退出，
+  并只对托管包的瞬时解析失败执行有限重试。
+
+
 ## [0.7.4] —— 2026-08-22
 
 ### 修复

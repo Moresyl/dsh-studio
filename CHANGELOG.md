@@ -9,6 +9,42 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.5] — 2026-08-22
+
+### Added
+
+- The plugin Sources view now links to DSH Hub as a community discovery
+  directory and explains the safe workflow: copy a listed npm package name back
+  into Studio, where the existing exact-version install review still applies.
+
+### Changed
+
+- Harness installation now chooses the newest compatible Node runtime that has
+  a working npm, rather than allowing a newer Node-only installation to hide a
+  complete runtime already on the machine.
+- npm entry points are executed with the exact selected Node before use. Plugin
+  operations preserve the pnpm store already recorded by an existing profile;
+  new profiles receive a stable Studio-owned store instead of inheriting a
+  changing GUI shell configuration.
+- DSH Hub remains an external website directory, not an installation authority.
+  Studio does not scrape its HTML or accept it as a custom Schema 1.0.0 endpoint.
+
+### Fixed
+
+- Fixed [#3](https://github.com/Moresyl/dsh-studio/issues/3): Homebrew Node
+  installations remain usable after their `node` symlink is canonicalized into
+  the Cellar. Both formula-owned `libexec` npm and prefix-shared npm layouts are
+  recognized on Apple Silicon and Intel Macs.
+- A supported Node installation without npm no longer blocks online Harness
+  setup. Studio automatically downloads and verifies its managed complete Node
+  runtime, then resumes the original Harness installation.
+- Fixed intermittent startup failures where concurrent Environment, tray and
+  window actions could observe a managed Harness promotion while profile module
+  fallbacks were being refreshed. Runtime inspection, installation and startup
+  now share one lifecycle gate, wait for supervised shutdown, and narrowly retry
+  only transient managed-package resolution failures.
+
+
 ## [0.7.4] — 2026-08-22
 
 ### Fixed
