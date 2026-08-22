@@ -1,4 +1,4 @@
-import { copyFile, cp, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { copyFile, cp, lstat, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -33,6 +33,7 @@ try {
     '--no-fund',
     '--ignore-scripts=false',
     '--legacy-peer-deps',
+    '--install-links',
   ])
   const packageRoot = join(directory, 'node_modules', '@deepseek-ai', 'dsh')
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
@@ -47,9 +48,12 @@ try {
   if (pnpm.version !== expectedPnpm) {
     throw new Error(`installed pnpm ${pnpm.version ?? 'unknown'}, expected ${expectedPnpm}`)
   }
-  await stat(
-    join(directory, 'node_modules', '@moresyl', 'dsh-studio-integration', 'lib', 'client.js'),
-  )
+  const integrationRoot = join(directory, 'node_modules', '@moresyl', 'dsh-studio-integration')
+  const integrationMetadata = await lstat(integrationRoot)
+  if (integrationMetadata.isSymbolicLink()) {
+    throw new Error('Studio integration was linked instead of materialized')
+  }
+  await stat(join(integrationRoot, 'lib', 'client.js'))
   const picker = await readFile(
     join(
       directory,
