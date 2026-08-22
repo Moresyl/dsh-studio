@@ -34,6 +34,11 @@ try {
     '--ignore-scripts=false',
     '--legacy-peer-deps',
     '--install-links',
+    '--foreground-scripts',
+    '--loglevel=http',
+    '--registry=https://registry.npmjs.org/',
+    '--fetch-retries=2',
+    '--fetch-timeout=60000',
   ])
   const packageRoot = join(directory, 'node_modules', '@deepseek-ai', 'dsh')
   const manifest = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'))
