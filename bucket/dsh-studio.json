@@ -1,5 +1,5 @@
 {
-  "version": "0.7.5",
+  "version": "0.7.6",
   "description": "Native desktop shell for DeepSeek Harness.",
   "homepage": "https://github.com/Moresyl/dsh-studio",
   "license": "MIT",
@@ -10,8 +10,8 @@
   ],
   "architecture": {
     "64bit": {
-      "url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.7.5/DSH.Studio_0.7.5_x64-setup.exe#/setup.exe",
-      "hash": "5a9d693c3049d545706bdfaaca613f134674d4aa39672ee7ac4eecc5b9369bbc"
+      "url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.7.6/DSH.Studio_0.7.6_x64-setup.exe#/setup.exe",
+      "hash": "6a12f7582326f133023d9d959c52e22ec838936bd694ec2d35b8adf08ac0dca4"
     }
   },
   "installer": {
