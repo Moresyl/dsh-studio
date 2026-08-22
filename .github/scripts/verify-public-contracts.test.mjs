@@ -46,5 +46,5 @@ test('release and SDK versions stay aligned', () => {
 
 test('repository public contracts agree end to end', async () => {
   const result = await verifyPublicContracts()
-  assert.deepEqual(result, { protocol: 3, schema: '1.0.0', version: '0.7.5' })
+  assert.deepEqual(result, { protocol: 3, schema: '1.0.0', version: '0.7.6' })
 })

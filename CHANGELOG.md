@@ -9,6 +9,45 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.6] — 2026-08-23
+
+### Added
+
+- The macOS application menu now exposes Check for Updates and Restart DSH
+  Studio while retaining the platform's standard edit, window, hide and quit
+  commands instead of the unhelpful default File / View / Help menus.
+- The embedded terminal adds explicit copy, paste and clear actions, native
+  platform shortcuts and an always-available scroll lane.
+
+### Changed
+
+- The managed Harness moves from `@deepseek-ai/dsh@0.1.0-rc.8` to
+  `0.1.1-rc.2`. Online and offline setup still consume the same fully locked
+  dependency graph, with pnpm remaining pinned to 11.7.0.
+- Packaged Unix terminals recover PATH from a bounded, credential-filtered login
+  shell environment and prefer those recovered developer tools over an
+  incomplete GUI-process PATH.
+- Installed local `link:`, file and Git plugins now display verified profile
+  metadata directly instead of being reinterpreted as npm registry packages.
+
+### Fixed
+
+- Fixed [#4](https://github.com/Moresyl/dsh-studio/issues/4): when the Harness is
+  already available on macOS, Studio no longer reports a missing package manager
+  merely because pnpm is not installed globally. It reuses an exact pnpm match
+  from Studio tools or the managed Harness.
+- Fixed installed local/Git plugin details issuing an npm registry request and
+  ending in HTTP 404.
+- Fixed macOS GUI launches losing login-shell tools such as `claude` and
+  `starship`, which could also trigger a Powerlevel10k warning.
+- Fixed terminal selection, copy, paste and scrolling. Selection copy does not
+  steal ordinary `Ctrl+C` interrupt semantics from Windows/Linux shells.
+- npm cache, resolution progress and ordinary informational stderr are no longer
+  all rendered as errors; warnings and genuine errors remain distinct.
+- Startup failure details are width-bounded, wrapped and internally scrollable
+  so they cannot push the workspace out of its layout.
+
+
 ## [0.7.5] — 2026-08-22
 
 ### Added
@@ -592,7 +631,10 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...HEAD
+[0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6
+[0.7.5]: https://github.com/Moresyl/dsh-studio/compare/v0.7.4...v0.7.5
+[0.7.4]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1

@@ -9,6 +9,38 @@
 
 ## [未发布]
 
+## [0.7.6] —— 2026-08-23
+
+### 新增
+
+- macOS 应用菜单新增「检查更新」和「重新启动 DSH Studio」，并保留系统标准的编辑、窗口、
+  隐藏与退出操作，替换没有实际价值的默认 File / View / Help 菜单。
+- 内置终端新增明确的复制、粘贴和清空操作，并为 macOS 与 Windows/Linux 提供符合平台习惯的
+  键盘快捷键和始终可用的滚动区域。
+
+### 变更
+
+- 托管 Harness 从 `@deepseek-ai/dsh@0.1.0-rc.8` 升级到 `0.1.1-rc.2`，离线与在线安装继续
+  共用同一份完整锁定依赖图；pnpm 保持固定为 11.7.0。
+- 打包后的 Unix 终端会从有界、过滤凭据的登录 Shell 环境恢复 PATH，并让恢复出的开发工具
+  优先于 GUI 进程的不完整 PATH。
+- 已安装的本地 `link:`、文件或 Git 插件直接使用 Profile 中的已验证信息展示详情，不再把
+  非 registry 来源误当成 npm 包重新查询。
+
+### 修复
+
+- 修复 [#4](https://github.com/Moresyl/dsh-studio/issues/4)：macOS 上 Harness 已经可用时，
+  Studio 不再因为系统没有全局 pnpm 而显示错误的包管理器警告；它会复用版本完全匹配的
+  Studio 工具或托管 Harness 中的 pnpm。
+- 修复点击已安装本地/Git 插件时请求 npm registry 并显示 HTTP 404 的问题。
+- 修复 macOS 图形界面启动时 PATH 缺少 `claude`、`starship` 等登录 Shell 工具，进而触发
+  Powerlevel10k 警告或终端命令不可用的问题。
+- 修复终端难以选择、复制、粘贴和滚动的问题；选区复制不会把普通 `Ctrl+C` 中断语义从
+  Windows/Linux Shell 中夺走。
+- npm cache、解析进度与普通信息即使写到 stderr 也不再全部标红；警告和真实错误仍保持醒目。
+- 左侧启动失败提示现在有宽度边界、自动换行与内部滚动，不会再挤坏右侧工作区。
+
+
 ## [0.7.5] —— 2026-08-22
 
 ### 新增
@@ -493,7 +525,10 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...HEAD
+[0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6
+[0.7.5]: https://github.com/Moresyl/dsh-studio/compare/v0.7.4...v0.7.5
+[0.7.4]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/Moresyl/dsh-studio/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/Moresyl/dsh-studio/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/Moresyl/dsh-studio/compare/v0.7.0...v0.7.1
