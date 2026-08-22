@@ -162,7 +162,7 @@ export function ConsolePane() {
             )}
 
             {error && (
-              <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed text-danger">
+              <p className="selectable max-h-36 min-w-0 overflow-y-auto rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-danger [overflow-wrap:anywhere]">
                 {error}
               </p>
             )}

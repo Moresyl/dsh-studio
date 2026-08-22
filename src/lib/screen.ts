@@ -20,7 +20,8 @@ import { Terminal, type ITheme } from '@xterm/xterm'
 
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
-import { isWindows } from '@/lib/platform'
+import { isMac, isWindows } from '@/lib/platform'
+import { clipboardAction } from '@/lib/terminal-shortcuts'
 
 import '@xterm/xterm/css/xterm.css'
 
@@ -178,14 +179,11 @@ function create(): Screen {
  * Returning false keeps xterm from also sending the keystroke to the shell.
  */
 function clipboardKeys(terminal: Terminal, event: KeyboardEvent): boolean {
-  if (event.type !== 'keydown') return true
-  if (!event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey) return true
-
-  const key = event.key.toLowerCase()
-  if (key !== 'c' && key !== 'v') return true
+  const action = clipboardAction(event, isMac)
+  if (action === null) return true
 
   event.preventDefault()
-  if (key === 'c') {
+  if (action === 'copy') {
     const selection = terminal.getSelection()
     // Nothing highlighted is not a failed copy; it is a keystroke with nothing
     // to do, and replacing the clipboard with an empty string would be worse.
@@ -208,6 +206,12 @@ function pasteInto(terminal: Terminal): void {
 export function paste(id: string): void {
   const screen = screens.get(id)
   if (screen) pasteInto(screen.terminal)
+}
+
+/** Copy xterm's canvas selection, which the webview cannot copy by itself. */
+export function copy(id: string): void {
+  const chosen = selection(id)
+  if (chosen.length > 0) void navigator.clipboard.writeText(chosen).catch(sink.report)
 }
 
 /**

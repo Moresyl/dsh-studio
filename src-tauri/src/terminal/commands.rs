@@ -17,7 +17,12 @@ pub async fn terminal_open(
     rows: u16,
     cols: u16,
 ) -> Result<Session> {
-    terminals.open(&app, rows, cols)
+    // A packaged macOS app does not inherit the PATH an interactive shell has.
+    // Resolve the same bounded, credential-filtered login environment used by
+    // the Harness before the PTY starts, so zsh startup commands and user tools
+    // such as starship or claude are reachable from the first prompt.
+    let shell = crate::harness::shell_environment::resolve().await;
+    terminals.open(&app, rows, cols, &shell.updates)
 }
 
 #[tauri::command]

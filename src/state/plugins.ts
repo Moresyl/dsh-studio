@@ -57,6 +57,8 @@ interface PluginStore {
     refresh?: boolean,
   ) => Promise<void>
   select: (name: string | null, sourceId?: string, version?: string) => Promise<void>
+  /** Open an installed package without asking a registry that may never have seen it. */
+  selectInstalled: (plugin: InstalledPlugin) => void
   selectSource: (id: string) => Promise<void>
   addSource: (label: string, endpoint: string) => Promise<boolean>
   removeSource: (id: string) => Promise<void>
@@ -188,6 +190,37 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     } finally {
       if (get().selected === name) set({ loadingDetail: false })
     }
+  },
+
+  selectInstalled: (plugin) => {
+    const version = plugin.spec || 'bundled'
+    set({
+      selected: plugin.name,
+      selectedSource: 'profile',
+      selectedVersion: version,
+      detail: {
+        name: plugin.name,
+        version,
+        description: '',
+        license: '',
+        homepage: null,
+        repository: null,
+        bundle: plugin.active || plugin.disabled || plugin.builtin,
+        dependencies: [],
+        installSpec: plugin.name,
+        source: plugin.spec || 'profile bundle',
+        compatibility: { state: 'unknown' },
+        integrity: null,
+        bundlePatch: null,
+        lifecycleScripts: [],
+        deprecated: null,
+        repositoryVerified: false,
+        integrityVerified: false,
+      },
+      loadingDetail: false,
+      previewToken: null,
+      error: null,
+    })
   },
 
   selectSource: async (id) => {

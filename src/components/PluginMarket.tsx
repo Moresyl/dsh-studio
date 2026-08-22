@@ -81,6 +81,7 @@ export function PluginMarket() {
   const refresh = usePlugins((state) => state.refresh)
   const search = usePlugins((state) => state.search)
   const select = usePlugins((state) => state.select)
+  const selectInstalled = usePlugins((state) => state.selectInstalled)
   const selectSource = usePlugins((state) => state.selectSource)
   const remove = usePlugins((state) => state.remove)
   const toggle = usePlugins((state) => state.toggle)
@@ -415,7 +416,7 @@ export function PluginMarket() {
               plugins={installed}
               initialized={profile?.initialized ?? false}
               working={working}
-              onOpen={(name) => void select(name, 'npm', 'latest')}
+              onOpen={selectInstalled}
               onToggle={(name, on) => void toggle(name, on)}
               onRemove={(name) => void confirmRemove(name)}
             />
@@ -662,7 +663,7 @@ interface InstalledProps {
   plugins: InstalledPlugin[]
   initialized: boolean
   working: string | null
-  onOpen: (name: string) => void
+  onOpen: (plugin: InstalledPlugin) => void
   onToggle: (name: string, on: boolean) => void
   onRemove: (name: string) => void
 }
@@ -696,7 +697,7 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
             <div className="min-w-0 flex-1">
               <button
                 type="button"
-                onClick={() => onOpen(plugin.name)}
+                onClick={() => onOpen(plugin)}
                 data-hint={plugin.name}
                 className="flex max-w-full items-baseline gap-2 text-left"
               >

@@ -77,7 +77,7 @@ export function TerminalPane() {
         label: t('menu.copy'),
         icon: Copy,
         disabled: selection.length === 0,
-        run: () => void navigator.clipboard.writeText(selection),
+        run: () => screens.copy(active),
       },
       { label: t('menu.paste'), icon: ClipboardPaste, run: () => screens.paste(active) },
       SEPARATOR,
@@ -111,6 +111,37 @@ export function TerminalPane() {
               onClose={() => void close(tab.id)}
             />
           ))}
+          {active && (
+            <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-0.5 border-l border-line bg-[var(--ground-chrome)] px-1.5">
+              <button
+                type="button"
+                data-hint={t('menu.copy')}
+                aria-label={t('menu.copy')}
+                onClick={() => screens.copy(active)}
+                className="grid size-[22px] place-items-center rounded-[4px] text-faint transition-colors hover:bg-surface-2 hover:text-text"
+              >
+                <Copy size={11} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                data-hint={t('menu.paste')}
+                aria-label={t('menu.paste')}
+                onClick={() => screens.paste(active)}
+                className="grid size-[22px] place-items-center rounded-[4px] text-faint transition-colors hover:bg-surface-2 hover:text-text"
+              >
+                <ClipboardPaste size={11} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                data-hint={t('terminal.clear')}
+                aria-label={t('terminal.clear')}
+                onClick={() => screens.clear(active)}
+                className="grid size-[22px] place-items-center rounded-[4px] text-faint transition-colors hover:bg-surface-2 hover:text-text"
+              >
+                <Eraser size={11} aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

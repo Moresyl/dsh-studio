@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 
 export const NODE_VERSION = '22.19.0'
 export const HARNESS_PACKAGE = '@deepseek-ai/dsh'
-export const HARNESS_VERSION = '0.1.0-rc.8'
+export const HARNESS_VERSION = '0.1.1-rc.2'
 export const PNPM_VERSION = '11.7.0'
 
 const TARGETS = {

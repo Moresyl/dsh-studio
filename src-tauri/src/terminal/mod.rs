@@ -27,8 +27,8 @@ pub mod commands;
 mod decoder;
 mod shell;
 
-use std::collections::HashMap;
-use std::ffi::OsString;
+use std::collections::{BTreeMap, HashMap};
+use std::ffi::{OsStr, OsString};
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -119,7 +119,13 @@ impl Terminals {
     /// `rows` and `cols` are the size the pane already knows it has. Starting at
     /// the right size matters more than it sounds: a shell asks once, at startup,
     /// and a prompt drawn for 80 columns stays wrong until something redraws it.
-    pub fn open(self: &Arc<Self>, app: &AppHandle, rows: u16, cols: u16) -> Result<Session> {
+    pub fn open(
+        self: &Arc<Self>,
+        app: &AppHandle,
+        rows: u16,
+        cols: u16,
+        login_environment: &BTreeMap<String, String>,
+    ) -> Result<Session> {
         let pty = portable_pty::native_pty_system();
         let pair = pty
             .openpty(PtySize {
@@ -130,7 +136,7 @@ impl Terminals {
             })
             .map_err(|failure| Error::Terminal(format!("could not open a terminal: {failure}")))?;
 
-        let command = self.command();
+        let command = self.command(login_environment);
         let program = command.get_argv().clone();
         let cwd = command
             .get_cwd()
@@ -290,18 +296,22 @@ impl Terminals {
     }
 
     /// The command a new terminal runs, environment and all.
-    fn command(&self) -> CommandBuilder {
+    fn command(&self, login_environment: &BTreeMap<String, String>) -> CommandBuilder {
         // `new_default_prog` is used only to read the environment the pty layer
         // would build: on Windows that is the registry's `PATH` rather than this
         // process's, so a shell installed since launch is found and a `PATH` the
         // user edited an hour ago is in effect.
         let base = CommandBuilder::new_default_prog();
         let inherited = base.get_env("PATH").map(OsString::from);
+        let recovered = login_environment.get("PATH").map(String::as_str);
 
-        let argv = shell::argv(inherited.as_deref());
+        let argv = shell::argv(recovered.map(OsStr::new).or(inherited.as_deref()));
         let mut command = CommandBuilder::from_argv(argv);
 
-        if let Some(path) = search_path(inherited.as_deref()) {
+        for (name, value) in login_environment {
+            command.env(name, value);
+        }
+        if let Some(path) = search_path(recovered.map(OsStr::new), inherited.as_deref()) {
             command.env("PATH", path);
         }
 
@@ -334,7 +344,7 @@ impl Terminals {
 /// the machine. `dsh` is installed inside application data, which is deliberately
 /// not on anybody's `PATH` — so without this, the one command the pane exists to
 /// make available would be the one command that does not work.
-fn search_path(inherited: Option<&std::ffi::OsStr>) -> Option<OsString> {
+fn search_path(recovered: Option<&OsStr>, inherited: Option<&OsStr>) -> Option<OsString> {
     let mut directories: Vec<PathBuf> = Vec::new();
 
     // The runtime the harness itself was started with, so `node` in here is the
@@ -358,16 +368,24 @@ fn search_path(inherited: Option<&std::ffi::OsStr>) -> Option<OsString> {
         directories.push(tools);
     }
 
-    if directories.is_empty() {
-        return None;
+    join_search_path(directories, recovered, inherited)
+}
+
+fn join_search_path(
+    mut prepended: Vec<PathBuf>,
+    recovered: Option<&OsStr>,
+    inherited: Option<&OsStr>,
+) -> Option<OsString> {
+    if let Some(base) = recovered.or(inherited) {
+        prepended.extend(std::env::split_paths(base));
     }
-    if let Some(inherited) = inherited {
-        directories.extend(std::env::split_paths(inherited));
+    if prepended.is_empty() {
+        return None;
     }
 
     // A directory containing `;` on Windows cannot be expressed in a `PATH` at
     // all, and inventing a truncated one would be worse than leaving `PATH` alone.
-    std::env::join_paths(directories).ok()
+    std::env::join_paths(prepended).ok()
 }
 
 /// Forward everything the shell prints to the pane that is showing it.
@@ -452,4 +470,44 @@ fn spawn_waiter(
             );
         })
         .expect("spawn a pty waiter thread");
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+
+    use super::join_search_path;
+
+    #[test]
+    fn recovered_login_path_wins_over_the_gui_process_path() {
+        let recovered = std::env::join_paths([PathBuf::from("login-bin")]).unwrap();
+        let inherited = std::env::join_paths([PathBuf::from("gui-bin")]).unwrap();
+        let joined = join_search_path(
+            vec![PathBuf::from("studio-bin")],
+            Some(&recovered),
+            Some(&inherited),
+        )
+        .expect("a path");
+
+        assert_eq!(
+            std::env::split_paths(&joined).collect::<Vec<_>>(),
+            [PathBuf::from("studio-bin"), PathBuf::from("login-bin")]
+        );
+    }
+
+    #[test]
+    fn inherited_path_remains_the_fallback() {
+        let inherited = std::env::join_paths([PathBuf::from("gui-bin")]).unwrap();
+        let joined = join_search_path(Vec::new(), None, Some(&inherited)).expect("a path");
+        assert_eq!(
+            std::env::split_paths(&joined).collect::<Vec<_>>(),
+            [PathBuf::from("gui-bin")]
+        );
+    }
+
+    #[test]
+    fn no_input_does_not_invent_a_path() {
+        assert_eq!(join_search_path(Vec::new(), None, None), None::<OsString>);
+    }
 }

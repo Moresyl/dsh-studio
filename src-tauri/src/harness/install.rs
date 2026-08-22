@@ -26,12 +26,12 @@ pub const PACKAGE: &str = "@deepseek-ai/dsh";
 
 /// One coherent upstream release, never an npm moving tag.
 ///
-/// Every official package in this release depends on the matching rc.8 family,
+/// Every official package in this release depends on the matching rc.2 family,
 /// including the public `dsh-code-runtime-worker-thread` package. Pinning the
 /// root keeps a newly installed machine from silently selecting an unrelated
 /// release graph.
-pub const VERSION: &str = "0.1.0-rc.8";
-pub const SPEC: &str = "@deepseek-ai/dsh@0.1.0-rc.8";
+pub const VERSION: &str = "0.1.1-rc.2";
+pub const SPEC: &str = "@deepseek-ai/dsh@0.1.1-rc.2";
 pub const PNPM_VERSION: &str = "11.7.0";
 pub const PNPM_SPEC: &str = "pnpm@11.7.0";
 const RUNTIME_SCHEMA: u8 = 2;

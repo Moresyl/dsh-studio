@@ -29,7 +29,7 @@ test('every release target maps to its exact native Node archive', () => {
     nodeArchive: `node-v${NODE_VERSION}-darwin-arm64.tar.gz`,
   })
   assert.equal(HARNESS_PACKAGE, '@deepseek-ai/dsh')
-  assert.equal(HARNESS_VERSION, '0.1.0-rc.8')
+  assert.equal(HARNESS_VERSION, '0.1.1-rc.2')
   assert.equal(PNPM_VERSION, '11.7.0')
 })
 

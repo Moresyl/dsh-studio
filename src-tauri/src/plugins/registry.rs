@@ -512,7 +512,7 @@ mod tests {
             &serde_json::json!({
                 "name": "@vendor/tool",
                 "version": "1.2.3",
-                "peerDependencies": { "@deepseek-ai/dsh": "^0.1.0-rc.7" }
+                "peerDependencies": { "@deepseek-ai/dsh": "^0.1.1-rc.1" }
             }),
         );
         assert_eq!(detail.install_spec, "@vendor/tool@1.2.3");
@@ -525,6 +525,14 @@ mod tests {
 
     #[test]
     fn incompatible_and_malformed_peer_ranges_are_blocked() {
+        let previous_prerelease_line = compatibility(&serde_json::json!({
+            "peerDependencies": { "@deepseek-ai/dsh": "^0.1.0-rc.7" }
+        }));
+        assert!(matches!(
+            previous_prerelease_line,
+            Compatibility::Incompatible { .. }
+        ));
+
         let incompatible = compatibility(&serde_json::json!({
             "peerDependencies": { "@deepseek-ai/dsh": "<0.1.0-rc.7" }
         }));

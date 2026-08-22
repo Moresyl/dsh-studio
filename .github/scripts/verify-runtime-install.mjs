@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
 
-const expected = '0.1.0-rc.8'
+const expected = '0.1.1-rc.2'
 const expectedPnpm = '11.7.0'
 const directory = await mkdtemp(join(tmpdir(), 'dsh-runtime-contract-'))
 

@@ -1,6 +1,7 @@
 //! dsh-studio — a native desktop shell for the DeepSeek Harness.
 
 mod about;
+mod application_menu;
 mod desktop;
 mod diagnostics;
 mod error;
@@ -93,6 +94,7 @@ pub fn run() {
             app.manage(desktop::Desk::default());
 
             window::build(app.handle())?;
+            application_menu::build(app.handle())?;
             tray::build(app.handle())?;
             desktop::wire(app.handle());
             sessions::attention::wire(app.handle());

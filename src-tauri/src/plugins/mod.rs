@@ -627,13 +627,26 @@ where
     })
 }
 
-/// The `.bin` directory of the pnpm the shell installed, if it is there.
+/// The `.bin` directory of a verified pnpm already owned by Studio.
+///
+/// The managed Harness contract already carries this exact pnpm. Reusing it
+/// avoids a second download and prevents the market from claiming there is no
+/// package manager immediately after a successful Harness install. The
+/// separate tools prefix remains the first choice so a future Harness repair
+/// cannot interrupt an in-flight profile operation.
+fn managed_manager() -> Option<PathBuf> {
+    [paths::tools_dir(), paths::harness_dir()]
+        .into_iter()
+        .find_map(|root| manager_in(&root))
+}
+
+/// A qualified pnpm below one npm project root.
 ///
 /// npm writes the platform's own launcher into `.bin` — a `.cmd` on Windows, a
 /// symlink elsewhere — which is exactly what the harness's PATH lookup expects
 /// to find, so nothing here has to write a shim of its own.
-fn managed_manager() -> Option<PathBuf> {
-    let manifest = paths::tools_dir().join("node_modules/pnpm/package.json");
+fn manager_in(root: &Path) -> Option<PathBuf> {
+    let manifest = root.join("node_modules/pnpm/package.json");
     let version = std::fs::read_to_string(manifest)
         .ok()
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
@@ -641,7 +654,7 @@ fn managed_manager() -> Option<PathBuf> {
     if version.as_deref() != Some(install::PNPM_VERSION) {
         return None;
     }
-    let directory = paths::tools_dir().join("node_modules").join(".bin");
+    let directory = root.join("node_modules").join(".bin");
     executable_in(&directory, "pnpm").map(|_| directory)
 }
 
@@ -778,7 +791,8 @@ mod tests {
     #[cfg(windows)]
     use super::path_with;
     use super::{
-        forward, is_package_spec, list, profile_store_dir, split_spec, PluginIntents, Stream,
+        forward, is_package_spec, list, manager_in, profile_store_dir, split_spec, PluginIntents,
+        Stream,
     };
 
     fn manifest(raw: &str) -> serde_json::Value {
@@ -956,6 +970,58 @@ mod tests {
             format!("pnpm@{}", crate::harness::install::PNPM_VERSION)
         );
         assert!(!crate::harness::install::PNPM_SPEC.ends_with("@latest"));
+    }
+
+    #[test]
+    fn any_studio_owned_runtime_can_supply_the_verified_package_manager() {
+        let root =
+            std::env::temp_dir().join(format!("dsh-studio-pnpm-runtime-{}", std::process::id()));
+        let package = root.join("node_modules/pnpm");
+        let bin = root.join("node_modules/.bin");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&package).expect("pnpm package directory");
+        std::fs::create_dir_all(&bin).expect("pnpm bin directory");
+        std::fs::write(
+            package.join("package.json"),
+            format!(
+                r#"{{"version":"{}"}}"#,
+                crate::harness::install::PNPM_VERSION
+            ),
+        )
+        .expect("pnpm manifest");
+        #[cfg(windows)]
+        let executable = bin.join("pnpm.cmd");
+        #[cfg(not(windows))]
+        let executable = bin.join("pnpm");
+        std::fs::write(executable, "launcher").expect("pnpm launcher");
+
+        assert_eq!(manager_in(&root), Some(bin));
+        std::fs::remove_dir_all(root).expect("fixture cleanup");
+    }
+
+    #[test]
+    fn a_wrong_or_incomplete_package_manager_is_not_advertised() {
+        let root =
+            std::env::temp_dir().join(format!("dsh-studio-pnpm-invalid-{}", std::process::id()));
+        let package = root.join("node_modules/pnpm");
+        let bin = root.join("node_modules/.bin");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&package).expect("pnpm package directory");
+        std::fs::create_dir_all(&bin).expect("pnpm bin directory");
+        std::fs::write(package.join("package.json"), r#"{"version":"0.0.0"}"#)
+            .expect("pnpm manifest");
+
+        assert_eq!(manager_in(&root), None, "wrong version");
+        std::fs::write(
+            package.join("package.json"),
+            format!(
+                r#"{{"version":"{}"}}"#,
+                crate::harness::install::PNPM_VERSION
+            ),
+        )
+        .expect("pnpm manifest");
+        assert_eq!(manager_in(&root), None, "missing launcher");
+        std::fs::remove_dir_all(root).expect("fixture cleanup");
     }
 
     #[test]

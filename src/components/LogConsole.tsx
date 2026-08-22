@@ -3,6 +3,7 @@ import { ClipboardCopy, Copy, Eraser, TerminalSquare } from 'lucide-react'
 
 import { t } from '@/lib/i18n'
 import type { LogLine } from '@/lib/ipc'
+import { logTone } from '@/lib/log-tone'
 import { contextMenu, selectedText } from '@/state/menu'
 
 /**
@@ -91,18 +92,24 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
             <p className="font-sans text-[12px]">{t('log.empty')}</p>
           </div>
         ) : (
-          lines.map((entry, index) => (
-            <p
-              key={index}
-              className={
-                entry.stream === 'stderr'
-                  ? 'break-words whitespace-pre-wrap text-danger'
-                  : 'break-words whitespace-pre-wrap text-muted'
-              }
-            >
-              {entry.line}
-            </p>
-          ))
+          lines.map((entry, index) => {
+            const tone = logTone(entry)
+            return (
+              <p
+                key={index}
+                className={[
+                  'break-words whitespace-pre-wrap',
+                  tone === 'error'
+                    ? 'text-danger'
+                    : tone === 'warning'
+                      ? 'text-warn'
+                      : 'text-muted',
+                ].join(' ')}
+              >
+                {entry.line}
+              </p>
+            )
+          })
         )}
       </div>
     </section>

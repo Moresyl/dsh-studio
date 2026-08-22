@@ -478,6 +478,12 @@
    Qualified with `:root` only to outweigh the library's two-class selector. */
 :root .xterm .xterm-viewport {
   background-color: var(--color-canvas-deep);
+  /* macOS hides overlay scrollbars until a trackpad gesture. Keeping a real
+     scroll lane makes the retained 5,000-line transcript discoverable with a
+     mouse as well as with Shift+PageUp. */
+  overflow-y: scroll !important;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 @media (prefers-reduced-motion: reduce) {

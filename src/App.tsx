@@ -25,7 +25,7 @@ import { usePresentation } from '@/state/presentation'
 import { subscribeToProfiles } from '@/state/profiles'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { subscribeToTerminals } from '@/state/terminals'
-import { watchForUpdates } from '@/state/update'
+import { useUpdate, watchForUpdates } from '@/state/update'
 import { switchWorkspace } from '@/state/workspace'
 
 /**
@@ -152,6 +152,19 @@ export default function App() {
   // should keep its schedule while the user is reading a pane, and a component
   // that unmounts must not be able to take the schedule down with it.
   useEffect(() => watchForUpdates(), [])
+
+  // macOS owns an application menu even when the custom title bar owns the
+  // rest of the chrome. Its update item enters the same checked state as the
+  // About pane button and brings that evidence into view.
+  useEffect(() => {
+    const pending = ipc.onApplicationCheckUpdate(() => {
+      show('about')
+      void useUpdate.getState().check(false)
+    })
+    return () => {
+      void pending.then((unlisten) => unlisten())
+    }
+  }, [show])
 
   // A native drop belongs to the surface the user can see. In the Studio
   // workbench it changes the next Harness working directory; in compatibility

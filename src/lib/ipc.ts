@@ -985,3 +985,8 @@ export const frontendCrash = (payload: {
   stack: string
   url: string
 }): Promise<void> => invoke('report_frontend_crash', payload)
+const APPLICATION_CHECK_UPDATE = 'application://check-update'
+
+/** The native macOS application menu asked for an interactive update check. */
+export const onApplicationCheckUpdate = (handler: () => void): Promise<UnlistenFn> =>
+  listen(APPLICATION_CHECK_UPDATE, handler)
