@@ -120,6 +120,16 @@ impl LaunchPlan {
             // Lets harness plugins detect that a native shell owns the session.
             .env("DSH_DESKTOP", "1");
         command.envs(&self.environment);
+        #[cfg(windows)]
+        {
+            // Both the composition preflight and the supervised Harness run
+            // through this command. Node is a console program on Windows, but
+            // Studio owns its output in the activity panel, so a transient
+            // console window would expose an implementation detail every time
+            // someone presses Start. CREATE_NO_WINDOW keeps both launches in
+            // the desktop process without changing their redirected streams.
+            command.creation_flags(0x0800_0000);
+        }
         command
     }
 

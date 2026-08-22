@@ -98,6 +98,7 @@ impl InstallPlan {
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
+        hide_console_window(&mut command);
         command
     }
 
@@ -133,8 +134,21 @@ impl InstallPlan {
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
+        hide_console_window(&mut command);
         command
     }
+}
+
+fn hide_console_window(command: &mut Command) {
+    #[cfg(windows)]
+    {
+        // npm and its lifecycle scripts report through the redirected pipes.
+        // CREATE_NO_WINDOW prevents their console host from flashing over the
+        // desktop shell while preserving that output for the Environment UI.
+        command.creation_flags(0x0800_0000);
+    }
+    #[cfg(not(windows))]
+    let _ = command;
 }
 
 /// Work out how to install `spec` with the given runtime.

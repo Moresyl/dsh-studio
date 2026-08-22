@@ -9,6 +9,18 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-08-22
+
+### Fixed
+
+- Fixed a transient black console window appearing when Start ran the Harness
+  composition preflight or launched the supervised Node process on Windows.
+  Both paths now use `CREATE_NO_WINDOW` while keeping stdout and stderr in the
+  Studio activity log.
+- Managed Harness and pnpm installation now use the same hidden-console launch
+  contract, so first install and Repair do not flash `node.exe`, `npm` or their
+  lifecycle console host over the desktop window.
+
 ## [0.7.3] — 2026-08-22
 
 ### Added
