@@ -9,6 +9,33 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.7] — 2026-08-23
+
+### Added
+
+- Node runtimes shown in Environment can now be selected explicitly. The choice
+  is persisted and falls back safely when that installation disappears.
+- Settings can request native notification access and send a test notification,
+  making macOS Notification Center registration observable instead of implicit.
+
+### Changed
+
+- macOS autostart now uses a real Login Item so it appears in System Settings and
+  startup-management tools while still launching Studio hidden in the tray.
+- The embedded terminal uses Unicode 11 cell widths and a full-height screen so
+  box drawing, CJK, emoji and full-screen TUIs keep their layout.
+- Dark macOS Vibrancy content uses opaque dark grounds instead of sampling a
+  light or inactive desktop through the window.
+
+### Fixed
+
+- Fixed catalog discovery being rejected when DNS returned a public address next
+  to a private or special-use address. Requests remain pinned to one admissible
+  public address, and hosts with no admissible address are still blocked.
+- Expanded special-use and IPv4-mapped IPv6 checks in the catalog SSRF guard.
+- Fixed the selected Node runtime not being honoured by Harness launch and npm
+  installation planning.
+
 ## [0.7.6] — 2026-08-23
 
 ### Added
@@ -631,7 +658,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...HEAD
+[0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/Moresyl/dsh-studio/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...v0.7.4

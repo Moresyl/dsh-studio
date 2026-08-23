@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime, State};
 use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt as _, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_notification::NotificationExt as _;
 
 use crate::error::{Error, Result};
 use crate::paths;
@@ -30,11 +31,13 @@ use crate::window;
 /// one, because a single-modifier combination is what an editor already has.
 pub const SUGGESTED: &str = "CmdOrCtrl+Shift+KeyD";
 
-/// The argument the login item passes.
+/// The argument used by launchers that can pass process arguments.
 ///
 /// A launch the machine started is not a launch anybody asked to look at, so it
 /// stops at the tray. Windows and Linux hand the flag through as an ordinary
-/// argument; macOS does the same through the launch agent's `ProgramArguments`.
+/// argument. macOS Login Items carry the equivalent `hidden` property instead
+/// of exposing `ProgramArguments`; the AppleScript launcher selects that native
+/// property while this flag remains the cross-platform fallback.
 pub const STANDBY_FLAG: &str = "--hidden";
 
 /// Modifiers that put a combination out of reach of ordinary typing.
@@ -208,6 +211,11 @@ pub fn startup_notification<R: Runtime>(
     kind: String,
     enabled: bool,
 ) -> Result<Startup> {
+    if enabled {
+        app.notification().request_permission().map_err(|cause| {
+            Error::Startup(format!("notification permission was not granted: {cause}"))
+        })?;
+    }
     let mut saved = read();
     match kind.as_str() {
         "turn-completed" => saved.notifications.turn_completed = enabled,
@@ -221,6 +229,27 @@ pub fn startup_notification<R: Runtime>(
         }
     }
     write(&saved)?;
+    Ok(report(&app, &keys))
+}
+
+/// Ask the operating system to register DSH Studio and send one explicit test
+/// notification. macOS adds an application to Notification Center when its
+/// first native notification is delivered; keeping this behind a button avoids
+/// interrupting a first launch while giving Settings a deterministic repair
+/// path for an app that was previously denied or never listed.
+#[tauri::command]
+pub fn startup_notification_test<R: Runtime>(
+    app: AppHandle<R>,
+    keys: State<'_, Keys>,
+) -> Result<Startup> {
+    app.notification().request_permission().map_err(|cause| {
+        Error::Startup(format!("notification permission was not granted: {cause}"))
+    })?;
+    crate::desktop::notify(
+        &app,
+        crate::locale::pick("DSH Studio notifications", "DSH Studio 通知"),
+        crate::locale::pick("Notifications are working.", "通知功能正常。"),
+    )?;
     Ok(report(&app, &keys))
 }
 

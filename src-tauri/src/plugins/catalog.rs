@@ -202,12 +202,15 @@ async fn restricted_json(start: &str) -> Result<serde_json::Value> {
             .await
             .map_err(|cause| Error::Network(format!("catalog DNS lookup failed: {cause}")))?
             .collect();
-        if addresses.is_empty() || addresses.iter().any(|address| blocked(address.ip())) {
-            return Err(Error::Network(
-                "catalog host resolved to a blocked local or special-use address".into(),
-            ));
-        }
-        let pinned = addresses[0];
+        // A dual-stack resolver may return an unroutable local/special-use
+        // address alongside the public address (this is common with split DNS
+        // and enterprise VPNs). Rejecting the whole answer made the built-in
+        // catalogs unusable on those machines. Keep the SSRF guard by selecting
+        // and pinning one admissible public address; a host that resolves only
+        // to blocked addresses is still refused.
+        let pinned = admissible_address(&addresses).ok_or_else(|| {
+            Error::Network("catalog host resolved to a blocked local or special-use address".into())
+        })?;
         let client = reqwest::Client::builder()
             // A proxy would resolve the hostname a second time and undo the
             // address we just admitted, reopening DNS rebinding around SSRF.
@@ -305,18 +308,30 @@ fn blocked(ip: IpAddr) -> bool {
                 || ip.is_unspecified()
                 || octets[0] == 0
                 || (octets[0] == 100 && (64..=127).contains(&octets[1]))
-                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
+                || (octets[0] == 192 && octets[1] == 0 && (octets[2] == 0 || octets[2] == 2))
                 || (octets[0] == 198 && (18..=19).contains(&octets[1]))
+                || (octets[0] == 198 && octets[1] == 51 && octets[2] == 100)
+                || (octets[0] == 203 && octets[1] == 0 && octets[2] == 113)
                 || octets[0] >= 224
         }
         IpAddr::V6(ip) => {
-            ip.is_loopback()
+            ip.to_ipv4_mapped()
+                .is_some_and(|mapped| blocked(IpAddr::V4(mapped)))
+                || ip.is_loopback()
                 || ip.is_unspecified()
                 || ip.is_multicast()
                 || (ip.segments()[0] & 0xfe00) == 0xfc00
                 || (ip.segments()[0] & 0xffc0) == 0xfe80
+                || (ip.segments()[0] == 0x2001 && ip.segments()[1] == 0x0db8)
         }
     }
+}
+
+fn admissible_address(addresses: &[SocketAddr]) -> Option<SocketAddr> {
+    addresses
+        .iter()
+        .copied()
+        .find(|address| !blocked(address.ip()))
 }
 
 fn parse_store(value: &serde_json::Value, query: &str) -> Result<Vec<Listing>> {
@@ -943,11 +958,11 @@ fn default_active() -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
     use super::{
-        blocked, dshfind_page_url, parse_dshfind_item, parse_dshfind_page, parse_standard,
-        parse_store, safe_url,
+        admissible_address, blocked, dshfind_page_url, parse_dshfind_item, parse_dshfind_page,
+        parse_standard, parse_store, safe_url,
     };
 
     #[test]
@@ -958,7 +973,16 @@ mod tests {
         assert!(blocked(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))));
         assert!(blocked(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 2))));
         assert!(blocked(IpAddr::V6(Ipv6Addr::LOCALHOST)));
+        assert!(blocked(IpAddr::V4(Ipv4Addr::new(203, 0, 113, 12))));
+        assert!(blocked(IpAddr::V6("2001:db8::1".parse().unwrap())));
+        assert!(blocked(IpAddr::V6("::ffff:127.0.0.1".parse().unwrap())));
         assert!(!blocked(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))));
+        let mixed = [
+            SocketAddr::from(([192, 168, 1, 20], 443)),
+            SocketAddr::from(([8, 8, 8, 8], 443)),
+        ];
+        assert_eq!(admissible_address(&mixed), Some(mixed[1]));
+        assert!(admissible_address(&mixed[..1]).is_none());
     }
 
     #[test]

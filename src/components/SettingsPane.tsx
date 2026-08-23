@@ -44,6 +44,7 @@ export function SettingsPane() {
   const refresh = useStartup((store) => store.refresh)
   const setAutostart = useStartup((store) => store.setAutostart)
   const setNotification = useStartup((store) => store.setNotification)
+  const testNotification = useStartup((store) => store.testNotification)
   const setLogLevel = useStartup((store) => store.setLogLevel)
   const retry = useStartup((store) => store.retry)
   const presentation = usePresentation((store) => store.mode)
@@ -204,6 +205,21 @@ export function SettingsPane() {
                 label={t('settings.jobFailed')}
                 onChange={(on) => void setNotification('job-failed', on)}
               />
+            </Row>
+
+            <Row
+              icon={BellRing}
+              label={t('settings.notificationTest')}
+              hint={t('settings.notificationTestHint')}
+            >
+              <Button
+                variant="secondary"
+                className="h-[30px] px-2.5 text-[11.5px]"
+                disabled={!ready || busy}
+                onClick={() => void testNotification()}
+              >
+                {t('settings.notificationTestAction')}
+              </Button>
             </Row>
           </div>
 

@@ -1,5 +1,6 @@
 //! The IPC surface for installing a Node runtime.
 
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -10,6 +11,12 @@ use super::{provision, NodeJobs, Progress};
 use crate::error::{Error, Result};
 use crate::harness::commands::AppState;
 use crate::harness::supervisor::Stream;
+
+/// Select which discovered Node runtime the next harness start will use.
+#[tauri::command]
+pub fn node_select(path: PathBuf) -> Result<NodeInstallation> {
+    super::choose(path)
+}
 
 /// Channel the frontend listens on while a runtime is being installed.
 pub const PROGRESS_CHANNEL: &str = "node://progress";

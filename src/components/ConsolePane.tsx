@@ -42,6 +42,7 @@ export function ConsolePane() {
     busy,
     installing,
     provisioningNode,
+    selectNode,
     error,
     inspect,
     start,
@@ -115,6 +116,8 @@ export function ConsolePane() {
                     runtimes={runtimes}
                     activePath={environment.node?.path ?? null}
                     minimum={environment.minimumNode}
+                    disabled={running || starting || working}
+                    onSelect={(path) => void selectNode(path)}
                   />
                 </Section>
               )}
@@ -318,10 +321,14 @@ function RuntimeList({
   runtimes,
   activePath,
   minimum,
+  disabled,
+  onSelect,
 }: {
   runtimes: NodeInstallation[]
   activePath: string | null
   minimum: NodeVersion
+  disabled: boolean
+  onSelect: (path: string) => void
 }) {
   return (
     <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
@@ -335,14 +342,23 @@ function RuntimeList({
             data-hint={runtime.path}
             className="flex h-[30px] items-center gap-2 px-2.5"
           >
-            <span
-              className={`shrink-0 font-mono text-[11.5px] tabular-nums ${usable ? 'text-text' : 'text-faint'}`}
+            <button
+              type="button"
+              disabled={disabled || !usable || active}
+              aria-pressed={active}
+              title={runtime.path}
+              onClick={() => onSelect(runtime.path)}
+              className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
             >
-              {formatVersion(runtime.version)}
-            </span>
-            <span className="truncate text-[11.5px] text-faint">
-              {t(`source.${runtime.source}`)}
-            </span>
+              <span
+                className={`shrink-0 font-mono text-[11.5px] tabular-nums ${usable ? 'text-text' : 'text-faint'}`}
+              >
+                {formatVersion(runtime.version)}
+              </span>
+              <span className="truncate text-[11.5px] text-faint">
+                {t(`source.${runtime.source}`)}
+              </span>
+            </button>
 
             {active ? (
               <span className="ml-auto shrink-0 rounded-[4px] bg-ok/15 px-1.5 py-0.5 text-[10.5px] font-medium text-ok">

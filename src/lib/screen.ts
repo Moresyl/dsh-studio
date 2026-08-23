@@ -15,6 +15,7 @@
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { FitAddon } from '@xterm/addon-fit'
+import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal, type ITheme } from '@xterm/xterm'
 
@@ -144,6 +145,12 @@ function create(): Screen {
 
   const fit = new FitAddon()
   terminal.loadAddon(fit)
+  // The harness and common shell tools use box drawing, CJK and emoji. xterm's
+  // legacy width table misplaces those cells, making a TUI appear to lose its
+  // borders or overwrite text even though the PTY delivered every byte.
+  const unicode = new Unicode11Addon()
+  terminal.loadAddon(unicode)
+  terminal.unicode.activeVersion = '11'
   // A link goes to the user's own browser. The default would hand it to the
   // webview, and a webview showing somebody's website is not this application.
   terminal.loadAddon(

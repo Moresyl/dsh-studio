@@ -54,10 +54,7 @@ pub fn environment() -> Environment {
     // runtime it installed is chosen by exactly the same rule as one the user
     // installed — and shows up in the same list, labelled for what it is.
     let all_node_runtimes = node_runtime::discover_in(Some(&paths::managed_node_dir()));
-    let node = all_node_runtimes
-        .iter()
-        .find(|install| install.version >= node_runtime::MINIMUM_SUPPORTED)
-        .cloned();
+    let node = crate::node::selected(&all_node_runtimes);
     let harness_entry = paths::harness_entry();
     let harness_version = install::runtime_version(&paths::harness_dir());
     let harness_installed = harness_entry.is_file() && harness_version.is_some();
@@ -150,9 +147,19 @@ pub fn install_plan() -> Result<InstallPlan> {
     }
     // Launching only needs Node, but installing needs that exact runtime's npm.
     // A newer Node-only package must not hide an older complete installation.
-    let node = supported
-        .into_iter()
-        .find(|install| install::npm_cli(&install.path).is_some())
+    let selected = environment.node.as_ref().map(|node| node.path.as_path());
+    let node = selected
+        .and_then(|path| {
+            supported
+                .iter()
+                .copied()
+                .find(|install| install.path == path && install::npm_cli(&install.path).is_some())
+        })
+        .or_else(|| {
+            supported
+                .into_iter()
+                .find(|install| install::npm_cli(&install.path).is_some())
+        })
         .ok_or(Error::NpmMissing)?;
 
     install::plan(&node.path, paths::harness_dir(), install::SPEC.to_string())

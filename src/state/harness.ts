@@ -46,6 +46,8 @@ interface HarnessStore {
   install: () => Promise<void>
   /** Fetch a Node runtime for a machine that has none. */
   provisionNode: () => Promise<void>
+  /** Use one of the discovered supported Node runtimes for the next start. */
+  selectNode: (path: string) => Promise<void>
   /** Empty the visible scrollback. The supervisor's own ring is untouched. */
   clear: () => void
   /** Apply one event from the Rust side. */
@@ -122,6 +124,19 @@ export const useHarness = create<HarnessStore>((set, get) => ({
       set({ error: describe(cause), nodeProgress: null })
     } finally {
       set({ provisioningNode: false })
+    }
+  },
+
+  selectNode: async (path) => {
+    if (get().busy || get().installing || get().provisioningNode) return
+    set({ busy: true, error: null })
+    try {
+      await ipc.nodeSelect(path)
+      await get().inspect()
+    } catch (cause) {
+      set({ error: describe(cause) })
+    } finally {
+      set({ busy: false })
     }
   },
 

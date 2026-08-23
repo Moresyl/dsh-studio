@@ -64,9 +64,12 @@ pub fn run() {
         // keeps a launch nobody asked to see from putting a window on screen —
         // see `startup::standby`, which is the only reader.
         .plugin(tauri_plugin_autostart::init(
-            // A launch agent rather than an AppleScript login item: the agent is
-            // a file this app owns and can withdraw, where the login item lives
-            // in a list only System Settings edits.
+            // AppleScript creates a real macOS Login Item (visible to System
+            // Settings and third-party startup managers). Other platforms use
+            // their native registry/desktop-file implementation.
+            #[cfg(target_os = "macos")]
+            tauri_plugin_autostart::MacosLauncher::AppleScript,
+            #[cfg(not(target_os = "macos"))]
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![startup::STANDBY_FLAG]),
         ))
@@ -111,6 +114,7 @@ pub fn run() {
             harness::commands::harness_install,
             harness::commands::harness_log,
             node::commands::node_provision,
+            node::commands::node_select,
             remote::commands::remote_status,
             remote::commands::remote_open,
             remote::commands::remote_close,
@@ -163,6 +167,7 @@ pub fn run() {
             startup::startup_autostart,
             startup::startup_shortcut,
             startup::startup_notification,
+            startup::startup_notification_test,
             startup::startup_log_level,
             material::window_material,
             window::window_open,

@@ -130,6 +130,10 @@ const NODE_CHANNEL = 'node://progress'
  */
 export const nodeProvision = (): Promise<NodeInstallation> => invoke('node_provision')
 
+/** Persist the exact discovered runtime that the next harness start should use. */
+export const nodeSelect = (path: string): Promise<NodeInstallation> =>
+  invoke('node_select', { path })
+
 export const onNodeProgress = (handler: (progress: NodeProgress) => void): Promise<UnlistenFn> =>
   listen<NodeProgress>(NODE_CHANNEL, (message) => handler(message.payload))
 
@@ -931,6 +935,9 @@ export const startupNotification = (
   kind: NotificationPreference,
   enabled: boolean,
 ): Promise<Startup> => invoke('startup_notification', { kind, enabled })
+
+/** Request native notification access and deliver one explicit test message. */
+export const startupNotificationTest = (): Promise<Startup> => invoke('startup_notification_test')
 
 export const startupLogLevel = (level: LogLevel): Promise<Startup> =>
   invoke('startup_log_level', { level })

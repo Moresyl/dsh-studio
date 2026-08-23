@@ -486,6 +486,9 @@ const en = {
   'settings.jobCompletedHint': 'Notify when a Harness background job finishes.',
   'settings.jobFailed': 'Background job failed',
   'settings.jobFailedHint': 'Notify when a Harness background job fails.',
+  'settings.notificationTest': 'Test notifications',
+  'settings.notificationTestHint': 'Register DSH Studio with the operating system and send one test message.',
+  'settings.notificationTestAction': 'Send test',
 
   'about.title': 'About',
   'about.subtitle': 'What this build is, and where it keeps things',
@@ -1064,6 +1067,9 @@ const zh: Record<MessageKey, string> = {
   'settings.jobCompletedHint': 'Harness 后台任务完成后通知。',
   'settings.jobFailed': '后台任务失败',
   'settings.jobFailedHint': 'Harness 后台任务执行失败时通知。',
+  'settings.notificationTest': '测试通知',
+  'settings.notificationTestHint': '向操作系统注册 DSH Studio，并发送一条测试消息。',
+  'settings.notificationTestAction': '发送测试',
 
   'about.title': '关于',
   'about.subtitle': '这个版本是什么，以及它把东西放在哪里',

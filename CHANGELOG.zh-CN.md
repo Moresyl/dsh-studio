@@ -9,6 +9,25 @@
 
 ## [未发布]
 
+## [0.7.7] —— 2026-08-23
+
+### 新增
+
+- 环境面板现在可以明确选择已发现的 Node 运行时；选择会持久化，运行时被外部删除后会安全回退。
+- 设置中增加原生通知权限/测试入口，让 macOS 通知中心的注册结果可验证，而不是只能猜测。
+
+### 变更
+
+- macOS 自启改用真正的 Login Item，因此会出现在系统设置和启动管理工具中，同时继续以托盘隐藏方式启动。
+- 内置终端使用 Unicode 11 单元宽度表并铺满可用高度，盒线、中文、Emoji 和全屏 TUI 不再错位或留白。
+- macOS 深色 Vibrancy 内容层改用不透底的深色背景，不再把浅色壁纸或非活动窗口灰色采样到文字下方。
+
+### 修复
+
+- 修复 DNS 同时返回公共地址和私有/特殊用途地址时目录请求被整体拒绝的问题；请求仍固定到一个可用公共地址，全部地址不可用时继续阻止。
+- 补充特殊用途地址和 IPv4 映射 IPv6 地址的目录 SSRF 校验。
+- 修复环境面板选择的 Node 没有真正用于 Harness 启动和 npm 安装计划的问题。
+
 ## [0.7.6] —— 2026-08-23
 
 ### 新增
@@ -525,7 +544,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...HEAD
+[0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/Moresyl/dsh-studio/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/Moresyl/dsh-studio/compare/v0.7.3...v0.7.4

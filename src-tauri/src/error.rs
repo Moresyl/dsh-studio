@@ -34,6 +34,9 @@ pub enum Error {
     #[error("Node.js is already being installed")]
     NodeProvisionBusy,
 
+    #[error("could not select Node.js runtime: {0}")]
+    NodeSelection(String),
+
     #[error(
         "Node.js publishes no build for this system, so it has to be installed by hand from nodejs.org"
     )]

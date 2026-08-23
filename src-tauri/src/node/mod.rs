@@ -29,11 +29,11 @@ mod http;
 
 pub(crate) use http::ensure_crypto_provider;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
 use node_runtime::{NodeInstallation, Source};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, Result};
 use crate::paths;
@@ -58,6 +58,98 @@ const PROGRESS_STEP: u64 = 512 * 1024;
 #[derive(Debug, Default)]
 pub struct NodeJobs {
     pub busy: AtomicBool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Selection {
+    path: PathBuf,
+}
+
+/// Pick the remembered runtime when it is still present and supported. A
+/// missing selection is intentionally non-fatal: version managers can remove
+/// an install outside Studio, so the newest supported runtime remains a safe
+/// fallback instead of making the harness unstartable.
+pub fn selected(runtimes: &[NodeInstallation]) -> Option<NodeInstallation> {
+    let remembered = std::fs::read(paths::node_selection_file())
+        .ok()
+        .and_then(|body| serde_json::from_slice::<Selection>(&body).ok())
+        .map(|selection| selection.path);
+    pick(runtimes, remembered.as_deref())
+}
+
+/// Pure selection rule, kept separate so it can be tested without touching the
+/// user's application-data directory.
+pub fn pick(runtimes: &[NodeInstallation], remembered: Option<&Path>) -> Option<NodeInstallation> {
+    remembered
+        .and_then(|path| {
+            runtimes
+                .iter()
+                .find(|runtime| {
+                    runtime.version >= node_runtime::MINIMUM_SUPPORTED && runtime.path == path
+                })
+                .cloned()
+        })
+        .or_else(|| {
+            runtimes
+                .iter()
+                .find(|runtime| runtime.version >= node_runtime::MINIMUM_SUPPORTED)
+                .cloned()
+        })
+}
+
+/// Validate and persist a user-selected runtime. Only an executable discovered
+/// by the same scanner used for launch may be selected; a typed path can never
+/// smuggle an arbitrary binary into the harness environment.
+pub fn choose(path: PathBuf) -> Result<NodeInstallation> {
+    let resolved = node_runtime::plain_path(path.canonicalize().map_err(|cause| {
+        Error::NodeSelection(format!("{} could not be opened: {cause}", path.display()))
+    })?);
+    let runtimes = node_runtime::discover_in(Some(&paths::managed_node_dir()));
+    let runtime = runtimes
+        .into_iter()
+        .find(|runtime| {
+            runtime.path == resolved && runtime.version >= node_runtime::MINIMUM_SUPPORTED
+        })
+        .ok_or_else(|| {
+            Error::NodeSelection(format!(
+                "{} is not a supported Node.js runtime discovered on this machine",
+                resolved.display()
+            ))
+        })?;
+
+    let file = paths::node_selection_file();
+    if let Some(parent) = file.parent() {
+        std::fs::create_dir_all(parent).map_err(|cause| {
+            Error::NodeSelection(format!(
+                "{} could not be created: {cause}",
+                parent.display()
+            ))
+        })?;
+    }
+    let mut body = serde_json::to_vec_pretty(&Selection {
+        path: runtime.path.clone(),
+    })
+    .map_err(|cause| Error::NodeSelection(format!("selection is invalid: {cause}")))?;
+    body.push(b'\n');
+    let temporary = file.with_extension("dsh-studio.tmp");
+    std::fs::write(&temporary, body).map_err(|cause| {
+        Error::NodeSelection(format!(
+            "{} could not be written: {cause}",
+            temporary.display()
+        ))
+    })?;
+    if file.exists() {
+        std::fs::remove_file(&file).map_err(|cause| {
+            Error::NodeSelection(format!("{} could not be replaced: {cause}", file.display()))
+        })?;
+    }
+    std::fs::rename(&temporary, &file).map_err(|cause| {
+        Error::NodeSelection(format!(
+            "{} could not be committed: {cause}",
+            file.display()
+        ))
+    })?;
+    Ok(runtime)
 }
 
 /// How far along an install is.
@@ -335,7 +427,53 @@ fn discard(download: &Path, staging: &Path) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Progress, PROGRESS_STEP};
+    use std::path::PathBuf;
+
+    use node_runtime::{NodeInstallation, Source, Version};
+
+    use super::{pick, Progress, PROGRESS_STEP};
+
+    fn runtime(path: &str, version: Version) -> NodeInstallation {
+        NodeInstallation {
+            path: PathBuf::from(path),
+            version,
+            source: Source::System,
+        }
+    }
+
+    #[test]
+    fn remembered_supported_runtime_wins_over_newest_default() {
+        let runtimes = vec![
+            runtime("/node/24", Version::new(24, 0, 0)),
+            runtime("/node/22", Version::new(22, 19, 0)),
+        ];
+        assert_eq!(
+            pick(&runtimes, Some(PathBuf::from("/node/22").as_path()))
+                .unwrap()
+                .path,
+            PathBuf::from("/node/22")
+        );
+    }
+
+    #[test]
+    fn missing_or_too_old_selection_falls_back_to_newest_supported() {
+        let runtimes = vec![
+            runtime("/node/24", Version::new(24, 0, 0)),
+            runtime("/node/20", Version::new(20, 19, 0)),
+        ];
+        assert_eq!(
+            pick(&runtimes, Some(PathBuf::from("/node/missing").as_path()))
+                .unwrap()
+                .path,
+            PathBuf::from("/node/24")
+        );
+        assert_eq!(
+            pick(&runtimes, Some(PathBuf::from("/node/20").as_path()))
+                .unwrap()
+                .path,
+            PathBuf::from("/node/24")
+        );
+    }
 
     #[test]
     fn keeps_byte_counts_out_of_the_log_and_everything_else_in() {

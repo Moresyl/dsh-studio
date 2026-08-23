@@ -28,6 +28,7 @@ interface StartupStore {
   /** `null` gives the key up. */
   setShortcut: (accelerator: string | null) => Promise<void>
   setNotification: (kind: NotificationPreference, enabled: boolean) => Promise<void>
+  testNotification: () => Promise<void>
   setLogLevel: (level: LogLevel) => Promise<void>
   /** Take the same key again after another program has let go of it. */
   retry: () => Promise<void>
@@ -56,6 +57,10 @@ export const useStartup = create<StartupStore>((set, get) => ({
 
   setNotification: async (kind, enabled) => {
     await change(set, get, () => ipc.startupNotification(kind, enabled))
+  },
+
+  testNotification: async () => {
+    await change(set, get, () => ipc.startupNotificationTest())
   },
 
   setLogLevel: async (level) => {

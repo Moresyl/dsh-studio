@@ -293,6 +293,23 @@
   --ground-chrome: color-mix(in oklab, var(--color-surface) 46%, transparent);
 }
 
+/* macOS Vibrancy samples the desktop behind a transparent window. In dark
+   appearance that sample can be a light wallpaper or a gray inactive-window
+   tint, which is exactly the combination that produced black text on gray
+   cards. Keep the compositor effect in the title/chrome layer, but make the
+   content grounds opaque whenever dark appearance is active. */
+:root[data-material='vibrancy'][data-theme='dark'] {
+  --ground-window: var(--color-canvas);
+  --ground-chrome: var(--color-surface);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-material='vibrancy']:not([data-theme='light']) {
+    --ground-window: var(--color-canvas);
+    --ground-chrome: var(--color-surface);
+  }
+}
+
 @layer base {
   /* Dark first, so a machine with no stated preference gets the surface this
      app was designed around. The two pins below are what keep the furniture the
@@ -469,6 +486,8 @@
    inside it. */
 .xterm {
   padding: 6px 4px 6px 10px;
+  width: 100%;
+  height: 100%;
 }
 
 /* The ground the terminal scrolls over.

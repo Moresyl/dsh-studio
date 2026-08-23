@@ -78,6 +78,13 @@ pub fn market_sources_file() -> PathBuf {
     app_data_dir().join("market-sources.json")
 }
 
+/// The exact Node executable selected by the user. The file is deliberately
+/// separate from the runtime manager stores: removing a Node simply makes the
+/// choice fall back to the newest supported runtime until it returns.
+pub fn node_selection_file() -> PathBuf {
+    app_data_dir().join("node-selection.json")
+}
+
 /// Where Node runtimes the shell downloaded are unpacked, one directory per
 /// release: `.../tools/node/v24.19.0`.
 ///
