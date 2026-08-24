@@ -56,6 +56,10 @@ interface HarnessStore {
   applyNodeProgress: (progress: NodeProgress) => void
 }
 
+/** Whether one operation that changes the supervised runtime is still active. */
+const occupied = (state: HarnessStore): boolean =>
+  state.busy || state.installing || state.provisioningNode
+
 export const useHarness = create<HarnessStore>((set, get) => ({
   environment: null,
   status: { phase: 'stopped' },
@@ -68,16 +72,26 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   error: null,
 
   inspect: async () => {
-    const [environment, status, lines] = await Promise.all([
-      ipc.environment(),
-      ipc.status(),
-      ipc.log(),
-    ])
-    set({ environment, status, lines })
+    set({ error: null })
+    try {
+      const [environment, status, lines] = await Promise.all([
+        ipc.environment(),
+        ipc.status(),
+        ipc.log(),
+      ])
+      set({ environment, status, lines })
+    } catch (cause) {
+      // Re-check is a visible action as well as the first startup probe. Keep a
+      // reason beside the controls that requested it. Reject as well so a
+      // caller coordinating a workspace or install does not continue after a
+      // refresh that never actually landed.
+      set({ error: describe(cause) })
+      throw cause
+    }
   },
 
   start: async () => {
-    if (get().busy) return
+    if (occupied(get())) return
     set({ busy: true, error: null })
     try {
       await ipc.start()
@@ -89,6 +103,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   },
 
   stop: async () => {
+    if (occupied(get())) return
     set({ busy: true, error: null })
     try {
       await ipc.stop()
@@ -100,7 +115,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   },
 
   install: async () => {
-    if (get().installing) return
+    if (occupied(get())) return
     set({ installing: true, installProgress: 0, error: null })
     try {
       await ipc.install()
@@ -114,7 +129,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   },
 
   provisionNode: async () => {
-    if (get().provisioningNode) return
+    if (occupied(get())) return
     set({ provisioningNode: true, nodeProgress: null, error: null })
     try {
       await ipc.nodeProvision()
@@ -128,7 +143,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   },
 
   selectNode: async (path) => {
-    if (get().busy || get().installing || get().provisioningNode) return
+    if (occupied(get())) return
     set({ busy: true, error: null })
     try {
       await ipc.nodeSelect(path)

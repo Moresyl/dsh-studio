@@ -129,6 +129,53 @@ describe('a shell the user closed', () => {
     expect(useTerminals.getState().tabs).toHaveLength(3)
     expect(useTerminals.getState().error).toBe('no such terminal')
   })
+
+  it('sends only one kill while the first close is still in flight', async () => {
+    let finish!: () => void
+    vi.mocked(ipc.terminalClose).mockReturnValue(
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    const first = useTerminals.getState().close('t2')
+    await useTerminals.getState().close('t2')
+
+    expect(ipc.terminalClose).toHaveBeenCalledOnce()
+    finish()
+    await first
+    ended({ id: 't2', code: 1 })
+  })
+})
+
+describe('opening a shell', () => {
+  it('discards an emulator created by a click that lost the opening race', async () => {
+    const screen = {} as never
+    useTerminals.setState({ opening: true })
+
+    await useTerminals.getState().open(screen, 24, 80)
+
+    expect(ipc.terminalOpen).not.toHaveBeenCalled()
+    expect(screens.discard).toHaveBeenCalledWith(screen)
+  })
+
+  it('closes the backend shell when binding its emulator fails', async () => {
+    const screen = {} as never
+    vi.mocked(ipc.terminalOpen).mockResolvedValue(shell('new'))
+    vi.mocked(ipc.terminalClose).mockResolvedValue(undefined)
+    vi.mocked(screens.adopt).mockImplementation(() => {
+      throw new Error('could not bind terminal input')
+    })
+
+    await useTerminals.getState().open(screen, 24, 80)
+
+    expect(screens.dispose).toHaveBeenCalledWith('new')
+    expect(ipc.terminalClose).toHaveBeenCalledWith('new')
+    expect(screens.discard).not.toHaveBeenCalledWith(screen)
+    expect(useTerminals.getState().tabs.map((tab) => tab.id)).toEqual(['t1', 't2', 't3'])
+    expect(useTerminals.getState().error).toBe('could not bind terminal input')
+    expect(useTerminals.getState().opening).toBe(false)
+  })
 })
 
 describe('reading the strip', () => {

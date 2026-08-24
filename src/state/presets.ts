@@ -29,6 +29,9 @@ interface PresetStore {
   choose: (id: string) => Promise<void>
 }
 
+/** Only the newest roster read or choice may update the radio group. */
+let generation = 0
+
 export const usePresets = create<PresetStore>((set, get) => ({
   presets: [],
   chosen: null,
@@ -36,28 +39,34 @@ export const usePresets = create<PresetStore>((set, get) => ({
   error: null,
 
   refresh: async () => {
+    const mine = ++generation
     try {
       const roster = await ipc.presetRoster()
-      set({ presets: roster.presets, chosen: roster.default, error: null })
+      if (mine === generation) {
+        set({ presets: roster.presets, chosen: roster.default, error: null })
+      }
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === generation) set({ error: describe(cause) })
     } finally {
-      set({ loading: false })
+      if (mine === generation) set({ loading: false })
     }
   },
 
   choose: async (id) => {
     const previous = get().chosen
     if (id === previous) return
+    const mine = ++generation
     set({ chosen: id, error: null })
 
     try {
       // The reply is the roster as it is now, so the list and the selection come
       // back from the file rather than from what was asked for.
       const roster = await ipc.presetChoose(id)
-      set({ presets: roster.presets, chosen: roster.default })
+      if (mine === generation) set({ presets: roster.presets, chosen: roster.default })
     } catch (cause) {
-      set({ chosen: previous, error: t('preset.failed', { reason: describe(cause) }) })
+      if (mine === generation) {
+        set({ chosen: previous, error: t('preset.failed', { reason: describe(cause) }) })
+      }
     }
   },
 }))

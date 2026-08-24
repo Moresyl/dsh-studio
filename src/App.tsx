@@ -81,8 +81,8 @@ export default function App() {
 
   // The one look at the machine, owned here rather than by a pane, because two
   // things now depend on the answer: the console shows it, and the guide exists
-  // or does not because of it. Settled on both paths — `inspect` is allowed to
-  // reject, and a rejected probe still has to let the window open.
+  // or does not because of it. Settled on both paths — `inspect` records and
+  // rejects a failed probe, and that failure still has to let the window open.
   useEffect(() => {
     const settle = () => consider(useHarness.getState().environment)
     void inspect().then(settle, settle)

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { HarnessEvent } from '@/lib/ipc'
+import * as ipc from '@/lib/ipc'
 import { useHarness } from '@/state/harness'
 
 // The store only reaches for the command surface inside its async actions; the
@@ -13,7 +14,10 @@ vi.mock('@/lib/ipc', () => ({
   start: vi.fn(),
   stop: vi.fn(),
   install: vi.fn(),
+  nodeProvision: vi.fn(),
+  nodeSelect: vi.fn(),
   onHarnessEvent: vi.fn(),
+  onNodeProgress: vi.fn(),
   formatVersion: vi.fn(),
 }))
 
@@ -29,12 +33,86 @@ const say = (line: string, stream: 'stdout' | 'stderr' = 'stdout'): HarnessEvent
 const apply = (event: HarnessEvent) => useHarness.getState().apply(event)
 
 beforeEach(() => {
+  vi.clearAllMocks()
   useHarness.setState({
+    environment: null,
     status: { phase: 'stopped' },
     lines: [],
+    busy: false,
     installing: false,
     installProgress: 0,
+    provisioningNode: false,
+    nodeProgress: null,
     error: null,
+  })
+  vi.mocked(ipc.environment).mockResolvedValue({} as never)
+  vi.mocked(ipc.status).mockResolvedValue({ phase: 'stopped' })
+  vi.mocked(ipc.log).mockResolvedValue([])
+})
+
+describe('supervisor actions', () => {
+  it('reports a failed environment re-check to coordinated callers', async () => {
+    vi.mocked(ipc.environment).mockRejectedValue('environment probe failed')
+
+    await expect(useHarness.getState().inspect()).rejects.toBe('environment probe failed')
+
+    expect(useHarness.getState().error).toBe('environment probe failed')
+  })
+
+  it('sends only one stop while the first request is still in flight', async () => {
+    let finish!: () => void
+    vi.mocked(ipc.stop).mockReturnValue(
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    const first = useHarness.getState().stop()
+    await useHarness.getState().stop()
+
+    expect(ipc.stop).toHaveBeenCalledOnce()
+    finish()
+    await first
+  })
+
+  it('does not start another runtime-changing action during installation', async () => {
+    let finish!: () => void
+    vi.mocked(ipc.install).mockReturnValue(
+      new Promise<void>((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    const installation = useHarness.getState().install()
+    await Promise.all([
+      useHarness.getState().start(),
+      useHarness.getState().stop(),
+      useHarness.getState().provisionNode(),
+      useHarness.getState().selectNode('C:\\node.exe'),
+    ])
+
+    expect(ipc.start).not.toHaveBeenCalled()
+    expect(ipc.stop).not.toHaveBeenCalled()
+    expect(ipc.nodeProvision).not.toHaveBeenCalled()
+    expect(ipc.nodeSelect).not.toHaveBeenCalled()
+    finish()
+    await installation
+  })
+
+  it('does not begin installation while a start request is in flight', async () => {
+    let finish!: (origin: string) => void
+    vi.mocked(ipc.start).mockReturnValue(
+      new Promise<string>((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    const starting = useHarness.getState().start()
+    await useHarness.getState().install()
+
+    expect(ipc.install).not.toHaveBeenCalled()
+    finish('http://127.0.0.1:57652')
+    await starting
   })
 })
 

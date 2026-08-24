@@ -86,7 +86,10 @@ export function ConsolePane() {
               <Button
                 variant="ghost"
                 className="h-5 px-1.5 text-[11.5px]"
-                onClick={() => void inspect()}
+                // The store already puts the reason beside this control; catch
+                // here so a manual failed probe is not also an unhandled browser
+                // promise rejection.
+                onClick={() => void inspect().catch(() => {})}
                 disabled={working}
               >
                 <RotateCw size={11} strokeWidth={2.4} />

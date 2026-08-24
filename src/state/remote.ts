@@ -28,37 +28,53 @@ interface RemoteStore {
   forget: (id: string) => Promise<void>
 }
 
+/** A mutation invalidates older reads; overlapping reads keep only the newest. */
+let mutationGeneration = 0
+let refreshGeneration = 0
+
 export const useRemote = create<RemoteStore>((set, get) => ({
   status: null,
   busy: false,
   error: null,
 
   refresh: async () => {
+    const mine = ++refreshGeneration
+    const mutations = mutationGeneration
     try {
-      set({ status: await ipc.remoteStatus() })
+      const status = await ipc.remoteStatus()
+      if (mine === refreshGeneration && mutations === mutationGeneration) {
+        set({ status, error: null })
+      }
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === refreshGeneration && mutations === mutationGeneration) {
+        set({ error: describe(cause) })
+      }
     }
   },
 
   open: async () => {
     if (get().busy) return
+    const mine = ++mutationGeneration
     set({ busy: true, error: null })
     try {
-      set({ status: await ipc.remoteOpen() })
+      const status = await ipc.remoteOpen()
+      if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: describe(cause) })
     } finally {
       set({ busy: false })
     }
   },
 
   close: async () => {
+    if (get().busy) return
+    const mine = ++mutationGeneration
     set({ busy: true, error: null })
     try {
-      set({ status: await ipc.remoteClose() })
+      const status = await ipc.remoteClose()
+      if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: describe(cause) })
     } finally {
       set({ busy: false })
     }
@@ -68,20 +84,24 @@ export const useRemote = create<RemoteStore>((set, get) => ({
   // disabled Close while a code is being replaced would be a lie about which
   // request is in flight.
   renew: async () => {
+    const mine = ++mutationGeneration
     set({ error: null })
     try {
-      set({ status: await ipc.remoteRenew() })
+      const status = await ipc.remoteRenew()
+      if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: describe(cause) })
     }
   },
 
   forget: async (id) => {
+    const mine = ++mutationGeneration
     set({ error: null })
     try {
-      set({ status: await ipc.remoteForget(id) })
+      const status = await ipc.remoteForget(id)
+      if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: describe(cause) })
     }
   },
 }))

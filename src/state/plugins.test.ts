@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as ipc from '@/lib/ipc'
+import type { PluginDetail } from '@/lib/ipc'
 import { packageName } from '@/state/plugins'
 import { usePlugins } from '@/state/plugins'
 
@@ -14,6 +15,26 @@ const installed = {
   builtin: false,
   marketReceipt: null,
 }
+
+const detail = (version: string): PluginDetail => ({
+  name: 'registry-plugin',
+  version,
+  description: '',
+  license: 'MIT',
+  homepage: null,
+  repository: null,
+  bundle: true,
+  dependencies: [],
+  installSpec: `registry-plugin@${version}`,
+  source: 'npm',
+  compatibility: { state: 'compatible', requirement: '*' },
+  integrity: 'sha512-test',
+  bundlePatch: null,
+  lifecycleScripts: [],
+  deprecated: null,
+  repositoryVerified: true,
+  integrityVerified: true,
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -52,29 +73,41 @@ describe('installed plugin details', () => {
   })
 
   it('still asks the selected catalog for registry metadata', async () => {
-    vi.mocked(ipc.pluginDetail).mockResolvedValue({
-      name: 'registry-plugin',
-      version: '1.2.3',
-      description: '',
-      license: 'MIT',
-      homepage: null,
-      repository: null,
-      bundle: true,
-      dependencies: [],
-      installSpec: 'registry-plugin@1.2.3',
-      source: 'npm',
-      compatibility: { state: 'compatible', requirement: '*' },
-      integrity: 'sha512-test',
-      bundlePatch: null,
-      lifecycleScripts: [],
-      deprecated: null,
-      repositoryVerified: true,
-      integrityVerified: true,
-    })
+    vi.mocked(ipc.pluginDetail).mockResolvedValue(detail('1.2.3'))
 
     await usePlugins.getState().select('registry-plugin', 'npm', '1.2.3')
 
     expect(ipc.pluginDetail).toHaveBeenCalledWith('npm', 'registry-plugin', '1.2.3')
     expect(usePlugins.getState().detail?.version).toBe('1.2.3')
+  })
+
+  it('keeps loading when an older version of the same package finishes first', async () => {
+    let finishOld!: (answer: PluginDetail) => void
+    let finishNew!: (answer: PluginDetail) => void
+    vi.mocked(ipc.pluginDetail)
+      .mockReturnValueOnce(
+        new Promise<PluginDetail>((resolve) => {
+          finishOld = resolve
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<PluginDetail>((resolve) => {
+          finishNew = resolve
+        }),
+      )
+
+    const oldRequest = usePlugins.getState().select('registry-plugin', 'npm', '1.0.0')
+    const newRequest = usePlugins.getState().select('registry-plugin', 'npm', '2.0.0')
+    finishOld(detail('1.0.0'))
+    await oldRequest
+
+    expect(usePlugins.getState().loadingDetail).toBe(true)
+    expect(usePlugins.getState().detail).toBeNull()
+
+    finishNew(detail('2.0.0'))
+    await newRequest
+
+    expect(usePlugins.getState().loadingDetail).toBe(false)
+    expect(usePlugins.getState().detail?.version).toBe('2.0.0')
   })
 })

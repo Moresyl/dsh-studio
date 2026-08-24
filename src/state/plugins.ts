@@ -78,6 +78,10 @@ let generation = 0
 
 type Write = (partial: Partial<PluginStore>) => void
 
+/** Whether a detail answer still belongs to the item the rail is showing. */
+const isSelected = (state: PluginStore, name: string, sourceId: string, version: string): boolean =>
+  state.selected === name && state.selectedSource === sourceId && state.selectedVersion === version
+
 /**
  * A change to the hosted profile landed.
  *
@@ -170,25 +174,13 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       const detail = await ipc.pluginDetail(sourceId, name, version)
       // Still the selection this request was made for, or it belongs to a
       // package the user has already clicked away from.
-      const current = get()
-      if (
-        current.selected === name &&
-        current.selectedSource === sourceId &&
-        current.selectedVersion === version
-      ) {
-        set({ detail })
-      }
+      if (isSelected(get(), name, sourceId, version)) set({ detail })
     } catch (cause) {
-      const current = get()
-      if (
-        current.selected === name &&
-        current.selectedSource === sourceId &&
-        current.selectedVersion === version
-      ) {
+      if (isSelected(get(), name, sourceId, version)) {
         set({ error: describe(cause) })
       }
     } finally {
-      if (get().selected === name) set({ loadingDetail: false })
+      if (isSelected(get(), name, sourceId, version)) set({ loadingDetail: false })
     }
   },
 

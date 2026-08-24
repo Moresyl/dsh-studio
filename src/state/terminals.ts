@@ -99,18 +99,42 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
   },
 
   open: async (screen, rows, cols) => {
-    if (get().opening) return
+    // The button's render-time `opening` value can still be false for a second
+    // click before React paints the first state change. The second emulator has
+    // already been created by then, so refusing the request must dispose it or
+    // it remains as an unowned canvas over the active terminal.
+    if (get().opening) {
+      screens.discard(screen)
+      return
+    }
     set({ opening: true, error: null })
+    let session: TerminalSession | null = null
     try {
-      const session = await ipc.terminalOpen(rows, cols)
+      const opened = await ipc.terminalOpen(rows, cols)
+      session = opened
       // Before the tab exists, on purpose. The pty is read from the moment it is
       // created, so a shell that prints its prompt immediately can beat its own
       // id back across the boundary — and this is the line that decides whether
       // that prompt lands in the terminal or in the buffer waiting for it.
-      screens.adopt(session.id, screen)
-      set((state) => ({ tabs: [...state.tabs, { ...session, exit: null }], active: session.id }))
+      screens.adopt(opened.id, screen)
+      set((state) => ({ tabs: [...state.tabs, { ...opened, exit: null }], active: opened.id }))
     } catch (cause) {
-      screens.discard(screen)
+      if (session) {
+        // `adopt` registers the screen before wiring its input and resize
+        // handlers. If either registration fails, both halves now exist but no
+        // tab owns them. Roll them both back; leaving the PTY alive would keep a
+        // hidden shell running until the whole application exits.
+        screens.dispose(session.id)
+        try {
+          await ipc.terminalClose(session.id)
+        } catch {
+          // Keep the error that prevented the terminal from opening. A cleanup
+          // failure is secondary and the Rust supervisor will still reap the
+          // child when Studio exits.
+        }
+      } else {
+        screens.discard(screen)
+      }
       set({ error: describe(cause) })
     } finally {
       set({ opening: false })
@@ -125,6 +149,11 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
       forget(id)
       return
     }
+
+    // A second click can arrive while the first kill is in flight. Sending the
+    // same kill again races the exit event and can turn a successful close into
+    // a visible "terminal is no longer open" error.
+    if (closing.has(id)) return
 
     closing.add(id)
     try {
