@@ -233,6 +233,12 @@ registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每
 | 托盘图标、运行中关闭到托盘         | ✅                                                       |
 | 原生右键菜单、窗口位置记忆         | ✅                                                       |
 | 深色 / 浅色，可跟随系统也可不跟随  | ✅                                                       |
+| Profile 管理、导入导出与差异对比   | ✅                                                       |
+| 终端、会话搜索/统计/导出、多窗口   | ✅                                                       |
+| 兼容 / 扩展 / 高级三种展示面       | ✅                                                       |
+| 随机或固定回环端口                 | ✅ 固定端口被占用时明确失败                              |
+| 独立于 renderer 的启动恢复         | ✅ 静态原生重试/诊断/退出                                |
+| 只读 Host 插件合同                 | ✅ Host Protocol 1，不开放包管理或命令权限               |
 | 静默自更新                         | ⏳ 计划中                                                |
 | 打包发布                           | ✅ Windows 安装/便携版、Linux、macOS 原生/通用版自动构建 |
 
@@ -308,7 +314,8 @@ src-tauri/crates/
 
 详细文档：[使用指南](docs/user-guide.zh-CN.md) · [故障排查](docs/troubleshooting.zh-CN.md) ·
 [架构](docs/architecture.zh-CN.md) · [插件与目录开发](docs/plugin-development.zh-CN.md) ·
-[插件互操作合同](docs/plugin-interoperability.zh-CN.md) · [Protocol 3 SDK](sdk/README.md)。
+[插件互操作合同](docs/plugin-interoperability.zh-CN.md) · [Protocol 3 SDK](sdk/README.md) ·
+[当前路线图](docs/ROADMAP.zh-CN.md)。
 
 **它会替换掉 harness 的界面吗？**
 不会。harness 从它自己的服务加载，未经任何修改。

@@ -9,7 +9,10 @@ Choose **Lite** for the smallest download, or **Full / Offline** when first-run 
 1. The Environment pane finds Node.js 22.19 or newer. The app can download and verify an official runtime when none is installed.
 2. The exact supported `@deepseek-ai/dsh` release is installed in app data, never into global npm.
 3. The workspace must exist. On Windows, local NTFS/ReFS volumes are admitted; network, removable and FAT/exFAT volumes are blocked before launch.
-4. Pick a profile and start. Harness remains bound to an OS-assigned port on `127.0.0.1`.
+4. Pick a profile and start. Harness remains bound to `127.0.0.1`. The default
+   asks the OS for a random port; Settings can persist a fixed port from 1024 to
+   65535 when a stable loopback origin is needed. Studio checks a fixed port
+   before starting Node and reports an occupied port instead of silently moving.
 
 ## Plugins
 
@@ -17,9 +20,21 @@ Discovery can use npm, DSH 1024Store, the rate-limited reviewed dshfind catalog,
 
 ## Presentation and desktop integration
 
-**Compatibility** mode opens the upstream Harness interface directly. **Advanced** mode opens Studio's workspace, and the preference is shared by every window. The built-in terminal receives the selected profile/workspace plus the managed Node, Harness and pnpm tools on `PATH`. Packaged macOS and Linux builds recover only an allowlisted set of development variables from the login shell; credentials are never imported.
+**Compatibility** opens the upstream Harness interface directly. **Extended**
+keeps the full upstream interface and adds a compact native toolbar for terminal,
+sessions, plugins, Profile and workspace actions. **Advanced** opens Studio's
+complete workspace. The preference is shared by every window. The built-in
+terminal receives the selected Profile/workspace plus the managed Node, Harness
+and pnpm tools on `PATH`. Packaged macOS and Linux builds recover only an
+allowlisted set of development variables from the login shell; credentials are
+never imported.
 
 Harness pages can feature-detect the frozen Protocol 3 `window.dshStudio` API for notifications, pickers, badges, deep links, profile listing/selection, exact-version plugin installation/removal, and native workspace admission/drop signals. The bridge accepts only the currently supervised loopback Harness origin and never exposes raw Tauri IPC or shell execution.
+
+Harness Host plugins can separately feature-detect read-only Host Protocol 1 for
+the active Studio/Harness versions and a bounded Profile roster. It provides no
+native handles, command runner, package mutation, or Profile mutation. See the
+[plugin interoperability contract](plugin-interoperability.md).
 
 Completion/failure notifications for user turns and background jobs can be enabled independently in Settings. Workspace selection uses the native folder picker and also accepts a dropped folder.
 
@@ -30,6 +45,11 @@ About can copy a public-safe diagnostic summary or export a 50 MiB-bounded ZIP. 
 If Studio cannot reach a window, run its executable with `--export-diagnostics`. The command exits before Tauri or Harness starts and prints the absolute path of a uniquely named ZIP. For example, use `.\dsh-studio.exe --export-diagnostics` beside the Windows portable executable, `"/Applications/DSH Studio.app/Contents/MacOS/dsh-studio" --export-diagnostics` on macOS, or `dsh-studio --export-diagnostics` on Linux.
 
 Persistent logs live in the app data `logs` directory. A file rotates at 10 MiB, logs older than seven days are removed, and the directory is capped at 200 MiB. Settings can select Debug, Info, Warning or Error persistence; the live console is never filtered.
+
+If the React renderer does not commit within 12 seconds, or the startup crash
+hook fires first, Studio opens a static native recovery window that does not load
+React, Harness, Node, or network resources. It can retry the renderer, export a
+redacted diagnostic archive, or quit.
 
 ## Updates
 

@@ -53,10 +53,13 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     [
       'src/lib/bridge.ts',
       'src-tauri/src/desktop/mod.rs',
+      'src-tauri/runtime-contract/dsh-studio-integration/lib/index.js',
       'sdk/index.js',
       'sdk/index.d.ts',
       'docs/plugin-development.md',
       'docs/plugin-development.zh-CN.md',
+      'docs/plugin-interoperability.md',
+      'docs/plugin-interoperability.zh-CN.md',
       '.github/release-notes/0.7.4.en.md',
       '.github/release-notes/0.7.4.zh-CN.md',
       'docs/schemas/catalog-1.0.0.schema.json',
@@ -68,10 +71,13 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
   const [
     bridge,
     rust,
+    hostIntegration,
     sdk,
     sdkTypes,
     docsEn,
     docsZh,
+    interoperabilityEn,
+    interoperabilityZh,
     notesEn,
     notesZh,
     schemaRaw,
@@ -89,6 +95,18 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
   if (new Set(protocols).size !== 1 || protocols[0] !== 3) {
     throw new Error(`public protocol declarations differ: ${protocols.join(', ')}`)
   }
+  const hostProtocols = [
+    protocolNumber(
+      hostIntegration,
+      /export const DSH_STUDIO_HOST_PROTOCOL = (\d+)/g,
+      'managed Host integration',
+    ),
+    protocolNumber(sdk, /export const DSH_STUDIO_HOST_PROTOCOL = (\d+)/g, 'SDK Host runtime'),
+    protocolNumber(sdkTypes, /export const DSH_STUDIO_HOST_PROTOCOL: (\d+)/g, 'SDK Host types'),
+  ]
+  if (new Set(hostProtocols).size !== 1 || hostProtocols[0] !== 1) {
+    throw new Error(`Host protocol declarations differ: ${hostProtocols.join(', ')}`)
+  }
   for (const [label, text] of [
     ['English plugin documentation', docsEn],
     ['Chinese plugin documentation', docsZh],
@@ -99,6 +117,14 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
       throw new Error(`${label} does not describe only Protocol 3`)
     }
   }
+  for (const [label, text] of [
+    ['English plugin interoperability documentation', interoperabilityEn],
+    ['Chinese plugin interoperability documentation', interoperabilityZh],
+  ]) {
+    if (!text.includes('Host Protocol 1') || text.includes('Host Protocol 2')) {
+      throw new Error(`${label} does not describe only Host Protocol 1`)
+    }
+  }
 
   validateCatalogSchema(JSON.parse(schemaRaw))
   validateVersions(
@@ -106,7 +132,12 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     JSON.parse(sdkPackageRaw),
     JSON.parse(tauriConfigRaw),
   )
-  return { protocol: protocols[0], schema: '1.0.0', version: JSON.parse(rootPackageRaw).version }
+  return {
+    protocol: protocols[0],
+    hostProtocol: hostProtocols[0],
+    schema: '1.0.0',
+    version: JSON.parse(rootPackageRaw).version,
+  }
 }
 
 const invoked = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
@@ -115,6 +146,6 @@ if (invoked) {
     process.argv[2] ? resolve(process.argv[2]) : DEFAULT_ROOT,
   )
   console.log(
-    `verified public contracts: Protocol ${result.protocol}, catalog ${result.schema}, SDK ${result.version}`,
+    `verified public contracts: Protocol ${result.protocol}, Host Protocol ${result.hostProtocol}, catalog ${result.schema}, SDK ${result.version}`,
   )
 }

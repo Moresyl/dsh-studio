@@ -56,6 +56,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm test:packaging
+      - run: pnpm verify:docs
       - name: Frontend logic coverage (80% minimum)
         run: pnpm test:coverage
       - run: pnpm build

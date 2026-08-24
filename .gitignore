@@ -27,8 +27,6 @@ src-tauri/tauri.windows.conf.json
 .workflow/
 .firecrawl/
 .tmp-*/
-# The development plan is a working note, not a published document.
-docs/ROADMAP.zh-CN.md
 
 # Editor / OS
 .DS_Store

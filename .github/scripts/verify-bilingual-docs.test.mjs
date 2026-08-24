@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import { validateBilingualPair, verifyBilingualDocs } from './verify-bilingual-docs.mjs'
+
+test('bilingual pair validation reports every missing shared fact', () => {
+  const problems = validateBilingualPair(
+    'docs/user-guide.md',
+    'ordinary content '.repeat(20),
+    'docs/user-guide.zh-CN.md',
+    '普通内容'.repeat(60),
+  )
+  assert.equal(problems.length, 8)
+  assert(problems.some((problem) => problem.includes('Extended')))
+  assert(problems.some((problem) => problem.includes('扩展模式')))
+})
+
+test('repository bilingual capability documents stay synchronized', async () => {
+  assert.deepEqual(await verifyBilingualDocs(), { pairs: 7 })
+})

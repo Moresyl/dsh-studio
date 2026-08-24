@@ -9,7 +9,9 @@
 1. 环境页会寻找 Node.js 22.19 或更高版本；没有时可由应用下载并校验官方运行时。
 2. 应用把固定版本的 `@deepseek-ai/dsh` 安装到自己的数据目录，不修改全局 npm。
 3. 工作区必须存在。Windows 会检查磁盘类型与文件系统：本地 NTFS/ReFS 可直接使用，网络盘、可移动盘和 FAT/exFAT 会阻止启动。
-4. 选择 Profile 后启动。Harness 只监听 `127.0.0.1` 的随机端口。
+4. 选择 Profile 后启动。Harness 始终只监听 `127.0.0.1`。默认由系统分配随机端口；需要稳定
+   回环来源时，可在设置中保存 1024–65535 的固定端口。Studio 会在启动 Node 前检查固定端口，
+   被占用时明确报错，不会静默换端口。
 
 ## 插件
 
@@ -17,9 +19,17 @@
 
 ## 界面模式与桌面集成
 
-**兼容模式**直接打开上游 Harness 界面；**高级模式**打开 Studio 工作台，选择会在所有窗口间共享。内置终端的 `PATH` 会包含固定版本的 Node、Harness 与 pnpm 工具，并带上当前 Profile 和工作区。打包后的 macOS/Linux 应用只从登录 Shell 恢复允许列表中的开发环境变量，不会导入凭据。
+**兼容模式**直接打开完整上游 Harness；**扩展模式**保留完整上游界面，并增加终端、会话、
+插件、Profile 与工作区的紧凑原生工具栏；**高级模式**打开 Studio 完整工作台。选择会在所有
+窗口间共享。内置终端的 `PATH` 会包含固定版本的 Node、Harness 与 pnpm 工具，并带上当前
+Profile 和工作区。打包后的 macOS/Linux 应用只从登录 Shell 恢复允许列表中的开发环境变量，
+不会导入凭据。
 
 Harness 页面可以探测冻结的 Protocol 3 `window.dshStudio` API，调用通知、选择器、角标、深链、Profile 查询/选择、精确版本插件安装/卸载，以及原生 Workspace 准入/拖放信号。桥接层只接受当前受监管的回环 Harness 来源，不开放原始 Tauri IPC 或 Shell 执行。
+
+Harness Host 插件还可以单独探测只读 Host Protocol 1，读取当前 Studio/Harness 版本和有界
+Profile 清单。该服务不提供原生句柄、命令执行器、包修改或 Profile 修改。详见
+[插件互操作合同](plugin-interoperability.zh-CN.md)。
 
 设置中可分别控制用户轮次、后台任务成功/失败通知。工作区既可通过原生目录选择器指定，也可直接拖入文件夹。
 
@@ -30,6 +40,10 @@ Harness 页面可以探测冻结的 Protocol 3 `window.dshStudio` API，调用�
 如果 Studio 已无法打开窗口，可给可执行文件传入 `--export-diagnostics`。命令会在 Tauri 和 Harness 启动前退出，并打印唯一命名 ZIP 的绝对路径。例如在 Windows 便携版目录运行 `.\dsh-studio.exe --export-diagnostics`，macOS 运行 `"/Applications/DSH Studio.app/Contents/MacOS/dsh-studio" --export-diagnostics`，Linux 运行 `dsh-studio --export-diagnostics`。
 
 持久化日志位于应用数据目录的 `logs` 子目录。单文件达到 10 MiB 会轮转，七天前的日志会删除，日志总量限制为 200 MiB；设置页可选择 Debug、Info、Warning 或 Error 阈值，实时控制台不受该阈值影响。
+
+如果 React renderer 在 12 秒内没有完成首次提交，或启动崩溃钩子更早触发，Studio 会打开
+不加载 React、Harness、Node 或网络资源的静态原生恢复窗口，可重试界面、导出脱敏诊断包
+或退出。
 
 ## 更新
 

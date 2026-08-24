@@ -44,10 +44,13 @@ release after it has the file.
 A mismatch is not a corrupted download to retry. Delete the file and get it from
 GitHub.
 
-The `.msi`, `.dmg` and `.exe` builds are also code-signed, and the updater checks
-a signature of its own on top of the checksum — so an installer that a mirror
-tampered with fails twice over. `.deb`, `.rpm` and `.AppImage` are not signed by
-any platform mechanism, which makes the checksum the whole of the guarantee there.
+The updater checks its own mandatory Tauri signature in addition to the
+checksum. Windows Authenticode and Apple Developer ID signing/notarization are
+separate protections and exist only on a release whose platform credentials were
+configured and whose release verification proved them. Do not infer an OS
+publisher signature from the file extension. `.deb`, `.rpm` and `.AppImage` have
+no platform publisher-signature contract here, so the published checksum is the
+download-integrity guarantee for those assets.
 
 ## Package managers need no mirror
 

@@ -14,10 +14,10 @@ import type { Presentation } from '@/state/presentation'
 const TRAFFIC_LIGHT_INSET = 78
 
 interface TitleBarProps {
-  /** Whether the harness is serving, and so whether there are two views. */
+  /** Whether the harness is serving, and so presentation choices are available. */
   serving: boolean
   mode: Presentation
-  /** Switch presentations. Absent while there is only one view to show. */
+  /** Switch presentations. Absent while there is only one surface to show. */
   onPresentation?: (mode: Presentation) => void
   /** Open the profile manager. Absent while the first-run guide is up. */
   onManageProfiles?: () => void
@@ -32,8 +32,8 @@ interface TitleBarProps {
  *
  * It also carries the view switch, because once the harness fills the window
  * this is the only chrome left and starting the harness would otherwise be a
- * one-way door. A switch and not a badge: it is the same two views every time,
- * so the pair belongs on screen together with the current one marked. The
+ * one-way door. A switch and not a badge: the available presentations belong
+ * on screen together with the current one marked. The
  * profile chip is here for the same reason: which stack is running is a property
  * of the window, and this strip is what survives the harness taking the rest.
  */

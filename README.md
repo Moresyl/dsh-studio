@@ -242,25 +242,31 @@ between versions is in the [changelog](CHANGELOG.md).
 Early. The Windows path is built and verified end to end; the rest is honest
 about being unfinished.
 
-|                                              |                                                                     |
-| -------------------------------------------- | ------------------------------------------------------------------- |
-| Environment detection, one-click install     | ✅                                                                  |
-| Supervisor, backoff restart, health probing  | ✅                                                                  |
-| Process-tree reclamation (Windows / Unix)    | ✅                                                                  |
-| Harness hosting, log console, English + 中文 | ✅                                                                  |
-| Plugin marketplace — install, switch, remove | ✅                                                                  |
-| Remote access, single-use QR, revocable keys | ✅                                                                  |
-| Signed in-app update, checked on a schedule  | ✅                                                                  |
-| Verified on Windows 11                       | ✅                                                                  |
-| macOS / Linux platform builds                | ✅ compiled and tested in the platform CI matrix                    |
-| Node runtime fetched and verified on demand  | ✅ no system Node needed                                            |
-| Updater signatures and `SHA256SUMS.txt`      | ✅ mandatory; OS signing is applied when credentials are configured |
-| Download page, five packaging channels       | ✅ Scoop live; four written, not yet submitted                      |
-| Tray icon, close-to-tray while serving       | ✅                                                                  |
-| Native context menus, saved window bounds    | ✅                                                                  |
-| Light and dark, following the system or not  | ✅                                                                  |
-| Silent self-update                           | ⏳ planned                                                          |
-| Packaged releases                            | ✅ Windows installer + portable, Linux, macOS native + Universal    |
+|                                                |                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| Environment detection, one-click install       | ✅                                                                  |
+| Supervisor, backoff restart, health probing    | ✅                                                                  |
+| Process-tree reclamation (Windows / Unix)      | ✅                                                                  |
+| Harness hosting, log console, English + 中文   | ✅                                                                  |
+| Plugin marketplace — install, switch, remove   | ✅                                                                  |
+| Remote access, single-use QR, revocable keys   | ✅                                                                  |
+| Signed in-app update, checked on a schedule    | ✅                                                                  |
+| Verified on Windows 11                         | ✅                                                                  |
+| macOS / Linux platform builds                  | ✅ compiled and tested in the platform CI matrix                    |
+| Node runtime fetched and verified on demand    | ✅ no system Node needed                                            |
+| Updater signatures and `SHA256SUMS.txt`        | ✅ mandatory; OS signing is applied when credentials are configured |
+| Download page, five packaging channels         | ✅ Scoop live; four written, not yet submitted                      |
+| Tray icon, close-to-tray while serving         | ✅                                                                  |
+| Native context menus, saved window bounds      | ✅                                                                  |
+| Light and dark, following the system or not    | ✅                                                                  |
+| Profile manager, import/export and comparison  | ✅                                                                  |
+| Terminal, session search/usage/export, windows | ✅                                                                  |
+| Compatibility / Extended / Advanced surfaces   | ✅                                                                  |
+| Fixed or random loopback port                  | ✅ occupied fixed ports fail clearly                                |
+| Renderer-independent startup recovery          | ✅ static native retry/diagnostics/quit                             |
+| Read-only Host plugin contract                 | ✅ Host Protocol 1; no package or command authority                 |
+| Silent self-update                             | ⏳ planned                                                          |
+| Packaged releases                              | ✅ Windows installer + portable, Linux, macOS native + Universal    |
 
 ## Design notes
 
@@ -341,7 +347,7 @@ desktop app wrapping a Node service has to answer.
 Detailed guides: [User guide](docs/user-guide.md) · [Troubleshooting](docs/troubleshooting.md) ·
 [Architecture](docs/architecture.md) · [Plugin and catalog development](docs/plugin-development.md) ·
 [Plugin interoperability contract](docs/plugin-interoperability.md) ·
-[Protocol 3 SDK](sdk/README.md).
+[Protocol 3 SDK](sdk/README.md) · [Current roadmap](docs/ROADMAP.md).
 
 **Does this replace the harness UI?**
 No. The harness is loaded from its own service, unmodified. What the shell adds
