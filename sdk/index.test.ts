@@ -2,10 +2,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   DSH_STUDIO_PROTOCOL,
+  DSH_STUDIO_HOST_PROTOCOL,
   getDshStudio,
+  getDshStudioHost,
   hasDshStudioCapability,
   onDshStudioWorkspaceDrop,
   requireDshStudio,
+  requireDshStudioHost,
 } from './index.js'
 
 function desktop() {
@@ -55,5 +58,20 @@ describe('DSH Studio SDK', () => {
     // @ts-expect-error Runtime callers can still arrive from untyped JavaScript.
     expect(() => onDshStudioWorkspaceDrop(null, { dshStudio: value.contract })).toThrow(TypeError)
     expect(value.onDrop).not.toHaveBeenCalled()
+  })
+
+  it('detects the read-only Host contract through Cordis or direct properties', () => {
+    const host = { protocol: DSH_STUDIO_HOST_PROTOCOL }
+    expect(getDshStudioHost({ get: vi.fn(() => host) })).toBe(host)
+    expect(getDshStudioHost({ dshStudioHost: host })).toBe(host)
+    expect(getDshStudioHost({ dshStudioHost: { protocol: 2 } })).toBeUndefined()
+    expect(getDshStudioHost(null)).toBeUndefined()
+  })
+
+  it('reports absent and incompatible Host contracts', () => {
+    expect(() => requireDshStudioHost({})).toThrow('Host Protocol 1 is not available')
+    expect(() => requireDshStudioHost({ dshStudioHost: { protocol: 2 } })).toThrow(
+      'Host Protocol 2 is not supported',
+    )
   })
 })

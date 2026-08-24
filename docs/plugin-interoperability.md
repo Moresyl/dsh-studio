@@ -9,8 +9,9 @@ Normative words such as MUST, MUST NOT and SHOULD are used intentionally.
 This contract keeps three different extension surfaces separate:
 
 1. A **Harness Host plugin** runs local code under Harness and uses upstream
-   Cordis services. Studio does not add raw native or package-manager services to
-   that process.
+   Cordis services. Studio additionally offers read-only Host Protocol 1 for
+   generation identity and bounded Profile discovery. It does not expose raw
+   native, command-runner, package-manager, or Profile-mutation authority.
 2. A **Harness Web Client plugin** runs in the supervised loopback page. It MAY
    feature-detect Protocol 3 through `@moresyl/dsh-studio-sdk`.
 3. A **Studio-managed integration** is shipped and qualified with the pinned
@@ -56,6 +57,22 @@ Protocol 3 has two pushed event families:
 Every subscription returns a disposer. A plugin MUST dispose listeners with its
 own UI lifecycle and MUST feature-detect again after Harness navigation or
 restart.
+
+### Read-only Host Protocol 1
+
+Host plugins MAY feature-detect `dshStudioHost` with
+`getDshStudioHost(ctx)`. The service is immutable and scoped to one Cordis
+generation. Its `profiles.current` identity cannot change in place, while
+`profiles.list()` re-reads at most 128 safe, non-symlink Profile directories and
+at most 256 KiB from each manifest. A malformed manifest is represented by the
+stable `unreadable-manifest` state without exposing parser or filesystem
+details.
+
+The service advertises only `profiles.read` and `runtime.read`. Its explicit
+restrictions keep arbitrary commands, native handles, package mutation, and
+Profile mutation disabled. Retained references fail after their owning Cordis
+fiber is disposed. Plugins MUST keep an ordinary Harness fallback and MUST NOT
+infer authority from `DSH_DESKTOP` or other process environment values.
 
 ## Presentation, invocation and transport
 

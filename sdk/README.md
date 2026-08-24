@@ -28,3 +28,29 @@ integer `protocol`. A protocol change is intentionally incompatible and must be
 handled by a new SDK release. See the repository's bilingual
 [plugin contract](../docs/plugin-development.md) for the trust boundary and
 two-phase package policy.
+
+## Harness Host plugins
+
+Host plugins can feature-detect the separate, read-only Host Protocol 1. It
+exposes the active generation's Studio/Harness versions and a bounded Profile
+roster. It deliberately cannot start commands, access native handles, install
+packages, or mutate Profiles.
+
+```js
+import { getDshStudioHost } from '@moresyl/dsh-studio-sdk'
+
+export const inject = []
+
+export function apply(ctx) {
+  const studio = getDshStudioHost(ctx)
+  if (!studio) return
+  ctx.logger.info(
+    `running in ${studio.studio.name} ${studio.studio.version} ` +
+      `with ${studio.profiles.list().length} profiles`,
+  )
+}
+```
+
+Use the normal Harness services for agent, model, session, tool, and workspace
+behavior. Package or Profile changes must continue through Studio's visible,
+receipt-backed native flows rather than a retained Host reference.

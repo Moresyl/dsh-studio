@@ -33,11 +33,13 @@ test('smoke profile mirrors the product bootstrap and materializes integration',
     const integration = join(runtime, 'node_modules', '@moresyl', 'dsh-studio-integration')
     await mkdir(join(integration, 'lib'), { recursive: true })
     await Promise.all(
-      ['package.json', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js'].map(async (relative) => {
-        const target = join(integration, relative)
-        await mkdir(join(target, '..'), { recursive: true })
-        await writeFile(target, relative)
-      }),
+      ['package.json', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js'].map(
+        async (relative) => {
+          const target = join(integration, relative)
+          await mkdir(join(target, '..'), { recursive: true })
+          await writeFile(target, relative)
+        },
+      ),
     )
     const home = join(root, 'home')
     const made = await prepareSmokeProfile(runtime, home)
@@ -48,11 +50,32 @@ test('smoke profile mirrors the product bootstrap and materializes integration',
     ])
     assert.equal(
       await readFile(
-        join(home, 'profiles', 'node_modules', '@moresyl', 'dsh-studio-integration', 'lib', 'client.js'),
+        join(
+          home,
+          'profiles',
+          'node_modules',
+          '@moresyl',
+          'dsh-studio-integration',
+          'lib',
+          'client.js',
+        ),
         'utf8',
       ),
       'lib/client.js',
     )
+    const probe = await readFile(
+      join(
+        home,
+        'profiles',
+        'node_modules',
+        '@moresyl',
+        'dsh-studio-host-contract-probe',
+        'index.js',
+      ),
+      'utf8',
+    )
+    assert.match(probe, /inject = \['dshStudioHost'\]/)
+    assert.match(await readFile(made.probePatch, 'utf8'), /dsh-studio-host-contract-probe/)
   } finally {
     await rm(root, { recursive: true, force: true })
   }

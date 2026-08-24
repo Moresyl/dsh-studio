@@ -87,6 +87,8 @@ try {
     entry,
     runtimeRoot: directory,
     dshHome,
+    studioVersion: '0.7.8',
+    harnessVersion: expected,
   })
   console.log(
     `cold-installed and fully booted the pinned ${manifest.name}@${expected} runtime graph at ${origin}`,

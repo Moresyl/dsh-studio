@@ -125,11 +125,24 @@ impl LaunchPlan {
         for patch in &self.patches {
             command.arg("--patch").arg(patch);
         }
-        command
-            .current_dir(&self.workspace)
-            // Lets harness plugins detect that a native shell owns the session.
-            .env("DSH_DESKTOP", "1");
+        command.current_dir(&self.workspace);
+        // Login-shell exports improve GUI launches on Unix, but they are
+        // untrusted input and must be applied before launcher-owned identity.
         command.envs(&self.environment);
+        command
+            // Lets harness plugins detect that a native shell owns the session.
+            .env("DSH_DESKTOP", "1")
+            // The managed integration turns these launcher-authenticated values
+            // into a read-only Host contract. Plugins never receive a native
+            // handle, arbitrary command runner, or package-manager authority.
+            .env("DSH_STUDIO_VERSION", env!("CARGO_PKG_VERSION"))
+            .env("DSH_STUDIO_RUNTIME_VERSION", super::install::VERSION)
+            .env("DSH_STUDIO_PROFILE", &self.profile)
+            .env("DSH_HOME", crate::paths::dsh_home())
+            .env(
+                "DSH_STUDIO_PROFILE_DIR",
+                crate::paths::profile_dir(&self.profile),
+            );
         #[cfg(windows)]
         {
             // Both the composition preflight and the supervised Harness run
@@ -608,7 +621,10 @@ mod tests {
             workspace: PathBuf::from("workspace"),
             host: "127.0.0.1".into(),
             port: 0,
-            environment: BTreeMap::new(),
+            environment: BTreeMap::from([
+                ("DSH_STUDIO_PROFILE".into(), "forged".into()),
+                ("ORDINARY_LOGIN_EXPORT".into(), "kept".into()),
+            ]),
         };
         let command = plan.to_command();
         let args = command
@@ -631,6 +647,41 @@ mod tests {
                 "--port",
                 "0",
             ]
+        );
+
+        let environment = command
+            .as_std()
+            .get_envs()
+            .filter_map(|(name, value)| {
+                value.map(|value| {
+                    (
+                        name.to_string_lossy().into_owned(),
+                        value.to_string_lossy().into_owned(),
+                    )
+                })
+            })
+            .collect::<BTreeMap<_, _>>();
+        assert_eq!(
+            environment.get("DSH_DESKTOP").map(String::as_str),
+            Some("1")
+        );
+        assert_eq!(
+            environment.get("DSH_STUDIO_VERSION").map(String::as_str),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
+        assert_eq!(
+            environment
+                .get("DSH_STUDIO_RUNTIME_VERSION")
+                .map(String::as_str),
+            Some(crate::harness::install::VERSION)
+        );
+        assert_eq!(
+            environment.get("DSH_STUDIO_PROFILE").map(String::as_str),
+            Some("web")
+        );
+        assert_eq!(
+            environment.get("ORDINARY_LOGIN_EXPORT").map(String::as_str),
+            Some("kept")
         );
     }
 

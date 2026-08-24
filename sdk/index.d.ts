@@ -1,4 +1,37 @@
 export const DSH_STUDIO_PROTOCOL: 3
+export const DSH_STUDIO_HOST_PROTOCOL: 1
+
+export interface DshStudioHostProfile {
+  readonly name: string
+  readonly dir: string
+  readonly initialized: boolean
+  readonly servesWindow: boolean
+  readonly packages: number
+  readonly problem: 'unreadable-manifest' | null
+}
+
+export interface DshStudioHost {
+  readonly protocol: 1
+  readonly studio: { readonly name: 'DSH Studio'; readonly version: string }
+  readonly harness: { readonly version: string }
+  readonly platform: string
+  readonly capabilities: readonly ('profiles.read' | 'runtime.read')[]
+  readonly restrictions: {
+    readonly arbitraryCommands: false
+    readonly nativeHandles: false
+    readonly packageMutation: false
+    readonly profileMutation: false
+  }
+  readonly profiles: {
+    readonly current: { readonly name: string; readonly dir: string }
+    list(): readonly DshStudioHostProfile[]
+  }
+}
+
+export interface DshStudioHostContext {
+  readonly dshStudioHost?: DshStudioHost | { readonly protocol?: unknown }
+  get?(name: 'dshStudioHost'): DshStudioHost | { readonly protocol?: unknown } | undefined
+}
 
 export interface DshStudioLink {
   readonly url: string
@@ -109,6 +142,8 @@ export function onDshStudioWorkspaceDrop(
   handler: (path: string) => void,
   scope?: unknown,
 ): () => void
+export function getDshStudioHost(ctx?: unknown): DshStudioHost | undefined
+export function requireDshStudioHost(ctx?: unknown): DshStudioHost
 
 declare global {
   interface Window {

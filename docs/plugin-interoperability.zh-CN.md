@@ -7,8 +7,9 @@
 
 本合同明确分开三类扩展面：
 
-1. **Harness Host 插件**在 Harness 下运行本地代码，使用上游 Cordis 服务；Studio 不会向
-   该进程增加原始原生能力或包管理器服务。
+1. **Harness Host 插件**在 Harness 下运行本地代码，使用上游 Cordis 服务；Studio 额外
+   提供只读 Host Protocol 1，用于读取当前代身份和有界 Profile 清单，但不开放原始原生
+   能力、命令执行器、包管理器或 Profile 修改权限。
 2. **Harness Web Client 插件**运行在受监管回环页面中，可以通过
    `@moresyl/dsh-studio-sdk` 探测 Protocol 3。
 3. **Studio 托管集成**随锁定运行时一起交付和验证，不是第三方权限入口；预期上游 seam
@@ -48,6 +49,18 @@ Protocol 3 有两类推送事件：
 
 每次订阅都返回 disposer。插件必须随自己的 UI 生命周期解除监听，Harness 导航或重启后
 必须重新探测。
+
+### 只读 Host Protocol 1
+
+Host 插件可以通过 `getDshStudioHost(ctx)` 探测 `dshStudioHost`。该服务不可变且只属于
+当前 Cordis generation；`profiles.current` 不会原地改变，而 `profiles.list()` 每次重新读取
+最多 128 个安全、非符号链接的 Profile 目录，每个 manifest 最多读取 256 KiB。手工损坏的
+manifest 会返回稳定的 `unreadable-manifest` 状态，不泄露解析器或文件系统细节，也不会让
+一个坏 Profile 隐藏其他健康 Profile。
+
+服务只声明 `profiles.read` 与 `runtime.read`，并明确把任意命令、原生句柄、包修改和
+Profile 修改设为禁用。Cordis fiber 卸载后，旧引用会失败。插件必须保留普通 Harness
+回退路径，不得把 `DSH_DESKTOP` 等进程环境值解释成授权。
 
 ## 展示、调用与传输
 
