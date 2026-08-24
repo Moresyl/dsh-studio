@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 
-import { beforeEach, describe as group, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe as group, expect, it, vi } from 'vitest'
 
 // Hoisted with the `vi.mock` call that hands them over, because `bridge.ts`
 // reaches for the dialog on the way in rather than at the moment it is opened.
@@ -26,7 +26,14 @@ vi.mock('@/lib/ipc', () => ({
   onDesktopLink: vi.fn(),
 }))
 
-import { accepts, answer, PROTOCOL, type Call } from '@/lib/bridge'
+import {
+  accepts,
+  answer,
+  PROTOCOL,
+  pushWorkspaceDrop,
+  serveDesktop,
+  type Call,
+} from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
 
 const SERVING = 'http://127.0.0.1:57652'
@@ -39,6 +46,10 @@ const request = (method: string, params: Record<string, unknown> = {}): Call => 
 
 beforeEach(() => {
   vi.clearAllMocks()
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
 group('accepts', () => {
@@ -292,6 +303,83 @@ group('answer', () => {
         expect.objectContaining({ title: undefined, defaultPath: undefined }),
       )
     })
+  })
+})
+
+group('desktop frame lifetime', () => {
+  function windowTree() {
+    const posted = vi.fn()
+    const child = { frames: [], postMessage: posted }
+    let message: ((event: MessageEvent) => void) | undefined
+    const root = {
+      frames: [child],
+      postMessage: vi.fn(),
+      addEventListener: vi.fn((name: string, listener: (event: MessageEvent) => void) => {
+        if (name === 'message') message = listener
+      }),
+      removeEventListener: vi.fn(),
+    }
+    vi.stubGlobal('window', root)
+    return { root, child, posted, message: () => message }
+  }
+
+  it('answers only its own harness frame and tears every listener down', async () => {
+    const tree = windowTree()
+    const unlisten = vi.fn()
+    let link: Parameters<typeof ipc.onDesktopLink>[0] | undefined
+    vi.mocked(ipc.onDesktopLink).mockImplementation(async (listener) => {
+      link = listener
+      return unlisten
+    })
+    vi.mocked(ipc.desktopOffer).mockResolvedValue({ protocol: PROTOCOL } as never)
+
+    const stop = await serveDesktop(SERVING)
+    const listener = tree.message()
+    expect(listener).toBeTypeOf('function')
+
+    listener?.({
+      origin: SERVING,
+      source: tree.child,
+      data: { dsh: PROTOCOL, id: 'trusted', method: 'hello' },
+    } as unknown as MessageEvent)
+    await vi.waitFor(() => expect(tree.posted).toHaveBeenCalledOnce())
+    expect(tree.posted).toHaveBeenLastCalledWith(
+      { dsh: PROTOCOL, id: 'trusted', ok: true, value: { protocol: PROTOCOL } },
+      SERVING,
+    )
+
+    listener?.({
+      origin: SERVING,
+      source: { frames: [], postMessage: vi.fn() },
+      data: { dsh: PROTOCOL, id: 'forged', method: 'hello' },
+    } as unknown as MessageEvent)
+    await Promise.resolve()
+    expect(tree.posted).toHaveBeenCalledOnce()
+
+    const opened = { url: 'dsh://open', route: 'open', query: {} }
+    link?.(opened)
+    expect(tree.posted).toHaveBeenLastCalledWith(
+      { dsh: PROTOCOL, event: 'link', link: opened },
+      SERVING,
+    )
+
+    stop()
+    expect(tree.root.removeEventListener).toHaveBeenCalledWith('message', listener)
+    expect(unlisten).toHaveBeenCalledOnce()
+  })
+
+  it('pushes a trimmed native workspace only while an origin is trusted', () => {
+    const tree = windowTree()
+
+    pushWorkspaceDrop('  D:\\repo  ', SERVING)
+    pushWorkspaceDrop('   ', SERVING)
+    pushWorkspaceDrop('D:\\other', '')
+
+    expect(tree.posted).toHaveBeenCalledOnce()
+    expect(tree.posted).toHaveBeenCalledWith(
+      { dsh: PROTOCOL, event: 'workspace-drop', path: 'D:\\repo' },
+      SERVING,
+    )
   })
 })
 
