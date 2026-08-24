@@ -22,10 +22,6 @@ use supervisor::LaunchPlan;
 /// shell commands to the local network, so it is not a setting.
 const BIND_HOST: &str = "127.0.0.1";
 
-/// Let the OS pick the port. Nothing else can collide with the result, which is
-/// why the shell never has to ask the user to free port 3080.
-const EPHEMERAL_PORT: u16 = 0;
-
 /// Whether this machine can currently run the harness, and what is missing.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -127,7 +123,7 @@ pub fn launch_plan() -> Result<LaunchPlan> {
             .collect(),
         workspace: environment.workspace,
         host: BIND_HOST.to_string(),
-        port: EPHEMERAL_PORT,
+        port: crate::startup::harness_port(),
         environment: Default::default(),
     })
 }

@@ -257,6 +257,13 @@ impl Supervisor {
         if self.active.swap(true, Ordering::SeqCst) {
             return Err(Error::AlreadyStarting);
         }
+        if let Err(failure) = fixed_port_available(&plan.host, plan.port) {
+            self.active.store(false, Ordering::SeqCst);
+            self.publish(Status::Failed {
+                reason: failure.to_string(),
+            });
+            return Err(failure);
+        }
         self.stopping.store(false, Ordering::SeqCst);
         self.publish(Status::Starting);
 
@@ -564,6 +571,19 @@ fn transient_profile_module_resolution_failure(detail: &str) -> bool {
         && (detail.contains("\\profiles\\") || detail.contains("/profiles/"))
 }
 
+fn fixed_port_available(host: &str, port: u16) -> Result<()> {
+    if port == 0 {
+        return Ok(());
+    }
+    std::net::TcpListener::bind((host, port))
+        .map(drop)
+        .map_err(|cause| {
+            Error::Readiness(format!(
+                "fixed Harness port {host}:{port} is unavailable: {cause}. Change it in Settings or stop the process using it"
+            ))
+        })
+}
+
 impl Drop for Supervisor {
     /// Stop the supervision loop from reviving a harness the app no longer owns.
     ///
@@ -628,5 +648,19 @@ mod tests {
         assert!(!transient_profile_module_resolution_failure(
             "Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-client-ui-renderer' imported from C:\\runtime\\node_modules\\"
         ));
+    }
+
+    #[test]
+    fn random_port_never_needs_a_preflight_bind() {
+        assert!(fixed_port_available("not-a-host", 0).is_ok());
+    }
+
+    #[test]
+    fn occupied_fixed_port_is_rejected_before_node_starts() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let failure = fixed_port_available("127.0.0.1", port).unwrap_err();
+        assert!(failure.to_string().contains(&port.to_string()));
+        assert!(failure.to_string().contains("Settings"));
     }
 }

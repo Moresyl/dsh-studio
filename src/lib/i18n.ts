@@ -477,6 +477,10 @@ const en = {
   'settings.logLevel.info': 'Info',
   'settings.logLevel.warn': 'Warnings',
   'settings.logLevel.error': 'Errors',
+  'settings.harnessPort': 'Stable Harness port',
+  'settings.harnessPortHint':
+    'Optional 1024–65535 port for plugins that persist state by origin. Leave empty for an automatic collision-free port; applies on the next Harness start.',
+  'settings.harnessPortAuto': 'Automatic',
   'settings.turnCompleted': 'Turn completed',
   'settings.turnCompletedHint':
     'Notify when a direct user turn finishes while the app is in the background.',
@@ -1065,6 +1069,10 @@ const zh: Record<MessageKey, string> = {
   'settings.logLevel.info': '信息',
   'settings.logLevel.warn': '警告',
   'settings.logLevel.error': '错误',
+  'settings.harnessPort': '固定 Harness 端口',
+  'settings.harnessPortHint':
+    '依赖 Origin 持久化状态的插件可填写 1024–65535；留空则自动分配无冲突端口，下次启动 Harness 生效。',
+  'settings.harnessPortAuto': '自动分配',
   'settings.turnCompleted': '用户回合完成',
   'settings.turnCompletedHint': '应用处于后台时，用户直接发起的回合完成后通知。',
   'settings.turnFailed': '用户回合需要处理',

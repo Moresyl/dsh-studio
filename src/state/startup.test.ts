@@ -18,6 +18,7 @@ const state: Startup = {
     jobFailed: true,
   },
   logLevel: 'info',
+  harnessPort: null,
 }
 
 beforeEach(() => {
@@ -64,6 +65,20 @@ describe('desktop startup settings', () => {
 
     expect(ipc.startupLogLevel).toHaveBeenCalledWith('error')
     expect(useStartup.getState().state).toEqual(changed)
+  })
+
+  it('persists a stable Harness port and can return to automatic allocation', async () => {
+    vi.mocked(ipc.startupHarnessPort)
+      .mockResolvedValueOnce({ ...state, harnessPort: 3080 })
+      .mockResolvedValueOnce(state)
+
+    await useStartup.getState().setHarnessPort(3080)
+    expect(ipc.startupHarnessPort).toHaveBeenLastCalledWith(3080)
+    expect(useStartup.getState().state?.harnessPort).toBe(3080)
+
+    await useStartup.getState().setHarnessPort(null)
+    expect(ipc.startupHarnessPort).toHaveBeenLastCalledWith(null)
+    expect(useStartup.getState().state?.harnessPort).toBeNull()
   })
 
   it('does not let an older settings read undo a completed change', async () => {

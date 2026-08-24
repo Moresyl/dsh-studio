@@ -88,6 +88,9 @@ pub struct Startup {
     pub notifications: Notifications,
     /// Minimum severity persisted to the bounded desktop log.
     pub log_level: crate::logging::LogLevel,
+    /// Fixed loopback port for plugins that persist state by Web origin. None
+    /// keeps the collision-free OS-assigned default.
+    pub harness_port: Option<u16>,
 }
 
 /// Notification preferences owned by the desktop shell.
@@ -279,6 +282,33 @@ pub fn startup_log_level<R: Runtime>(
     Ok(report(&app, &keys))
 }
 
+/// Choose a stable Web origin, or return to the collision-free random default.
+#[tauri::command]
+pub fn startup_harness_port<R: Runtime>(
+    app: AppHandle<R>,
+    keys: State<'_, Keys>,
+    port: Option<u16>,
+) -> Result<Startup> {
+    if port.is_some_and(|port| port < 1_024) {
+        return Err(Error::Startup(
+            "a fixed Harness port must be between 1024 and 65535".into(),
+        ));
+    }
+    let _change = keys
+        .changes
+        .lock()
+        .map_err(|_| Error::Startup("startup settings are unavailable".into()))?;
+    let mut saved = read();
+    saved.harness_port = port;
+    write(&saved)?;
+    Ok(report(&app, &keys))
+}
+
+/// Port passed to the next Harness process. Zero asks the OS for a free one.
+pub fn harness_port() -> u16 {
+    read().harness_port.unwrap_or(0)
+}
+
 /// Read at the moment attention would be requested. Notifications are rare,
 /// and this makes changes from another window effective without a second cache.
 pub fn attention_enabled(attention: Attention) -> bool {
@@ -303,6 +333,7 @@ fn report<R: Runtime>(app: &AppHandle<R>, keys: &Keys) -> Startup {
         suggested: SUGGESTED,
         notifications: saved.notifications,
         log_level: crate::logging::configured_level(),
+        harness_port: saved.harness_port,
     }
 }
 
@@ -383,6 +414,7 @@ fn summon<R: Runtime>(app: &AppHandle<R>) {
 struct Saved {
     shortcut: Option<String>,
     notifications: Notifications,
+    harness_port: Option<u16>,
 }
 
 fn file() -> PathBuf {
@@ -478,5 +510,13 @@ mod tests {
         assert!(saved.notifications.turn_failed);
         assert!(saved.notifications.job_completed);
         assert!(saved.notifications.job_failed);
+        assert_eq!(saved.harness_port, None);
+    }
+
+    #[test]
+    fn old_settings_without_a_port_keep_the_random_default() {
+        let saved: Saved =
+            serde_json::from_str(r#"{"notifications":{"turnCompleted":false}}"#).unwrap();
+        assert_eq!(saved.harness_port, None);
     }
 }

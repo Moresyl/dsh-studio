@@ -5,6 +5,7 @@ import {
   CircleCheck,
   CircleX,
   Keyboard,
+  Network,
   Power,
   PanelsTopLeft,
   ScrollText,
@@ -46,6 +47,7 @@ export function SettingsPane() {
   const setNotification = useStartup((store) => store.setNotification)
   const testNotification = useStartup((store) => store.testNotification)
   const setLogLevel = useStartup((store) => store.setLogLevel)
+  const setHarnessPort = useStartup((store) => store.setHarnessPort)
   const retry = useStartup((store) => store.retry)
   const presentation = usePresentation((store) => store.mode)
   const choosePresentation = usePresentation((store) => store.choose)
@@ -149,6 +151,19 @@ export function SettingsPane() {
                 <option value="warn">{t('settings.logLevel.warn')}</option>
                 <option value="error">{t('settings.logLevel.error')}</option>
               </select>
+            </Row>
+
+            <Row
+              icon={Network}
+              label={t('settings.harnessPort')}
+              hint={t('settings.harnessPortHint')}
+            >
+              <PortField
+                key={state?.harnessPort ?? 'automatic'}
+                value={state?.harnessPort ?? null}
+                disabled={!ready || busy}
+                onSave={(port) => void setHarnessPort(port)}
+              />
             </Row>
 
             <Row
@@ -338,6 +353,52 @@ function Recorder({ recording, onRecording: setRecording }: RecorderProps) {
           )
         ))}
     </div>
+  )
+}
+
+interface PortFieldProps {
+  value: number | null
+  disabled: boolean
+  onSave: (port: number | null) => void
+}
+
+function PortField({ value, disabled, onSave }: PortFieldProps) {
+  const [draft, setDraft] = useState(value?.toString() ?? '')
+
+  const save = () => {
+    const normalized = draft.trim()
+    if (normalized === '') {
+      if (value !== null) onSave(null)
+      return
+    }
+    const port = Number(normalized)
+    if (Number.isInteger(port) && port >= 1_024 && port <= 65_535 && port !== value) {
+      onSave(port)
+    }
+  }
+
+  return (
+    <input
+      type="number"
+      min={1024}
+      max={65535}
+      step={1}
+      inputMode="numeric"
+      value={draft}
+      placeholder={t('settings.harnessPortAuto')}
+      aria-label={t('settings.harnessPort')}
+      disabled={disabled}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={save}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur()
+        if (event.key === 'Escape') {
+          setDraft(value?.toString() ?? '')
+          event.currentTarget.blur()
+        }
+      }}
+      className="h-[30px] w-[112px] rounded-control border border-line-strong bg-surface-2 px-2.5 text-right text-[11.5px] text-text outline-none placeholder:text-faint focus:border-brand disabled:opacity-40"
+    />
   )
 }
 

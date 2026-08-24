@@ -30,6 +30,7 @@ interface StartupStore {
   setNotification: (kind: NotificationPreference, enabled: boolean) => Promise<void>
   testNotification: () => Promise<void>
   setLogLevel: (level: LogLevel) => Promise<void>
+  setHarnessPort: (port: number | null) => Promise<void>
   /** Take the same key again after another program has let go of it. */
   retry: () => Promise<void>
 }
@@ -77,6 +78,10 @@ export const useStartup = create<StartupStore>((set, get) => ({
 
   setLogLevel: async (level) => {
     await change(set, get, () => ipc.startupLogLevel(level))
+  },
+
+  setHarnessPort: async (port) => {
+    await change(set, get, () => ipc.startupHarnessPort(port))
   },
 
   retry: async () => {

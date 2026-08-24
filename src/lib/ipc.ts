@@ -908,6 +908,8 @@ export interface Startup {
   suggested: string
   notifications: NotificationPreferences
   logLevel: LogLevel
+  /** Fixed loopback port, or null for an OS-assigned collision-free port. */
+  harnessPort: number | null
 }
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -941,6 +943,9 @@ export const startupNotificationTest = (): Promise<Startup> => invoke('startup_n
 
 export const startupLogLevel = (level: LogLevel): Promise<Startup> =>
   invoke('startup_log_level', { level })
+
+export const startupHarnessPort = (port: number | null): Promise<Startup> =>
+  invoke('startup_harness_port', { port })
 
 /* -------------------------------------------------------------------------- */
 /* About                                                                      */

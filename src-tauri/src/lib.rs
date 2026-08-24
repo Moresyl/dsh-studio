@@ -171,6 +171,7 @@ pub fn run() {
             startup::startup_notification,
             startup::startup_notification_test,
             startup::startup_log_level,
+            startup::startup_harness_port,
             material::window_material,
             window::window_open,
             desktop::commands::desktop_offer,
