@@ -131,6 +131,7 @@ pub fn run() {
             plugins::commands::plugin_media,
             plugins::commands::plugin_preview,
             plugins::commands::plugin_sources,
+            plugins::commands::plugin_source_health,
             plugins::commands::plugin_source_select,
             plugins::commands::plugin_source_add,
             plugins::commands::plugin_source_remove,

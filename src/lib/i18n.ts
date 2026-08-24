@@ -200,6 +200,9 @@ const en = {
     'Only the public catalog Schema is accepted. Private addresses, credentials, cross-origin redirects, oversized responses and executable install commands are rejected.',
   'plugins.sources.addAction': 'Validate and add',
   'plugins.sources.validating': 'Validating…',
+  'plugins.sources.check': 'Check source contract',
+  'plugins.sources.conformant': 'Conformant',
+  'plugins.sources.installable': 'installable',
   'plugins.hub.open': 'Open DSH Hub',
   'plugins.hub.title': 'DSH Hub community directory',
   'plugins.hub.detail':
@@ -821,6 +824,9 @@ const zh: Record<MessageKey, string> = {
     '只接受公开目录 Schema；内网地址、凭据、跨源跳转、超大响应和可执行安装命令都会被拒绝。',
   'plugins.sources.addAction': '验证并添加',
   'plugins.sources.validating': '正在验证…',
+  'plugins.sources.check': '检查来源协议',
+  'plugins.sources.conformant': '协议通过',
+  'plugins.sources.installable': '可安装',
   'plugins.hub.open': '打开 DSH Hub',
   'plugins.hub.title': 'DSH Hub 社区目录',
   'plugins.hub.detail':

@@ -17,6 +17,7 @@ import * as ipc from '@/lib/ipc'
 import { showError } from '@/state/dialog'
 import type {
   ArchivePackage,
+  CatalogHealth,
   CatalogSource,
   InstalledPlugin,
   PluginDetail,
@@ -36,6 +37,7 @@ interface PluginStore {
   hasMore: boolean
   indexedAt: number
   sources: CatalogSource[]
+  sourceHealth: Record<string, CatalogHealth>
   /** The package the detail rail is describing, if any. */
   selected: string | null
   selectedSource: string | null
@@ -50,6 +52,7 @@ interface PluginStore {
   previewExpiresAt: number | null
   /** A catalog-source choice or edit is being committed. */
   sourceWorking: boolean
+  checkingSource: string | null
   /** The package name a change is running against, or null when idle. */
   working: string | null
   error: string | null
@@ -68,6 +71,7 @@ interface PluginStore {
   selectSource: (id: string) => Promise<void>
   addSource: (label: string, endpoint: string) => Promise<boolean>
   removeSource: (id: string) => Promise<void>
+  checkSource: (id: string) => Promise<void>
   preview: (spec: string) => Promise<boolean>
   add: () => Promise<boolean>
   remove: (name: string) => Promise<void>
@@ -130,6 +134,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   hasMore: false,
   indexedAt: 0,
   sources: [],
+  sourceHealth: {},
   selected: null,
   selectedSource: null,
   selectedVersion: null,
@@ -140,6 +145,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   previewToken: null,
   previewExpiresAt: null,
   sourceWorking: false,
+  checkingSource: null,
   working: null,
   error: null,
 
@@ -351,6 +357,19 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       failed(set, cause)
     } finally {
       set({ sourceWorking: false })
+    }
+  },
+
+  checkSource: async (id) => {
+    if (get().checkingSource) return
+    set({ checkingSource: id, error: null })
+    try {
+      const health = await ipc.pluginSourceHealth(id)
+      set((state) => ({ sourceHealth: { ...state.sourceHealth, [id]: health } }))
+    } catch (cause) {
+      failed(set, cause)
+    } finally {
+      set({ checkingSource: null })
     }
   },
 

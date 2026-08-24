@@ -228,6 +228,40 @@ pub fn plugin_sources() -> Vec<super::catalog::Source> {
     super::catalog::sources()
 }
 
+/// Re-read one source through the same bounded parser used by the market.
+/// npm is an authority rather than a catalog document, so its probe resolves
+/// the pinned Harness package through the user's configured registry instead.
+#[tauri::command]
+pub async fn plugin_source_health(id: String) -> Result<super::catalog::Health> {
+    if id != "npm" {
+        return super::catalog::health(&id).await;
+    }
+    let started = std::time::Instant::now();
+    let detail = super::registry::detail(&node()?, crate::harness::install::PACKAGE).await?;
+    let listing = super::registry::Listing {
+        name: detail.name,
+        version: detail.version,
+        description: detail.description,
+        publisher: String::new(),
+        updated: String::new(),
+        weekly_downloads: 0,
+        link: detail.homepage.clone().or(detail.repository.clone()),
+        repository: detail.repository,
+        source_id: "npm".into(),
+        source_label: "npm registry".into(),
+        installable: true,
+        categories: Vec::new(),
+        has_icon: false,
+        icon: None,
+    };
+    Ok(super::catalog::Health::from_listings(
+        "npm",
+        "npm/package-metadata-v1",
+        &[listing],
+        started.elapsed().as_millis().try_into().unwrap_or(u64::MAX),
+    ))
+}
+
 #[tauri::command]
 pub fn plugin_source_select(id: String) -> Result<Vec<super::catalog::Source>> {
     super::catalog::select(&id)

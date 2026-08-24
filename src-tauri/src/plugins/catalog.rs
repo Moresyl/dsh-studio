@@ -7,7 +7,7 @@
 
 use std::collections::BTreeSet;
 use std::net::{IpAddr, SocketAddr};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -45,6 +45,57 @@ pub struct Source {
     pub endpoint: Option<String>,
     pub built_in: bool,
     pub active: bool,
+}
+
+/// One fresh, read-only conformance probe for a discovery source.
+///
+/// The report deliberately contains no response body or package metadata. It
+/// is safe to show in diagnostics without leaking a private registry token or
+/// allowing a catalog to smuggle renderer-controlled markup into the app.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Health {
+    pub source_id: String,
+    pub contract: String,
+    pub checked_at: u64,
+    pub items: usize,
+    pub installable: usize,
+    pub latency_ms: u64,
+    pub warnings: Vec<String>,
+}
+
+impl Health {
+    pub(crate) fn from_listings(
+        source_id: &str,
+        contract: &str,
+        listings: &[Listing],
+        latency_ms: u64,
+    ) -> Self {
+        let installable = listings.iter().filter(|item| item.installable).count();
+        let mut warnings = Vec::new();
+        if listings.is_empty() {
+            warnings.push("the source returned no catalog items".to_string());
+        } else if installable == 0 {
+            warnings.push("the source returned no installable exact npm versions".to_string());
+        } else if installable < listings.len() {
+            warnings.push(format!(
+                "{} catalog items were excluded from installation",
+                listings.len() - installable
+            ));
+        }
+        Self {
+            source_id: source_id.to_string(),
+            contract: contract.to_string(),
+            checked_at: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs(),
+            items: listings.len(),
+            installable,
+            latency_ms,
+            warnings,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -190,6 +241,30 @@ pub async fn search(source_id: &str, query: &str) -> Result<Vec<Listing>> {
             parse_standard(&value, &source.id, &source.label, query, &source.endpoint)
         }
     }
+}
+
+/// Fetch and parse the complete bounded view used by a catalog source.
+/// Successful completion proves the current response still satisfies the
+/// source contract and all of the normal size, SSRF, identity and item limits.
+pub async fn health(source_id: &str) -> Result<Health> {
+    let contract = match source_id {
+        STORE_ID => "reviewed-http/1024store",
+        DSHFIND_ID => "reviewed-http/dshfind-v1",
+        "npm" => {
+            return Err(Error::Plugin(
+                "npm registry health is checked through its package metadata authority".into(),
+            ))
+        }
+        _ => "standard-http/1.0.0",
+    };
+    let started = std::time::Instant::now();
+    let listings = search(source_id, "").await?;
+    Ok(Health::from_listings(
+        source_id,
+        contract,
+        &listings,
+        started.elapsed().as_millis().try_into().unwrap_or(u64::MAX),
+    ))
 }
 
 /// Re-read one catalog identity for detail, media and commit validation. The
@@ -1062,7 +1137,7 @@ mod tests {
 
     use super::{
         admissible_address, blocked, dshfind_detail_url, dshfind_page_url, exact_listing,
-        parse_dshfind_item, parse_dshfind_page, parse_standard, parse_store, safe_url,
+        parse_dshfind_item, parse_dshfind_page, parse_standard, parse_store, safe_url, Health,
     };
 
     #[test]
@@ -1111,6 +1186,30 @@ mod tests {
             items[0].icon.as_ref().map(|icon| icon.url.as_str()),
             Some("https://catalog.example/assets/safe.png")
         );
+    }
+
+    #[test]
+    fn health_summary_counts_installable_items_and_reports_empty_sources() {
+        let value = serde_json::json!({ "schemaVersion": "1.0.0", "items": [{
+            "package": { "name": "safe-plugin" }, "latestVersion": "1.2.3"
+        }]});
+        let items = parse_standard(
+            &value,
+            "custom-a",
+            "A",
+            "",
+            "https://catalog.example/plugins.json",
+        )
+        .expect("catalog");
+        let report = Health::from_listings("custom-a", "standard-http/1.0.0", &items, 42);
+        assert_eq!(report.items, 1);
+        assert_eq!(report.installable, 1);
+        assert_eq!(report.latency_ms, 42);
+        assert!(report.warnings.is_empty());
+
+        let empty = Health::from_listings("custom-b", "standard-http/1.0.0", &[], 1);
+        assert_eq!(empty.installable, 0);
+        assert_eq!(empty.warnings, ["the source returned no catalog items"]);
     }
 
     #[test]

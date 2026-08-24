@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from 'react'
-import { Database, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { CheckCircle2, Database, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { t } from '@/lib/i18n'
@@ -14,8 +14,11 @@ interface CatalogSourcesDialogProps {
 export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
   const sources = usePlugins((state) => state.sources)
   const sourceWorking = usePlugins((state) => state.sourceWorking)
+  const sourceHealth = usePlugins((state) => state.sourceHealth)
+  const checkingSource = usePlugins((state) => state.checkingSource)
   const addSource = usePlugins((state) => state.addSource)
   const removeSource = usePlugins((state) => state.removeSource)
+  const checkSource = usePlugins((state) => state.checkSource)
   const [adding, setAdding] = useState(false)
   const [label, setLabel] = useState('')
   const [endpoint, setEndpoint] = useState('')
@@ -71,8 +74,10 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           <ul className="overflow-hidden rounded-control border border-line">
-            {sources.map((source) => (
-              <li
+            {sources.map((source) => {
+              const health = sourceHealth[source.id]
+              return (
+                <li
                 key={source.id}
                 className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
               >
@@ -95,7 +100,39 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
                   <p className="mt-1 truncate font-mono text-[10px] text-faint">
                     {source.endpoint ?? source.kind}
                   </p>
+                  {health && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9.5px] text-faint">
+                      <span className="inline-flex items-center gap-1 text-ok">
+                        <CheckCircle2 size={10} aria-hidden="true" />
+                        {t('plugins.sources.conformant')}
+                      </span>
+                      <span>{health.contract}</span>
+                      <span>
+                        {health.installable}/{health.items}{' '}
+                        {t('plugins.sources.installable')}
+                      </span>
+                      <span>{health.latencyMs} ms</span>
+                      {health.warnings.map((warning) => (
+                        <span key={warning} className="w-full text-warn">
+                          {warning}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void checkSource(source.id)}
+                  disabled={sourceWorking || checkingSource !== null}
+                  aria-label={t('plugins.sources.check')}
+                  className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-brand/10 hover:text-brand disabled:opacity-50"
+                >
+                  {checkingSource === source.id ? (
+                    <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <RefreshCw size={13} aria-hidden="true" />
+                  )}
+                </button>
                 {!source.builtIn && (
                   <button
                     type="button"
@@ -107,8 +144,9 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
                     <Trash2 size={13} aria-hidden="true" />
                   </button>
                 )}
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
 
           <form

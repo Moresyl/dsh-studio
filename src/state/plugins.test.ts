@@ -49,6 +49,8 @@ beforeEach(() => {
     previewToken: null,
     previewExpiresAt: null,
     sourceWorking: false,
+    sourceHealth: {},
+    checkingSource: null,
     working: null,
     error: null,
   })
@@ -208,5 +210,44 @@ describe('plugin catalog source changes', () => {
     finish([])
     await expect(first).resolves.toBe(true)
     expect(usePlugins.getState().sourceWorking).toBe(false)
+  })
+
+  it('stores a fresh source contract report and blocks overlapping probes', async () => {
+    let finish!: (answer: ipc.CatalogHealth) => void
+    vi.mocked(ipc.pluginSourceHealth).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    const first = usePlugins.getState().checkSource('dshfind')
+    await usePlugins.getState().checkSource('npm')
+    expect(ipc.pluginSourceHealth).toHaveBeenCalledOnce()
+    expect(usePlugins.getState().checkingSource).toBe('dshfind')
+
+    finish({
+      sourceId: 'dshfind',
+      contract: 'reviewed-http/dshfind-v1',
+      checkedAt: 1,
+      items: 12,
+      installable: 12,
+      latencyMs: 42,
+      warnings: [],
+    })
+    await first
+    expect(usePlugins.getState().sourceHealth.dshfind).toMatchObject({ items: 12, latencyMs: 42 })
+    expect(usePlugins.getState().checkingSource).toBeNull()
+  })
+
+  it('shows source contract failures in the global error dialog', async () => {
+    vi.mocked(ipc.pluginSourceHealth).mockRejectedValue(new Error('catalog schema drift'))
+
+    await usePlugins.getState().checkSource('dshfind')
+
+    expect(usePlugins.getState().error).toContain('catalog schema drift')
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'catalog schema drift',
+    })
   })
 })

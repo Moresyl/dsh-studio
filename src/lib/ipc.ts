@@ -278,6 +278,17 @@ export interface CatalogSource {
   active: boolean
 }
 
+/** Fresh native conformance report for one bounded discovery source. */
+export interface CatalogHealth {
+  sourceId: string
+  contract: string
+  checkedAt: number
+  items: number
+  installable: number
+  latencyMs: number
+  warnings: string[]
+}
+
 export interface PluginDetail {
   name: string
   version: string
@@ -356,6 +367,9 @@ export const pluginMedia = (
 ): Promise<PluginMedia | null> => invoke('plugin_media', { sourceId, name, version })
 
 export const pluginSources = (): Promise<CatalogSource[]> => invoke('plugin_sources')
+
+export const pluginSourceHealth = (id: string): Promise<CatalogHealth> =>
+  invoke('plugin_source_health', { id })
 
 export const pluginSourceSelect = (id: string): Promise<CatalogSource[]> =>
   invoke('plugin_source_select', { id })
