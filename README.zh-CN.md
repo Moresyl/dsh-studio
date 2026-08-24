@@ -281,10 +281,13 @@ registry——[`packaging/README.md`](packaging/README.md) 里逐条写明了每
 ```sh
 pnpm install
 pnpm tauri dev      # 运行
-pnpm tauri build    # 为当前平台产出安装包
+pnpm bundle:local   # 为当前平台产出供本地验证的未签名安装包
 # 正式流水线会准备 src-tauri/runtime-cache/offline，并合并
 # src-tauri/tauri.full.conf.json 产出完整离线版。
 ```
+
+`bundle:local` 会明确跳过更新签名和系统平台签名，因为开发机不会保存正式发布私钥。正式版本
+仍由发布流水线构建；只要更新产物缺少签名，流水线就会失败关闭。
 
 检查：
 

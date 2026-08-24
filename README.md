@@ -312,10 +312,14 @@ one of those credentials can be taken back on its own, mid-connection.
 ```sh
 pnpm install
 pnpm tauri dev      # run it
-pnpm tauri build    # produce installers for the current platform
+pnpm bundle:local   # produce unsigned installers for local verification
 # The release workflow prepares src-tauri/runtime-cache/offline and merges
 # src-tauri/tauri.full.conf.json to produce the Full / Offline edition.
 ```
+
+`bundle:local` deliberately skips updater and platform signing because developer
+machines do not carry the release private keys. Official releases are built by the
+release workflow, which fails closed unless the updater artifacts are signed.
 
 Checks:
 

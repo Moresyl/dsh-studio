@@ -42,6 +42,7 @@
     "verify:docs": "node .github/scripts/verify-bilingual-docs.mjs",
     "test:packaging": "node --test .github/scripts/*.test.mjs",
     "test:release": "node .github/scripts/release-notes.mjs && pnpm verify:contracts && pnpm verify:a11y && pnpm verify:docs && pnpm test:packaging && cargo test --manifest-path src-tauri/Cargo.toml --workspace && pnpm lint && pnpm test:coverage && pnpm build",
+    "bundle:local": "tauri build --no-sign",
     "tauri": "tauri"
   },
   "dependencies": {
