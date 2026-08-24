@@ -66,9 +66,11 @@ export const useUpdate = create<UpdateState>((set, get) => ({
 
   install: async () => {
     if (get().installing || get().checking) return
+    const expectedVersion = get().release?.version
+    if (!expectedVersion) return
     set({ installing: true, progress: { downloaded: 0, total: null }, error: null })
     try {
-      const installed = await installUpdate((progress) => set({ progress }))
+      const installed = await installUpdate(expectedVersion, (progress) => set({ progress }))
       // The release can disappear between the first check and the install click.
       if (!installed) set({ release: null, checked: true })
     } catch (cause) {

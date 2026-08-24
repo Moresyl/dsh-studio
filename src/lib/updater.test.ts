@@ -62,10 +62,10 @@ describe('installUpdate', () => {
       report({ event: 'Progress', data: { chunkLength: 6 } })
       report({ event: 'Finished' })
     })
-    check.mockResolvedValue({ downloadAndInstall, close })
+    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
     const progress = vi.fn()
 
-    await expect(installUpdate(progress)).resolves.toBe(true)
+    await expect(installUpdate('0.4.0', progress)).resolves.toBe(true)
 
     expect(progress).toHaveBeenLastCalledWith({ downloaded: 10, total: 10 })
     expect(relaunch).toHaveBeenCalledOnce()
@@ -75,16 +75,49 @@ describe('installUpdate', () => {
   it('does not relaunch when the update disappeared before installation', async () => {
     check.mockResolvedValue(null)
 
-    await expect(installUpdate(vi.fn())).resolves.toBe(false)
+    await expect(installUpdate('0.4.0', vi.fn())).resolves.toBe(false)
     expect(relaunch).not.toHaveBeenCalled()
   })
 
   it('closes the native resource and leaves relaunch alone after a download failure', async () => {
     downloadAndInstall.mockRejectedValue(new Error('network lost'))
-    check.mockResolvedValue({ downloadAndInstall, close })
+    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
 
-    await expect(installUpdate(vi.fn())).rejects.toThrow(/Full \/ Offline.*network lost/s)
+    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(
+      /Full \/ Offline.*network lost/s,
+    )
     expect(relaunch).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('requires a fresh review when latest changed after confirmation', async () => {
+    check.mockResolvedValue({ version: '0.5.0', downloadAndInstall, close })
+
+    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/changed.*review/s)
+    expect(downloadAndInstall).not.toHaveBeenCalled()
+    expect(relaunch).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('never reports more than the signed artifact content length', async () => {
+    downloadAndInstall.mockImplementation(async (report) => {
+      report({ event: 'Started', data: { contentLength: 10 } })
+      report({ event: 'Progress', data: { chunkLength: 12 } })
+    })
+    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
+    const progress = vi.fn()
+
+    await installUpdate('0.4.0', progress)
+
+    expect(progress).toHaveBeenLastCalledWith({ downloaded: 10, total: 10 })
+  })
+
+  it('explains that a manual restart is required if relaunch fails after installation', async () => {
+    downloadAndInstall.mockResolvedValue(undefined)
+    relaunch.mockRejectedValue(new Error('process plugin unavailable'))
+    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
+
+    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/installed.*start.*again/s)
     expect(close).toHaveBeenCalledOnce()
   })
 })

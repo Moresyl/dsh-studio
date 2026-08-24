@@ -124,14 +124,23 @@ describe('installation', () => {
     expect(updater.installUpdate).not.toHaveBeenCalled()
   })
 
+  it('does not ask the updater to install without a reviewed release', async () => {
+    await useUpdate.getState().install()
+
+    expect(updater.installUpdate).not.toHaveBeenCalled()
+    expect(useUpdate.getState().installing).toBe(false)
+  })
+
   it('forwards progress and clears the busy state after a recoverable failure', async () => {
-    updater.installUpdate.mockImplementation(async (report) => {
+    useUpdate.setState({ release })
+    updater.installUpdate.mockImplementation(async (_version, report) => {
       report({ downloaded: 50, total: 100 })
       throw new Error('signature rejected')
     })
 
     await useUpdate.getState().install()
 
+    expect(updater.installUpdate).toHaveBeenCalledWith('0.4.0', expect.any(Function))
     expect(useUpdate.getState()).toMatchObject({
       installing: false,
       progress: { downloaded: 50, total: 100 },
