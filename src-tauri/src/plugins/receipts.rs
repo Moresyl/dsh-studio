@@ -6,7 +6,7 @@
 //! provenance together.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -209,30 +209,8 @@ fn save(profile_dir: &Path, store: &Store) -> Result<()> {
         ));
     }
     let path = profile_dir.join(FILE);
-    let temporary = temporary(&path);
-    std::fs::write(&temporary, body)
-        .map_err(|cause| Error::Plugin(format!("could not write market receipts: {cause}")))?;
-    if let Err(cause) = replace(&temporary, &path) {
-        let _ = std::fs::remove_file(&temporary);
-        return Err(Error::Plugin(format!(
-            "could not commit market receipts: {cause}"
-        )));
-    }
-    Ok(())
-}
-
-fn replace(temporary: &Path, target: &Path) -> std::io::Result<()> {
-    #[cfg(windows)]
-    if target.exists() {
-        std::fs::remove_file(target)?;
-    }
-    #[cfg(not(windows))]
-    let _ = target;
-    std::fs::rename(temporary, target)
-}
-
-fn temporary(path: &Path) -> PathBuf {
-    path.with_extension(format!("json.{}.tmp", std::process::id()))
+    crate::atomic::write(&path, body)
+        .map_err(|cause| Error::Plugin(format!("could not commit market receipts: {cause}")))
 }
 
 fn valid_integrity(value: &str) -> bool {

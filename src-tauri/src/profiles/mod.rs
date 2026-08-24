@@ -867,7 +867,7 @@ fn write_manifest(dir: &Path, manifest: &Value) -> Result<()> {
 }
 
 fn write(path: &Path, contents: &str) -> Result<()> {
-    std::fs::write(path, contents).map_err(|cause| {
+    crate::atomic::write(path, contents).map_err(|cause| {
         Error::Profile(format!("{} could not be written: {cause}", path.display()))
     })
 }

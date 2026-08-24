@@ -92,7 +92,7 @@ pub async fn report_build(
 /// system's own save dialog just returned.
 #[tauri::command]
 pub async fn report_save(path: String, text: String) -> Result<()> {
-    tokio::task::spawn_blocking(move || std::fs::write(&path, text))
+    tokio::task::spawn_blocking(move || crate::atomic::write(Path::new(&path), text))
         .await
         .map_err(|cause| Error::Report(format!("writing the report failed: {cause}")))?
         .map_err(|cause| Error::Report(format!("writing the report failed: {cause}")))

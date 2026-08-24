@@ -71,22 +71,7 @@ impl Store {
         })
         .map_err(|cause| Error::Workspace(format!("workspace state is invalid: {cause}")))?;
         body.push(b'\n');
-        let temporary = self.file.with_extension("dsh-studio.tmp");
-        std::fs::write(&temporary, body).map_err(|cause| {
-            Error::Workspace(format!(
-                "{} could not be written: {cause}",
-                temporary.display()
-            ))
-        })?;
-        if self.file.exists() {
-            std::fs::remove_file(&self.file).map_err(|cause| {
-                Error::Workspace(format!(
-                    "{} could not be replaced: {cause}",
-                    self.file.display()
-                ))
-            })?;
-        }
-        std::fs::rename(&temporary, &self.file).map_err(|cause| {
+        crate::atomic::write(&self.file, body).map_err(|cause| {
             Error::Workspace(format!(
                 "{} could not be committed: {cause}",
                 self.file.display()

@@ -451,16 +451,7 @@ fn write_bytes_atomic(path: &Path, body: &[u8]) -> Result<()> {
             Error::Plugin(format!("could not create plugin recovery state: {cause}"))
         })?;
     }
-    let temporary = path.with_extension("dsh-studio.tmp");
-    std::fs::write(&temporary, body).map_err(|cause| {
-        Error::Plugin(format!("could not write plugin recovery state: {cause}"))
-    })?;
-    if path.exists() {
-        std::fs::remove_file(path).map_err(|cause| {
-            Error::Plugin(format!("could not replace plugin recovery state: {cause}"))
-        })?;
-    }
-    std::fs::rename(&temporary, path)
+    crate::atomic::write(path, body)
         .map_err(|cause| Error::Plugin(format!("could not commit plugin recovery state: {cause}")))
 }
 

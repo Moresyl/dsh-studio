@@ -2,6 +2,7 @@
 
 mod about;
 mod application_menu;
+mod atomic;
 mod desktop;
 mod diagnostics;
 mod error;

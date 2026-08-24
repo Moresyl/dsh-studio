@@ -332,43 +332,10 @@ fn write_level_at(path: &Path, level: LogLevel) -> Result<()> {
         std::fs::create_dir_all(parent)
             .map_err(|cause| Error::Report(format!("could not create log settings: {cause}")))?;
     }
-    let temporary = path.with_extension(format!("json.{}.tmp", std::process::id()));
     let raw = serde_json::to_vec(&Settings { level })
         .map_err(|cause| Error::Report(format!("could not encode log settings: {cause}")))?;
-    std::fs::write(&temporary, raw)
-        .map_err(|cause| Error::Report(format!("could not stage log settings: {cause}")))?;
-    replace_file(&temporary, path).map_err(|cause| {
-        let _ = std::fs::remove_file(&temporary);
-        Error::Report(format!("could not save log settings: {cause}"))
-    })
-}
-
-#[cfg(not(windows))]
-fn replace_file(staged: &Path, target: &Path) -> std::io::Result<()> {
-    std::fs::rename(staged, target)
-}
-
-#[cfg(windows)]
-fn replace_file(staged: &Path, target: &Path) -> std::io::Result<()> {
-    use std::os::windows::ffi::OsStrExt as _;
-    use windows_sys::Win32::Storage::FileSystem::{
-        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
-    };
-
-    let staged: Vec<u16> = staged.as_os_str().encode_wide().chain(Some(0)).collect();
-    let target: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
-    let moved = unsafe {
-        MoveFileExW(
-            staged.as_ptr(),
-            target.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if moved == 0 {
-        Err(std::io::Error::last_os_error())
-    } else {
-        Ok(())
-    }
+    crate::atomic::write(path, raw)
+        .map_err(|cause| Error::Report(format!("could not save log settings: {cause}")))
 }
 
 fn write_crash(info: &std::panic::PanicHookInfo<'_>) {

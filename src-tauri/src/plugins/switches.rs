@@ -232,7 +232,7 @@ fn write(path: &Path, manifest: &Value) -> Result<()> {
         ))
     })?;
     json.push('\n');
-    std::fs::write(path, json)
+    crate::atomic::write(path, json)
         .map_err(|cause| Error::Plugin(format!("{} could not be written: {cause}", path.display())))
 }
 

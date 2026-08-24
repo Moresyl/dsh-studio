@@ -248,19 +248,7 @@ fn write_json_atomic(path: &Path, value: &impl Serialize) -> Result<()> {
     let mut body = serde_json::to_vec_pretty(value)
         .map_err(|cause| Error::Profile(format!("profile state could not be encoded: {cause}")))?;
     body.push(b'\n');
-    let temporary = path.with_extension("dsh-studio.tmp");
-    std::fs::write(&temporary, body).map_err(|cause| {
-        Error::Profile(format!(
-            "{} could not be written: {cause}",
-            temporary.display()
-        ))
-    })?;
-    if path.exists() {
-        std::fs::remove_file(path).map_err(|cause| {
-            Error::Profile(format!("{} could not be replaced: {cause}", path.display()))
-        })?;
-    }
-    std::fs::rename(&temporary, path).map_err(|cause| {
+    crate::atomic::write(path, body).map_err(|cause| {
         Error::Profile(format!(
             "{} could not be committed: {cause}",
             path.display()

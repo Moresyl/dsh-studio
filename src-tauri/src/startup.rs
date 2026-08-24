@@ -438,7 +438,7 @@ fn write(saved: &Saved) -> Result<()> {
         std::fs::create_dir_all(parent).map_err(|cause| Error::Startup(cause.to_string()))?;
     }
     let raw = serde_json::to_vec(saved).map_err(|cause| Error::Startup(cause.to_string()))?;
-    std::fs::write(path, raw).map_err(|cause| Error::Startup(cause.to_string()))
+    crate::atomic::write(&path, raw).map_err(|cause| Error::Startup(cause.to_string()))
 }
 
 #[cfg(test)]

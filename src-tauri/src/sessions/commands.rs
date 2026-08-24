@@ -75,7 +75,7 @@ pub async fn session_export(
 /// is already in hand would be work nobody asked for.
 #[tauri::command]
 pub async fn session_save(path: String, text: String) -> Result<()> {
-    tokio::task::spawn_blocking(move || std::fs::write(&path, text))
+    tokio::task::spawn_blocking(move || crate::atomic::write(std::path::Path::new(&path), text))
         .await
         .map_err(|cause| Error::Session(format!("writing the session failed: {cause}")))?
         .map_err(|cause| Error::Session(format!("writing the session failed: {cause}")))

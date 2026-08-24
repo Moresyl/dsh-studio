@@ -486,7 +486,7 @@ pub fn preset_choose(id: String) -> Result<Roster> {
             ))
         })?;
     }
-    std::fs::write(&path, edited).map_err(|cause| {
+    crate::atomic::write(&path, edited).map_err(|cause| {
         Error::Preset(format!("{} could not be written: {cause}", path.display()))
     })?;
 

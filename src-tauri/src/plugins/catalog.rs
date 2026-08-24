@@ -1115,15 +1115,7 @@ fn save(settings: &Settings) -> Result<()> {
         .map_err(|cause| Error::Plugin(format!("could not create catalog settings: {cause}")))?;
     let body = serde_json::to_vec_pretty(settings)
         .map_err(|cause| Error::Plugin(format!("could not encode catalog settings: {cause}")))?;
-    let temporary = path.with_extension("json.tmp");
-    std::fs::write(&temporary, body)
-        .map_err(|cause| Error::Plugin(format!("could not write catalog settings: {cause}")))?;
-    if path.exists() {
-        std::fs::remove_file(&path).map_err(|cause| {
-            Error::Plugin(format!("could not replace catalog settings: {cause}"))
-        })?;
-    }
-    std::fs::rename(temporary, path)
+    crate::atomic::write(&path, body)
         .map_err(|cause| Error::Plugin(format!("could not commit catalog settings: {cause}")))
 }
 
