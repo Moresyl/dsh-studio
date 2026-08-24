@@ -346,6 +346,9 @@ function Recorder({ recording, onRecording: setRecording }: RecorderProps) {
             <Button
               variant="ghost"
               disabled={busy}
+              aria-label={t('settings.suggest', {
+                keys: spellCombination(state.suggested, isMac).join(' '),
+              })}
               data-hint={t('settings.suggest', {
                 keys: spellCombination(state.suggested, isMac).join(' '),
               })}

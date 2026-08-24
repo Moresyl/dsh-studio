@@ -514,3 +514,37 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Windows High Contrast and equivalent forced-colour modes discard most of the
+   palette. Restore the boundaries and status meaning that colour mixing alone
+   cannot carry once the operating system becomes the colour authority. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline-color: Highlight;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  [role='button'],
+  [role='switch'],
+  [role='tab'],
+  [role='dialog'],
+  [role='alertdialog'] {
+    border: 1px solid ButtonText;
+    forced-color-adjust: auto;
+  }
+
+  [aria-current='true'],
+  [aria-selected='true'],
+  [aria-checked='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  :disabled,
+  [aria-disabled='true'] {
+    color: GrayText;
+  }
+}

@@ -38,9 +38,10 @@
     "test:coverage": "vitest run --coverage",
     "test:coverage:rust": "cargo llvm-cov --manifest-path src-tauri/Cargo.toml --workspace --json --output-path src-tauri/target/llvm-cov.json && node .github/scripts/verify-rust-coverage.mjs",
     "verify:contracts": "node .github/scripts/verify-public-contracts.mjs",
+    "verify:a11y": "node .github/scripts/verify-accessibility.mjs",
     "verify:docs": "node .github/scripts/verify-bilingual-docs.mjs",
     "test:packaging": "node --test .github/scripts/*.test.mjs",
-    "test:release": "node .github/scripts/release-notes.mjs && pnpm verify:contracts && pnpm verify:docs && pnpm test:packaging && cargo test --manifest-path src-tauri/Cargo.toml --workspace && pnpm lint && pnpm test:coverage && pnpm build",
+    "test:release": "node .github/scripts/release-notes.mjs && pnpm verify:contracts && pnpm verify:a11y && pnpm verify:docs && pnpm test:packaging && cargo test --manifest-path src-tauri/Cargo.toml --workspace && pnpm lint && pnpm test:coverage && pnpm build",
     "tauri": "tauri"
   },
   "dependencies": {

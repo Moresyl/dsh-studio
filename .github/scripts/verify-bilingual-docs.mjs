@@ -8,6 +8,7 @@ const DEFAULT_ROOT = resolve(HERE, '..', '..')
 export const BILINGUAL_PAIRS = Object.freeze([
   ['README.md', 'README.zh-CN.md'],
   ['docs/architecture.md', 'docs/architecture.zh-CN.md'],
+  ['docs/accessibility-acceptance.md', 'docs/accessibility-acceptance.zh-CN.md'],
   ['docs/plugin-development.md', 'docs/plugin-development.zh-CN.md'],
   ['docs/plugin-interoperability.md', 'docs/plugin-interoperability.zh-CN.md'],
   ['docs/troubleshooting.md', 'docs/troubleshooting.zh-CN.md'],
@@ -16,6 +17,11 @@ export const BILINGUAL_PAIRS = Object.freeze([
 ])
 
 const CONTRACTS = Object.freeze([
+  {
+    pair: 'docs/accessibility-acceptance.md|docs/accessibility-acceptance.zh-CN.md',
+    english: ['pnpm verify:a11y', '200% zoom', 'No Apple device'],
+    chinese: ['pnpm verify:a11y', '200% 缩放', '没有 Apple 设备'],
+  },
   {
     pair: 'README.md|README.zh-CN.md',
     english: ['Renderer-independent startup recovery', 'Read-only Host plugin contract'],

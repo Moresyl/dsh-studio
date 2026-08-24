@@ -16,5 +16,5 @@ test('bilingual pair validation reports every missing shared fact', () => {
 })
 
 test('repository bilingual capability documents stay synchronized', async () => {
-  assert.deepEqual(await verifyBilingualDocs(), { pairs: 7 })
+  assert.deepEqual(await verifyBilingualDocs(), { pairs: 8 })
 })
