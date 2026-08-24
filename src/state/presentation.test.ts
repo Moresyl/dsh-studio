@@ -31,4 +31,11 @@ describe('presentation preference', () => {
     expect(localStorage.setItem).toHaveBeenCalledWith('dsh-studio.presentation', 'advanced')
     expect(shared.announce).toHaveBeenCalledWith('presentation')
   })
+
+  it('restores the additive extended mode across windows', async () => {
+    stored.set('dsh-studio.presentation', 'extended')
+    vi.resetModules()
+    const { usePresentation } = await import('@/state/presentation')
+    expect(usePresentation.getState().mode).toBe('extended')
+  })
 })

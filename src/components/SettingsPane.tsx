@@ -128,11 +128,14 @@ export function SettingsPane() {
               <select
                 value={presentation}
                 onChange={(event) =>
-                  choosePresentation(event.target.value as 'compatibility' | 'advanced')
+                  choosePresentation(
+                    event.target.value as 'compatibility' | 'extended' | 'advanced',
+                  )
                 }
                 className="h-[30px] rounded-control border border-line-strong bg-surface-2 px-2.5 text-[11.5px] text-text outline-none focus:border-brand"
               >
                 <option value="compatibility">{t('settings.presentation.compatibility')}</option>
+                <option value="extended">{t('settings.presentation.extended')}</option>
                 <option value="advanced">{t('settings.presentation.advanced')}</option>
               </select>
             </Row>

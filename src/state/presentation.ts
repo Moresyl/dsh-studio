@@ -2,13 +2,14 @@ import { create } from 'zustand'
 
 import { announce, onSharedChange } from '@/lib/ipc'
 
-export type Presentation = 'compatibility' | 'advanced'
+export type Presentation = 'compatibility' | 'extended' | 'advanced'
 
 const KEY = 'dsh-studio.presentation'
 
 function remembered(): Presentation {
   try {
-    return window.localStorage.getItem(KEY) === 'advanced' ? 'advanced' : 'compatibility'
+    const saved = window.localStorage.getItem(KEY)
+    return saved === 'advanced' || saved === 'extended' ? saved : 'compatibility'
   } catch {
     return 'compatibility'
   }

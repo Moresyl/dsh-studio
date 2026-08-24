@@ -467,9 +467,14 @@ const en = {
   'settings.appearanceHint': 'Also on the title bar, next to the window controls.',
   'settings.presentation': 'Default presentation',
   'settings.presentationHint':
-    'Compatibility opens the upstream Harness UI. Advanced opens Studio tools and native framing.',
+    'Compatibility keeps upstream Harness untouched; Extended adds quick native operations; Advanced opens the complete Studio workbench.',
   'settings.presentation.compatibility': 'Compatibility',
+  'settings.presentation.extended': 'Extended',
   'settings.presentation.advanced': 'Advanced',
+  'view.extended': 'Extended',
+  'extended.actions': 'Extended Harness actions',
+  'extended.label': 'Quick actions',
+  'common.loading': 'Loading…',
   'settings.logLevel': 'Persistent log level',
   'settings.logLevelHint':
     'Controls bounded files on disk. The live console always keeps every line.',
@@ -491,7 +496,8 @@ const en = {
   'settings.jobFailed': 'Background job failed',
   'settings.jobFailedHint': 'Notify when a Harness background job fails.',
   'settings.notificationTest': 'Test notifications',
-  'settings.notificationTestHint': 'Register DSH Studio with the operating system and send one test message.',
+  'settings.notificationTestHint':
+    'Register DSH Studio with the operating system and send one test message.',
   'settings.notificationTestAction': 'Send test',
 
   'about.title': 'About',
@@ -1060,9 +1066,15 @@ const zh: Record<MessageKey, string> = {
   'settings.appearance': '外观',
   'settings.appearanceHint': '标题栏上也有一份，就在窗口按钮旁边。',
   'settings.presentation': '默认界面模式',
-  'settings.presentationHint': '兼容模式直接打开上游 Harness；高级模式打开 Studio 工具与原生框架。',
+  'settings.presentationHint':
+    '兼容模式保持上游 Harness 原样；扩展模式增加原生快捷操作；高级模式打开完整 Studio 工作台。',
   'settings.presentation.compatibility': '兼容模式',
+  'settings.presentation.extended': '扩展模式',
   'settings.presentation.advanced': '高级模式',
+  'view.extended': '扩展',
+  'extended.actions': 'Harness 扩展操作',
+  'extended.label': '快捷操作',
+  'common.loading': '正在加载…',
   'settings.logLevel': '持久日志级别',
   'settings.logLevelHint': '控制磁盘上的限额日志；实时控制台始终保留全部输出。',
   'settings.logLevel.debug': '调试',

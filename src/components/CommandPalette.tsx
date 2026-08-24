@@ -27,7 +27,7 @@ import {
 } from 'lucide-react'
 
 import { Empty } from '@/components/Empty'
-import { SETTINGS, SETTINGS_KEYS, VIEWS, type View } from '@/components/Workbench'
+import { SETTINGS, SETTINGS_KEYS, VIEWS, type View } from '@/components/workbench-contract'
 import { leaf, when } from '@/lib/format'
 import { fuzzy, segments } from '@/lib/fuzzy'
 import { t, type MessageKey } from '@/lib/i18n'

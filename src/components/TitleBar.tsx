@@ -8,6 +8,7 @@ import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import { drawsWindowControls, isMac } from '@/lib/platform'
 import { contextMenu, SEPARATOR } from '@/state/menu'
+import type { Presentation } from '@/state/presentation'
 
 /** Width the macOS traffic lights need before the title may start. */
 const TRAFFIC_LIGHT_INSET = 78
@@ -15,10 +16,9 @@ const TRAFFIC_LIGHT_INSET = 78
 interface TitleBarProps {
   /** Whether the harness is serving, and so whether there are two views. */
   serving: boolean
-  /** Whether the control panel is the view currently in front. */
-  panelOpen: boolean
-  /** Switch views. Absent while there is only one view to show. */
-  onTogglePanel?: () => void
+  mode: Presentation
+  /** Switch presentations. Absent while there is only one view to show. */
+  onPresentation?: (mode: Presentation) => void
   /** Open the profile manager. Absent while the first-run guide is up. */
   onManageProfiles?: () => void
 }
@@ -37,7 +37,7 @@ interface TitleBarProps {
  * profile chip is here for the same reason: which stack is running is a property
  * of the window, and this strip is what survives the harness taking the rest.
  */
-export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }: TitleBarProps) {
+export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: TitleBarProps) {
   const appWindow = getCurrentWindow()
   const [maximized, setMaximized] = useState(false)
 
@@ -113,7 +113,7 @@ export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }
           </span>
         )}
 
-        {serving && onTogglePanel && <ViewSwitch panelOpen={panelOpen} onToggle={onTogglePanel} />}
+        {serving && onPresentation && <ViewSwitch mode={mode} onChoose={onPresentation} />}
 
         {onManageProfiles && <ProfileSwitch onManage={onManageProfiles} />}
       </div>
@@ -158,11 +158,30 @@ export function TitleBar({ serving, panelOpen, onTogglePanel, onManageProfiles }
 }
 
 /** Two views, both named, with the current one raised. */
-function ViewSwitch({ panelOpen, onToggle }: { panelOpen: boolean; onToggle: () => void }) {
+function ViewSwitch({
+  mode,
+  onChoose,
+}: {
+  mode: Presentation
+  onChoose: (mode: Presentation) => void
+}) {
   return (
     <div className="ml-2 flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
-      <SwitchTab label={t('view.harness')} active={!panelOpen} onClick={onToggle} />
-      <SwitchTab label={t('view.panel')} active={panelOpen} onClick={onToggle} />
+      <SwitchTab
+        label={t('view.harness')}
+        active={mode === 'compatibility'}
+        onClick={() => onChoose('compatibility')}
+      />
+      <SwitchTab
+        label={t('view.extended')}
+        active={mode === 'extended'}
+        onClick={() => onChoose('extended')}
+      />
+      <SwitchTab
+        label={t('view.panel')}
+        active={mode === 'advanced'}
+        onClick={() => onChoose('advanced')}
+      />
     </div>
   )
 }

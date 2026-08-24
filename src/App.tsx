@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 
@@ -7,12 +7,11 @@ import { ContextMenu } from '@/components/ContextMenu'
 import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
 import { Onboarding } from '@/components/Onboarding'
-import { ProfileManager } from '@/components/ProfileManager'
 import { RecoveryCenter } from '@/components/RecoveryCenter'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
 import { Tooltip } from '@/components/Tooltip'
-import { Workbench, SETTINGS, VIEWS, type View } from '@/components/Workbench'
+import { SETTINGS, VIEWS, type View } from '@/components/workbench-contract'
 import { t } from '@/lib/i18n'
 import { pushWorkspaceDrop } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
@@ -27,6 +26,13 @@ import { subscribeToRemote, useRemote } from '@/state/remote'
 import { subscribeToTerminals } from '@/state/terminals'
 import { useUpdate, watchForUpdates } from '@/state/update'
 import { switchWorkspace } from '@/state/workspace'
+
+const ProfileManager = lazy(() =>
+  import('@/components/ProfileManager').then((module) => ({ default: module.ProfileManager })),
+)
+const Workbench = lazy(() =>
+  import('@/components/Workbench').then((module) => ({ default: module.Workbench })),
+)
 
 /**
  * The window: a title bar, a status bar, and whichever view is between them.
@@ -52,6 +58,7 @@ export default function App() {
   // With nothing serving there is nothing else to show.
   const showPanel = origin === null || presentation === 'advanced'
   const [view, setView] = useState<View>('console')
+  const [workbenchLoaded, setWorkbenchLoaded] = useState(presentation === 'advanced')
   // Held by the window rather than by the title bar that opens it: the manager
   // covers the window, and a modal inside a strip 36px tall would be positioned
   // against a strip 36px tall.
@@ -85,7 +92,15 @@ export default function App() {
   const show = useCallback(
     (next: View) => {
       setView(next)
+      setWorkbenchLoaded(true)
       choosePresentation('advanced')
+    },
+    [choosePresentation],
+  )
+  const present = useCallback(
+    (mode: 'compatibility' | 'extended' | 'advanced') => {
+      if (mode === 'advanced') setWorkbenchLoaded(true)
+      choosePresentation(mode)
     },
     [choosePresentation],
   )
@@ -253,10 +268,8 @@ export default function App() {
     <div className="flex h-full flex-col overflow-hidden">
       <TitleBar
         serving={origin !== null}
-        panelOpen={showPanel}
-        onTogglePanel={
-          origin ? () => choosePresentation(showPanel ? 'compatibility' : 'advanced') : undefined
-        }
+        mode={presentation}
+        onPresentation={origin ? present : undefined}
         // Not while the guide is up: which profile to work in is a question for
         // somebody who already has a harness to point at one.
         onManageProfiles={stage === 'guiding' ? undefined : manage}
@@ -270,11 +283,28 @@ export default function App() {
         <Onboarding />
       ) : (
         <div className="relative flex min-h-0 flex-1">
-          {origin && <HarnessFrame origin={origin} hidden={showPanel} />}
+          {origin && (
+            <div className="flex min-h-0 flex-1 flex-col" hidden={showPanel}>
+              {presentation === 'extended' && (
+                <ExtendedToolbar
+                  onView={show}
+                  onProfiles={manage}
+                  onWorkspace={() => void chooseWorkspace()}
+                />
+              )}
+              <div className="relative min-h-0 flex-1">
+                <HarnessFrame origin={origin} hidden={false} />
+              </div>
+            </div>
+          )}
           {/* Hidden rather than unmounted, for the same reason the frame is: a
               search someone typed and a pairing code on screen must survive a
               glance at the harness. */}
-          <Workbench hidden={!showPanel} view={view} onSelect={show} />
+          {workbenchLoaded && (
+            <Suspense fallback={<LoadingSurface />}>
+              <Workbench hidden={!showPanel} view={view} onSelect={show} />
+            </Suspense>
+          )}
         </div>
       )}
 
@@ -285,7 +315,11 @@ export default function App() {
         onChangeWorkspace={() => void chooseWorkspace()}
       />
 
-      {managing && <ProfileManager onClose={() => setManaging(false)} />}
+      {managing && (
+        <Suspense fallback={<LoadingSurface overlay />}>
+          <ProfileManager onClose={() => setManaging(false)} />
+        </Suspense>
+      )}
       <RecoveryCenter />
 
       {/* Not while the guide is up, for the same reason the manager is not
@@ -300,6 +334,56 @@ export default function App() {
       <Dialog />
       <ContextMenu />
       <Tooltip />
+    </div>
+  )
+}
+
+function ExtendedToolbar({
+  onView,
+  onProfiles,
+  onWorkspace,
+}: {
+  onView: (view: View) => void
+  onProfiles: () => void
+  onWorkspace: () => void
+}) {
+  return (
+    <nav
+      aria-label={t('extended.actions')}
+      className="chrome flex h-10 shrink-0 items-center gap-1 border-b border-line px-3"
+    >
+      <span className="mr-2 text-[11.5px] font-medium text-faint">{t('extended.label')}</span>
+      <ToolbarButton onClick={() => onView('terminal')}>{t('nav.terminal')}</ToolbarButton>
+      <ToolbarButton onClick={() => onView('sessions')}>{t('nav.sessions')}</ToolbarButton>
+      <ToolbarButton onClick={() => onView('plugins')}>{t('nav.plugins')}</ToolbarButton>
+      <ToolbarButton onClick={onProfiles}>{t('profile.manage')}</ToolbarButton>
+      <ToolbarButton onClick={onWorkspace}>{t('workspace.choose')}</ToolbarButton>
+    </nav>
+  )
+}
+
+function ToolbarButton({ children, onClick }: { children: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="h-7 rounded-control px-2.5 text-[11.5px] text-muted transition-colors hover:bg-surface-2 hover:text-text"
+    >
+      {children}
+    </button>
+  )
+}
+
+function LoadingSurface({ overlay = false }: { overlay?: boolean }) {
+  return (
+    <div
+      role="status"
+      className={[
+        'grid place-items-center bg-canvas text-[12px] text-faint',
+        overlay ? 'absolute inset-0 z-50' : 'min-h-0 flex-1',
+      ].join(' ')}
+    >
+      {t('common.loading')}
     </div>
   )
 }
