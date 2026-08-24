@@ -9,6 +9,15 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed [#12](https://github.com/Moresyl/dsh-studio/issues/12): the reviewed
+  1024Store snapshot may exceed the custom-source 2 MiB ceiling, dshfind now
+  uses its bounded server-side desktop search instead of trying to scan more
+  than 10,000 entries, and exact prerelease npm versions such as `1.2.3-rc.1`
+  pass the same integrity, compatibility, lifecycle and repository checks as
+  exact stable versions. Ranges, tags and build metadata remain blocked.
+
 ## [0.7.7] — 2026-08-23
 
 ### Added

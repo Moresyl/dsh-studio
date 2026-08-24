@@ -148,9 +148,24 @@ pub async fn detail_with_source(node: &Path, name: &str, source: &str) -> Result
 
 /// Resolve and validate the exact package spec immediately before mutation.
 pub async fn preflight(node: &Path, spec: &str) -> Result<Detail> {
+    let requested = exact_requested_version(spec)?;
     let detail = resolve(node, spec).await?;
+    if detail.version != requested {
+        return Err(Error::Plugin(
+            "the registry did not resolve the requested exact package version".into(),
+        ));
+    }
     validate_preflight(&detail)?;
     Ok(detail)
+}
+
+fn exact_requested_version(spec: &str) -> Result<&str> {
+    let (_, requested) = super::split_spec(spec);
+    requested
+        .filter(|version| {
+            semver::Version::parse(version).is_ok_and(|parsed| parsed.build.is_empty())
+        })
+        .ok_or_else(|| Error::Plugin("market installs require an exact package version".into()))
 }
 
 /// Resolve an exact candidate for a review UI without weakening execution:
@@ -181,11 +196,11 @@ pub async fn resolve(node: &Path, spec: &str) -> Result<Detail> {
 
 fn validate_preflight(detail: &Detail) -> Result<()> {
     let version = semver::Version::parse(&detail.version).map_err(|_| {
-        Error::Plugin("the registry did not return a stable semantic version".into())
+        Error::Plugin("the registry did not return an exact semantic version".into())
     })?;
-    if !version.pre.is_empty() || !version.build.is_empty() {
+    if !version.build.is_empty() {
         return Err(Error::Plugin(
-            "market installs require a stable exact package version".into(),
+            "market installs require an exact package version without build metadata".into(),
         ));
     }
     if let Compatibility::Incompatible { reason, .. } = &detail.compatibility {
@@ -456,8 +471,8 @@ fn string(value: &serde_json::Value, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        compatibility, detail_from_manifest, listing, repository_identity, validate_preflight,
-        Compatibility,
+        compatibility, detail_from_manifest, exact_requested_version, listing, repository_identity,
+        validate_preflight, Compatibility,
     };
 
     #[test]
@@ -563,6 +578,28 @@ mod tests {
         );
         assert!(validate_preflight(&safe).is_ok());
 
+        let prerelease = detail_from_manifest(
+            "preview-plugin",
+            "npm",
+            &serde_json::json!({
+                "name": "preview-plugin",
+                "version": "1.2.3-rc.1",
+                "dist": { "integrity": format!("sha512-{}==", "A".repeat(86)) }
+            }),
+        );
+        assert!(validate_preflight(&prerelease).is_ok());
+
+        let build_metadata = detail_from_manifest(
+            "ambiguous-plugin",
+            "npm",
+            &serde_json::json!({
+                "name": "ambiguous-plugin",
+                "version": "1.2.3+rebuilt",
+                "dist": { "integrity": format!("sha512-{}==", "A".repeat(86)) }
+            }),
+        );
+        assert!(validate_preflight(&build_metadata).is_err());
+
         let scripted = detail_from_manifest(
             "scripted-plugin",
             "npm",
@@ -587,6 +624,18 @@ mod tests {
             }),
         );
         assert!(validate_preflight(&deprecated).is_err());
+    }
+
+    #[test]
+    fn market_requests_accept_exact_prereleases_but_not_ranges_tags_or_builds() {
+        assert_eq!(
+            exact_requested_version("plugin@1.2.3-rc.1").unwrap(),
+            "1.2.3-rc.1"
+        );
+        assert!(exact_requested_version("plugin@^1.2.3").is_err());
+        assert!(exact_requested_version("plugin@latest").is_err());
+        assert!(exact_requested_version("plugin@1.2.3+rebuilt").is_err());
+        assert!(exact_requested_version("plugin").is_err());
     }
 
     #[test]

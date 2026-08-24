@@ -21,9 +21,17 @@ pub(crate) const DSHFIND_ID: &str = "dshfind";
 const DSHFIND_LABEL: &str = "dshfind";
 const DSHFIND_ENDPOINT: &str = "https://api.dshfind.com/v1/plugins";
 const DSHFIND_PAGE_SIZE: usize = 100;
-const DSHFIND_MAX_PAGES: usize = 100;
+// dshfind documents this exact user agent as its bounded desktop view: at
+// most 200 entries over two pages, with false plugins removed server-side.
+const DSHFIND_MAX_ITEMS: usize = 200;
+const DSHFIND_MAX_PAGES: usize = 2;
 const DSHFIND_PAGE_DELAY: Duration = Duration::from_millis(2_100);
-const MAX_BODY: usize = 2 << 20;
+const DSHFIND_USER_AGENT: &str = "dsh-community-market/0.1";
+const DEFAULT_USER_AGENT: &str = "dsh-studio-market/1";
+const MAX_CUSTOM_BODY: usize = 2 << 20;
+// The reviewed 1024Store snapshot is currently larger than 2 MiB. It remains
+// a pinned built-in origin and still has a finite streaming budget.
+const MAX_REVIEWED_BODY: usize = 8 << 20;
 const MAX_ITEMS: usize = 10_000;
 const MAX_CUSTOM: usize = 12;
 const MAX_REDIRECTS: usize = 3;
@@ -114,7 +122,7 @@ pub async fn add(label: &str, endpoint: &str) -> Result<Vec<Source>> {
     let endpoint = safe_url(endpoint)?;
     // Registration proves the endpoint answers the public contract before it
     // can become an active source.
-    let value = restricted_json(endpoint.as_str()).await?;
+    let value = restricted_json(endpoint.as_str(), MAX_CUSTOM_BODY, DEFAULT_USER_AGENT).await?;
     parse_standard(&value, "registration", &label, "", endpoint.as_str()).map(|_| ())?;
 
     let mut settings = load();
@@ -162,7 +170,8 @@ pub fn remove(id: &str) -> Result<Vec<Source>> {
 pub async fn search(source_id: &str, query: &str) -> Result<Vec<Listing>> {
     match source_id {
         STORE_ID => {
-            let value = restricted_json(STORE_ENDPOINT).await?;
+            let value =
+                restricted_json(STORE_ENDPOINT, MAX_REVIEWED_BODY, DEFAULT_USER_AGENT).await?;
             parse_store(&value, query)
         }
         DSHFIND_ID => fetch_dshfind(query).await,
@@ -176,13 +185,79 @@ pub async fn search(source_id: &str, query: &str) -> Result<Vec<Listing>> {
                 .iter()
                 .find(|source| source.id == custom)
                 .ok_or_else(|| Error::Plugin(format!("unknown catalog source {custom}")))?;
-            let value = restricted_json(&source.endpoint).await?;
+            let value =
+                restricted_json(&source.endpoint, MAX_CUSTOM_BODY, DEFAULT_USER_AGENT).await?;
             parse_standard(&value, &source.id, &source.label, query, &source.endpoint)
         }
     }
 }
 
-async fn restricted_json(start: &str) -> Result<serde_json::Value> {
+/// Re-read one catalog identity for detail, media and commit validation. The
+/// dshfind search index does not promise to index npm package aliases, so an
+/// exact-name miss falls back to its bounded 200-item desktop view.
+pub async fn find(
+    source_id: &str,
+    name: &str,
+    version: &str,
+    repository: Option<&str>,
+) -> Result<Option<Listing>> {
+    if source_id == DSHFIND_ID {
+        if let Some(endpoint) = repository.and_then(dshfind_detail_url) {
+            let value =
+                restricted_json(endpoint.as_str(), MAX_CUSTOM_BODY, DSHFIND_USER_AGENT).await?;
+            return Ok(parse_dshfind_item(&value, "")
+                .filter(|item| item.name == name && item.version == version));
+        }
+    }
+    let matches = search(source_id, name).await?;
+    if let Some(item) = exact_listing(matches, name, version) {
+        return Ok(Some(item));
+    }
+    if source_id == DSHFIND_ID {
+        return search(source_id, "")
+            .await
+            .map(|items| exact_listing(items, name, version));
+    }
+    Ok(None)
+}
+
+fn dshfind_detail_url(repository: &str) -> Option<url::Url> {
+    let repository = safe_url(repository).ok()?;
+    if !repository.host_str()?.eq_ignore_ascii_case("github.com") || repository.query().is_some() {
+        return None;
+    }
+    let segments: Vec<_> = repository
+        .path_segments()?
+        .filter(|part| !part.is_empty())
+        .collect();
+    if segments.len() != 2 {
+        return None;
+    }
+    let owner = segments[0];
+    let name = segments[1].strip_suffix(".git").unwrap_or(segments[1]);
+    if !github_part(owner, 100, false) || !github_part(name, 100, true) {
+        return None;
+    }
+    let mut endpoint = safe_url(DSHFIND_ENDPOINT).ok()?;
+    endpoint
+        .path_segments_mut()
+        .ok()?
+        .clear()
+        .extend(["v1", "plugins", owner, name]);
+    Some(endpoint)
+}
+
+fn exact_listing(items: Vec<Listing>, name: &str, version: &str) -> Option<Listing> {
+    items
+        .into_iter()
+        .find(|item| item.name == name && item.version == version && item.installable)
+}
+
+async fn restricted_json(
+    start: &str,
+    max_body: usize,
+    user_agent: &str,
+) -> Result<serde_json::Value> {
     crate::node::ensure_crypto_provider();
     let original = safe_url(start)?;
     let origin = original.origin().ascii_serialization();
@@ -225,7 +300,7 @@ async fn restricted_json(start: &str) -> Result<serde_json::Value> {
             .get(next.clone())
             .header("accept", "application/json")
             .header("accept-encoding", "identity")
-            .header("user-agent", "dsh-studio-market/1")
+            .header("user-agent", user_agent)
             .send()
             .await
             .map_err(|cause| Error::Network(format!("catalog request failed: {cause}")))?;
@@ -259,6 +334,15 @@ async fn restricted_json(start: &str) -> Result<serde_json::Value> {
         if !(content_type.starts_with("application/json") || content_type.contains("+json")) {
             return Err(Error::Network("catalog response is not JSON".into()));
         }
+        if response
+            .content_length()
+            .is_some_and(|content_length| content_length > max_body as u64)
+        {
+            return Err(Error::Network(format!(
+                "catalog response exceeded {} MiB",
+                max_body >> 20
+            )));
+        }
 
         let mut body = Vec::new();
         while let Some(chunk) = response
@@ -266,10 +350,10 @@ async fn restricted_json(start: &str) -> Result<serde_json::Value> {
             .await
             .map_err(|cause| Error::Network(format!("catalog response failed: {cause}")))?
         {
-            if body.len() + chunk.len() > MAX_BODY {
+            if body.len().saturating_add(chunk.len()) > max_body {
                 return Err(Error::Network(format!(
                     "catalog response exceeded {} MiB",
-                    MAX_BODY >> 20
+                    max_body >> 20
                 )));
             }
             body.extend_from_slice(&chunk);
@@ -374,7 +458,10 @@ fn parse_store(value: &serde_json::Value, query: &str) -> Result<Vec<Listing>> {
             continue;
         }
         let (name, version) = exact[0];
-        if !super::is_package_spec(&format!("{name}@{version}")) || !seen.insert(name.to_string()) {
+        if !super::is_package_name(name)
+            || !exact_market_version(version)
+            || !seen.insert(name.to_string())
+        {
             continue;
         }
         let description = localized_description(package.get("description"));
@@ -438,8 +525,12 @@ async fn fetch_dshfind(query: &str) -> Result<Vec<Listing>> {
         let endpoint = dshfind_page_url(
             page_number,
             dataset.as_ref().map(|item| item.data_version.as_str()),
+            query,
         )?;
-        let page = parse_dshfind_page(&restricted_json(endpoint.as_str()).await?, page_number)?;
+        let page = parse_dshfind_page(
+            &restricted_json(endpoint.as_str(), MAX_CUSTOM_BODY, DSHFIND_USER_AGENT).await?,
+            page_number,
+        )?;
         if let Some(expected) = &dataset {
             if expected != &page.dataset {
                 return Err(Error::Network(
@@ -481,12 +572,16 @@ async fn fetch_dshfind(query: &str) -> Result<Vec<Listing>> {
     Ok(listings)
 }
 
-fn dshfind_page_url(page: usize, data_version: Option<&str>) -> Result<url::Url> {
+fn dshfind_page_url(page: usize, data_version: Option<&str>, search: &str) -> Result<url::Url> {
     let mut endpoint = safe_url(DSHFIND_ENDPOINT)?;
     {
         let mut query = endpoint.query_pairs_mut();
         query.append_pair("page", &page.to_string());
         query.append_pair("per_page", &DSHFIND_PAGE_SIZE.to_string());
+        let search: String = search.trim().chars().take(64).collect();
+        if !search.is_empty() {
+            query.append_pair("q", &search);
+        }
         if let Some(data_version) = data_version {
             query.append_pair("data_version", data_version);
         }
@@ -513,7 +608,7 @@ fn parse_dshfind_page(value: &serde_json::Value, expected_page: usize) -> Result
             "dshfind response changed the requested page size".into(),
         ));
     }
-    if total > MAX_ITEMS || total_pages > DSHFIND_MAX_PAGES {
+    if total > DSHFIND_MAX_ITEMS || total_pages > DSHFIND_MAX_PAGES {
         return Err(Error::Network(
             "dshfind catalog exceeded the item or page limit".into(),
         ));
@@ -675,12 +770,8 @@ fn dshfind_npm_target(value: &serde_json::Value) -> Option<(String, String)> {
         let Some(raw_version) = method.get("revision").and_then(serde_json::Value::as_str) else {
             continue;
         };
-        let Ok(version) = semver::Version::parse(raw_version) else {
-            continue;
-        };
         if !super::is_package_name(name)
-            || !version.pre.is_empty()
-            || !version.build.is_empty()
+            || !exact_market_version(raw_version)
             || declared.is_some_and(|candidate| candidate != name)
         {
             continue;
@@ -734,7 +825,10 @@ fn parse_standard(
         else {
             continue;
         };
-        if !super::is_package_spec(&format!("{name}@{version}")) || !seen.insert(name.to_string()) {
+        if !super::is_package_name(name)
+            || !exact_market_version(version)
+            || !seen.insert(name.to_string())
+        {
             continue;
         }
         let description = text(item, "summary", 1_000).unwrap_or_default();
@@ -770,6 +864,12 @@ fn parse_standard(
         });
     }
     Ok(listings)
+}
+
+/// Catalogs pin immutable npm versions. A prerelease such as `1.2.3-rc.1` is
+/// still exact; ranges, tags and build metadata are not accepted identities.
+fn exact_market_version(raw: &str) -> bool {
+    semver::Version::parse(raw).is_ok_and(|version| version.build.is_empty())
 }
 
 fn standard_icon(item: &serde_json::Value, endpoint: &str) -> Option<super::media::Candidate> {
@@ -961,8 +1061,8 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
     use super::{
-        admissible_address, blocked, dshfind_page_url, parse_dshfind_item, parse_dshfind_page,
-        parse_standard, parse_store, safe_url,
+        admissible_address, blocked, dshfind_detail_url, dshfind_page_url, exact_listing,
+        parse_dshfind_item, parse_dshfind_page, parse_standard, parse_store, safe_url,
     };
 
     #[test]
@@ -990,6 +1090,8 @@ mod tests {
         let value = serde_json::json!({ "schemaVersion": "1.0.0", "items": [
             { "package": { "name": "safe-plugin" }, "latestVersion": "1.2.3", "summary": "Safe",
               "media": { "icon": { "url": "https://catalog.example/assets/safe.png" } } },
+            { "package": { "name": "preview-plugin" }, "latestVersion": "1.2.3-rc.1" },
+            { "package": { "name": "range-plugin" }, "latestVersion": "^1.2.3" },
             { "package": { "name": "git+https://bad" }, "latestVersion": "main", "summary": "Bad" }
         ]});
         let items = parse_standard(
@@ -1000,8 +1102,9 @@ mod tests {
             "https://catalog.example/plugins.json",
         )
         .expect("catalog");
-        assert_eq!(items.len(), 1);
+        assert_eq!(items.len(), 2);
         assert_eq!(items[0].name, "safe-plugin");
+        assert_eq!(items[1].version, "1.2.3-rc.1");
         assert_eq!(items[0].source_id, "custom-a");
         assert!(items[0].has_icon);
         assert_eq!(
@@ -1044,6 +1147,31 @@ mod tests {
     }
 
     #[test]
+    fn exact_catalog_lookup_never_substitutes_a_different_version() {
+        let listing = parse_dshfind_item(&dshfind_item(), "").expect("listing");
+        assert!(exact_listing(vec![listing.clone()], &listing.name, "9.9.9").is_none());
+        assert_eq!(
+            exact_listing(vec![listing.clone()], &listing.name, &listing.version)
+                .expect("same identity")
+                .name,
+            listing.name
+        );
+    }
+
+    #[test]
+    fn dshfind_detail_identity_is_derived_only_from_a_canonical_github_repository() {
+        assert_eq!(
+            dshfind_detail_url("https://github.com/Example/safe-plugin.git")
+                .expect("detail URL")
+                .as_str(),
+            "https://api.dshfind.com/v1/plugins/Example/safe-plugin"
+        );
+        assert!(dshfind_detail_url("https://gitlab.com/example/safe-plugin").is_none());
+        assert!(dshfind_detail_url("https://github.com/example/safe-plugin/issues").is_none());
+        assert!(dshfind_detail_url("https://github.com/example/safe-plugin?token=x").is_none());
+    }
+
+    #[test]
     fn reviewed_store_ignores_unverified_commands() {
         let value = serde_json::json!({ "packages": [
             { "name": "bad", "installMethods": [{ "kind": "github", "spec": "github:x/y" }] },
@@ -1083,7 +1211,7 @@ mod tests {
     }
 
     #[test]
-    fn dshfind_accepts_only_one_stable_reviewed_npm_target_with_a_matching_repository() {
+    fn dshfind_accepts_one_exact_reviewed_npm_target_with_a_matching_repository() {
         let item = parse_dshfind_item(&dshfind_item(), "safe").expect("reviewed item");
         assert_eq!(item.name, "@example/safe-plugin");
         assert_eq!(item.version, "1.2.3");
@@ -1100,7 +1228,16 @@ mod tests {
 
         let mut prerelease = dshfind_item();
         prerelease["install"]["methods"][0]["revision"] = serde_json::json!("1.2.3-rc.1");
-        assert!(parse_dshfind_item(&prerelease, "").is_none());
+        assert_eq!(
+            parse_dshfind_item(&prerelease, "")
+                .expect("exact prerelease")
+                .version,
+            "1.2.3-rc.1"
+        );
+
+        let mut range = dshfind_item();
+        range["install"]["methods"][0]["revision"] = serde_json::json!("^1.2.3");
+        assert!(parse_dshfind_item(&range, "").is_none());
 
         let mut mismatched = dshfind_item();
         mismatched["full_name"] = serde_json::json!("someone/else");
@@ -1127,9 +1264,15 @@ mod tests {
         inconsistent["total_pages"] = serde_json::json!(2);
         assert!(parse_dshfind_page(&inconsistent, 1).is_err());
 
-        let url = dshfind_page_url(2, Some(&format!("sha256:{hash}"))).expect("URL");
+        let url = dshfind_page_url(2, Some(&format!("sha256:{hash}")), " memory ").expect("URL");
         assert!(url.as_str().contains("page=2"));
         assert!(url.as_str().contains("data_version=sha256%3A"));
+        assert!(url.as_str().contains("q=memory"));
+
+        let mut oversized = value;
+        oversized["total"] = serde_json::json!(201);
+        oversized["total_pages"] = serde_json::json!(3);
+        assert!(parse_dshfind_page(&oversized, 1).is_err());
     }
 
     #[tokio::test]
@@ -1152,5 +1295,17 @@ mod tests {
         assert!(!items.is_empty());
         assert!(items.iter().all(|item| item.installable));
         assert!(items.iter().all(|item| item.source_id == super::DSHFIND_ID));
+        let item = items.into_iter().next().expect("one installable item");
+        let detail = super::find(
+            super::DSHFIND_ID,
+            &item.name,
+            &item.version,
+            item.repository.as_deref(),
+        )
+        .await
+        .expect("live detail")
+        .expect("same exact catalog identity");
+        assert_eq!(detail.name, item.name);
+        assert_eq!(detail.version, item.version);
     }
 }

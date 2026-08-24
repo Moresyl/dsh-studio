@@ -1,9 +1,9 @@
 //! A bounded market index shared by every window.
 //!
-//! HTTP catalogs are complete snapshots, so downloading one for every
-//! keystroke is both wasteful and makes pagination dishonest. npm search is a
-//! query index; we retain its largest supported page and apply the same local
-//! filtering and ordering contract to both shapes.
+//! Most HTTP catalogs are complete snapshots, so downloading one for every
+//! keystroke is wasteful. npm and dshfind are query indexes; cache entries for
+//! those sources include the normalized query while snapshot sources keep one
+//! source-wide entry.
 
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, HashMap};
@@ -55,8 +55,9 @@ pub async fn search(
     refresh: bool,
 ) -> Result<Page> {
     let normalized_query = query.trim().to_ascii_lowercase();
-    let cache_key = if source_id == "npm" {
-        format!("npm\0{normalized_query}")
+    let query_index = source_id == "npm" || source_id == super::catalog::DSHFIND_ID;
+    let cache_key = if query_index {
+        format!("{source_id}\0{normalized_query}")
     } else {
         source_id.to_string()
     };
@@ -73,6 +74,8 @@ pub async fn search(
         None => {
             let items = if source_id == "npm" {
                 super::registry::search(node, &normalized_query).await?
+            } else if source_id == super::catalog::DSHFIND_ID {
+                super::catalog::search(source_id, &normalized_query).await?
             } else {
                 // HTTP catalogs are indexed in full. Search, categories and
                 // pages are then stable until the explicit refresh or TTL.

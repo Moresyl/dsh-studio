@@ -172,10 +172,8 @@ pub async fn plugin_media(
     if source_id == "npm" {
         return Ok(None);
     }
-    let candidate = super::catalog::search(&source_id, "")
+    let candidate = super::catalog::find(&source_id, &name, &version, None)
         .await?
-        .into_iter()
-        .find(|item| item.name == name && item.version == version)
         .and_then(|item| item.icon);
     let Some(candidate) = candidate else {
         return Ok(None);
@@ -516,15 +514,18 @@ async fn reviewed_detail(
         .find(|source| source.id == source_id && source.active)
         .ok_or_else(|| Error::Plugin("the selected catalog source is no longer active".into()))?;
     detail.source = source.label;
-    let item = super::catalog::search(source_id, "")
-        .await?
-        .into_iter()
-        .find(|item| item.name == detail.name && item.version == detail.version && item.installable)
-        .ok_or_else(|| {
-            Error::Plugin(
-                "the exact package version is no longer present in the selected catalog".into(),
-            )
-        })?;
+    let item = super::catalog::find(
+        source_id,
+        &detail.name,
+        &detail.version,
+        detail.repository.as_deref(),
+    )
+    .await?
+    .ok_or_else(|| {
+        Error::Plugin(
+            "the exact package version is no longer present in the selected catalog".into(),
+        )
+    })?;
     detail.repository_verified = item
         .repository
         .as_deref()

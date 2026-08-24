@@ -6,8 +6,9 @@
 
 能从市场安装的插件必须是合法 npm 包：发布 Harness 能识别的 Profile patch，并在
 `peerDependencies` 中声明兼容的 `@deepseek-ai/dsh` 范围。Studio 必须先解析出一个
-已发布的精确版本才会改动 Profile；Harness peer 不兼容或格式错误、发布者已弃用、
-缺少可验证的 SHA-512 registry 完整性，或者声明了 `preinstall`、`install`、
+已发布的精确版本才会改动 Profile；`1.2.3-rc.1` 这类精确 SemVer 预发布版本受支持，
+版本范围、tag 与构建元数据不属于精确目录身份。Harness peer 不兼容或格式错误、发布者已
+弃用、缺少可验证的 SHA-512 registry 完整性，或者声明了 `preinstall`、`install`、
 `postinstall`、`prepare` 中任一生命周期脚本，都会被阻止。
 
 目录只负责发现，不是安装权威。它无权要求 Studio 执行命令、允许构建、接受范围或 tag、
@@ -44,8 +45,8 @@ npm manifest 中的仓库身份一致。
 ```
 
 只有上述字段参与发现；安装命令、脚本、路径、Git spec 和权限提示都会被忽略。
-`latestVersion` 只是建议值：预览和提交都会通过当前 npm registry 重新解析
-`package.name@latestVersion`。
+`latestVersion` 只是建议值，并且必须是可带预发布段的精确 SemVer；预览和提交都会通过
+当前 npm registry 重新解析 `package.name@latestVersion`。
 
 ### 受限媒体
 

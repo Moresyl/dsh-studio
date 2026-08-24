@@ -7,9 +7,11 @@
 A market-installable plugin is a valid npm package that publishes a Harness
 profile patch and declares its compatible `@deepseek-ai/dsh` range in
 `peerDependencies`. Studio resolves one exact published version before it can
-change a profile. It rejects an incompatible or malformed peer range, a
-publisher deprecation, missing SHA-512 registry integrity, and any package that
-declares `preinstall`, `install`, `postinstall`, or `prepare`.
+change a profile. Exact SemVer prereleases such as `1.2.3-rc.1` are supported;
+ranges, tags and build metadata are not exact catalog identities. It rejects an
+incompatible or malformed peer range, a publisher deprecation, missing SHA-512
+registry integrity, and any package that declares `preinstall`, `install`,
+`postinstall`, or `prepare`.
 
 Catalogs are discovery inputs, not package authorities. They cannot ask Studio
 to execute a command, grant build permission, accept a range or tag, install a
@@ -49,7 +51,8 @@ characters and DNS answers that fail the public-address check are rejected.
 
 Only the fields above participate in discovery. Install commands, scripts,
 paths, Git specs and permission hints are ignored. `latestVersion` is only a
-suggestion: preview and commit both re-resolve
+suggestion and must be an exact SemVer, including an optional prerelease:
+preview and commit both re-resolve
 `package.name@latestVersion` through the configured npm registry.
 
 ### Restricted media
