@@ -1,6 +1,6 @@
 pkgbase = dsh-studio-bin
 	pkgdesc = Native desktop shell for DeepSeek Harness
-	pkgver = 0.7.7
+	pkgver = 0.7.8
 	pkgrel = 1
 	url = https://github.com/Moresyl/dsh-studio
 	arch = x86_64
@@ -13,9 +13,9 @@ pkgbase = dsh-studio-bin
 	conflicts = dsh-studio
 	options = !strip
 	options = !emptydirs
-	source = dsh-studio-bin-0.7.7.deb::https://github.com/Moresyl/dsh-studio/releases/download/v0.7.7/DSH.Studio_0.7.7_amd64.deb
-	source = dsh-studio-bin-0.7.7-LICENSE::https://raw.githubusercontent.com/Moresyl/dsh-studio/v0.7.7/LICENSE
-	sha256sums = 0e4e18986e7df4b14098f605690f9690ae87a481ed9b75403c24f6745b596990
+	source = dsh-studio-bin-0.7.8.deb::https://github.com/Moresyl/dsh-studio/releases/download/v0.7.8/DSH.Studio_0.7.8_amd64.deb
+	source = dsh-studio-bin-0.7.8-LICENSE::https://raw.githubusercontent.com/Moresyl/dsh-studio/v0.7.8/LICENSE
+	sha256sums = eb34851f5105e4dcaa1256f90de01eebe99eb6001af9bcef98a457cd16c5aa68
 	sha256sums = 550f4b329f634d289d8c6180ac5cdcbc3f0dcf0348a1f3f0c7e63306f494eaec
 
 pkgname = dsh-studio-bin
