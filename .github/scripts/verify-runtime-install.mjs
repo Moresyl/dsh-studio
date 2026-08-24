@@ -2,6 +2,7 @@ import { copyFile, cp, lstat, mkdtemp, readFile, rm, stat } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
+import { verifyProfileBoot } from './runtime-profile-smoke.mjs'
 
 const expected = '0.1.1-rc.2'
 const expectedPnpm = '11.7.0'
@@ -81,7 +82,15 @@ try {
     }
   }
   await run(process.execPath, [entry, '--help'], { timeout: 120_000 })
-  console.log(`cold-installed and executed the pinned ${manifest.name}@${expected} runtime graph`)
+  const dshHome = join(directory, 'dsh-home')
+  const origin = await verifyProfileBoot({
+    entry,
+    runtimeRoot: directory,
+    dshHome,
+  })
+  console.log(
+    `cold-installed and fully booted the pinned ${manifest.name}@${expected} runtime graph at ${origin}`,
+  )
 } finally {
   await rm(directory, { recursive: true, force: true })
 }
