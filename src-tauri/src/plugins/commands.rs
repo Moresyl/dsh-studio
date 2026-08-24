@@ -74,6 +74,7 @@ pub async fn plugin_recovery_retry(
                         .into(),
                 ));
             }
+            verify_dependency_graph(&spec, &state).await?;
             let source = super::catalog::sources()
                 .into_iter()
                 .find(|source| source.id == source_id && source.active)
@@ -197,6 +198,7 @@ pub async fn plugin_preview(
     source_id: String,
     item_id: String,
     display_name: String,
+    state: State<'_, AppState>,
     intents: State<'_, Arc<PluginIntents>>,
 ) -> Result<InstallPreview> {
     let (name, version) = super::split_spec(&spec);
@@ -208,6 +210,7 @@ pub async fn plugin_preview(
             "the selected catalog item does not match the exact registry package".into(),
         ));
     }
+    verify_dependency_graph(&spec, &state).await?;
     let token = intents.issue(
         crate::profiles::selected(),
         spec,
@@ -289,6 +292,7 @@ pub async fn plugin_add(
             "the selected catalog item does not match the resolved package".into(),
         ));
     }
+    verify_dependency_graph(&spec, &state).await?;
     let profile_dir = crate::paths::profile_dir(&profile);
     let retry = super::recovery::RetryPlan::Add {
         spec: spec.clone(),
@@ -474,6 +478,17 @@ fn settle(supervisor: &Supervisor, outcome: Result<String>) -> Result<PluginStat
         Err(failure) => supervisor.note(Stream::Stderr, failure.to_string()),
     }
     outcome.map(|_| super::state())
+}
+
+/// Run the isolated pnpm resolution with the same process guard and log stream
+/// as the eventual profile operation.
+async fn verify_dependency_graph(spec: &str, state: &State<'_, AppState>) -> Result<()> {
+    let supervisor = Arc::clone(&state.supervisor);
+    let reporter = Arc::clone(&supervisor);
+    super::verify_installable(spec, supervisor.guard(), move |stream, line| {
+        reporter.note(stream, line)
+    })
+    .await
 }
 
 /// The one-change-at-a-time flag, held for as long as the change runs.

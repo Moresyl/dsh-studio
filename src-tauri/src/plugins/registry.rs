@@ -35,6 +35,13 @@ const BUDGET: Duration = Duration::from_secs(20);
 
 static REGISTRY: OnceCell<String> = OnceCell::const_new();
 
+/// The one registry both review and installation must use. Keeping this value
+/// shared prevents a profile-local npm setting from making pnpm install a
+/// different package graph from the one the market just verified.
+pub(super) async fn configured_base(node: &Path) -> String {
+    base(node).await
+}
+
 /// One search result.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

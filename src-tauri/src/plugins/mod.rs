@@ -491,6 +491,7 @@ where
     let manager = ensure_package_manager(manager_node, report.clone()).await?;
     let profile_dir = paths::profile_dir(profile);
     let store = profile_store_dir(&profile_dir);
+    let registry = registry::configured_base(&node.path).await;
 
     let mut command = Command::new(&node.path);
     command
@@ -505,6 +506,9 @@ where
         // the app happened to be launched from.
         .current_dir(paths::app_data_dir())
         .env("PATH", path_with(&node.path, manager.as_deref()))
+        // Installation must use the same source whose metadata and integrity
+        // the review checked, even when a profile carries an old local .npmrc.
+        .env("npm_config_registry", registry)
         // pnpm otherwise follows whichever global config happens to be active
         // in the GUI environment. Preserve the store an existing profile is
         // already linked to; give a new profile one stable Studio-owned store.
@@ -537,13 +541,101 @@ where
         // the plugin panel, and an exit code on its own gives the person who
         // pressed it nothing to act on. So the failure carries its own reason.
         return Err(Error::Plugin(
-            match last_words(err).or_else(|| last_words(out)) {
+            match package_manager_reason(joined(out), joined(err)) {
                 Some(reason) => format!("the plugin command failed ({status}): {reason}"),
                 None => format!("the plugin command exited with {status} without saying why"),
             },
         ));
     }
     Ok(())
+}
+
+/// Resolve the complete dependency graph in a disposable project before the
+/// profile transaction begins.
+///
+/// Registry metadata alone proves only that the selected package exists. pnpm
+/// can still fail later because one of that package's dependencies was
+/// unpublished, made private, or is absent from the configured mirror. Running
+/// the same pinned pnpm with a lockfile-only install catches that class without
+/// running lifecycle scripts or writing to the user's profile.
+pub async fn verify_installable<R>(spec: &str, guard: &ProcessGuard, report: R) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    let (name, version) = split_spec(spec);
+    let version = version.ok_or_else(|| {
+        Error::Plugin("dependency preflight requires an exact package version".into())
+    })?;
+    let environment = crate::harness::environment();
+    let node = environment.node.ok_or(Error::NoNodeRuntime {
+        minimum: node_runtime::MINIMUM_SUPPORTED,
+    })?;
+    if !environment.harness_installed || !environment.harness_compatible {
+        return Err(Error::Plugin(
+            "dependency preflight requires a verified Harness runtime".into(),
+        ));
+    }
+    let manager_node = environment
+        .all_node_runtimes
+        .iter()
+        .find(|install| {
+            install.version >= node_runtime::MINIMUM_SUPPORTED
+                && install::npm_cli(&install.path).is_some()
+        })
+        .map(|install| install.path.as_path())
+        .unwrap_or(node.path.as_path());
+    let manager = ensure_package_manager(manager_node, report.clone())
+        .await?
+        .ok_or_else(|| Error::Plugin("the verified pnpm executable is unavailable".into()))?;
+    let pnpm = manager_cli(&manager).ok_or_else(|| {
+        Error::Plugin("the verified pnpm package has no command entry point".into())
+    })?;
+    let project = PreflightProject::create(name, version)?;
+    let registry = registry::configured_base(&node.path).await;
+
+    report(
+        Stream::Stdout,
+        format!("checking every dependency required by {spec}"),
+    );
+    let mut command = Command::new(&node.path);
+    command
+        .arg(pnpm)
+        .arg("--dir")
+        .arg(project.path())
+        .arg("install")
+        .arg("--lockfile-only")
+        .arg("--ignore-scripts")
+        .arg("--reporter=append-only")
+        .arg("--config.auto-install-peers=false")
+        .env("CI", "true")
+        .env("npm_config_registry", registry)
+        .env("npm_config_store_dir", paths::plugin_store_dir())
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    #[cfg(windows)]
+    command.creation_flags(0x0800_0000);
+
+    let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
+    let stdout = child.stdout.take().expect("stdout was piped");
+    let stderr = child.stderr.take().expect("stderr was piped");
+    let out = tokio::spawn(forward(stdout, Stream::Stdout, report.clone()));
+    let err = tokio::spawn(forward(stderr, Stream::Stderr, report));
+    let status = child.wait().await.map_err(|cause| {
+        Error::Plugin(format!(
+            "dependency preflight could not be waited on: {cause}"
+        ))
+    })?;
+    let (out, err) = tokio::join!(out, err);
+    if status.success() {
+        return Ok(());
+    }
+
+    let reason = package_manager_reason(joined(out), joined(err))
+        .unwrap_or_else(|| format!("pnpm exited with {status} without saying why"));
+    Err(Error::Plugin(format!(
+        "{spec} cannot be installed because its dependency graph did not resolve: {reason}. The profile was not changed"
+    )))
 }
 
 /// Switch an installed plugin on or off without uninstalling it.
@@ -577,7 +669,7 @@ pub fn switch(name: &str, enabled: bool) -> Result<()> {
 
 /// How many trailing lines are kept to explain a failure. Enough to hold an
 /// `ERR_PNPM_*` heading and the sentence under it; short enough to read at once.
-const TAIL_LINES: usize = 3;
+const TAIL_LINES: usize = 16;
 
 /// Report every line of a stream, and hand back the last few of them.
 async fn forward<P, R>(pipe: P, stream: Stream, report: R) -> Vec<String>
@@ -615,11 +707,119 @@ where
 }
 
 /// What a stream said last, as one line an error message can carry.
-fn last_words(
-    collected: std::result::Result<Vec<String>, tokio::task::JoinError>,
-) -> Option<String> {
-    let joined = collected.ok()?.join(" · ");
-    (!joined.is_empty()).then_some(joined)
+fn joined(collected: std::result::Result<Vec<String>, tokio::task::JoinError>) -> Vec<String> {
+    collected.unwrap_or_default()
+}
+
+/// Prefer the package manager's actual error over a harness wrapper printed to
+/// the other stream. The old stderr-first tail regularly reduced a useful
+/// `ERR_PNPM_FETCH_404` to only "pnpm failed in profile directory".
+fn package_manager_reason(stdout: Vec<String>, stderr: Vec<String>) -> Option<String> {
+    let meaningful = |lines: &[String]| {
+        let start = lines.iter().position(|line| {
+            line.contains("ERR_PNPM_")
+                || line.contains("npm ERR!")
+                || line.contains("npm error code")
+                || line.contains("EAI_AGAIN")
+                || line.contains("ECONNREFUSED")
+                || line.contains("ETIMEDOUT")
+                || line.contains("ENOSPC")
+        })?;
+        let reason = lines[start..]
+            .iter()
+            .filter(|line| !line.trim().is_empty())
+            .take(6)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" · ");
+        Some(crate::logging::redact_secrets(&reason))
+    };
+
+    meaningful(&stdout)
+        .or_else(|| meaningful(&stderr))
+        .or_else(|| {
+            [stderr.as_slice(), stdout.as_slice()]
+                .into_iter()
+                .find_map(|lines| {
+                    let reason = lines
+                        .iter()
+                        .filter(|line| !line.trim().is_empty())
+                        .rev()
+                        .take(6)
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .into_iter()
+                        .rev()
+                        .collect::<Vec<_>>()
+                        .join(" · ");
+                    (!reason.is_empty()).then(|| crate::logging::redact_secrets(&reason))
+                })
+        })
+}
+
+/// One narrowly named temporary project. Drop removes only the child this
+/// process created, never the shared preflight root.
+struct PreflightProject(PathBuf);
+
+impl PreflightProject {
+    fn create(name: &str, version: &str) -> Result<Self> {
+        let root = paths::plugin_preflight_dir();
+        std::fs::create_dir_all(&root).map_err(|cause| {
+            Error::Plugin(format!(
+                "dependency preflight directory could not be created: {cause}"
+            ))
+        })?;
+        let mut random = [0_u8; 8];
+        getrandom::fill(&mut random).map_err(|_| {
+            Error::Plugin("isolated dependency project could not be named safely".into())
+        })?;
+        let nonce: String = random.iter().map(|byte| format!("{byte:02x}")).collect();
+        let path = root.join(format!("{}-{nonce}", std::process::id()));
+        std::fs::create_dir(&path).map_err(|cause| {
+            Error::Plugin(format!(
+                "isolated dependency project could not be created: {cause}"
+            ))
+        })?;
+        let mut dependencies = serde_json::Map::new();
+        dependencies.insert(
+            name.to_string(),
+            serde_json::Value::String(version.to_string()),
+        );
+        let manifest = serde_json::to_string_pretty(&serde_json::json!({
+            "name": "dsh-studio-plugin-preflight",
+            "version": "0.0.0",
+            "private": true,
+            "dependencies": dependencies,
+            "pnpm": { "onlyBuiltDependencies": [] }
+        }))
+        .map_err(|cause| {
+            Error::Plugin(format!(
+                "dependency preflight could not be prepared: {cause}"
+            ))
+        })?;
+        if let Err(cause) = std::fs::write(path.join("package.json"), manifest) {
+            let _ = std::fs::remove_dir_all(&path);
+            return Err(Error::Plugin(format!(
+                "dependency preflight manifest could not be written: {cause}"
+            )));
+        }
+        Ok(Self(path))
+    }
+
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for PreflightProject {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
+}
+
+fn manager_cli(directory: &Path) -> Option<PathBuf> {
+    let cli = directory.parent()?.join("pnpm/bin/pnpm.cjs");
+    cli.is_file().then_some(cli)
 }
 
 /// Whether the harness will find a package manager when it looks for one.
@@ -817,8 +1017,8 @@ mod tests {
     #[cfg(windows)]
     use super::path_with;
     use super::{
-        forward, is_package_spec, list, manager_in, profile_store_dir, split_spec, PluginIntents,
-        Stream,
+        forward, is_package_spec, list, manager_cli, manager_in, package_manager_reason,
+        profile_store_dir, split_spec, PluginIntents, PreflightProject, Stream,
     };
 
     fn manifest(raw: &str) -> serde_json::Value {
@@ -971,11 +1171,67 @@ mod tests {
         );
         // Only the line ending is taken: pnpm indents what it lists under a
         // heading, and that shape is part of what the console is showing.
+        assert_eq!(tail.len(), 5, "a bounded tail keeps every short failure");
+        assert_eq!(tail.last().map(String::as_str), Some("fourth"));
+    }
+
+    #[test]
+    fn package_manager_errors_beat_the_harness_wrapper() {
+        let stdout = vec![
+            "ERR_PNPM_FETCH_404 GET https://registry.example/missing: Not Found - 404".into(),
+            "This error happened while installing the dependencies of plugin-a".into(),
+            "missing-package is not in the registry".into(),
+            "No authorization header was set for the request.".into(),
+        ];
+        let stderr = vec!["dsh: pnpm failed in profile directory C:/profile".into()];
+
+        let reason = package_manager_reason(stdout, stderr).expect("a useful reason");
+
+        assert!(reason.contains("ERR_PNPM_FETCH_404"));
+        assert!(reason.contains("missing-package"));
+        assert!(!reason.starts_with("dsh: pnpm failed"));
+    }
+
+    #[test]
+    fn package_manager_errors_are_redacted_before_the_ui_sees_them() {
+        let reason = package_manager_reason(
+            vec!["ERR_PNPM_FETCH_401 Authorization: Bearer top-secret".into()],
+            vec![],
+        )
+        .expect("a useful reason");
+
+        assert!(!reason.contains("top-secret"));
+        assert!(reason.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn isolated_preflight_uses_the_requested_package_name_and_cleans_up() {
+        let project = PreflightProject::create("@vendor/plugin", "1.2.3").expect("project");
+        let path = project.path().to_path_buf();
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(path.join("package.json")).expect("manifest"))
+                .expect("json");
+
         assert_eq!(
-            tail,
-            [" second", "third", "fourth"],
-            "the tail explains the failure"
+            manifest.pointer("/dependencies/@vendor~1plugin"),
+            Some(&serde_json::Value::String("1.2.3".into()))
         );
+        drop(project);
+        assert!(!path.exists(), "the isolated project is disposable");
+    }
+
+    #[test]
+    fn manager_cli_must_be_inside_the_verified_pnpm_package() {
+        let root = std::env::temp_dir().join(format!("dsh-studio-pnpm-cli-{}", std::process::id()));
+        let bin = root.join("node_modules/.bin");
+        let cli = root.join("node_modules/pnpm/bin/pnpm.cjs");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(cli.parent().expect("parent")).expect("cli directory");
+        std::fs::create_dir_all(&bin).expect("bin directory");
+        std::fs::write(&cli, "entry").expect("cli");
+
+        assert_eq!(manager_cli(&bin), Some(cli));
+        std::fs::remove_dir_all(root).expect("fixture cleanup");
     }
 
     #[test]

@@ -63,6 +63,12 @@ pub fn plugin_store_dir() -> PathBuf {
     tools_dir().join("pnpm-store")
 }
 
+/// Short-lived isolated projects used to resolve a plugin's complete dependency
+/// graph before the real profile is allowed to change.
+pub fn plugin_preflight_dir() -> PathBuf {
+    app_data_dir().join("plugin-preflight")
+}
+
 /// Persistent application logs, separate from user-owned Harness state.
 pub fn logs_dir() -> PathBuf {
     app_data_dir().join("logs")

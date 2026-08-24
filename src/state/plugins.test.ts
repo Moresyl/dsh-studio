@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as ipc from '@/lib/ipc'
 import type { PluginDetail, PluginInstallPreview } from '@/lib/ipc'
+import { useDialog } from '@/state/dialog'
 import { packageName } from '@/state/plugins'
 import { usePlugins } from '@/state/plugins'
 
@@ -51,6 +52,7 @@ beforeEach(() => {
     working: null,
     error: null,
   })
+  useDialog.setState({ pending: null })
 })
 
 afterEach(() => vi.useRealTimers())
@@ -178,6 +180,10 @@ describe('plugin install previews', () => {
 
     await expect(usePlugins.getState().add()).resolves.toBe(false)
     expect(usePlugins.getState().error).toContain('registry unavailable')
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'registry unavailable',
+    })
     expect(usePlugins.getState().previewToken).toBeNull()
     expect(usePlugins.getState().previewExpiresAt).toBeNull()
   })

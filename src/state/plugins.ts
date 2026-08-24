@@ -12,7 +12,9 @@
 import { create } from 'zustand'
 
 import { describe } from '@/lib/errors'
+import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
+import { showError } from '@/state/dialog'
 import type {
   ArchivePackage,
   CatalogSource,
@@ -86,6 +88,20 @@ let stateGeneration = 0
 
 type Write = (partial: Partial<PluginStore>) => void
 
+/** Keep the inline history while also making failures impossible to miss. */
+const failed = (set: Write, cause: unknown): void => {
+  const error = typeof cause === 'string' ? cause : describe(cause)
+  set({ error })
+  showError({
+    title: t('plugins.error.title'),
+    body: t('plugins.error.body'),
+    details: error,
+    close: t('dialog.error.close'),
+    copy: t('dialog.error.copy'),
+    copied: t('dialog.error.copied'),
+  })
+}
+
 /** Whether a detail answer still belongs to the item the rail is showing. */
 const isSelected = (state: PluginStore, name: string, sourceId: string, version: string): boolean =>
   state.selected === name && state.selectedSource === sourceId && state.selectedVersion === version
@@ -134,7 +150,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       const [profile, sources] = await Promise.all([ipc.pluginState(), ipc.pluginSources()])
       if (mine === stateGeneration) set({ profile, sources, error: null })
     } catch (cause) {
-      if (mine === stateGeneration) set({ error: describe(cause) })
+      if (mine === stateGeneration) failed(set, cause)
     }
   },
 
@@ -156,7 +172,8 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       }
     } catch (cause) {
       if (mine === generation) {
-        set({ error: describe(cause), results: [], total: 0, hasMore: false })
+        failed(set, cause)
+        set({ results: [], total: 0, hasMore: false })
       }
     } finally {
       if (mine === generation) set({ searching: false })
@@ -195,7 +212,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       if (isSelected(get(), name, sourceId, version)) set({ detail })
     } catch (cause) {
       if (isSelected(get(), name, sourceId, version)) {
-        set({ error: describe(cause) })
+        failed(set, cause)
       }
     } finally {
       if (isSelected(get(), name, sourceId, version)) set({ loadingDetail: false })
@@ -265,7 +282,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         error: null,
       })
     } catch (cause) {
-      set({ error: describe(cause) })
+      failed(set, cause)
     } finally {
       set({ sourceWorking: false })
     }
@@ -298,7 +315,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       })
       return true
     } catch (cause) {
-      set({ error: describe(cause) })
+      failed(set, cause)
       return false
     } finally {
       set({ sourceWorking: false })
@@ -331,7 +348,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         error: null,
       })
     } catch (cause) {
-      set({ error: describe(cause) })
+      failed(set, cause)
     } finally {
       set({ sourceWorking: false })
     }
@@ -343,7 +360,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     const sourceId = get().selectedSource
     const version = get().selectedVersion
     if (!selected || !sourceId) {
-      set({ error: 'The selected market item no longer exists.' })
+      failed(set, 'The selected market item no longer exists.')
       return false
     }
     const mine = ++previewGeneration
@@ -367,7 +384,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       }
       return false
     } catch (cause) {
-      if (mine === previewGeneration) set({ error: describe(cause) })
+      if (mine === previewGeneration) failed(set, cause)
       return false
     } finally {
       if (mine === previewGeneration) set({ previewing: false })
@@ -402,7 +419,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       landed(set, await ipc.pluginAdd(token))
       return true
     } catch (cause) {
-      set({ error: describe(cause) })
+      failed(set, cause)
       return false
     } finally {
       set({ working: null })
@@ -416,7 +433,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     try {
       landed(set, await ipc.pluginRemove(name))
     } catch (cause) {
-      set({ error: describe(cause) })
+      failed(set, cause)
     } finally {
       set({ working: null })
     }
@@ -432,7 +449,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     try {
       landed(set, await ipc.pluginSwitch(name, enabled))
     } catch (cause) {
-      set({ error: describe(cause) })
+      failed(set, cause)
     } finally {
       set({ working: null })
     }
@@ -445,7 +462,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     } catch (cause) {
       // The usual answer here is that the file is not a package at all, and the
       // sentence Rust wrote about it says which file and why.
-      set({ error: describe(cause) })
+      failed(set, cause)
       return null
     }
   },
@@ -459,7 +476,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     try {
       landed(set, await ipc.pluginImport(archive.path))
     } catch (cause) {
-      set({ error: describe(cause) })
+      failed(set, cause)
     } finally {
       set({ working: null })
     }

@@ -572,6 +572,12 @@ const en = {
   'guide.session.workspace': 'Working directory',
 
   'dialog.cancel': 'Cancel',
+  'dialog.error.copy': 'Copy error',
+  'dialog.error.copied': 'Copied',
+  'dialog.error.close': 'Close',
+  'plugins.error.title': 'Plugin operation failed',
+  'plugins.error.body':
+    'The operation did not finish. The exact reason is shown below and can be copied for a bug report.',
   'recovery.title': 'Plugin profile recovered',
   'recovery.restored':
     'DSH Studio found an interrupted plugin operation and restored the profile before Harness started.',
@@ -1152,6 +1158,11 @@ const zh: Record<MessageKey, string> = {
   'guide.session.workspace': '工作目录',
 
   'dialog.cancel': '取消',
+  'dialog.error.copy': '复制错误',
+  'dialog.error.copied': '已复制',
+  'dialog.error.close': '关闭',
+  'plugins.error.title': '插件操作失败',
+  'plugins.error.body': '操作未能完成。下方保留了具体原因，可复制后用于反馈问题。',
   'recovery.title': '插件配置已恢复',
   'recovery.restored': '检测到上次插件操作被中断，已在 Harness 启动前恢复到操作前的配置。',
   'recovery.failed': '中断的操作无法自动恢复，诊断报告中保留了恢复错误。',

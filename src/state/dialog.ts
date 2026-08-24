@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 /**
- * The question a destructive button has to ask before it acts.
+ * The application-owned modal state for confirmations and blocking errors.
  *
  * Kept as state with a promise attached rather than as a `confirm()` call, for
  * the reason every desktop application eventually learns: the webview's own
@@ -21,13 +21,30 @@ export interface Question {
   tone?: 'danger' | 'brand'
 }
 
-interface Pending extends Question {
+export interface ErrorNotice {
+  title: string
+  body: string
+  /** The complete native error, kept selectable and copyable. */
+  details: string
+  close: string
+  copy: string
+  copied: string
+}
+
+interface PendingQuestion extends Question {
+  kind: 'question'
   answer: (taken: boolean) => void
 }
 
+interface PendingNotice extends ErrorNotice {
+  kind: 'error'
+}
+
+export type PendingDialog = PendingQuestion | PendingNotice
+
 interface DialogState {
-  pending: Pending | null
-  put: (pending: Pending) => void
+  pending: PendingDialog | null
+  put: (pending: PendingDialog) => void
   settle: (taken: boolean) => void
 }
 
@@ -38,7 +55,8 @@ export const useDialog = create<DialogState>((set, get) => ({
     // One question at a time. A second one arriving means the first is no
     // longer what is on screen, so it is answered "no" rather than left holding
     // a promise nobody will ever resolve.
-    get().pending?.answer(false)
+    const previous = get().pending
+    if (previous?.kind === 'question') previous.answer(false)
     set({ pending })
   },
 
@@ -46,7 +64,7 @@ export const useDialog = create<DialogState>((set, get) => ({
     const pending = get().pending
     if (!pending) return
     set({ pending: null })
-    pending.answer(taken)
+    if (pending.kind === 'question') pending.answer(taken)
   },
 }))
 
@@ -57,4 +75,10 @@ export const useDialog = create<DialogState>((set, get) => ({
  * the old global `confirm()` had and the reason it survived this long.
  */
 export const ask = (question: Question): Promise<boolean> =>
-  new Promise((resolve) => useDialog.getState().put({ ...question, answer: resolve }))
+  new Promise((resolve) =>
+    useDialog.getState().put({ ...question, kind: 'question', answer: resolve }),
+  )
+
+/** Show a blocking, copyable application error without creating a promise. */
+export const showError = (notice: ErrorNotice): void =>
+  useDialog.getState().put({ ...notice, kind: 'error' })

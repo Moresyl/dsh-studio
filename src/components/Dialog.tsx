@@ -1,5 +1,5 @@
-import { useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react'
-import { Info, TriangleAlert } from 'lucide-react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { Copy, Info, TriangleAlert } from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { t } from '@/lib/i18n'
@@ -11,8 +11,9 @@ import { useDialog } from '@/state/dialog'
  *
  * A dialog earns its place by being rarer than the thing it interrupts: it is
  * for the question that has to be answered before an action that cannot be
- * taken back, and for nothing else. Everything routine belongs on the pane,
- * where it does not stop the user to be read.
+ * taken back, and for a failure that would otherwise be easy to miss.
+ * Everything routine belongs on the pane, where it does not stop the user to
+ * be read.
  *
  * What makes it read as a window rather than as a web overlay is the small
  * stuff. It is the app's own panel, on the app's own surface, at the app's own
@@ -27,6 +28,7 @@ export function Dialog() {
 
   const card = useRef<HTMLDivElement>(null)
   const accept = useRef<HTMLButtonElement>(null)
+  const [copiedDetails, setCopiedDetails] = useState<string | null>(null)
 
   useEffect(() => {
     if (!pending) return
@@ -41,17 +43,33 @@ export function Dialog() {
 
   if (!pending) return null
 
-  const danger = pending.tone !== 'brand'
+  const notice = pending.kind === 'error'
+  const copied = notice && copiedDetails === pending.details
+  const danger = notice || pending.tone !== 'brand'
   const Icon = danger ? TriangleAlert : Info
+
+  const dismiss = () => {
+    setCopiedDetails(null)
+    settle(false)
+  }
+
+  const copyError = async () => {
+    if (!notice) return
+    try {
+      await navigator.clipboard.writeText(pending.details)
+      setCopiedDetails(pending.details)
+    } catch {
+      // The error remains selectable when clipboard access is unavailable.
+    }
+  }
 
   // Escape says no, Tab stays in here: outside a modal the rest of the window
   // is still focusable, and a caret that walks out of a question and into the
   // pane behind it is how a dialog stops being a dialog.
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) =>
-    holdFocus(card.current, event, () => settle(false))
+    holdFocus(card.current, event, dismiss)
 
-  const onBackdrop = (event: MouseEvent<HTMLDivElement>) =>
-    pressedBackdrop(event, () => settle(false))
+  const onBackdrop = (event: MouseEvent<HTMLDivElement>) => pressedBackdrop(event, dismiss)
 
   return (
     <div
@@ -87,10 +105,16 @@ export function Dialog() {
               {pending.body}
             </p>
 
-            {pending.subject && (
+            {!notice && pending.subject && (
               <p className="selectable mt-2.5 truncate rounded-control border border-line bg-canvas-deep px-2.5 py-1.5 font-mono text-[11.5px] text-muted">
                 {pending.subject}
               </p>
+            )}
+
+            {notice && (
+              <pre className="selectable mt-2.5 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-control border border-line bg-canvas-deep px-2.5 py-2 font-mono text-[11.5px] leading-relaxed text-muted">
+                {pending.details}
+              </pre>
             )}
           </div>
         </div>
@@ -98,12 +122,30 @@ export function Dialog() {
         {/* Cancel first, going through last — the order the platform this ships
             on puts them in, and the order the hand already expects. */}
         <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => settle(false)}>
-            {t('dialog.cancel')}
-          </Button>
-          <Button ref={accept} variant={danger ? 'danger' : 'primary'} onClick={() => settle(true)}>
-            {pending.confirm}
-          </Button>
+          {notice ? (
+            <>
+              <Button variant="secondary" onClick={() => void copyError()}>
+                <Copy size={13} aria-hidden="true" />
+                {copied ? pending.copied : pending.copy}
+              </Button>
+              <Button ref={accept} variant="primary" onClick={dismiss}>
+                {pending.close}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="secondary" onClick={() => settle(false)}>
+                {t('dialog.cancel')}
+              </Button>
+              <Button
+                ref={accept}
+                variant={danger ? 'danger' : 'primary'}
+                onClick={() => settle(true)}
+              >
+                {pending.confirm}
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
