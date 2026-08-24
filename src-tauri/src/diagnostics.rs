@@ -118,8 +118,15 @@ pub async fn report_archive(path: String, text: String) -> Result<()> {
 /// path, because renderer code should not gain filesystem authority from an
 /// error reporting hook.
 #[tauri::command]
-pub fn report_frontend_crash(message: String, stack: String, url: String) -> Result<()> {
-    crate::logging::write_frontend_crash(&message, &stack, &url)
+pub fn report_frontend_crash(
+    window: tauri::WebviewWindow,
+    message: String,
+    stack: String,
+    url: String,
+) -> Result<()> {
+    crate::logging::write_frontend_crash(&message, &stack, &url)?;
+    crate::recovery::renderer_failed(&window, &message);
+    Ok(())
 }
 
 /// Export the evidence already on disk without constructing any application state.

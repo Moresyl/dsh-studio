@@ -108,6 +108,7 @@ pub fn build<R: tauri::Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<Web
     // it is what the user will reach for.
     if !standby {
         rescue(&window);
+        crate::recovery::watch(&window);
     }
 
     Ok(window)
@@ -153,6 +154,7 @@ pub fn open<R: Runtime>(
         cascade(&window, from);
     }
     rescue(&window);
+    crate::recovery::watch(&window);
 
     Ok(window)
 }

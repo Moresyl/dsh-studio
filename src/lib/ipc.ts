@@ -992,6 +992,9 @@ export const frontendCrash = (payload: {
   stack: string
   url: string
 }): Promise<void> => invoke('report_frontend_crash', payload)
+
+/** Mark this window healthy only after React committed the application root. */
+export const rendererReady = (): Promise<void> => invoke('renderer_ready')
 const APPLICATION_CHECK_UPDATE = 'application://check-update'
 
 /** The native macOS application menu asked for an interactive update check. */

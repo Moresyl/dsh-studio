@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "startup-recovery",
+  "description": "Minimal permissions for the renderer-independent startup recovery window.",
+  "windows": ["startup-recovery"],
+  "permissions": ["core:default"]
+}

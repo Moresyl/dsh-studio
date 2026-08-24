@@ -56,6 +56,17 @@ export default function App() {
   // covers the window, and a modal inside a strip 36px tall would be positioned
   // against a strip 36px tall.
   const [managing, setManaging] = useState(false)
+
+  // This effect can only run after React committed the application root. Rust
+  // uses that fact to cancel the static startup-recovery deadline; it is not a
+  // Harness health signal and deliberately does not wait for Node or a profile.
+  useEffect(() => {
+    void ipc.rendererReady().catch(() => {
+      // A browser preview has no native recovery channel. The visible UI still
+      // works, and Rust retains its deadline in a real desktop window.
+    })
+  }, [])
+
   // Stable, because the palette rebuilds its command list from its props and
   // this window re-renders on every line the harness prints.
   const manage = useCallback(() => setManaging(true), [])

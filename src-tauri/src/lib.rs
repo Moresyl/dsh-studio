@@ -16,6 +16,7 @@ mod paths;
 mod plugins;
 mod presets;
 mod profiles;
+mod recovery;
 mod remote;
 mod sessions;
 mod startup;
@@ -91,6 +92,7 @@ pub fn run() {
             app.manage(Arc::new(PluginIntents::default()));
             app.manage(Arc::new(NodeJobs::default()));
             app.manage(Arc::new(sessions::Library::default()));
+            app.manage(recovery::RendererHealth::default());
             app.manage(terminal::Terminals::new()?);
             // Before `desktop::wire`, which is where a link that started the app
             // is put down for whoever asks for it first.
@@ -180,6 +182,11 @@ pub fn run() {
             diagnostics::report_save,
             diagnostics::report_archive,
             diagnostics::report_frontend_crash,
+            recovery::renderer_ready,
+            recovery::recovery_state,
+            recovery::recovery_retry,
+            recovery::recovery_export_diagnostics,
+            recovery::recovery_quit,
             workspace::workspace_select,
             workspace::workspace_inspect,
         ])

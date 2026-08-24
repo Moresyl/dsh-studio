@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>DSH Studio startup recovery</title>
+    <style>
+      :root {
+        font:
+          14px/1.55 Inter,
+          'Segoe UI',
+          system-ui,
+          sans-serif;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        color: #e8edf5;
+        background: #0d1118;
+      }
+      main {
+        width: min(520px, calc(100vw - 48px));
+      }
+      .mark {
+        width: 42px;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 13px;
+        color: #80b4ff;
+        background: #17243a;
+        font-size: 22px;
+      }
+      h1 {
+        margin: 18px 0 8px;
+        font-size: 22px;
+        line-height: 1.25;
+      }
+      p {
+        margin: 0 0 14px;
+        color: #aeb9c8;
+      }
+      pre {
+        max-height: 96px;
+        margin: 18px 0;
+        padding: 12px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border: 1px solid #293241;
+        border-radius: 10px;
+        color: #cbd5e3;
+        background: #111823;
+        font:
+          12px/1.5 ui-monospace,
+          Consolas,
+          monospace;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 9px;
+      }
+      button {
+        min-height: 36px;
+        padding: 0 15px;
+        border: 1px solid #354052;
+        border-radius: 9px;
+        color: #e8edf5;
+        background: #1a2330;
+        cursor: pointer;
+      }
+      button.primary {
+        border-color: #3678d1;
+        background: #2465b9;
+      }
+      button:hover {
+        filter: brightness(1.12);
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.55;
+      }
+      #result {
+        min-height: 22px;
+        margin-top: 14px;
+        color: #8cc7a7;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          color-scheme: light;
+        }
+        body {
+          color: #18202b;
+          background: #f4f7fb;
+        }
+        .mark {
+          color: #185fae;
+          background: #e1edfc;
+        }
+        p {
+          color: #566274;
+        }
+        pre {
+          border-color: #d7dde7;
+          color: #374151;
+          background: #fff;
+        }
+        button {
+          border-color: #ccd4df;
+          color: #202936;
+          background: #fff;
+        }
+        button.primary {
+          border-color: #2465b9;
+          color: #fff;
+          background: #2465b9;
+        }
+      }
+    </style>
+    <script src="/recovery.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">!</div>
+      <h1 id="title">The application interface did not start</h1>
+      <p id="summary">
+        DSH Studio opened a recovery surface that does not depend on React, Harness, Node, or the
+        network.
+      </p>
+      <pre id="reason">Loading startup evidence…</pre>
+      <div class="actions">
+        <button id="retry" class="primary" type="button">Retry interface</button>
+        <button id="export" type="button">Export diagnostics</button>
+        <button id="quit" type="button">Quit</button>
+      </div>
+      <p id="result" role="status" aria-live="polite"></p>
+    </main>
+  </body>
+</html>
