@@ -28,7 +28,7 @@ pub mod switches;
 use std::collections::{BTreeSet, VecDeque};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -83,6 +83,29 @@ pub struct PluginState {
 #[derive(Debug, Default)]
 pub struct PluginJobs {
     pub busy: AtomicBool,
+}
+
+impl PluginJobs {
+    /// Claim the one profile-wide package-manager slot.
+    ///
+    /// The returned guard clears the flag on every exit path, including task
+    /// cancellation when a window closes halfway through a profile import.
+    pub(crate) fn claim(&self) -> Result<PluginJob<'_>> {
+        if self.busy.swap(true, Ordering::SeqCst) {
+            return Err(Error::PluginBusy);
+        }
+        Ok(PluginJob(&self.busy))
+    }
+}
+
+/// A package-manager claim that cannot be stranded by an early return or a
+/// cancelled async command.
+pub(crate) struct PluginJob<'a>(&'a AtomicBool);
+
+impl Drop for PluginJob<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
 }
 
 const INTENT_TTL: Duration = Duration::from_secs(2 * 60);
@@ -1018,11 +1041,22 @@ mod tests {
     use super::path_with;
     use super::{
         forward, is_package_spec, list, manager_cli, manager_in, package_manager_reason,
-        profile_store_dir, split_spec, PluginIntents, PreflightProject, Stream,
+        profile_store_dir, split_spec, PluginIntents, PluginJobs, PreflightProject, Stream,
     };
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
+    }
+
+    #[test]
+    fn a_cancelled_package_job_releases_the_profile_slot() {
+        let jobs = PluginJobs::default();
+        let first = jobs.claim().expect("first claim");
+        assert!(jobs.claim().is_err(), "a concurrent claim must be refused");
+
+        drop(first);
+
+        assert!(jobs.claim().is_ok(), "dropping the task guard releases it");
     }
 
     /// The panel's list, for a profile where nothing was switched off.

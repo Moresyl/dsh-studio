@@ -1,7 +1,6 @@
 //! The IPC surface behind the profile switcher and the profile manager.
 
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -141,15 +140,11 @@ pub async fn profile_duplicate(
 ) -> Result<Roster> {
     // The market's own guard, because this is the market's own work: a package
     // manager, running over a profile directory.
-    if jobs.busy.swap(true, Ordering::SeqCst) {
-        return Err(Error::PluginBusy);
-    }
+    let _busy = jobs.claim()?;
     let outcome = match super::duplicate(&source, &name) {
         Ok(specs) => install_into(&name, specs, &state).await,
         Err(failure) => Err(failure),
     };
-    jobs.busy.store(false, Ordering::SeqCst);
-
     outcome.map(|()| super::roster())
 }
 
@@ -192,15 +187,11 @@ pub async fn profile_import(
     state: State<'_, AppState>,
     jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<Roster> {
-    if jobs.busy.swap(true, Ordering::SeqCst) {
-        return Err(Error::PluginBusy);
-    }
+    let _busy = jobs.claim()?;
     let outcome = match super::declaration(&path).and_then(|file| super::import(&file, &name)) {
         Ok(specs) => install_into(&name, specs, &state).await,
         Err(failure) => Err(failure),
     };
-    jobs.busy.store(false, Ordering::SeqCst);
-
     outcome.map(|()| super::roster())
 }
 

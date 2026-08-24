@@ -1,7 +1,6 @@
 //! The IPC surface behind the plugin panel.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use serde::Serialize;
@@ -50,7 +49,7 @@ pub async fn plugin_recovery_retry(
         Error::Plugin("this recovered operation cannot be replayed safely".into())
     })?;
     reject_retry_drift(&notice.profile, &retry)?;
-    let _busy = Busy::claim(&jobs.busy)?;
+    let _busy = jobs.claim()?;
     let supervisor = Arc::clone(&state.supervisor);
     let reporter = Arc::clone(&supervisor);
     let profile = notice.profile.clone();
@@ -300,7 +299,7 @@ pub async fn plugin_add(
         item_id: item_id.clone(),
         display_name: display_name.clone(),
     };
-    let _busy = Busy::claim(&jobs.busy)?;
+    let _busy = jobs.claim()?;
     // Re-check expiry/profile under the same mutex and atomically remove the
     // token. Nothing before this point changes the profile.
     intents.consume(&token, &profile)?;
@@ -356,7 +355,7 @@ pub async fn plugin_import(
     state: State<'_, AppState>,
     jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<PluginState> {
-    let _busy = Busy::claim(&jobs.busy)?;
+    let _busy = jobs.claim()?;
 
     let supervisor = Arc::clone(&state.supervisor);
     let reporter = Arc::clone(&supervisor);
@@ -405,7 +404,7 @@ async fn apply<F>(
 where
     F: FnOnce() -> Result<()>,
 {
-    let _busy = Busy::claim(&jobs.busy)?;
+    let _busy = jobs.claim()?;
 
     apply_claimed(change, spec, retry, state, finalize).await
 }
@@ -489,30 +488,6 @@ async fn verify_dependency_graph(spec: &str, state: &State<'_, AppState>) -> Res
         reporter.note(stream, line)
     })
     .await
-}
-
-/// The one-change-at-a-time flag, held for as long as the change runs.
-///
-/// A guard rather than a set and a matching clear, because there are three ways
-/// out of a change and only two of them are lines of code: it lands, it fails,
-/// or the task is dropped because the window closed. A flag left set by the
-/// third is a panel that refuses to install anything again until the whole
-/// application is restarted, and nothing on screen would say why.
-struct Busy<'a>(&'a AtomicBool);
-
-impl<'a> Busy<'a> {
-    fn claim(flag: &'a AtomicBool) -> Result<Self> {
-        if flag.swap(true, Ordering::SeqCst) {
-            return Err(Error::PluginBusy);
-        }
-        Ok(Self(flag))
-    }
-}
-
-impl Drop for Busy<'_> {
-    fn drop(&mut self) {
-        self.0.store(false, Ordering::SeqCst);
-    }
 }
 
 /// The Node runtime every registry call runs through.
