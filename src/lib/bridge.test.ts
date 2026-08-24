@@ -350,11 +350,27 @@ group('desktop frame lifetime', () => {
 
     listener?.({
       origin: SERVING,
+      source: tree.child,
+      data: { dsh: PROTOCOL, id: 'unsupported', method: 'exec' },
+    } as unknown as MessageEvent)
+    await vi.waitFor(() => expect(tree.posted).toHaveBeenCalledTimes(2))
+    expect(tree.posted).toHaveBeenLastCalledWith(
+      {
+        dsh: PROTOCOL,
+        id: 'unsupported',
+        ok: false,
+        error: 'the desktop has no method named exec',
+      },
+      SERVING,
+    )
+
+    listener?.({
+      origin: SERVING,
       source: { frames: [], postMessage: vi.fn() },
       data: { dsh: PROTOCOL, id: 'forged', method: 'hello' },
     } as unknown as MessageEvent)
     await Promise.resolve()
-    expect(tree.posted).toHaveBeenCalledOnce()
+    expect(tree.posted).toHaveBeenCalledTimes(2)
 
     const opened = { url: 'dsh://open', route: 'open', query: {} }
     link?.(opened)
