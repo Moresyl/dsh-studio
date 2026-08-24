@@ -30,7 +30,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && vite build && node .github/scripts/verify-bundle-budget.mjs",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write src media website packaging .github",

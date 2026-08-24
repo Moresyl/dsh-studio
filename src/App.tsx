@@ -23,7 +23,6 @@ import { usePalette } from '@/state/palette'
 import { usePresentation } from '@/state/presentation'
 import { subscribeToProfiles } from '@/state/profiles'
 import { subscribeToRemote, useRemote } from '@/state/remote'
-import { subscribeToTerminals } from '@/state/terminals'
 import { useUpdate, watchForUpdates } from '@/state/update'
 import { switchWorkspace } from '@/state/workspace'
 
@@ -157,7 +156,10 @@ export default function App() {
   // on screen. Subscribing from the window is also what lets the rail carry a
   // count of them, which is the reminder that they end with this window.
   useEffect(() => {
-    const pending = subscribeToTerminals()
+    // Loading the event owner asynchronously also keeps xterm's emulator out
+    // of the first-paint bundle. The import starts immediately, so shells still
+    // have a window-lifetime listener before anybody can navigate to the pane.
+    const pending = import('@/state/terminals').then((module) => module.subscribeToTerminals())
     return () => {
       void pending.then((unlisten) => unlisten())
     }
