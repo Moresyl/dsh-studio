@@ -122,6 +122,11 @@ function create(): Screen {
   const style = getComputedStyle(document.documentElement)
 
   const terminal = new Terminal({
+    // Unicode11Addon registers a width provider through xterm's proposed
+    // `unicode` API. xterm 6 refuses that API unless the terminal opts in
+    // before the addon activates, which otherwise makes New terminal throw
+    // before the PTY is even opened.
+    allowProposedApi: true,
     cursorBlink: true,
     cursorStyle: 'bar',
     // Outlined while the pane is not focused, which is how a terminal says the
