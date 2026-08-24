@@ -9,6 +9,22 @@
 
 ## [未发布]
 
+## [0.7.8] —— 2026-08-24
+
+### 新增
+
+- 插件安装现在会在确认和实际写入 Profile 前，用 Studio 管理的 Node、精确 pnpm 和同一 registry
+  在一次性隔离目录中解析完整依赖图；检查只生成锁文件、不运行生命周期脚本，也不会改动真实 Profile。
+- 插件搜索、详情、来源和安装/卸载失败会同时保留页内错误并弹出可复制的本地化诊断窗口，便于直接
+  报告 `ERR_PNPM_*`、网络、磁盘和权限根因。
+
+### 变更
+
+- Harness、终端、插件、预设和远程会话的破坏性操作改为互斥执行；异步刷新、详情和搜索结果只在
+  仍属于当前选择时写回，避免快速点击或多窗口通知用旧响应覆盖新状态。
+- Windows 上日志级别设置使用可替换、写穿的原子文件更新；快捷键和通知设置串行写入，保存失败时
+  恢复上一组已注册快捷键。
+
 ### 修复
 
 - 修复 [#12](https://github.com/Moresyl/dsh-studio/issues/12)：经过审查的 1024Store
@@ -16,6 +32,14 @@
   不再尝试扫描超过 10,000 条目录；`1.2.3-rc.1` 这类精确 npm 预发布版本会继续经过
   完整性、兼容性、生命周期脚本和仓库回链检查后正常安装。版本范围、tag 与构建元数据
   仍会被阻止。
+- 修复 [#11](https://github.com/Moresyl/dsh-studio/issues/11)：xterm Unicode 11 插件启用前没有
+  打开 proposed API，导致 Windows 11 点击「新建终端」时在 PTY 创建前抛错、按钮看起来无响应。
+- 安装预览在确认窗口停留过久而过期时会自动重新审查一次；包、版本或来源已经改变则返回详情页，
+  不会用旧的一次性令牌继续安装。
+- 插件完整依赖图包含 registry 中不存在或无权限访问的包时，在真实 Profile 改动前停止，并优先
+  显示 `ERR_PNPM_FETCH_404` 等包管理器根因，而不是只显示 `pnpm failed in profile directory`。
+- 修复并发启动/停止/安装、终端创建/关闭、插件与来源操作、预设应用和远程会话连接可能重复提交，
+  以及稍后返回的 Profile、会话、启动设置和插件刷新可能把成功结果覆盖回旧状态的问题。
 
 ## [0.7.7] —— 2026-08-23
 
@@ -552,7 +576,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...HEAD
+[0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/Moresyl/dsh-studio/compare/v0.7.4...v0.7.5

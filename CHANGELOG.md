@@ -9,6 +9,24 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.7.8] — 2026-08-24
+
+### Added
+
+- Plugin installation now resolves the complete dependency graph before review and again before
+  touching the Profile, using Studio's managed Node, exact pnpm and the same registry in a disposable
+  project. The check writes only a lockfile, runs no lifecycle scripts and never mutates the real Profile.
+- Plugin search, detail, source and mutation failures retain their inline history and also open a
+  localized, copyable diagnostic dialog with the relevant `ERR_PNPM_*`, network, disk or permission cause.
+
+### Changed
+
+- Destructive Harness, terminal, plugin, preset and remote-session actions are mutually exclusive.
+  Asynchronous refresh, detail and search results write back only while they still belong to the current
+  selection, preventing rapid clicks or cross-window announcements from restoring stale state.
+- Windows log-level settings use replace-existing, write-through atomic updates. Shortcut and notification
+  settings serialize their writes and restore the previous registered shortcut when persistence fails.
+
 ### Fixed
 
 - Fixed [#12](https://github.com/Moresyl/dsh-studio/issues/12): the reviewed
@@ -17,6 +35,16 @@ pre-1.0 caveat that anything may still move.
   than 10,000 entries, and exact prerelease npm versions such as `1.2.3-rc.1`
   pass the same integrity, compatibility, lifecycle and repository checks as
   exact stable versions. Ranges, tags and build metadata remain blocked.
+- Fixed [#11](https://github.com/Moresyl/dsh-studio/issues/11): the xterm Unicode 11 addon was activated
+  before proposed APIs were enabled, so New terminal could throw before creating a PTY and appear inert
+  on Windows 11.
+- An install preview left open until its one-shot token expires is reviewed once again automatically.
+  If its package, version or source changed, Studio returns to detail instead of installing from stale intent.
+- When a plugin's complete dependency graph contains a registry package that is missing or inaccessible,
+  installation stops before the real Profile changes and reports the package-manager cause such as
+  `ERR_PNPM_FETCH_404`, not only `pnpm failed in profile directory`.
+- Fixed overlapping start/stop/install, terminal create/close, plugin/source, preset and remote-session
+  actions, plus late Profile, session, startup-settings and plugin refreshes overwriting successful state.
 
 ## [0.7.7] — 2026-08-23
 
@@ -667,7 +695,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...HEAD
+[0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/Moresyl/dsh-studio/compare/v0.7.4...v0.7.5
