@@ -39,8 +39,8 @@ const CONTRACTS = Object.freeze([
   },
   {
     pair: 'docs/ROADMAP.md|docs/ROADMAP.zh-CN.md',
-    english: ['Benchmark 2.0.4', '2de525a', 'not a published version'],
-    chinese: ['对标 2.0.4', '2de525a', '不发布 Release'],
+    english: ['Benchmark\n2.0.4', '87047b54', 'not a published version'],
+    chinese: ['对标 2.0.4', '87047b54', '不发布 Release'],
   },
 ])
 
