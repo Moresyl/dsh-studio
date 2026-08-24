@@ -324,7 +324,10 @@ fn read_level() -> LogLevel {
 }
 
 fn write_level(level: LogLevel) -> Result<()> {
-    let path = settings_file();
+    write_level_at(&settings_file(), level)
+}
+
+fn write_level_at(path: &Path, level: LogLevel) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|cause| Error::Report(format!("could not create log settings: {cause}")))?;
@@ -333,8 +336,39 @@ fn write_level(level: LogLevel) -> Result<()> {
     let raw = serde_json::to_vec(&Settings { level })
         .map_err(|cause| Error::Report(format!("could not encode log settings: {cause}")))?;
     std::fs::write(&temporary, raw)
-        .and_then(|_| std::fs::rename(&temporary, &path))
-        .map_err(|cause| Error::Report(format!("could not save log settings: {cause}")))
+        .map_err(|cause| Error::Report(format!("could not stage log settings: {cause}")))?;
+    replace_file(&temporary, path).map_err(|cause| {
+        let _ = std::fs::remove_file(&temporary);
+        Error::Report(format!("could not save log settings: {cause}"))
+    })
+}
+
+#[cfg(not(windows))]
+fn replace_file(staged: &Path, target: &Path) -> std::io::Result<()> {
+    std::fs::rename(staged, target)
+}
+
+#[cfg(windows)]
+fn replace_file(staged: &Path, target: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt as _;
+    use windows_sys::Win32::Storage::FileSystem::{
+        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+    };
+
+    let staged: Vec<u16> = staged.as_os_str().encode_wide().chain(Some(0)).collect();
+    let target: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
+    let moved = unsafe {
+        MoveFileExW(
+            staged.as_ptr(),
+            target.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+        )
+    };
+    if moved == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 
 fn write_crash(info: &std::panic::PanicHookInfo<'_>) {
@@ -542,6 +576,20 @@ mod tests {
         }
         assert!(LogLevel::parse("trace").is_err());
         assert!(LogLevel::parse("").is_err());
+    }
+
+    #[test]
+    fn log_level_settings_can_be_replaced_more_than_once() {
+        let root = root("level-settings");
+        let path = root.join("logging.json");
+
+        write_level_at(&path, LogLevel::Warn).expect("first setting");
+        write_level_at(&path, LogLevel::Error).expect("replacement setting");
+
+        let saved: Settings =
+            serde_json::from_slice(&std::fs::read(&path).expect("settings file")).expect("json");
+        assert_eq!(saved.level, LogLevel::Error);
+        std::fs::remove_dir_all(root).expect("cleanup");
     }
 
     #[test]

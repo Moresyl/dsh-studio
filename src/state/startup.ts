@@ -34,16 +34,28 @@ interface StartupStore {
   retry: () => Promise<void>
 }
 
+/** A settings write makes every older settings read stale. */
+let mutationGeneration = 0
+let refreshGeneration = 0
+
 export const useStartup = create<StartupStore>((set, get) => ({
   state: null,
   busy: false,
   error: null,
 
   refresh: async () => {
+    if (get().busy) return
+    const mine = ++refreshGeneration
+    const mutations = mutationGeneration
     try {
-      set({ state: await ipc.startupState() })
+      const state = await ipc.startupState()
+      if (mine === refreshGeneration && mutations === mutationGeneration) {
+        set({ state, error: null })
+      }
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === refreshGeneration && mutations === mutationGeneration) {
+        set({ error: describe(cause) })
+      }
     }
   },
 
@@ -86,6 +98,7 @@ type Get = () => StartupStore
  */
 async function change(set: Set, get: Get, run: () => Promise<Startup>): Promise<void> {
   if (get().busy) return
+  mutationGeneration += 1
   set({ busy: true, error: null })
   try {
     set({ state: await run() })

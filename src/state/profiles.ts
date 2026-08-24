@@ -54,6 +54,9 @@ interface ProfileStore {
 
 type Write = (partial: Partial<ProfileStore>) => void
 
+/** A profile mutation invalidates any comparison still being calculated. */
+let comparisonGeneration = 0
+
 /**
  * Run one change and take the roster it answers with.
  *
@@ -71,8 +74,9 @@ const change = async (
   // in there at once is how a half-installed profile happens.
   if (get().working !== null) return false
 
+  comparisonGeneration += 1
   const before = get().roster
-  set({ working: subject, error: null, note: null })
+  set({ working: subject, comparison: null, comparing: false, error: null, note: null })
 
   try {
     const roster = await run()
@@ -103,6 +107,7 @@ export const useProfiles = create<ProfileStore>((set, get) => ({
   error: null,
 
   refresh: async () => {
+    if (get().working !== null) return
     try {
       set({ roster: await ipc.profileRoster() })
     } catch (cause) {
@@ -145,13 +150,16 @@ export const useProfiles = create<ProfileStore>((set, get) => ({
   load: (path, name) => change(set, get, name, () => ipc.profileImport(path, name)),
 
   compare: async (left, right) => {
+    if (get().working !== null) return
+    const mine = ++comparisonGeneration
     set({ comparing: true, error: null })
     try {
-      set({ comparison: await ipc.profileCompare(left, right) })
+      const comparison = await ipc.profileCompare(left, right)
+      if (mine === comparisonGeneration) set({ comparison })
     } catch (cause) {
-      set({ comparison: null, error: describe(cause) })
+      if (mine === comparisonGeneration) set({ comparison: null, error: describe(cause) })
     } finally {
-      set({ comparing: false })
+      if (mine === comparisonGeneration) set({ comparing: false })
     }
   },
 

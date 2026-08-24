@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as ipc from '@/lib/ipc'
-import type { PluginDetail } from '@/lib/ipc'
+import type { PluginDetail, PluginInstallPreview } from '@/lib/ipc'
 import { packageName } from '@/state/plugins'
 import { usePlugins } from '@/state/plugins'
 
@@ -44,6 +44,10 @@ beforeEach(() => {
     selectedVersion: null,
     detail: null,
     loadingDetail: false,
+    previewing: false,
+    previewToken: null,
+    sourceWorking: false,
+    working: null,
     error: null,
   })
 })
@@ -109,5 +113,48 @@ describe('installed plugin details', () => {
 
     expect(usePlugins.getState().loadingDetail).toBe(false)
     expect(usePlugins.getState().detail?.version).toBe('2.0.0')
+  })
+})
+
+describe('plugin install previews', () => {
+  it('drops a preview token when the selected package changes before verification finishes', async () => {
+    let finishPreview!: (answer: PluginInstallPreview) => void
+    vi.mocked(ipc.pluginDetail).mockResolvedValue(detail('1.0.0'))
+    vi.mocked(ipc.pluginPreview).mockReturnValue(
+      new Promise((resolve) => {
+        finishPreview = resolve
+      }),
+    )
+
+    await usePlugins.getState().select('registry-plugin', 'npm', '1.0.0')
+    const pending = usePlugins.getState().preview('registry-plugin@1.0.0')
+    await usePlugins.getState().select('another-plugin', 'npm', '1.0.0')
+    finishPreview({ token: 'old-package-token', expiresInSeconds: 300 })
+
+    await expect(pending).resolves.toBe(false)
+    expect(usePlugins.getState().previewing).toBe(false)
+    expect(usePlugins.getState().previewToken).toBeNull()
+  })
+})
+
+describe('plugin catalog source changes', () => {
+  it('serializes source edits that target the same settings document', async () => {
+    let finish!: (answer: []) => void
+    vi.mocked(ipc.pluginSourceAdd).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    const first = usePlugins.getState().addSource('One', 'https://one.example/catalog.json')
+    await expect(
+      usePlugins.getState().addSource('Two', 'https://two.example/catalog.json'),
+    ).resolves.toBe(false)
+
+    expect(ipc.pluginSourceAdd).toHaveBeenCalledOnce()
+    expect(usePlugins.getState().sourceWorking).toBe(true)
+    finish([])
+    await expect(first).resolves.toBe(true)
+    expect(usePlugins.getState().sourceWorking).toBe(false)
   })
 })

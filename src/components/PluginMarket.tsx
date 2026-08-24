@@ -76,6 +76,7 @@ export function PluginMarket() {
   const sources = usePlugins((state) => state.sources)
   const selected = usePlugins((state) => state.selected)
   const searching = usePlugins((state) => state.searching)
+  const sourceWorking = usePlugins((state) => state.sourceWorking)
   const working = usePlugins((state) => state.working)
   const error = usePlugins((state) => state.error)
   const refresh = usePlugins((state) => state.refresh)
@@ -224,6 +225,7 @@ export function PluginMarket() {
             <div className="flex h-11 items-center gap-2 px-4">
               <select
                 value={activeSource?.id ?? 'npm'}
+                disabled={working !== null || sourceWorking}
                 onChange={(event) => {
                   setCategory(null)
                   setPage(0)
@@ -241,6 +243,7 @@ export function PluginMarket() {
               <button
                 type="button"
                 onClick={() => setManagingSources(true)}
+                disabled={working !== null || sourceWorking}
                 data-hint={t('plugins.sources.manage')}
                 aria-label={t('plugins.sources.manage')}
                 className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text"
@@ -423,7 +426,7 @@ export function PluginMarket() {
           ) : (
             <Sources
               sources={sources}
-              working={working !== null}
+              working={working !== null || sourceWorking}
               onSelect={(id) => void selectSource(id)}
               onManage={() => setManagingSources(true)}
             />

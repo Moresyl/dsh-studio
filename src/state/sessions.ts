@@ -71,6 +71,9 @@ type Write = (partial: Partial<SessionStore>) => void
 /** Only the newest search may write results; older answers are dropped. */
 let generation = 0
 
+/** Opening the same id twice still produces two snapshots; only the last wins. */
+let openingGeneration = 0
+
 export const useSessions = create<SessionStore>((set, get) => ({
   cards: null,
   hits: null,
@@ -84,6 +87,7 @@ export const useSessions = create<SessionStore>((set, get) => ({
   error: null,
 
   refresh: async () => {
+    if (get().scanning) return
     set({ scanning: true, error: null })
     try {
       const { cards } = await ipc.sessionRoster()
@@ -123,23 +127,28 @@ export const useSessions = create<SessionStore>((set, get) => ({
   },
 
   open: async (id) => {
+    const mine = ++openingGeneration
     set({ opening: id, opened: null, error: null })
     try {
       const opened = await ipc.sessionRead(id)
       // Still the session this was asked for, or the user has moved on.
-      if (get().opening === id) set({ opened })
+      if (mine === openingGeneration && get().opening === id) set({ opened })
     } catch (cause) {
-      if (get().opening === id) set({ error: describe(cause) })
+      if (mine === openingGeneration && get().opening === id) set({ error: describe(cause) })
     } finally {
-      if (get().opening === id) set({ opening: null })
+      if (mine === openingGeneration && get().opening === id) set({ opening: null })
     }
   },
 
   // The error goes with the session it belongs to. A sentence about an export
   // that failed has no meaning over the list of every session on the machine.
-  close: () => set({ opened: null, opening: null, error: null }),
+  close: () => {
+    openingGeneration += 1
+    set({ opened: null, opening: null, error: null })
+  },
 
   copyOut: async (id, format) => {
+    if (get().exporting) return false
     const rendered = await render(set, id, format)
     if (!rendered) return false
 
@@ -156,14 +165,21 @@ export const useSessions = create<SessionStore>((set, get) => ({
   },
 
   saveOut: async (id, format, kind) => {
+    if (get().exporting) return false
     const rendered = await render(set, id, format)
     if (!rendered) return false
 
-    const path = await pickPath({
-      title: t('sessions.saveTitle'),
-      defaultPath: rendered.name,
-      filters: [{ name: kind, extensions: [suffix(rendered.name)] }],
-    })
+    let path: string | null
+    try {
+      path = await pickPath({
+        title: t('sessions.saveTitle'),
+        defaultPath: rendered.name,
+        filters: [{ name: kind, extensions: [suffix(rendered.name)] }],
+      })
+    } catch (cause) {
+      set({ error: describe(cause) })
+      return false
+    }
     // Dismissed, which is an answer rather than a failure.
     if (!path) return false
 

@@ -13,6 +13,7 @@ interface CatalogSourcesDialogProps {
 /** Add and remove public Schema-compatible discovery endpoints. */
 export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
   const sources = usePlugins((state) => state.sources)
+  const sourceWorking = usePlugins((state) => state.sourceWorking)
   const addSource = usePlugins((state) => state.addSource)
   const removeSource = usePlugins((state) => state.removeSource)
   const [adding, setAdding] = useState(false)
@@ -99,6 +100,7 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
                   <button
                     type="button"
                     onClick={() => void removeSource(source.id)}
+                    disabled={sourceWorking}
                     aria-label={t('plugins.sources.remove')}
                     className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-danger/10 hover:text-danger"
                   >
@@ -138,7 +140,9 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
               <Button
                 type="submit"
                 variant="primary"
-                disabled={adding || label.trim() === '' || endpoint.trim() === ''}
+                disabled={
+                  adding || sourceWorking || label.trim() === '' || endpoint.trim() === ''
+                }
               >
                 {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
                 {adding ? t('plugins.sources.validating') : t('plugins.sources.addAction')}

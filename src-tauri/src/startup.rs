@@ -63,6 +63,8 @@ pub fn standby() -> bool {
 pub struct Keys {
     wanted: Mutex<Option<String>>,
     held: AtomicBool,
+    /// Serializes settings changes from multiple windows and keeps read/modify/write atomic.
+    changes: Mutex<()>,
 }
 
 /// What the settings pane shows, and what every change here answers with.
@@ -172,6 +174,12 @@ pub fn startup_shortcut<R: Runtime>(
     keys: State<'_, Keys>,
     accelerator: Option<String>,
 ) -> Result<Startup> {
+    let _change = keys
+        .changes
+        .lock()
+        .map_err(|_| Error::Startup("startup settings are unavailable".into()))?;
+    let previous = keys.wanted.lock().ok().and_then(|wanted| wanted.clone());
+
     // Released first either way: a change to the combination has to give up the
     // old one, and a failure to take the new one must not leave both live.
     release(&app);
@@ -182,11 +190,7 @@ pub fn startup_shortcut<R: Runtime>(
             // The old combination was let go to make room for this one, so a
             // refusal here would otherwise cost the setting as well as the
             // change — the pane would still show a key that nothing holds.
-            let previous = keys.wanted.lock().ok().and_then(|wanted| wanted.clone());
-            if let Some(previous) = previous {
-                keys.held
-                    .store(hold(&app, &previous).is_ok(), Ordering::Relaxed);
-            }
+            restore_shortcut(&app, &keys, previous.as_deref());
             return Err(refused);
         }
         keys.held.store(true, Ordering::Relaxed);
@@ -194,7 +198,12 @@ pub fn startup_shortcut<R: Runtime>(
 
     let mut saved = read();
     saved.shortcut = accelerator.clone();
-    write(&saved)?;
+    if let Err(failure) = write(&saved) {
+        release(&app);
+        keys.held.store(false, Ordering::Relaxed);
+        restore_shortcut(&app, &keys, previous.as_deref());
+        return Err(failure);
+    }
     if let Ok(mut wanted) = keys.wanted.lock() {
         *wanted = accelerator;
     }
@@ -216,6 +225,10 @@ pub fn startup_notification<R: Runtime>(
             Error::Startup(format!("notification permission was not granted: {cause}"))
         })?;
     }
+    let _change = keys
+        .changes
+        .lock()
+        .map_err(|_| Error::Startup("startup settings are unavailable".into()))?;
     let mut saved = read();
     match kind.as_str() {
         "turn-completed" => saved.notifications.turn_completed = enabled,
@@ -333,6 +346,11 @@ fn release<R: Runtime>(app: &AppHandle<R>) {
     // targeted unregister would need the old accelerator to still parse, which
     // is not true of a file somebody edited by hand.
     let _ = app.global_shortcut().unregister_all();
+}
+
+fn restore_shortcut<R: Runtime>(app: &AppHandle<R>, keys: &Keys, accelerator: Option<&str>) {
+    let held = accelerator.is_some_and(|accelerator| hold(app, accelerator).is_ok());
+    keys.held.store(held, Ordering::Relaxed);
 }
 
 /// Bring the window forward, or put it away if it is already what is in front.

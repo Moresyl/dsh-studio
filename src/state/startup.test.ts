@@ -65,4 +65,38 @@ describe('desktop startup settings', () => {
     expect(ipc.startupLogLevel).toHaveBeenCalledWith('error')
     expect(useStartup.getState().state).toEqual(changed)
   })
+
+  it('does not let an older settings read undo a completed change', async () => {
+    let finishRefresh!: (answer: Startup) => void
+    vi.mocked(ipc.startupState).mockReturnValue(
+      new Promise<Startup>((resolve) => {
+        finishRefresh = resolve
+      }),
+    )
+    const changed = { ...state, autostart: true }
+    vi.mocked(ipc.startupAutostart).mockResolvedValue(changed)
+
+    const refresh = useStartup.getState().refresh()
+    await useStartup.getState().setAutostart(true)
+    finishRefresh(state)
+    await refresh
+
+    expect(useStartup.getState().state).toEqual(changed)
+  })
+
+  it('ignores a refresh requested while a settings write is active', async () => {
+    let finish!: (answer: Startup) => void
+    vi.mocked(ipc.startupAutostart).mockReturnValue(
+      new Promise<Startup>((resolve) => {
+        finish = resolve
+      }),
+    )
+
+    const changing = useStartup.getState().setAutostart(true)
+    await useStartup.getState().refresh()
+
+    expect(ipc.startupState).not.toHaveBeenCalled()
+    finish({ ...state, autostart: true })
+    await changing
+  })
 })

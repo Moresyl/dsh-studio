@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { Profile, Roster } from '@/lib/ipc'
+import type { Comparison, Profile, Roster } from '@/lib/ipc'
 import * as ipc from '@/lib/ipc'
 import { useDialog } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
@@ -99,6 +99,48 @@ describe('a change to the profiles directory', () => {
 
     expect(await useProfiles.getState().rename('lab', 'bench')).toBe(true)
     expect(useProfiles.getState().comparison).toBeNull()
+  })
+
+  it('does not restore a stale comparison after a profile changes', async () => {
+    let finishCompare!: (answer: Comparison) => void
+    vi.mocked(ipc.profileCompare).mockReturnValue(
+      new Promise<Comparison>((resolve) => {
+        finishCompare = resolve
+      }),
+    )
+    vi.mocked(ipc.profileRename).mockResolvedValue(roster('web', 'web', 'bench'))
+
+    const comparing = useProfiles.getState().compare('web', 'lab')
+    await useProfiles.getState().rename('lab', 'bench')
+    finishCompare({ left: 'web', right: 'lab', rows: [], differences: 0 })
+    await comparing
+
+    expect(useProfiles.getState().comparison).toBeNull()
+    expect(useProfiles.getState().comparing).toBe(false)
+  })
+
+  it('does not refresh the roster during a profile write', async () => {
+    const pending = gate<Roster>()
+    vi.mocked(ipc.profileCreate).mockReturnValue(pending.reply)
+
+    const creating = useProfiles.getState().create('bench')
+    await useProfiles.getState().refresh()
+
+    expect(ipc.profileRoster).not.toHaveBeenCalled()
+    pending.settle(roster('web', 'web', 'lab', 'bench'))
+    await creating
+  })
+
+  it('does not compare profiles while one of them is being changed', async () => {
+    const pending = gate<Roster>()
+    vi.mocked(ipc.profileCreate).mockReturnValue(pending.reply)
+
+    const creating = useProfiles.getState().create('bench')
+    await useProfiles.getState().compare('web', 'lab')
+
+    expect(ipc.profileCompare).not.toHaveBeenCalled()
+    pending.settle(roster('web', 'web', 'lab', 'bench'))
+    await creating
   })
 })
 

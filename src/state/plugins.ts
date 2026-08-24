@@ -44,6 +44,8 @@ interface PluginStore {
   loadingDetail: boolean
   previewing: boolean
   previewToken: string | null
+  /** A catalog-source choice or edit is being committed. */
+  sourceWorking: boolean
   /** The package name a change is running against, or null when idle. */
   working: string | null
   error: string | null
@@ -75,6 +77,10 @@ interface PluginStore {
 
 /** Only the newest search may write results; older answers are dropped. */
 let generation = 0
+/** Invalidates an install preview when its catalog selection changes. */
+let previewGeneration = 0
+/** A source or profile mutation makes an older combined refresh stale. */
+let stateGeneration = 0
 
 type Write = (partial: Partial<PluginStore>) => void
 
@@ -91,6 +97,7 @@ const isSelected = (state: PluginStore, name: string, sourceId: string, version:
  * not only for another window with this panel open.
  */
 const landed = (set: Write, profile: PluginState): void => {
+  ++stateGeneration
   set({ profile })
   void ipc.announce('profiles')
 }
@@ -113,15 +120,18 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   loadingDetail: false,
   previewing: false,
   previewToken: null,
+  sourceWorking: false,
   working: null,
   error: null,
 
   refresh: async () => {
+    if (get().working || get().sourceWorking) return
+    const mine = ++stateGeneration
     try {
       const [profile, sources] = await Promise.all([ipc.pluginState(), ipc.pluginSources()])
-      set({ profile, sources })
+      if (mine === stateGeneration) set({ profile, sources, error: null })
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === stateGeneration) set({ error: describe(cause) })
     }
   },
 
@@ -151,12 +161,14 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   },
 
   select: async (name, sourceId = 'npm', version = 'latest') => {
+    ++previewGeneration
     if (name === null) {
       set({
         selected: null,
         selectedSource: null,
         selectedVersion: null,
         detail: null,
+        previewing: false,
         previewToken: null,
       })
       return
@@ -168,6 +180,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       selectedVersion: version,
       detail: null,
       loadingDetail: true,
+      previewing: false,
       previewToken: null,
     })
     try {
@@ -185,6 +198,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   },
 
   selectInstalled: (plugin) => {
+    ++previewGeneration
     const version = plugin.spec || 'bundled'
     set({
       selected: plugin.name,
@@ -210,12 +224,17 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         integrityVerified: false,
       },
       loadingDetail: false,
+      previewing: false,
       previewToken: null,
       error: null,
     })
   },
 
   selectSource: async (id) => {
+    if (get().working || get().sourceWorking) return
+    ++previewGeneration
+    ++stateGeneration
+    set({ sourceWorking: true, previewing: false, previewToken: null, error: null })
     try {
       const sources = await ipc.pluginSourceSelect(id)
       set({
@@ -234,10 +253,16 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       })
     } catch (cause) {
       set({ error: describe(cause) })
+    } finally {
+      set({ sourceWorking: false })
     }
   },
 
   addSource: async (label, endpoint) => {
+    if (get().working || get().sourceWorking) return false
+    ++previewGeneration
+    ++stateGeneration
+    set({ sourceWorking: true, previewing: false, previewToken: null, error: null })
     try {
       const sources = await ipc.pluginSourceAdd(label, endpoint)
       set({
@@ -255,10 +280,16 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     } catch (cause) {
       set({ error: describe(cause) })
       return false
+    } finally {
+      set({ sourceWorking: false })
     }
   },
 
   removeSource: async (id) => {
+    if (get().working || get().sourceWorking) return
+    ++previewGeneration
+    ++stateGeneration
+    set({ sourceWorking: true, previewing: false, previewToken: null, error: null })
     try {
       const sources = await ipc.pluginSourceRemove(id)
       set({
@@ -274,6 +305,8 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       })
     } catch (cause) {
       set({ error: describe(cause) })
+    } finally {
+      set({ sourceWorking: false })
     }
   },
 
@@ -281,10 +314,12 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working || get().previewing) return false
     const selected = get().selected
     const sourceId = get().selectedSource
+    const version = get().selectedVersion
     if (!selected || !sourceId) {
       set({ error: 'The selected market item no longer exists.' })
       return false
     }
+    const mine = ++previewGeneration
     set({ previewing: true, previewToken: null, error: null })
     try {
       const preview = await ipc.pluginPreview(
@@ -293,13 +328,16 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         selected,
         get().detail?.name ?? selected,
       )
-      set({ previewToken: preview.token })
-      return true
+      if (mine === previewGeneration && isSelected(get(), selected, sourceId, version ?? 'latest')) {
+        set({ previewToken: preview.token })
+        return true
+      }
+      return false
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === previewGeneration) set({ error: describe(cause) })
       return false
     } finally {
-      set({ previewing: false })
+      if (mine === previewGeneration) set({ previewing: false })
     }
   },
 
@@ -311,6 +349,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       return
     }
     const selected = get().selected ?? 'plugin'
+    ++stateGeneration
     set({ working: packageName(selected), previewToken: null, error: null })
     try {
       landed(set, await ipc.pluginAdd(token))
@@ -323,6 +362,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   remove: async (name) => {
     if (get().working) return
+    ++stateGeneration
     set({ working: name, error: null })
     try {
       landed(set, await ipc.pluginRemove(name))
@@ -338,6 +378,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     // the same profile manifest and the harness reconciles it after each one.
     // Fast enough that the flicker is the point: it says the write landed.
     if (get().working) return
+    ++stateGeneration
     set({ working: name, error: null })
     try {
       landed(set, await ipc.pluginSwitch(name, enabled))
@@ -364,6 +405,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working) return
     // Named by the package rather than by the file: the progress line under the
     // list is about what is being installed, not about where it was found.
+    ++stateGeneration
     set({ working: archive.name, error: null })
     try {
       landed(set, await ipc.pluginImport(archive.path))
