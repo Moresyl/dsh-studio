@@ -444,6 +444,7 @@ function Palette({
           <Search size={15} strokeWidth={2.1} className="shrink-0 text-faint" aria-hidden="true" />
           <input
             ref={field}
+            aria-label={t('palette.search')}
             type="text"
             role="combobox"
             aria-expanded="true"

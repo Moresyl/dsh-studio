@@ -258,6 +258,7 @@ export function PluginMarket() {
               />
               <input
                 ref={field}
+                aria-label={t('plugins.search')}
                 type="search"
                 value={query}
                 onChange={(event) => {
@@ -323,6 +324,7 @@ export function PluginMarket() {
               </select>
               <select
                 value={sort}
+                aria-label={t('plugins.sort.label')}
                 onChange={(event) => {
                   setSort(event.target.value as PluginSort)
                   setPage(0)

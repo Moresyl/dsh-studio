@@ -160,6 +160,7 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
             <div className="mt-3 grid gap-2">
               <input
                 value={label}
+                aria-label={t('plugins.sources.name')}
                 onChange={(event) => setLabel(event.target.value)}
                 placeholder={t('plugins.sources.name')}
                 maxLength={64}
@@ -167,6 +168,7 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
               />
               <input
                 value={endpoint}
+                aria-label={t('plugins.sources.endpoint')}
                 onChange={(event) => setEndpoint(event.target.value)}
                 placeholder="https://catalog.example/plugins.json"
                 inputMode="url"

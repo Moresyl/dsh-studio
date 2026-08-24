@@ -233,6 +233,7 @@ export function SessionsPane() {
             />
             <input
               ref={field}
+              aria-label={t('sessions.search')}
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}

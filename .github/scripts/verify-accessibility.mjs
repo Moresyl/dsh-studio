@@ -38,10 +38,47 @@ function hasAccessibleName(opening, children) {
 export function validateAccessibilitySource(path, source) {
   const problems = []
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const labelledIds = new Set()
+
+  const collectLabels = (node) => {
+    if (ts.isJsxElement(node) && tagName(node.openingElement) === 'label') {
+      const target = literalAttribute(node.openingElement, 'htmlFor')
+      if (target) labelledIds.add(target)
+    }
+    ts.forEachChild(node, collectLabels)
+  }
+  collectLabels(file)
+
+  const wrappedByLabel = (node) => {
+    for (let parent = node.parent; parent; parent = parent.parent) {
+      if (ts.isJsxElement(parent) && tagName(parent.openingElement) === 'label') return true
+      if (ts.isJsxElement(parent) || ts.isJsxFragment(parent)) continue
+      break
+    }
+    return false
+  }
+
+  const validateFormControl = (node) => {
+    const tag = tagName(node)
+    if (!['input', 'select', 'textarea'].includes(tag)) return
+    if (tag === 'input' && literalAttribute(node, 'type') === 'hidden') return
+    const id = literalAttribute(node, 'id')
+    if (
+      attribute(node, 'aria-label') ||
+      attribute(node, 'aria-labelledby') ||
+      (id && labelledIds.has(id)) ||
+      wrappedByLabel(node)
+    ) {
+      return
+    }
+    const line = file.getLineAndCharacterOfPosition(node.getStart()).line + 1
+    problems.push(`${path}:${line} ${tag} has no associated label`)
+  }
 
   const visit = (node) => {
     if (ts.isJsxElement(node)) {
       const opening = node.openingElement
+      validateFormControl(opening)
       const tag = tagName(opening)
       const role = literalAttribute(opening, 'role')
       const named = hasAccessibleName(opening, node.children)
@@ -65,6 +102,7 @@ export function validateAccessibilitySource(path, source) {
         }
       }
     }
+    if (ts.isJsxSelfClosingElement(node)) validateFormControl(node)
     ts.forEachChild(node, visit)
   }
 

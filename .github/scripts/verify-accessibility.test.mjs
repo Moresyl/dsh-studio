@@ -39,6 +39,23 @@ test('modal dialogs expose modal state and an accessible name', () => {
   )
 })
 
+test('form controls need ARIA, an associated label, or a wrapping label', () => {
+  assert.deepEqual(validateAccessibilitySource('fixture.tsx', '<input placeholder="Search" />'), [
+    'fixture.tsx:1 input has no associated label',
+  ])
+  assert.deepEqual(
+    validateAccessibilitySource(
+      'fixture.tsx',
+      '<><label htmlFor="query">Search</label><input id="query" /></>',
+    ),
+    [],
+  )
+  assert.deepEqual(
+    validateAccessibilitySource('fixture.tsx', '<label>Search<input /></label>'),
+    [],
+  )
+})
+
 test('repository accessibility contracts stay enforced', async () => {
   const result = await verifyAccessibility()
   assert(result.files > 20)

@@ -127,6 +127,7 @@ export function SettingsPane() {
             >
               <select
                 value={presentation}
+                aria-label={t('settings.presentation')}
                 onChange={(event) =>
                   choosePresentation(
                     event.target.value as 'compatibility' | 'extended' | 'advanced',
@@ -143,6 +144,7 @@ export function SettingsPane() {
             <Row icon={ScrollText} label={t('settings.logLevel')} hint={t('settings.logLevelHint')}>
               <select
                 value={state?.logLevel ?? 'info'}
+                aria-label={t('settings.logLevel')}
                 disabled={!ready || busy}
                 onChange={(event) =>
                   void setLogLevel(event.target.value as 'debug' | 'info' | 'warn' | 'error')

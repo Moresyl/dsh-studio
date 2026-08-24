@@ -121,6 +121,7 @@ const en = {
   'plugins.sort.updated': 'Recently updated',
   'plugins.sort.name': 'Name',
   'plugins.sort.downloads': 'Downloads',
+  'plugins.sort.label': 'Sort plugins',
   'plugins.index.refresh': 'Refresh source index',
   'plugins.index.summary': '{total} packages · page {page} of {pages}',
   'plugins.page.previous': 'Previous page',
@@ -196,6 +197,7 @@ const en = {
   'plugins.sources.remove': 'Remove source',
   'plugins.sources.add': 'Add standard HTTPS source',
   'plugins.sources.name': 'Source name',
+  'plugins.sources.endpoint': 'Catalog HTTPS endpoint',
   'plugins.sources.security':
     'Only the public catalog Schema is accepted. Private addresses, credentials, cross-origin redirects, oversized responses and executable install commands are rejected.',
   'plugins.sources.addAction': 'Validate and add',
@@ -603,6 +605,7 @@ const en = {
   'dialog.error.close': 'Close',
   'dialog.failure.title': 'Operation failed',
   'dialog.failure.body': 'The requested action did not complete. You can copy the details for diagnosis.',
+  'dialog.failure.unknown': 'The operation failed without error details.',
   'plugins.error.title': 'Plugin operation failed',
   'plugins.error.body':
     'The operation did not finish. The exact reason is shown below and can be copied for a bug report.',
@@ -762,6 +765,7 @@ const zh: Record<MessageKey, string> = {
   'plugins.sort.updated': '最近更新',
   'plugins.sort.name': '名称',
   'plugins.sort.downloads': '下载量',
+  'plugins.sort.label': '插件排序方式',
   'plugins.index.refresh': '刷新来源索引',
   'plugins.index.summary': '共 {total} 个 · 第 {page}/{pages} 页',
   'plugins.page.previous': '上一页',
@@ -833,6 +837,7 @@ const zh: Record<MessageKey, string> = {
   'plugins.sources.remove': '移除来源',
   'plugins.sources.add': '添加标准 HTTPS 来源',
   'plugins.sources.name': '来源名称',
+  'plugins.sources.endpoint': '目录 HTTPS 地址',
   'plugins.sources.security':
     '只接受公开目录 Schema；内网地址、凭据、跨源跳转、超大响应和可执行安装命令都会被拒绝。',
   'plugins.sources.addAction': '验证并添加',
@@ -1217,6 +1222,7 @@ const zh: Record<MessageKey, string> = {
   'dialog.error.close': '关闭',
   'dialog.failure.title': '操作失败',
   'dialog.failure.body': '请求的操作未能完成；你可以复制详细信息用于诊断。',
+  'dialog.failure.unknown': '操作失败，但没有返回错误详情。',
   'plugins.error.title': '插件操作失败',
   'plugins.error.body': '操作未能完成。下方保留了具体原因，可复制后用于反馈问题。',
   'recovery.title': '插件配置已恢复',

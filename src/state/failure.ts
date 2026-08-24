@@ -8,7 +8,7 @@ import { showError } from '@/state/dialog'
  * type-ahead searches must remain quiet when the machine is offline.
  */
 export function reportFailure(cause: unknown): string {
-  const details = describe(cause)
+  const details = describe(cause, t('dialog.failure.unknown'))
   showError({
     title: t('dialog.failure.title'),
     body: t('dialog.failure.body'),

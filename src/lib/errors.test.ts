@@ -12,5 +12,6 @@ suite('describe', () => {
     expect(describe({ token: 'secret' })).toBe('Something went wrong.')
     expect(describe('  ')).toBe('Something went wrong.')
     expect(describe(null)).toBe('Something went wrong.')
+    expect(describe(null, '无法读取错误详情。')).toBe('无法读取错误详情。')
   })
 })
