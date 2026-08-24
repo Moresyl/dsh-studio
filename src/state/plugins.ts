@@ -44,6 +44,8 @@ interface PluginStore {
   loadingDetail: boolean
   previewing: boolean
   previewToken: string | null
+  /** Native expiry for the one-shot confirmation, expressed in wall-clock ms. */
+  previewExpiresAt: number | null
   /** A catalog-source choice or edit is being committed. */
   sourceWorking: boolean
   /** The package name a change is running against, or null when idle. */
@@ -65,7 +67,7 @@ interface PluginStore {
   addSource: (label: string, endpoint: string) => Promise<boolean>
   removeSource: (id: string) => Promise<void>
   preview: (spec: string) => Promise<boolean>
-  add: () => Promise<void>
+  add: () => Promise<boolean>
   remove: (name: string) => Promise<void>
   /** Take an installed plugin out of the layer stack, or put it back. */
   toggle: (name: string, enabled: boolean) => Promise<void>
@@ -120,6 +122,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   loadingDetail: false,
   previewing: false,
   previewToken: null,
+  previewExpiresAt: null,
   sourceWorking: false,
   working: null,
   error: null,
@@ -170,6 +173,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         detail: null,
         previewing: false,
         previewToken: null,
+        previewExpiresAt: null,
       })
       return
     }
@@ -182,6 +186,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       loadingDetail: true,
       previewing: false,
       previewToken: null,
+      previewExpiresAt: null,
     })
     try {
       const detail = await ipc.pluginDetail(sourceId, name, version)
@@ -226,6 +231,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       loadingDetail: false,
       previewing: false,
       previewToken: null,
+      previewExpiresAt: null,
       error: null,
     })
   },
@@ -234,7 +240,13 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working || get().sourceWorking) return
     ++previewGeneration
     ++stateGeneration
-    set({ sourceWorking: true, previewing: false, previewToken: null, error: null })
+    set({
+      sourceWorking: true,
+      previewing: false,
+      previewToken: null,
+      previewExpiresAt: null,
+      error: null,
+    })
     try {
       const sources = await ipc.pluginSourceSelect(id)
       set({
@@ -249,6 +261,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         selectedVersion: null,
         detail: null,
         previewToken: null,
+        previewExpiresAt: null,
         error: null,
       })
     } catch (cause) {
@@ -262,7 +275,13 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working || get().sourceWorking) return false
     ++previewGeneration
     ++stateGeneration
-    set({ sourceWorking: true, previewing: false, previewToken: null, error: null })
+    set({
+      sourceWorking: true,
+      previewing: false,
+      previewToken: null,
+      previewExpiresAt: null,
+      error: null,
+    })
     try {
       const sources = await ipc.pluginSourceAdd(label, endpoint)
       set({
@@ -274,6 +293,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         selected: null,
         detail: null,
         previewToken: null,
+        previewExpiresAt: null,
         error: null,
       })
       return true
@@ -289,7 +309,13 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     if (get().working || get().sourceWorking) return
     ++previewGeneration
     ++stateGeneration
-    set({ sourceWorking: true, previewing: false, previewToken: null, error: null })
+    set({
+      sourceWorking: true,
+      previewing: false,
+      previewToken: null,
+      previewExpiresAt: null,
+      error: null,
+    })
     try {
       const sources = await ipc.pluginSourceRemove(id)
       set({
@@ -301,6 +327,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         selected: null,
         detail: null,
         previewToken: null,
+        previewExpiresAt: null,
         error: null,
       })
     } catch (cause) {
@@ -320,7 +347,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       return false
     }
     const mine = ++previewGeneration
-    set({ previewing: true, previewToken: null, error: null })
+    set({ previewing: true, previewToken: null, previewExpiresAt: null, error: null })
     try {
       const preview = await ipc.pluginPreview(
         spec,
@@ -328,8 +355,14 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         selected,
         get().detail?.name ?? selected,
       )
-      if (mine === previewGeneration && isSelected(get(), selected, sourceId, version ?? 'latest')) {
-        set({ previewToken: preview.token })
+      if (
+        mine === previewGeneration &&
+        isSelected(get(), selected, sourceId, version ?? 'latest')
+      ) {
+        set({
+          previewToken: preview.token,
+          previewExpiresAt: Date.now() + preview.expiresInSeconds * 1_000,
+        })
         return true
       }
       return false
@@ -342,19 +375,35 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   },
 
   add: async () => {
-    if (get().working) return
-    const token = get().previewToken
-    if (!token) {
-      set({ error: 'The install preview expired. Review the package again.' })
-      return
+    if (get().working || get().previewing) return false
+    let token = get().previewToken
+    const expiresAt = get().previewExpiresAt
+
+    // The confirmation screen may reasonably stay open while somebody reads
+    // the manifest. If its native one-shot token expired meanwhile, verify the
+    // same exact package again at the confirming click instead of presenting an
+    // Install button that can only fail. The backend still binds the fresh
+    // token to this source, package, version and active profile.
+    if (!token || expiresAt === null || expiresAt <= Date.now()) {
+      const spec = get().detail?.installSpec
+      if (!spec || !(await get().preview(spec))) return false
+      token = get().previewToken
+      if (!token) return false
     }
     const selected = get().selected ?? 'plugin'
     ++stateGeneration
-    set({ working: packageName(selected), previewToken: null, error: null })
+    set({
+      working: packageName(selected),
+      previewToken: null,
+      previewExpiresAt: null,
+      error: null,
+    })
     try {
       landed(set, await ipc.pluginAdd(token))
+      return true
     } catch (cause) {
       set({ error: describe(cause) })
+      return false
     } finally {
       set({ working: null })
     }

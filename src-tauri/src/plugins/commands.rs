@@ -217,7 +217,7 @@ pub async fn plugin_preview(
     )?;
     Ok(InstallPreview {
         token,
-        expires_in_seconds: 2 * 60,
+        expires_in_seconds: super::INTENT_TTL.as_secs(),
     })
 }
 
@@ -262,11 +262,14 @@ pub async fn plugin_add(
     intents: State<'_, Arc<PluginIntents>>,
 ) -> Result<PluginState> {
     let profile = crate::profiles::selected();
-    let intent = intents.consume(&token, &profile)?;
-    let spec = intent.spec;
-    let source_id = intent.source_id;
-    let item_id = intent.item_id;
-    let display_name = intent.display_name;
+    // Registry and catalog checks can fail for transient reasons. Inspect the
+    // one-shot confirmation first, then spend it only after those checks and
+    // the cross-window job claim succeed.
+    let intent = intents.inspect(&token, &profile)?;
+    let spec = intent.spec.clone();
+    let source_id = intent.source_id.clone();
+    let item_id = intent.item_id.clone();
+    let display_name = intent.display_name.clone();
     let (resolved_name, resolved_version) = super::split_spec(&spec);
     let resolved_version = resolved_version
         .ok_or_else(|| Error::Plugin("market installs require an exact package version".into()))?;
@@ -293,7 +296,11 @@ pub async fn plugin_add(
         item_id: item_id.clone(),
         display_name: display_name.clone(),
     };
-    apply(Change::Add, &spec, retry, &state, &jobs, move || {
+    let _busy = Busy::claim(&jobs.busy)?;
+    // Re-check expiry/profile under the same mutex and atomically remove the
+    // token. Nothing before this point changes the profile.
+    intents.consume(&token, &profile)?;
+    apply_claimed(Change::Add, &spec, retry, &state, move || {
         super::receipts::record(
             &profile,
             &profile_dir,
@@ -396,6 +403,20 @@ where
 {
     let _busy = Busy::claim(&jobs.busy)?;
 
+    apply_claimed(change, spec, retry, state, finalize).await
+}
+
+/// Apply a change after the caller has claimed the one profile-wide job slot.
+async fn apply_claimed<F>(
+    change: Change,
+    spec: &str,
+    retry: super::recovery::RetryPlan,
+    state: &State<'_, AppState>,
+    finalize: F,
+) -> Result<PluginState>
+where
+    F: FnOnce() -> Result<()>,
+{
     let supervisor = Arc::clone(&state.supervisor);
     let reporter = Arc::clone(&supervisor);
     let outcome = super::change_finalize(

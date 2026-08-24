@@ -381,7 +381,12 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                     if (ready) setReviewing(true)
                   })
                 } else {
-                  void add()
+                  void add().then((installed) => {
+                    // A failed one-shot confirmation must not leave an Install
+                    // button backed by a token the native side already used.
+                    // The next click starts a fresh, visible review.
+                    if (!installed) setReviewing(false)
+                  })
                 }
               }}
               disabled={working !== null || previewing || installBlocked}

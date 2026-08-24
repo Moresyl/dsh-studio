@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as ipc from '@/lib/ipc'
 import type { PluginDetail, PluginInstallPreview } from '@/lib/ipc'
@@ -46,11 +46,14 @@ beforeEach(() => {
     loadingDetail: false,
     previewing: false,
     previewToken: null,
+    previewExpiresAt: null,
     sourceWorking: false,
     working: null,
     error: null,
   })
 })
+
+afterEach(() => vi.useRealTimers())
 
 describe('plugin installation identity', () => {
   it('keeps progress attached to the selected package when the install spec is pinned', () => {
@@ -134,6 +137,49 @@ describe('plugin install previews', () => {
     await expect(pending).resolves.toBe(false)
     expect(usePlugins.getState().previewing).toBe(false)
     expect(usePlugins.getState().previewToken).toBeNull()
+  })
+
+  it('revalidates an expired review at the confirming click before installing', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-24T08:00:00Z'))
+    vi.mocked(ipc.pluginDetail).mockResolvedValue(detail('1.0.0'))
+    vi.mocked(ipc.pluginPreview)
+      .mockResolvedValueOnce({ token: 'review-token', expiresInSeconds: 120 })
+      .mockResolvedValueOnce({ token: 'fresh-token', expiresInSeconds: 120 })
+    vi.mocked(ipc.pluginAdd).mockResolvedValue({
+      profile: 'web',
+      profileDir: 'C:/Users/test/.dsh/profiles/web',
+      initialized: true,
+      plugins: [],
+      packageManager: true,
+    })
+
+    await usePlugins.getState().select('registry-plugin', 'npm', '1.0.0')
+    await expect(usePlugins.getState().preview('registry-plugin@1.0.0')).resolves.toBe(true)
+    vi.advanceTimersByTime(120_001)
+
+    await expect(usePlugins.getState().add()).resolves.toBe(true)
+    expect(ipc.pluginPreview).toHaveBeenCalledTimes(2)
+    expect(ipc.pluginAdd).toHaveBeenCalledWith('fresh-token')
+    expect(usePlugins.getState().previewToken).toBeNull()
+    expect(usePlugins.getState().previewExpiresAt).toBeNull()
+  })
+
+  it('returns to a fresh review after a consumed install attempt fails', async () => {
+    vi.mocked(ipc.pluginDetail).mockResolvedValue(detail('1.0.0'))
+    vi.mocked(ipc.pluginPreview).mockResolvedValue({
+      token: 'one-shot-token',
+      expiresInSeconds: 120,
+    })
+    vi.mocked(ipc.pluginAdd).mockRejectedValue(new Error('registry unavailable'))
+
+    await usePlugins.getState().select('registry-plugin', 'npm', '1.0.0')
+    await usePlugins.getState().preview('registry-plugin@1.0.0')
+
+    await expect(usePlugins.getState().add()).resolves.toBe(false)
+    expect(usePlugins.getState().error).toContain('registry unavailable')
+    expect(usePlugins.getState().previewToken).toBeNull()
+    expect(usePlugins.getState().previewExpiresAt).toBeNull()
   })
 })
 

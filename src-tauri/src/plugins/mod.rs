@@ -161,6 +161,32 @@ impl PluginIntents {
         }
         Ok(intent)
     }
+
+    /// Read a confirmation without spending it while registry and source
+    /// checks are still allowed to fail. `consume` remains the only operation
+    /// that authorizes the profile write.
+    pub fn inspect(&self, token: &str, profile: &str) -> Result<InstallIntent> {
+        let mut entries = self
+            .entries
+            .lock()
+            .map_err(|_| Error::Plugin("install confirmation state is unavailable".into()))?;
+        purge_intents(&mut entries);
+        let intent = entries
+            .iter()
+            .find(|(candidate, _)| candidate == token)
+            .map(|(_, intent)| intent.clone())
+            .ok_or_else(|| {
+                Error::Plugin(
+                    "the install confirmation expired or was already used; preview it again".into(),
+                )
+            })?;
+        if intent.profile != profile {
+            return Err(Error::Plugin(
+                "the active profile changed after the install preview; preview it again".into(),
+            ));
+        }
+        Ok(intent)
+    }
 }
 
 fn purge_intents(entries: &mut VecDeque<(String, InstallIntent)>) {
@@ -1080,6 +1106,10 @@ mod tests {
                 "Safe Plugin".into(),
             )
             .expect("second preview");
+        let inspected = intents
+            .inspect(&token, "web")
+            .expect("inspect without consume");
+        assert_eq!(inspected.spec, "safe-plugin@1.2.3");
         let intent = intents.consume(&token, "web").expect("consume once");
         assert_eq!(intent.spec, "safe-plugin@1.2.3");
         assert!(intents.consume(&token, "web").is_err());
