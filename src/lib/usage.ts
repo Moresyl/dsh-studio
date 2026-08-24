@@ -178,6 +178,45 @@ export function bill(usage: ModelUsage[], rates: Rates): Bill {
   return { total, unpriced }
 }
 
+/** A spreadsheet-safe daily statement with facts only, never inferred prices. */
+export function usageCsv(days: DayUsage[], currency: string): string {
+  const rows = [
+    [
+      'date',
+      'sessions',
+      'input_tokens',
+      'output_tokens',
+      'cache_read_tokens',
+      'cache_write_tokens',
+      'total_tokens',
+      'cost',
+      'currency',
+    ].join(','),
+  ]
+  for (const one of days) {
+    rows.push(
+      [
+        one.date,
+        one.sessions,
+        one.tokens.input,
+        one.tokens.output,
+        one.tokens.cacheRead,
+        one.tokens.cacheWrite,
+        weigh(one.tokens),
+        one.cost ?? '',
+        csvCell(currency),
+      ].join(','),
+    )
+  }
+  return `${rows.join('\r\n')}\r\n`
+}
+
+/** Keep future currency labels from becoming spreadsheet formulas or columns. */
+function csvCell(value: string): string {
+  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value
+  return `"${safe.replaceAll('"', '""')}"`
+}
+
 /** A local calendar day, as the key a tally is kept under. */
 function stamp(at: Date): string {
   const month = String(at.getMonth() + 1).padStart(2, '0')

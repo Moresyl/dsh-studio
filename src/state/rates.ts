@@ -28,10 +28,13 @@ export const SYMBOL: Record<Currency, string> = { CNY: '¥', USD: '$' }
 interface RateState {
   rates: Rates
   currency: Currency
+  /** Optional local monthly ceiling in the same user-labelled currency. */
+  monthlyBudget: number | null
   /** Set one model's price, or drop it when every field is zero. */
   price: (model: string, rate: Rate) => void
   forget: (model: string) => void
   choose: (currency: Currency) => void
+  setBudget: (budget: number | null) => void
 }
 
 export const useRates = create<RateState>((set, get) => ({
@@ -46,25 +49,32 @@ export const useRates = create<RateState>((set, get) => ({
     else delete rates[model]
 
     set({ rates })
-    save({ rates, currency: get().currency })
+    save({ rates, currency: get().currency, monthlyBudget: get().monthlyBudget })
   },
 
   forget: (model) => {
     const rates = { ...get().rates }
     delete rates[model]
     set({ rates })
-    save({ rates, currency: get().currency })
+    save({ rates, currency: get().currency, monthlyBudget: get().monthlyBudget })
   },
 
   choose: (currency) => {
     set({ currency })
-    save({ rates: get().rates, currency })
+    save({ rates: get().rates, currency, monthlyBudget: get().monthlyBudget })
+  },
+
+  setBudget: (budget) => {
+    const monthlyBudget = validBudget(budget) ? budget : null
+    set({ monthlyBudget })
+    save({ rates: get().rates, currency: get().currency, monthlyBudget })
   },
 }))
 
-interface Saved {
+export interface SavedPricing {
   rates: Rates
   currency: Currency
+  monthlyBudget: number | null
 }
 
 /**
@@ -74,24 +84,30 @@ interface Saved {
  * other page in the webview could have written, and a rate that is a string
  * would turn every total into `NaN` silently.
  */
-function remembered(): Saved {
-  const empty: Saved = { rates: {}, currency: 'CNY' }
-
+function remembered(): SavedPricing {
   try {
-    const raw = window.localStorage.getItem(KEY)
-    if (!raw) return empty
-
-    const saved: unknown = JSON.parse(raw)
-    if (typeof saved !== 'object' || saved === null) return empty
-
-    const { rates, currency } = saved as Partial<Saved>
-    return {
-      rates: typeof rates === 'object' && rates !== null ? sane(rates) : {},
-      currency: currency === 'USD' ? 'USD' : 'CNY',
-    }
+    return decodePricing(window.localStorage.getItem(KEY))
   } catch {
     // Unreadable storage, or JSON that is not JSON. Either way there are no
     // prices, which the statement already knows how to say.
+    return decodePricing(null)
+  }
+}
+
+/** Decode untrusted local storage without allowing malformed money into totals. */
+export function decodePricing(raw: string | null): SavedPricing {
+  const empty: SavedPricing = { rates: {}, currency: 'CNY', monthlyBudget: null }
+  if (!raw) return empty
+  try {
+    const saved: unknown = JSON.parse(raw)
+    if (typeof saved !== 'object' || saved === null) return empty
+    const { rates, currency, monthlyBudget } = saved as Partial<SavedPricing>
+    return {
+      rates: typeof rates === 'object' && rates !== null ? sane(rates) : {},
+      currency: currency === 'USD' ? 'USD' : 'CNY',
+      monthlyBudget: validBudget(monthlyBudget) ? monthlyBudget : null,
+    }
+  } catch {
     return empty
   }
 }
@@ -118,7 +134,10 @@ function sane(rates: Record<string, unknown>): Rates {
 const money = (value: unknown): boolean =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0
 
-function save(saved: Saved): void {
+const validBudget = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0
+
+function save(saved: SavedPricing): void {
   try {
     window.localStorage.setItem(KEY, JSON.stringify(saved))
   } catch {

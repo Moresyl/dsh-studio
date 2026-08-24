@@ -46,6 +46,8 @@ export default defineConfig({
         'src/lib/errors.ts',
         'src/lib/fuzzy.ts',
         'src/lib/updater.ts',
+        'src/lib/usage.ts',
+        'src/state/rates.ts',
         'src/state/terminals.ts',
         'src/state/update.ts',
         'src/state/workspace.ts',

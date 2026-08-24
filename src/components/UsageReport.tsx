@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
-import { Coins, Pencil, Wallet } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { save as pickPath } from '@tauri-apps/plugin-dialog'
+import { Check, Coins, Download, Pencil, Wallet } from 'lucide-react'
 
 import { Empty } from '@/components/Empty'
 import { TabButton } from '@/components/TabButton'
 import { count, day } from '@/lib/format'
+import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
+import * as ipc from '@/lib/ipc'
 import type { MessageKey } from '@/lib/i18n'
 import type { SessionCard } from '@/lib/ipc'
 import {
@@ -13,6 +16,7 @@ import {
   byModel,
   charge,
   cost,
+  usageCsv,
   weigh,
   type DayUsage,
   type ModelUsage,
@@ -20,6 +24,7 @@ import {
   type Rates,
 } from '@/lib/usage'
 import { SYMBOL, useRates, type Currency } from '@/state/rates'
+import { showError } from '@/state/dialog'
 import { spent } from '@/state/sessions'
 
 /** How far back a statement can look. Days, because that is what a bar is. */
@@ -69,10 +74,14 @@ export function UsageReport({
   const rates = useRates((state) => state.rates)
   const currency = useRates((state) => state.currency)
   const choose = useRates((state) => state.choose)
+  const monthlyBudget = useRates((state) => state.monthlyBudget)
+  const setBudget = useRates((state) => state.setBudget)
 
   const [span, setSpan] = useState(30)
   /** The model whose price is being typed, if one is. */
   const [editing, setEditing] = useState<string | null>(null)
+  const [budgetDraft, setBudgetDraft] = useState(() => String(monthlyBudget ?? ''))
+  const [exported, setExported] = useState(false)
 
   const symbol = SYMBOL[currency]
 
@@ -92,15 +101,62 @@ export function UsageReport({
   const days = useMemo(() => byDay(within, span, rates), [within, span, rates])
   const statement = useMemo(() => bill(models, rates), [models, rates])
   const tokens = useMemo(() => spent(within), [within])
+  const month = useMemo(() => {
+    const today = new Date()
+    const floor = new Date(today.getFullYear(), today.getMonth(), 1).getTime()
+    const ceiling = new Date(today.getFullYear(), today.getMonth() + 1, 1).getTime()
+    const cardsThisMonth = cards.filter((card) => card.started >= floor && card.started < ceiling)
+    return bill(byModel(cardsThisMonth), rates)
+  }, [cards, rates])
 
   const total = weigh(tokens)
-  const priced = statement.total > 0
+  // A priced model can still cost exactly zero when all of this span's tokens
+  // happened to use a zero-priced class (for example cached input). Presence
+  // of a user rate, not a positive bill, is what makes the amount known.
+  const priced = models.some((model) => rates[model.model] !== undefined)
   // Everything that spent anything has a price, so money is a complete unit and
   // the chart and the ranking can use it. While one model is still unpriced they
   // stay in tokens: a bar drawn from a partial cost is a bar that is wrong by an
   // amount nobody can see, and a ranking by it puts the cheap-looking session on
   // top because nobody has priced the model it ran on.
-  const settled = priced && statement.unpriced.length === 0
+  const settled = models.length > 0 && statement.unpriced.length === 0
+  const budgetComplete = month.unpriced.length === 0
+
+  useEffect(() => {
+    if (!exported) return
+    const timer = window.setTimeout(() => setExported(false), 1_400)
+    return () => window.clearTimeout(timer)
+  }, [exported])
+
+  const commitBudget = () => {
+    const value = Number(budgetDraft)
+    const next = Number.isFinite(value) && value > 0 ? value : null
+    setBudget(next)
+    setBudgetDraft(String(next ?? ''))
+  }
+
+  const exportTrend = async () => {
+    try {
+      const last = days.at(-1)?.date ?? new Date().toISOString().slice(0, 10)
+      const path = await pickPath({
+        title: t('usage.exportTitle'),
+        defaultPath: `dsh-usage-${last}-${span}d.csv`,
+        filters: [{ name: t('usage.exportKind'), extensions: ['csv'] }],
+      })
+      if (!path) return
+      await ipc.sessionSave(path, usageCsv(days, currency))
+      setExported(true)
+    } catch (cause) {
+      showError({
+        title: t('usage.exportFailed'),
+        body: t('usage.exportFailedBody'),
+        details: describe(cause),
+        close: t('dialog.error.close'),
+        copy: t('dialog.error.copy'),
+        copied: t('dialog.error.copied'),
+      })
+    }
+  }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -116,8 +172,41 @@ export function UsageReport({
           ))}
         </div>
 
+        <label className="ml-auto flex h-7 items-center gap-1.5 rounded-control border border-line bg-surface px-2 text-[10.5px] text-faint">
+          {t('usage.monthlyBudget')}
+          <span>{symbol}</span>
+          <input
+            type="number"
+            min={0}
+            step="1"
+            inputMode="decimal"
+            value={budgetDraft}
+            onChange={(event) => setBudgetDraft(event.target.value)}
+            onBlur={commitBudget}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur()
+            }}
+            placeholder={t('usage.noBudget')}
+            className="w-16 bg-transparent text-[11px] text-text tabular-nums outline-none placeholder:text-faint"
+          />
+        </label>
+
+        <button
+          type="button"
+          onClick={() => void exportTrend()}
+          data-hint={t('usage.export')}
+          aria-label={t('usage.export')}
+          className="grid size-7 place-items-center rounded-control border border-line text-faint hover:bg-surface-2 hover:text-text"
+        >
+          {exported ? (
+            <Check size={13} className="text-ok" aria-hidden="true" />
+          ) : (
+            <Download size={13} aria-hidden="true" />
+          )}
+        </button>
+
         <div
-          className="ml-auto flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline"
+          className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline"
           data-hint={t('usage.currency')}
         >
           {CURRENCIES.map((one) => (
@@ -141,6 +230,15 @@ export function UsageReport({
             tokens={total}
             sessions={within.length}
           />
+
+          {monthlyBudget !== null && (
+            <Budget
+              spent={month.total}
+              budget={monthlyBudget}
+              complete={budgetComplete}
+              symbol={symbol}
+            />
+          )}
 
           {statement.unpriced.length > 0 && (
             <Short models={statement.unpriced} onPrice={(model) => setEditing(model)} />
@@ -167,6 +265,63 @@ export function UsageReport({
         </div>
       )}
     </div>
+  )
+}
+
+function Budget({
+  spent,
+  budget,
+  complete,
+  symbol,
+}: {
+  spent: number
+  budget: number
+  complete: boolean
+  symbol: string
+}) {
+  const share = complete ? spent / budget : null
+  const tone =
+    share === null
+      ? 'border-line bg-surface'
+      : share >= 1
+        ? 'border-danger/30 bg-danger/[0.07]'
+        : share >= 0.8
+          ? 'border-warn/30 bg-warn/[0.07]'
+          : 'border-ok/25 bg-ok/[0.05]'
+  const message =
+    share === null
+      ? t('usage.budgetUnknown')
+      : share >= 1
+        ? t('usage.budgetOver', { spent: cash(spent, symbol), budget: cash(budget, symbol) })
+        : t('usage.budgetStatus', {
+            spent: cash(spent, symbol),
+            budget: cash(budget, symbol),
+            percent: String(Math.round(share * 100)),
+          })
+
+  return (
+    <section className={`rounded-panel border px-3 py-2 ${tone}`}>
+      <div className="flex items-center justify-between gap-3 text-[11px]">
+        <span className="font-medium text-text">{t('usage.monthBudgetStatus')}</span>
+        <span className={share !== null && share >= 1 ? 'text-danger' : 'text-muted'}>
+          {message}
+        </span>
+      </div>
+      {share !== null && (
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-line" aria-hidden="true">
+          <span
+            className={
+              share >= 1
+                ? 'block h-full bg-danger'
+                : share >= 0.8
+                  ? 'block h-full bg-warn'
+                  : 'block h-full bg-ok'
+            }
+            style={{ width: `${Math.min(share * 100, 100)}%` }}
+          />
+        </div>
+      )}
+    </section>
   )
 }
 

