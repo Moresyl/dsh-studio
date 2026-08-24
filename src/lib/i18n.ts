@@ -601,6 +601,8 @@ const en = {
   'dialog.error.copy': 'Copy error',
   'dialog.error.copied': 'Copied',
   'dialog.error.close': 'Close',
+  'dialog.failure.title': 'Operation failed',
+  'dialog.failure.body': 'The requested action did not complete. You can copy the details for diagnosis.',
   'plugins.error.title': 'Plugin operation failed',
   'plugins.error.body':
     'The operation did not finish. The exact reason is shown below and can be copied for a bug report.',
@@ -1213,6 +1215,8 @@ const zh: Record<MessageKey, string> = {
   'dialog.error.copy': '复制错误',
   'dialog.error.copied': '已复制',
   'dialog.error.close': '关闭',
+  'dialog.failure.title': '操作失败',
+  'dialog.failure.body': '请求的操作未能完成；你可以复制详细信息用于诊断。',
   'plugins.error.title': '插件操作失败',
   'plugins.error.body': '操作未能完成。下方保留了具体原因，可复制后用于反馈问题。',
   'recovery.title': '插件配置已恢复',

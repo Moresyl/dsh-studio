@@ -8,6 +8,7 @@ const updater = vi.hoisted(() => ({
 vi.mock('@/lib/updater', () => updater)
 
 import type { Release } from '@/lib/updater'
+import { useDialog } from '@/state/dialog'
 import { isAnnounceable, useUpdate, watchForUpdates } from '@/state/update'
 
 const release: Release = {
@@ -42,6 +43,7 @@ beforeEach(() => {
     error: null,
     dismissed: null,
   })
+  useDialog.setState({ pending: null })
 })
 
 afterEach(() => {
@@ -91,9 +93,11 @@ describe('checking', () => {
 
     await useUpdate.getState().check(true)
     expect(useUpdate.getState().error).toBeNull()
+    expect(useDialog.getState().pending).toBeNull()
 
     await useUpdate.getState().check(false)
     expect(useUpdate.getState().error).toBe('offline')
+    expect(useDialog.getState().pending).toMatchObject({ kind: 'error', details: 'offline' })
   })
 })
 
@@ -145,6 +149,10 @@ describe('installation', () => {
       installing: false,
       progress: { downloaded: 50, total: 100 },
       error: 'signature rejected',
+    })
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'signature rejected',
     })
   })
 

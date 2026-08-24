@@ -12,8 +12,8 @@
  */
 import { create } from 'zustand'
 
-import { describe } from '@/lib/errors'
 import { checkForUpdate, installUpdate, type DownloadProgress, type Release } from '@/lib/updater'
+import { reportFailure } from '@/state/failure'
 
 const DISMISSED_KEY = 'dsh-studio:update:dismissed'
 
@@ -58,7 +58,7 @@ export const useUpdate = create<UpdateState>((set, get) => ({
     try {
       set({ release: await checkForUpdate(), checked: true })
     } catch (cause) {
-      if (!quiet) set({ error: describe(cause) })
+      if (!quiet) set({ error: reportFailure(cause) })
     } finally {
       set({ checking: false })
     }
@@ -74,7 +74,7 @@ export const useUpdate = create<UpdateState>((set, get) => ({
       // The release can disappear between the first check and the install click.
       if (!installed) set({ release: null, checked: true })
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
     } finally {
       set({ installing: false })
     }

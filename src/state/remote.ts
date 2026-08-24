@@ -11,6 +11,7 @@ import { create } from 'zustand'
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type { RemoteStatus } from '@/lib/ipc'
+import { reportFailure } from '@/state/failure'
 
 interface RemoteStore {
   /** Null only until the first read lands. */
@@ -60,7 +61,7 @@ export const useRemote = create<RemoteStore>((set, get) => ({
       const status = await ipc.remoteOpen()
       if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      if (mine === mutationGeneration) set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: reportFailure(cause) })
     } finally {
       set({ busy: false })
     }
@@ -74,7 +75,7 @@ export const useRemote = create<RemoteStore>((set, get) => ({
       const status = await ipc.remoteClose()
       if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      if (mine === mutationGeneration) set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: reportFailure(cause) })
     } finally {
       set({ busy: false })
     }
@@ -90,7 +91,7 @@ export const useRemote = create<RemoteStore>((set, get) => ({
       const status = await ipc.remoteRenew()
       if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      if (mine === mutationGeneration) set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: reportFailure(cause) })
     }
   },
 
@@ -101,7 +102,7 @@ export const useRemote = create<RemoteStore>((set, get) => ({
       const status = await ipc.remoteForget(id)
       if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
-      if (mine === mutationGeneration) set({ error: describe(cause) })
+      if (mine === mutationGeneration) set({ error: reportFailure(cause) })
     }
   },
 }))

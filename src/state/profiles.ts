@@ -21,6 +21,7 @@ import { t } from '@/lib/i18n'
 import type { Comparison, Declaration, Profile, Roster } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
+import { reportFailure } from '@/state/failure'
 import { usePlugins } from '@/state/plugins'
 
 interface ProfileStore {
@@ -91,7 +92,7 @@ const change = async (
     void ipc.announce('profiles')
     return true
   } catch (cause) {
-    set({ error: describe(cause) })
+    set({ error: reportFailure(cause) })
     return false
   } finally {
     set({ working: null })
@@ -132,7 +133,7 @@ export const useProfiles = create<ProfileStore>((set, get) => ({
       set({ note: t('profile.exported', { path }) })
       return true
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
       return false
     }
   },
@@ -142,7 +143,7 @@ export const useProfiles = create<ProfileStore>((set, get) => ({
     try {
       return await ipc.profileDeclaration(path)
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
       return null
     }
   },
@@ -157,7 +158,9 @@ export const useProfiles = create<ProfileStore>((set, get) => ({
       const comparison = await ipc.profileCompare(left, right)
       if (mine === comparisonGeneration) set({ comparison })
     } catch (cause) {
-      if (mine === comparisonGeneration) set({ comparison: null, error: describe(cause) })
+      if (mine === comparisonGeneration) {
+        set({ comparison: null, error: reportFailure(cause) })
+      }
     } finally {
       if (mine === comparisonGeneration) set({ comparing: false })
     }

@@ -1,8 +1,8 @@
 import { ask } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
-import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
+import { reportFailure } from '@/state/failure'
 
 /** Select a native directory and offer the restart needed to apply it. */
 export async function switchWorkspace(path: string): Promise<boolean> {
@@ -10,7 +10,7 @@ export async function switchWorkspace(path: string): Promise<boolean> {
     await ipc.workspaceSelect(path)
     await useHarness.getState().inspect()
   } catch (cause) {
-    useHarness.setState({ error: describe(cause) })
+    useHarness.setState({ error: reportFailure(cause) })
     return false
   }
 

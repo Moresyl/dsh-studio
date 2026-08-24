@@ -19,6 +19,7 @@ import * as ipc from '@/lib/ipc'
 import type { TerminalExit, TerminalSession } from '@/lib/ipc'
 import * as screens from '@/lib/screen'
 import type { Screen } from '@/lib/screen'
+import { reportFailure } from '@/state/failure'
 
 /** One tab: a shell, and how it ended if it has. */
 export interface TerminalTab extends TerminalSession {
@@ -135,7 +136,7 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
       } else {
         screens.discard(screen)
       }
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
     } finally {
       set({ opening: false })
     }
@@ -160,7 +161,7 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
       await ipc.terminalClose(id)
     } catch (cause) {
       closing.delete(id)
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
     }
   },
 

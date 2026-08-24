@@ -15,6 +15,7 @@ import * as ipc from '@/lib/ipc'
 import type { Startup } from '@/lib/ipc'
 import type { NotificationPreference } from '@/lib/ipc'
 import type { LogLevel } from '@/lib/ipc'
+import { reportFailure } from '@/state/failure'
 
 interface StartupStore {
   /** Null until the first read lands. */
@@ -99,7 +100,8 @@ type Get = () => StartupStore
  *
  * Refusals are the ordinary case here rather than the exception — a combination
  * another program is holding is a normal thing to try — so the message stays on
- * screen next to the control that produced it.
+ * screen next to the control that produced it and is also placed in the global,
+ * copyable failure dialog.
  */
 async function change(set: Set, get: Get, run: () => Promise<Startup>): Promise<void> {
   if (get().busy) return
@@ -108,7 +110,7 @@ async function change(set: Set, get: Get, run: () => Promise<Startup>): Promise<
   try {
     set({ state: await run() })
   } catch (cause) {
-    set({ error: describe(cause) })
+    set({ error: reportFailure(cause) })
   } finally {
     set({ busy: false })
   }

@@ -47,6 +47,7 @@ const serving = () =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useDialog.setState({ pending: null })
   useProfiles.setState({
     roster: roster('web', 'web', 'lab'),
     working: null,
@@ -89,6 +90,10 @@ describe('a change to the profiles directory', () => {
     // Nothing was written, so nothing about the roster may change.
     expect(useProfiles.getState().roster?.profiles).toHaveLength(2)
     expect(useProfiles.getState().working).toBeNull()
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'the harness is running lab; stop it first',
+    })
   })
 
   it('drops the comparison on screen, which may have just lost a side', async () => {
@@ -129,6 +134,15 @@ describe('a change to the profiles directory', () => {
     expect(ipc.profileRoster).not.toHaveBeenCalled()
     pending.settle(roster('web', 'web', 'lab', 'bench'))
     await creating
+  })
+
+  it('keeps a failed background roster refresh quiet', async () => {
+    vi.mocked(ipc.profileRoster).mockRejectedValueOnce('profile directory unavailable')
+
+    await useProfiles.getState().refresh()
+
+    expect(useProfiles.getState().error).toBe('profile directory unavailable')
+    expect(useDialog.getState().pending).toBeNull()
   })
 
   it('does not compare profiles while one of them is being changed', async () => {

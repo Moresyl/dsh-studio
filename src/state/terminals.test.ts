@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TerminalExit, TerminalSession } from '@/lib/ipc'
 import * as ipc from '@/lib/ipc'
 import * as screens from '@/lib/screen'
+import { useDialog } from '@/state/dialog'
 import { runningCount, subscribeToTerminals, useTerminals } from '@/state/terminals'
 
 // The rules under test are all about what a finished shell does to the tab
@@ -39,6 +40,7 @@ let unsubscribe: () => void
 beforeEach(async () => {
   vi.clearAllMocks()
   useTerminals.setState({ tabs: [], active: null, opening: false, error: null })
+  useDialog.setState({ pending: null })
 
   vi.mocked(ipc.onTerminalOutput).mockResolvedValue(() => {})
   vi.mocked(ipc.onTerminalExit).mockImplementation((handler) => {
@@ -128,6 +130,10 @@ describe('a shell the user closed', () => {
 
     expect(useTerminals.getState().tabs).toHaveLength(3)
     expect(useTerminals.getState().error).toBe('no such terminal')
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'no such terminal',
+    })
   })
 
   it('sends only one kill while the first close is still in flight', async () => {
@@ -174,6 +180,10 @@ describe('opening a shell', () => {
     expect(screens.discard).not.toHaveBeenCalledWith(screen)
     expect(useTerminals.getState().tabs.map((tab) => tab.id)).toEqual(['t1', 't2', 't3'])
     expect(useTerminals.getState().error).toBe('could not bind terminal input')
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'could not bind terminal input',
+    })
     expect(useTerminals.getState().opening).toBe(false)
   })
 })

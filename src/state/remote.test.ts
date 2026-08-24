@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as ipc from '@/lib/ipc'
 import type { RemoteStatus } from '@/lib/ipc'
+import { useDialog } from '@/state/dialog'
 import { useRemote } from '@/state/remote'
 
 vi.mock('@/lib/ipc')
@@ -22,6 +23,7 @@ const status = (open: boolean): RemoteStatus => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useDialog.setState({ pending: null })
   useRemote.setState({ status: status(false), busy: false, error: null })
 })
 
@@ -95,5 +97,26 @@ describe('remote access state', () => {
     await older
 
     expect(useRemote.getState().status?.codeSecondsLeft).toBe(120)
+  })
+
+  it('opens a copyable failure dialog for a refused user mutation', async () => {
+    vi.mocked(ipc.remoteOpen).mockRejectedValueOnce('the selected port is already in use')
+
+    await useRemote.getState().open()
+
+    expect(useRemote.getState().busy).toBe(false)
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'the selected port is already in use',
+    })
+  })
+
+  it('does not interrupt the user when a background status refresh fails', async () => {
+    vi.mocked(ipc.remoteStatus).mockRejectedValueOnce('network interface unavailable')
+
+    await useRemote.getState().refresh()
+
+    expect(useRemote.getState().error).toBe('network interface unavailable')
+    expect(useDialog.getState().pending).toBeNull()
   })
 })

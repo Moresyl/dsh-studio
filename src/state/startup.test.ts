@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as ipc from '@/lib/ipc'
 import type { Startup } from '@/lib/ipc'
+import { useDialog } from '@/state/dialog'
 import { useStartup } from '@/state/startup'
 
 vi.mock('@/lib/ipc')
@@ -23,6 +24,7 @@ const state: Startup = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useDialog.setState({ pending: null })
   useStartup.setState({ state: null, busy: false, error: null })
   vi.mocked(ipc.startupState).mockResolvedValue(state)
 })
@@ -55,6 +57,10 @@ describe('desktop startup settings', () => {
 
     expect(useStartup.getState().state).toEqual(state)
     expect(useStartup.getState().error).toBe('settings file is read-only')
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'settings file is read-only',
+    })
   })
 
   it('changes the persistent log level using the backend answer', async () => {

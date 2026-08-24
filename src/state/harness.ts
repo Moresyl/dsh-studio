@@ -10,6 +10,7 @@ import { create } from 'zustand'
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type { Environment, HarnessEvent, LogLine, NodeProgress, Status } from '@/lib/ipc'
+import { reportFailure } from '@/state/failure'
 
 /** Matches the ring the supervisor keeps, so scrollback agrees on both sides. */
 const MAX_LINES = 2000
@@ -96,7 +97,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
     try {
       await ipc.start()
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
     } finally {
       set({ busy: false })
     }
@@ -108,7 +109,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
     try {
       await ipc.stop()
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
     } finally {
       set({ busy: false })
     }
@@ -122,7 +123,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
       // The check card is driven by what is on disk, so re-read it.
       await get().inspect()
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
     } finally {
       set({ installing: false })
     }
@@ -136,7 +137,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
       // The runtime now exists on disk; the check card reads it from there.
       await get().inspect()
     } catch (cause) {
-      set({ error: describe(cause), nodeProgress: null })
+      set({ error: reportFailure(cause), nodeProgress: null })
     } finally {
       set({ provisioningNode: false })
     }
@@ -149,7 +150,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
       await ipc.nodeSelect(path)
       await get().inspect()
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
     } finally {
       set({ busy: false })
     }

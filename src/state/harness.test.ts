@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { HarnessEvent } from '@/lib/ipc'
 import * as ipc from '@/lib/ipc'
+import { useDialog } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
 
 // The store only reaches for the command surface inside its async actions; the
@@ -45,6 +46,7 @@ beforeEach(() => {
     nodeProgress: null,
     error: null,
   })
+  useDialog.setState({ pending: null })
   vi.mocked(ipc.environment).mockResolvedValue({} as never)
   vi.mocked(ipc.status).mockResolvedValue({ phase: 'stopped' })
   vi.mocked(ipc.log).mockResolvedValue([])
@@ -57,6 +59,38 @@ describe('supervisor actions', () => {
     await expect(useHarness.getState().inspect()).rejects.toBe('environment probe failed')
 
     expect(useHarness.getState().error).toBe('environment probe failed')
+  })
+
+  it('shows a start failure globally and releases the operation slot', async () => {
+    vi.mocked(ipc.start).mockRejectedValue(new Error('duplicate loader entry id'))
+
+    await useHarness.getState().start()
+
+    expect(useHarness.getState()).toMatchObject({
+      busy: false,
+      error: 'duplicate loader entry id',
+    })
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'duplicate loader entry id',
+    })
+  })
+
+  it('shows a runtime provisioning failure globally and clears stale progress', async () => {
+    useHarness.setState({ nodeProgress: { phase: 'download', downloaded: 10, total: 20 } as never })
+    vi.mocked(ipc.nodeProvision).mockRejectedValue(new Error('Node archive checksum mismatch'))
+
+    await useHarness.getState().provisionNode()
+
+    expect(useHarness.getState()).toMatchObject({
+      provisioningNode: false,
+      nodeProgress: null,
+      error: 'Node archive checksum mismatch',
+    })
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'Node archive checksum mismatch',
+    })
   })
 
   it('sends only one stop while the first request is still in flight', async () => {

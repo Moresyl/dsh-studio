@@ -20,6 +20,7 @@ import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import type { SessionCard, SessionHit, SessionTranscript } from '@/lib/ipc'
+import { reportFailure } from '@/state/failure'
 
 interface SessionStore {
   /** Every session, newest first. Null until the first read lands. */
@@ -159,7 +160,7 @@ export const useSessions = create<SessionStore>((set, get) => ({
       await navigator.clipboard.writeText(rendered.text)
       return true
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
       return false
     }
   },
@@ -177,7 +178,7 @@ export const useSessions = create<SessionStore>((set, get) => ({
         filters: [{ name: kind, extensions: [suffix(rendered.name)] }],
       })
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
       return false
     }
     // Dismissed, which is an answer rather than a failure.
@@ -187,7 +188,7 @@ export const useSessions = create<SessionStore>((set, get) => ({
       await ipc.sessionSave(path, rendered.text)
       return true
     } catch (cause) {
-      set({ error: describe(cause) })
+      set({ error: reportFailure(cause) })
       return false
     }
   },
@@ -203,7 +204,7 @@ async function render(
   try {
     return await ipc.sessionExport(id, format)
   } catch (cause) {
-    set({ error: describe(cause) })
+    set({ error: reportFailure(cause) })
     return null
   } finally {
     // Off before the save dialog opens: waiting on a person is not work, and a

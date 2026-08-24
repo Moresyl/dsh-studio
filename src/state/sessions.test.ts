@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as ipc from '@/lib/ipc'
 import type { SessionCard, SessionExport, SessionTranscript } from '@/lib/ipc'
+import { useDialog } from '@/state/dialog'
 import { useSessions } from '@/state/sessions'
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ save: vi.fn() }))
@@ -27,6 +28,7 @@ const rendered: SessionExport = { name: 'session.md', text: '# Session' }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useDialog.setState({ pending: null })
   useSessions.setState({
     cards: null,
     hits: null,
@@ -126,5 +128,20 @@ describe('session exports', () => {
 
     expect(useSessions.getState().error).toBe('save dialog unavailable')
     expect(ipc.sessionSave).not.toHaveBeenCalled()
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'save dialog unavailable',
+    })
+  })
+
+  it('reports a clipboard refusal globally and returns false', async () => {
+    vi.mocked(navigator.clipboard.writeText).mockRejectedValueOnce('clipboard permission denied')
+
+    await expect(useSessions.getState().copyOut('session-1', 'markdown')).resolves.toBe(false)
+
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'clipboard permission denied',
+    })
   })
 })

@@ -6,5 +6,8 @@
  * rendered `[object Object]` into its error slot would be hiding the one thing
  * the user needed to read.
  */
-export const describe = (cause: unknown): string =>
-  typeof cause === 'string' ? cause : cause instanceof Error ? cause.message : String(cause)
+export const describe = (cause: unknown): string => {
+  if (typeof cause === 'string' && cause.trim()) return cause
+  if (cause instanceof Error && cause.message.trim()) return cause.message
+  return 'Something went wrong.'
+}

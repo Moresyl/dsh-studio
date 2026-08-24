@@ -14,7 +14,7 @@ const answer = async (taken: boolean): Promise<void> => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useDialog.getState().settle(false)
+  useDialog.setState({ pending: null })
   useHarness.setState({
     status: { phase: 'stopped' },
     error: null,
@@ -55,5 +55,9 @@ describe('selecting a native workspace', () => {
     expect(await switchWorkspace('E:\\unsafe')).toBe(false)
     expect(useHarness.getState().error).toBe('removable workspaces are blocked')
     expect(useHarness.getState().inspect).not.toHaveBeenCalled()
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'removable workspaces are blocked',
+    })
   })
 })
