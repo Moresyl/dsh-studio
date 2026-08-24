@@ -50,7 +50,7 @@ type Form =
   | { kind: 'create' }
   | { kind: 'duplicate'; source: string }
   | { kind: 'rename'; from: string }
-  | { kind: 'import'; path: string; from: string; plugins: number }
+  | { kind: 'import'; path: string; from: string; plugins: number; verified: boolean }
 
 /**
  * Everything a profile is, in one place.
@@ -165,6 +165,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
         path,
         from: file.name,
         plugins: Object.keys(file.plugins).length,
+        verified: file.verified,
       })
     }
   }, [read])
@@ -797,11 +798,16 @@ function NameForm({ form, busy, onCancel, onSubmit }: NameFormProps) {
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="caption truncate">{heading}</h3>
         {form.kind === 'import' && (
-          <span className="shrink-0 text-[11px] text-faint tabular-nums">
-            {form.plugins > 0
-              ? t('profile.installedCount', { count: form.plugins })
-              : t('profile.noPlugins')}
-          </span>
+          <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums">
+            <span className={form.verified ? 'text-ok' : 'text-warn'}>
+              {form.verified ? t('profile.backupVerified') : t('profile.backupLegacy')}
+            </span>
+            <span className="text-faint">
+              {form.plugins > 0
+                ? t('profile.installedCount', { count: form.plugins })
+                : t('profile.noPlugins')}
+            </span>
+          </div>
         )}
       </div>
 

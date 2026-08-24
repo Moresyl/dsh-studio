@@ -31,6 +31,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
 use crate::paths;
@@ -75,8 +76,12 @@ const STUDIO_MODULE_FILES: [&str; 4] = [
 /// anything is written.
 const DECLARATION_KIND: &str = "dsh-studio-profile";
 
-/// The declaration format. Bumped only if an older file would be misread.
-const DECLARATION_VERSION: u32 = 1;
+/// The declaration format. Version two adds a canonical SHA-256 integrity
+/// envelope; version one remains readable as an explicitly unverified legacy
+/// export.
+const DECLARATION_VERSION: u32 = 2;
+const LEGACY_DECLARATION_VERSION: u32 = 1;
+const MAX_DECLARATION_BYTES: usize = 2 * 1024 * 1024;
 
 /// One profile, as the switcher and the manager show it.
 #[derive(Debug, Serialize)]
@@ -174,6 +179,25 @@ pub struct Declaration {
     /// The profile's own patch layer, verbatim. The one part of a profile that is
     /// nobody else's copy of anything.
     pub patch: String,
+    /// SHA-256 of the canonical declaration fields. This detects damaged or
+    /// accidentally edited backups; it is integrity evidence, not a publisher
+    /// signature.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub integrity: Option<String>,
+    /// Computed while reading, never trusted from or written into the file.
+    #[serde(skip)]
+    pub verified: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeclarationPayload<'a> {
+    kind: &'a str,
+    version: u32,
+    name: &'a str,
+    plugins: &'a BTreeMap<String, String>,
+    disabled: &'a [String],
+    patch: &'a str,
 }
 
 /// Every profile on the machine. Cheap; safe to call on every render.
@@ -439,14 +463,18 @@ pub fn export(name: &str) -> Result<Declaration> {
     let name = expect_profile(name)?;
     let manifest = plugins::read_manifest(&paths::profile_dir(&name)).unwrap_or(Value::Null);
 
-    Ok(Declaration {
+    let mut declaration = Declaration {
         kind: DECLARATION_KIND.to_string(),
         version: DECLARATION_VERSION,
         plugins: dependencies(&manifest),
         disabled: switches::switched_off(&name).into_iter().collect(),
         patch: patch(&name).unwrap_or_else(|| EMPTY_PATCH.to_string()),
         name,
-    })
+        integrity: None,
+        verified: true,
+    };
+    declaration.integrity = Some(declaration_integrity(&declaration)?);
+    Ok(declaration)
 }
 
 /// Read an exported profile, without importing it.
@@ -454,10 +482,16 @@ pub fn export(name: &str) -> Result<Declaration> {
 /// Its own step so the manager can show what a file contains and let someone
 /// name the profile before anything is written.
 pub fn declaration(path: &Path) -> Result<Declaration> {
-    let raw = std::fs::read_to_string(path).map_err(|cause| {
+    let raw = std::fs::read(path).map_err(|cause| {
         Error::Profile(format!("{} could not be read: {cause}", path.display()))
     })?;
-    let declaration: Declaration = serde_json::from_str(&raw).map_err(|cause| {
+    if raw.len() > MAX_DECLARATION_BYTES {
+        return Err(Error::Profile(format!(
+            "{} is larger than the 2 MiB profile backup limit",
+            path.display()
+        )));
+    }
+    let mut declaration: Declaration = serde_json::from_slice(&raw).map_err(|cause| {
         Error::Profile(format!(
             "{} is not an exported profile: {cause}",
             path.display()
@@ -471,13 +505,51 @@ pub fn declaration(path: &Path) -> Result<Declaration> {
             declaration.kind
         )));
     }
-    if declaration.version > DECLARATION_VERSION {
+    if !(LEGACY_DECLARATION_VERSION..=DECLARATION_VERSION).contains(&declaration.version) {
         return Err(Error::Profile(format!(
-            "{} was written by a newer version of this app",
-            path.display()
+            "{} uses unsupported profile backup version {}",
+            path.display(),
+            declaration.version
         )));
     }
+    if declaration.version == DECLARATION_VERSION {
+        let offered = declaration.integrity.as_deref().ok_or_else(|| {
+            Error::Profile(format!(
+                "{} has no profile backup integrity value",
+                path.display()
+            ))
+        })?;
+        let actual = declaration_integrity(&declaration)?;
+        if !offered.eq_ignore_ascii_case(&actual) {
+            return Err(Error::Profile(format!(
+                "{} failed its profile backup integrity check; it was not restored",
+                path.display()
+            )));
+        }
+        declaration.verified = true;
+    }
     Ok(declaration)
+}
+
+fn declaration_integrity(declaration: &Declaration) -> Result<String> {
+    let payload = DeclarationPayload {
+        kind: &declaration.kind,
+        version: declaration.version,
+        name: &declaration.name,
+        plugins: &declaration.plugins,
+        disabled: &declaration.disabled,
+        patch: &declaration.patch,
+    };
+    let encoded = serde_json::to_vec(&payload).map_err(|cause| {
+        Error::Profile(format!(
+            "the profile backup integrity value could not be calculated: {cause}"
+        ))
+    })?;
+    Ok(format!("sha256:{}", hex(&Sha256::digest(encoded))))
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 /// Make a profile from an exported one, and say what it has to install.
@@ -922,6 +994,93 @@ mod tests {
         rows.iter()
             .find(|row| row.name == name)
             .expect("a row for every package in either profile")
+    }
+
+    fn backup(version: u32) -> Declaration {
+        Declaration {
+            kind: DECLARATION_KIND.into(),
+            version,
+            name: "work".into(),
+            plugins: BTreeMap::from([("@vendor/notes".into(), "1.2.3".into())]),
+            disabled: vec!["@vendor/notes".into()],
+            patch: "- name: notes\n".into(),
+            integrity: None,
+            verified: false,
+        }
+    }
+
+    fn backup_path(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "dsh-studio-profile-backup-{label}-{}.json",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn current_profile_backups_are_verified_before_restore_preview() {
+        let mut file = backup(DECLARATION_VERSION);
+        file.integrity = Some(declaration_integrity(&file).expect("digest"));
+        let path = backup_path("verified");
+        save(&file, &path).expect("backup");
+
+        let read = declaration(&path).expect("verified backup");
+
+        assert!(read.verified);
+        assert!(read
+            .integrity
+            .as_deref()
+            .is_some_and(|value| value.starts_with("sha256:")));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn a_tampered_profile_backup_is_refused_before_restore() {
+        let mut file = backup(DECLARATION_VERSION);
+        file.integrity = Some(declaration_integrity(&file).expect("digest"));
+        let path = backup_path("tampered");
+        save(&file, &path).expect("backup");
+        let changed = std::fs::read_to_string(&path)
+            .expect("backup text")
+            .replace("1.2.3", "9.9.9");
+        std::fs::write(&path, changed).expect("tamper");
+
+        let failure = declaration(&path).expect_err("tamper must fail");
+
+        assert!(failure.to_string().contains("integrity check"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn legacy_profile_backups_remain_readable_but_are_not_claimed_verified() {
+        let path = backup_path("legacy");
+        save(&backup(LEGACY_DECLARATION_VERSION), &path).expect("legacy backup");
+
+        let read = declaration(&path).expect("legacy backup");
+
+        assert!(!read.verified);
+        assert!(read.integrity.is_none());
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn unsupported_profile_backup_versions_are_refused() {
+        for version in [0, DECLARATION_VERSION + 1] {
+            let path = backup_path(&format!("version-{version}"));
+            save(&backup(version), &path).expect("backup fixture");
+            assert!(declaration(&path).is_err());
+            let _ = std::fs::remove_file(path);
+        }
+    }
+
+    #[test]
+    fn oversized_profile_backups_are_bounded_before_json_parsing() {
+        let path = backup_path("oversized");
+        std::fs::write(&path, vec![b' '; MAX_DECLARATION_BYTES + 1]).expect("large fixture");
+
+        let failure = declaration(&path).expect_err("oversized backup");
+
+        assert!(failure.to_string().contains("2 MiB"));
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

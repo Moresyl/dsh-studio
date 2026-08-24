@@ -499,6 +499,10 @@ export interface Declaration {
   disabled: string[]
   /** The profile's own patch layer, verbatim. */
   patch: string
+  /** Canonical SHA-256 written by current exports. */
+  integrity?: string
+  /** True only after the native side recomputed and matched the digest. */
+  verified: boolean
 }
 
 export const profileRoster = (): Promise<Roster> => invoke('profile_roster')
