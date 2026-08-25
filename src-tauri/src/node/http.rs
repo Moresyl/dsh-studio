@@ -29,10 +29,15 @@ const USER_AGENT: &str = concat!("dsh-studio/", env!("CARGO_PKG_VERSION"));
 /// enough that a black-holed route is not mistaken for a slow one.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 
-/// Bounds a metadata GET end to end. The archive download is deliberately not
-/// held to any total: 30 MB over a hotel connection is slow, not stuck, and the
-/// byte counter on screen is what tells the two apart.
+/// Bounds a metadata GET end to end. Archives use separate header and idle
+/// deadlines below so a slow, progressing hotel download remains valid while a
+/// peer that stops producing bytes cannot hold the install forever.
 const METADATA_TIMEOUT: Duration = Duration::from_secs(30);
+const MAX_METADATA_BYTES: u64 = 4 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
+const DOWNLOAD_HEADER_TIMEOUT: Duration = Duration::from_secs(30);
+const DOWNLOAD_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
+const MAX_REDIRECTS: usize = 5;
 
 /// Give rustls its cipher-suite implementation, once per process.
 ///
@@ -53,13 +58,23 @@ pub fn client() -> Result<Client> {
     Client::builder()
         .user_agent(USER_AGENT)
         .connect_timeout(CONNECT_TIMEOUT)
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= MAX_REDIRECTS {
+                attempt.error("too many Node download redirects")
+            } else if attempt.url().scheme() != "https" {
+                attempt.error("Node downloads may not redirect away from HTTPS")
+            } else {
+                attempt.follow()
+            }
+        }))
         .build()
         .map_err(|cause| Error::Network(format!("no HTTPS client could be built: {cause}")))
 }
 
 /// GET a small text document — a release index, a checksum list.
 pub async fn text(client: &Client, url: &str) -> Result<String> {
-    let response = client
+    ensure_https(url)?;
+    let mut response = client
         .get(url)
         .timeout(METADATA_TIMEOUT)
         .send()
@@ -72,9 +87,26 @@ pub async fn text(client: &Client, url: &str) -> Result<String> {
     if !status.is_success() {
         return Err(Error::Network(format!("{url} answered {status}")));
     }
-    response
-        .text()
+    if response
+        .content_length()
+        .is_some_and(|size| size > MAX_METADATA_BYTES)
+    {
+        return Err(Error::Network(format!(
+            "{url} sent more than 4 MiB of metadata"
+        )));
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
         .await
+        .map_err(|cause| Error::Network(format!("{url} sent an unreadable reply: {cause}")))?
+    {
+        let size = bounded_size(body.len() as u64, chunk.len() as u64, MAX_METADATA_BYTES)
+            .ok_or_else(|| Error::Network(format!("{url} sent more than 4 MiB of metadata")))?;
+        body.reserve(size.saturating_sub(body.len() as u64) as usize);
+        body.extend_from_slice(&chunk);
+    }
+    String::from_utf8(body)
         .map_err(|cause| Error::Network(format!("{url} sent an unreadable reply: {cause}")))
 }
 
@@ -96,15 +128,24 @@ pub async fn download<P>(
 where
     P: FnMut(u64, Option<u64>),
 {
-    let mut response = client.get(url).send().await.map_err(|cause| {
-        Error::Network(format!("{url} could not be reached: {}", reason(&cause)))
-    })?;
+    ensure_https(url)?;
+    let mut response = tokio::time::timeout(DOWNLOAD_HEADER_TIMEOUT, client.get(url).send())
+        .await
+        .map_err(|_| Error::Network(format!("{url} did not answer within 30 seconds")))?
+        .map_err(|cause| {
+            Error::Network(format!("{url} could not be reached: {}", reason(&cause)))
+        })?;
 
     let status = response.status();
     if !status.is_success() {
         return Err(Error::Network(format!("{url} answered {status}")));
     }
     let total = response.content_length();
+    if total.is_some_and(|size| size > MAX_ARCHIVE_BYTES) {
+        return Err(Error::Network(format!(
+            "the download from {url} exceeds the 256 MiB safety limit"
+        )));
+    }
 
     let mut file = tokio::fs::File::create(destination)
         .await
@@ -113,16 +154,25 @@ where
     let mut received: u64 = 0;
     progress(received, total);
 
-    while let Some(chunk) = response
-        .chunk()
+    while let Some(chunk) = tokio::time::timeout(DOWNLOAD_IDLE_TIMEOUT, response.chunk())
         .await
+        .map_err(|_| {
+            Error::Network(format!(
+                "the download from {url} produced no data for 90 seconds"
+            ))
+        })?
         .map_err(|cause| Error::Network(format!("the download from {url} broke off: {cause}")))?
     {
+        received =
+            bounded_size(received, chunk.len() as u64, MAX_ARCHIVE_BYTES).ok_or_else(|| {
+                Error::Network(format!(
+                    "the download from {url} exceeds the 256 MiB safety limit"
+                ))
+            })?;
         digest.update(&chunk);
         file.write_all(&chunk)
             .await
             .map_err(|cause| Error::Network(format!("the download could not be saved: {cause}")))?;
-        received += chunk.len() as u64;
         progress(received, total);
     }
 
@@ -134,6 +184,23 @@ where
         .map_err(|cause| Error::Network(format!("the download could not be saved: {cause}")))?;
 
     Ok(hex(&digest.finalize()))
+}
+
+fn ensure_https(value: &str) -> Result<()> {
+    let url = reqwest::Url::parse(value)
+        .map_err(|_| Error::Network("Node download URL is invalid".into()))?;
+    if url.scheme() != "https" || !url.username().is_empty() || url.password().is_some() {
+        return Err(Error::Network(
+            "Node downloads require a credential-free HTTPS URL".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn bounded_size(current: u64, incoming: u64, maximum: u64) -> Option<u64> {
+    current
+        .checked_add(incoming)
+        .filter(|combined| *combined <= maximum)
 }
 
 /// The innermost cause of a reqwest failure.
@@ -163,9 +230,50 @@ fn hex(digest: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use sha2::{Digest, Sha256};
 
-    use super::hex;
+    use super::{bounded_size, client, download, ensure_https, hex, text};
+
+    #[test]
+    fn node_sources_are_exactly_credential_free_https() {
+        assert!(ensure_https("https://nodejs.org/dist/index.json").is_ok());
+        for unsafe_url in [
+            "http://nodejs.org/dist/index.json",
+            "https://token@nodejs.org/dist/index.json",
+            "not a URL",
+        ] {
+            assert!(ensure_https(unsafe_url).is_err(), "accepted {unsafe_url}");
+        }
+    }
+
+    #[tokio::test]
+    async fn node_network_helpers_refuse_plain_http_before_connecting() {
+        let client = client().expect("client");
+        assert!(text(&client, "http://127.0.0.1/index.json")
+            .await
+            .expect_err("HTTP metadata must be refused")
+            .to_string()
+            .contains("credential-free HTTPS"));
+        assert!(download(
+            &client,
+            "http://127.0.0.1/node.zip",
+            Path::new("unused"),
+            |_, _| {}
+        )
+        .await
+        .expect_err("HTTP archives must be refused")
+        .to_string()
+        .contains("credential-free HTTPS"));
+    }
+
+    #[test]
+    fn byte_limits_reject_overflow_and_the_first_byte_past_the_ceiling() {
+        assert_eq!(bounded_size(3, 2, 5), Some(5));
+        assert_eq!(bounded_size(5, 1, 5), None);
+        assert_eq!(bounded_size(u64::MAX, 1, u64::MAX), None);
+    }
 
     #[test]
     fn spells_a_digest_the_way_the_published_checksums_do() {
