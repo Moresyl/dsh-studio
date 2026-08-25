@@ -24,6 +24,8 @@ struct State {
     last_known_good: String,
 }
 
+pub(super) struct Snapshot(State);
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct StoredState {
@@ -86,16 +88,45 @@ impl Store {
                 .ok()
                 .and_then(|body| serde_json::from_slice::<StoredState>(&body).ok());
 
-        let Some(stored) = stored else {
-            let fallback = self.fallback();
-            return State {
-                schema: SCHEMA,
-                active: fallback.clone(),
-                pending: None,
-                last_known_good: fallback,
-            };
-        };
+        stored.map_or_else(|| self.fallback_state(), |stored| self.decode(stored))
+    }
 
+    fn read_for_mutation(&self) -> Result<State> {
+        let raw = match crate::bounded_file::read(
+            &self.selection_path(),
+            crate::bounded_file::CONTROL_BYTES,
+        ) {
+            Ok(raw) => raw,
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(self.fallback_state());
+            }
+            Err(cause) => {
+                return Err(Error::Profile(format!(
+                    "{} could not be read safely: {cause}",
+                    self.selection_path().display()
+                )));
+            }
+        };
+        let stored = serde_json::from_slice::<StoredState>(&raw).map_err(|cause| {
+            Error::Profile(format!(
+                "{} is not valid profile state: {cause}",
+                self.selection_path().display()
+            ))
+        })?;
+        Ok(self.decode(stored))
+    }
+
+    fn fallback_state(&self) -> State {
+        let fallback = self.fallback();
+        State {
+            schema: SCHEMA,
+            active: fallback.clone(),
+            pending: None,
+            last_known_good: fallback,
+        }
+    }
+
+    fn decode(&self, stored: StoredState) -> State {
         // v1 contained only `selected`. It was the profile releases before this
         // one had already been running, so it is the least surprising healthy
         // baseline for a one-time migration.
@@ -135,7 +166,7 @@ impl Store {
         if !self.usable(name) {
             return Err(Error::Profile(format!("there is no profile called {name}")));
         }
-        let mut state = self.read();
+        let mut state = self.read_for_mutation()?;
         state.pending = (state.active != name).then(|| name.to_string());
         self.write(&state)
     }
@@ -146,7 +177,7 @@ impl Store {
                 "profile {name} disappeared before it could be marked healthy"
             )));
         }
-        let mut state = self.read();
+        let mut state = self.read_for_mutation()?;
         // A second window may have selected another candidate while this one
         // was starting. Do not erase that newer choice.
         if state
@@ -163,7 +194,7 @@ impl Store {
     }
 
     fn failed(&self, name: &str, reason: &str) -> Result<Option<String>> {
-        let mut state = self.read();
+        let mut state = self.read_for_mutation()?;
         let fallback = (state.pending.as_deref() == Some(name)
             && state.last_known_good != name
             && self.usable(&state.last_known_good))
@@ -200,9 +231,12 @@ impl Store {
                 )));
             }
         };
-        let Ok(stored) = serde_json::from_slice::<StoredState>(&raw) else {
-            return Ok(());
-        };
+        let stored = serde_json::from_slice::<StoredState>(&raw).map_err(|cause| {
+            Error::Profile(format!(
+                "{} is not valid profile state: {cause}",
+                self.selection_path().display()
+            ))
+        })?;
         // Renaming the directory necessarily creates a moment when `from` is no
         // longer usable. Reusing `read` here used to discard that exact value
         // before it could be renamed, silently selecting the fallback profile.
@@ -223,7 +257,7 @@ impl Store {
     }
 
     fn remove(&self, name: &str) -> Result<()> {
-        let mut state = self.read();
+        let mut state = self.read_for_mutation()?;
         let fallback = self.fallback();
         if state.active == name {
             state.active = fallback.clone();
@@ -305,6 +339,14 @@ pub fn rename(from: &str, to: &str) -> Result<()> {
 
 pub fn remove(name: &str) -> Result<()> {
     Store::managed().remove(name)
+}
+
+pub(super) fn snapshot() -> Result<Snapshot> {
+    Store::managed().read_for_mutation().map(Snapshot)
+}
+
+pub(super) fn restore(snapshot: Snapshot) -> Result<()> {
+    Store::managed().write(&snapshot.0)
 }
 
 pub fn notice() -> Option<RecoveryNotice> {
@@ -417,6 +459,26 @@ mod tests {
         let state = store.read();
         assert_eq!(state.active, "renamed");
         assert_eq!(state.last_known_good, "renamed");
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn mutations_refuse_to_overwrite_oversized_selection_state() {
+        let (store, base) = store("oversized-mutation");
+        std::fs::create_dir_all(&store.root).expect("state directory");
+        std::fs::write(
+            store.selection_path(),
+            vec![b' '; crate::bounded_file::CONTROL_BYTES + 1],
+        )
+        .expect("oversized selection");
+
+        let failure = store.choose("web").expect_err("mutation must fail closed");
+
+        assert!(failure.to_string().contains("safety limit"));
+        assert_eq!(
+            std::fs::metadata(store.selection_path()).unwrap().len(),
+            (crate::bounded_file::CONTROL_BYTES + 1) as u64
+        );
         let _ = std::fs::remove_dir_all(base);
     }
 }

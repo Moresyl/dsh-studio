@@ -556,12 +556,63 @@ pub fn remove(name: &str) -> Result<()> {
         )));
     }
 
-    discard(&name)?;
-    // Never leave the window pointed at a profile that is not there. The
-    // fallback in `selected` would cover it, but a selection file naming a
-    // deleted profile is a lie the next reader has to work out for themselves.
-    selection::remove(&name)?;
+    let disabled = switches::switched_off(&name);
+    let selection_snapshot = selection::snapshot()?;
+
+    // Commit reversible metadata first. The directory is the user's actual
+    // profile and is removed only after every sidecar accepted the change, so a
+    // settings-file failure can never report "remove failed" after the data is
+    // already gone.
+    switches::forget(&name)?;
+    if let Err(failure) = selection::remove(&name) {
+        let mut rollback = Vec::new();
+        if let Err(cause) = restore_disabled(&name, &disabled) {
+            rollback.push(format!("plugin state: {cause}"));
+        }
+        return Err(remove_failure(&name, failure, rollback, true));
+    }
+    if let Err(failure) = discard_directory(&name) {
+        let mut rollback = Vec::new();
+        if let Err(cause) = restore_disabled(&name, &disabled) {
+            rollback.push(format!("plugin state: {cause}"));
+        }
+        if let Err(cause) = selection::restore(selection_snapshot) {
+            rollback.push(format!("selection: {cause}"));
+        }
+        return Err(remove_failure(&name, failure, rollback, false));
+    }
     Ok(())
+}
+
+fn restore_disabled(name: &str, disabled: &BTreeSet<String>) -> Result<()> {
+    if disabled.is_empty() {
+        Ok(())
+    } else {
+        switches::remember(name, disabled)
+    }
+}
+
+fn remove_failure(
+    name: &str,
+    failure: Error,
+    rollback: impl IntoIterator<Item = String>,
+    data_untouched: bool,
+) -> Error {
+    let rollback = rollback.into_iter().collect::<Vec<_>>();
+    let data = if data_untouched {
+        "no profile data was deleted"
+    } else {
+        "directory removal may have stopped part-way; inspect the profile before using it again"
+    };
+    let detail = if rollback.is_empty() {
+        format!("; {data}, and its metadata was restored")
+    } else {
+        format!(
+            "; {data}, and metadata rollback also failed for {}",
+            rollback.join(", ")
+        )
+    };
+    Error::Profile(format!("{name} could not be removed: {failure}{detail}"))
 }
 
 /// A profile as a file.
@@ -712,6 +763,11 @@ pub fn save(declaration: &Declaration, path: &Path) -> Result<()> {
 /// A copy missing what it was copying is not a copy, and leaving one behind
 /// makes the user clean up after a failure they did not cause.
 pub fn discard(name: &str) -> Result<()> {
+    discard_directory(name)?;
+    switches::forget(name)
+}
+
+fn discard_directory(name: &str) -> Result<()> {
     if !is_name(name) {
         return Err(Error::Profile(format!("{name} is not a profile name")));
     }
@@ -736,7 +792,7 @@ pub fn discard(name: &str) -> Result<()> {
             )));
         }
     }
-    switches::forget(name)
+    Ok(())
 }
 
 /// Two profiles, package by package.
