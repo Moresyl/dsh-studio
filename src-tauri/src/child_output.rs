@@ -1,6 +1,6 @@
 //! Bounded line framing for output produced by untrusted child processes.
 
-use tokio::io::{AsyncBufRead, AsyncBufReadExt as _};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _};
 
 const MAX_LINE_BYTES: usize = 32 * 1024;
 const TRUNCATED: &[u8] = b" ... [line truncated]";
@@ -52,6 +52,29 @@ where
     }
 }
 
+/// Capture a stream without letting a child process choose the allocation size.
+///
+/// The rest of an oversized stream is still drained. That lets the child exit
+/// instead of blocking forever on a full pipe while the caller waits for its
+/// status, but no more untrusted bytes are retained in memory.
+pub async fn capture<R>(mut reader: R, maximum: usize) -> std::io::Result<Vec<u8>>
+where
+    R: AsyncRead + Unpin,
+{
+    let mut body = Vec::with_capacity(maximum.min(64 * 1024));
+    let mut limited = (&mut reader).take(maximum.saturating_add(1) as u64);
+    limited.read_to_end(&mut body).await?;
+    if body.len() <= maximum {
+        return Ok(body);
+    }
+
+    tokio::io::copy(&mut reader, &mut tokio::io::sink()).await?;
+    Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("child output exceeds the {maximum} byte safety limit"),
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use tokio::io::BufReader;
@@ -82,5 +105,14 @@ mod tests {
         assert!(next_line(&mut reader, &mut line).await.expect("last line"));
         assert_eq!(line, b"last");
         assert!(!next_line(&mut reader, &mut line).await.expect("end"));
+    }
+
+    #[tokio::test]
+    async fn capture_accepts_the_limit_and_drains_an_oversized_stream() {
+        assert_eq!(capture(b"12345".as_slice(), 5).await.unwrap(), b"12345");
+        let failure = capture(b"123456789".as_slice(), 5)
+            .await
+            .expect_err("oversized output");
+        assert_eq!(failure.kind(), std::io::ErrorKind::InvalidData);
     }
 }
