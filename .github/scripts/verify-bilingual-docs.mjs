@@ -5,6 +5,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_ROOT = resolve(HERE, '..', '..')
 
+/** Short immutable competitor revision documented by both roadmap languages. */
+export const BENCHMARK_HEAD = '2172b1b2'
+
 export const BILINGUAL_PAIRS = Object.freeze([
   ['README.md', 'README.zh-CN.md'],
   ['docs/architecture.md', 'docs/architecture.zh-CN.md'],
@@ -39,8 +42,8 @@ const CONTRACTS = Object.freeze([
   },
   {
     pair: 'docs/ROADMAP.md|docs/ROADMAP.zh-CN.md',
-    english: ['Benchmark\n2.0.4', '87047b54', 'v0.8.0 release candidate'],
-    chinese: ['对标 2.0.4', '87047b54', 'v0.8.0 发布候选'],
+    english: ['Benchmark\n2.0.4', BENCHMARK_HEAD, 'v0.8.0 release candidate'],
+    chinese: ['对标 2.0.4', BENCHMARK_HEAD, 'v0.8.0 发布候选'],
   },
 ])
 

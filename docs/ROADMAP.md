@@ -2,15 +2,21 @@
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-08-25. The refreshed benchmark head is
+Updated 2026-08-26. The refreshed benchmark head is
 `anywhere-labs/dsh-desktop` at
-`87047b54ccd6c1d34fc3890755f836883889ec01`, with its Harness submodule at
+`2172b1b2f2b0de4c2b3a1d8b55f11f8083a9305e`, with its Harness submodule at
 `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` (`dsh-v0.1.1-rc.2`). Its current
 package identifies itself as 2.0.3 even though the preceding verified snapshot
 `bd5ba85a275258318134632b3cc13d6b5ea8088b` identified itself as Benchmark
 2.0.4, so this comparison uses commit identity rather than treating the
 non-monotonic package field as a release ordering. The DSH Studio comparison
 started at `9d608e7245e74662a67fe754222fd1b845270092`.
+
+The product-depth review also sampled `vastsa/PI-Desktop`,
+`jasonsuhari/gridbash`, `wess/sinclair`, `BraydenPB/agent-grid`,
+`limboo-ai/limboo`, and `jpdlr/hydra`. Those projects are used only as evidence
+for interaction and isolation patterns; README roadmap claims are not treated
+as shipped features without corresponding code or tests.
 
 This document avoids volatile star/download counts and never treats pipeline
 support as proof that an external channel or platform signature is live.
@@ -31,10 +37,13 @@ The remaining gaps are concentrated in:
    signed macOS install, update, notification, login item, or terminal flow.
 3. **Packaged UI automation:** logic coverage and a real Harness boot gate exist,
    but final installers still need repeatable WebView/window interaction smoke.
+4. **Parallel-agent workspace depth:** Harness already owns subagents and Studio
+   owns real PTYs, but Studio does not yet provide worktree-first isolation,
+   persistent split layouts, or a native review/merge surface for several agents.
 
 ## Current capability matrix
 
-| Capability              | Benchmark head `87047b54`                 | DSH Studio now                                                                                                                         |
+| Capability              | Benchmark head `2172b1b2`                 | DSH Studio now                                                                                                                         |
 | ----------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | No system Node required | Bundled Electron/runtime                  | Lite downloads and verifies official Node; Full carries SHA-256-pinned Node, Harness and pnpm                                          |
 | Real runtime gate       | Profile boot smoke                        | Cold-installs the full 511-package graph and boots the real Profile, Loader, Web server and Host probe on Windows/Linux/macOS CI       |
@@ -46,6 +55,7 @@ The remaining gaps are concentrated in:
 | Plugin market           | Built-in Community Market                 | Multi-source catalogs, pagination/limits, exact npm revalidation, preview token, integrity receipt, transaction rollback and UI errors |
 | Catalog health          | Source management and tests               | Native contract/latency/installability health checks for npm, dshfind, 1024Store and custom sources                                    |
 | Terminal                | Built in                                  | PTY, Unicode 11 and process-tree ownership; no external CMD flash                                                                      |
+| Parallel agent workspace | Upstream subagents                        | Harness subagents and tabbed PTYs today; native worktree isolation, persistent splits and orchestration review remain planned          |
 | Mobile remote           | Planned                                   | Delivered: loopback Harness plus separate LAN gateway, one-use QR and revocable per-device credentials                                 |
 | Sessions                | Primarily upstream UI                     | Local full-text search, project filter, per-model token/cost reports and Markdown/HTML/JSON export                                     |
 | Usage controls          | Upstream session UI                       | Local monthly budget status, complete-price guard and spreadsheet-safe daily CSV trend export                                          |
@@ -113,6 +123,21 @@ still depends on verifying the tagged pipeline, public assets, updater signature
 - Upload screenshots, WebView console, Harness tail and diagnostics on failure,
   not only an exit code.
 
+### P1 — isolated agent workspaces
+
+- Add a bounded native worktree registry: repository preflight, explicit branch
+  identity, collision-safe paths, durable ownership receipts and recovery after
+  interrupted create/remove. Never delete a dirty or externally owned worktree.
+- Associate each managed terminal/session with one workspace identity. Restore
+  layout and launch intent after restart, but do not claim that killed child
+  processes survived application exit.
+- Add a persistent recursive split tree with keyboard navigation and an explicit
+  pane ceiling. Resource estimates and a confirmation step must precede large
+  multi-pane launches.
+- Make changes reviewable by workspace and agent before merge: file list, diff,
+  test evidence, conflict state and guarded rollback. A UI button is not a safe
+  rollback contract until preimage identity and dirty-tree checks are enforced.
+
 ### P1 — plugin ecosystem
 
 - Publish the SDK and Host Protocol 1 documentation with the next formal release,
@@ -133,6 +158,10 @@ still depends on verifying the tagged pipeline, public assets, updater signature
   assistive-technology runs remain a release-candidate task.
 - Consider opt-in, removable anonymous reliability metrics only after privacy and
   retention rules exist; do not add a telemetry SDK first.
+- Expose a narrow, authenticated local orchestration control plane only after the
+  worktree and pane ownership contracts exist. It may spawn/inspect/stop bounded
+  sessions and deliver messages; arbitrary desktop IPC, secrets, and unreviewed
+  package mutation stay out of the protocol.
 
 ## Release decision
 
