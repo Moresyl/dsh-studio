@@ -228,25 +228,20 @@ fn write_archive(path: &Path, report: &str, logs: &[PathBuf], crashes: &[PathBuf
         ));
     }
 
-    let temporary = parent.join(format!(
-        ".{}.{}.tmp",
-        path.file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("dsh-studio-diagnostics.zip"),
-        std::process::id()
-    ));
+    let (temporary, staging_file) = crate::atomic::stage(path)
+        .map_err(|cause| Error::Report(format!("could not stage diagnostic archive: {cause}")))?;
+    drop(staging_file);
     let result = build_archive(&temporary, report, logs, crashes);
     if let Err(cause) = result {
         let _ = std::fs::remove_file(&temporary);
         return Err(cause);
     }
-    if path.exists() {
-        std::fs::remove_file(path).map_err(|cause| {
-            Error::Report(format!("could not replace diagnostic archive: {cause}"))
-        })?;
+    let committed = crate::atomic::replace(&temporary, path)
+        .map_err(|cause| Error::Report(format!("could not publish diagnostic archive: {cause}")));
+    if committed.is_err() {
+        let _ = std::fs::remove_file(temporary);
     }
-    std::fs::rename(&temporary, path)
-        .map_err(|cause| Error::Report(format!("could not publish diagnostic archive: {cause}")))
+    committed
 }
 
 fn build_archive(path: &Path, report: &str, logs: &[PathBuf], crashes: &[PathBuf]) -> Result<()> {
@@ -859,8 +854,10 @@ mod tests {
         let out = root.join("support.zip");
         std::fs::write(&log, "Authorization: Bearer secret-value").unwrap();
         std::fs::write(&dump, [0_u8, 1, 2, 3]).unwrap();
+        std::fs::write(&out, b"previous archive").unwrap();
 
         write_archive(&out, "api_key=sk-report", &[log], &[dump]).unwrap();
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 3);
         let file = std::fs::File::open(&out).unwrap();
         let mut zip = zip::ZipArchive::new(file).unwrap();
         let mut report = String::new();
