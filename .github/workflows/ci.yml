@@ -55,11 +55,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
+      - run: pnpm build
       - run: pnpm test:packaging
       - run: pnpm verify:docs
       - name: Frontend logic coverage (80% minimum)
         run: pnpm test:coverage
-      - run: pnpm build
       - name: Rust and LAN remote regression
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
