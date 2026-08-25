@@ -328,6 +328,23 @@ fn write_level(level: LogLevel) -> Result<()> {
 }
 
 fn write_level_at(path: &Path, level: LogLevel) -> Result<()> {
+    match crate::bounded_file::read(path, crate::bounded_file::CONTROL_BYTES) {
+        Ok(raw) => {
+            serde_json::from_slice::<Settings>(&raw).map_err(|cause| {
+                Error::Report(format!(
+                    "{} is not valid log settings: {cause}",
+                    path.display()
+                ))
+            })?;
+        }
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {}
+        Err(cause) => {
+            return Err(Error::Report(format!(
+                "{} could not be read safely: {cause}",
+                path.display()
+            )));
+        }
+    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|cause| Error::Report(format!("could not create log settings: {cause}")))?;
@@ -556,6 +573,39 @@ mod tests {
         let saved: Settings =
             serde_json::from_slice(&std::fs::read(&path).expect("settings file")).expect("json");
         assert_eq!(saved.level, LogLevel::Error);
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn invalid_log_settings_are_not_silently_replaced() {
+        let root = root("invalid-level-settings");
+        let path = root.join("logging.json");
+        std::fs::create_dir_all(&root).expect("settings directory");
+        std::fs::write(&path, "{not-json").expect("invalid settings");
+
+        let failure = write_level_at(&path, LogLevel::Warn).expect_err("invalid settings");
+        assert!(failure.to_string().contains("not valid log settings"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{not-json");
+        std::fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn oversized_log_settings_are_not_silently_replaced() {
+        let root = root("oversized-level-settings");
+        let path = root.join("logging.json");
+        std::fs::create_dir_all(&root).expect("settings directory");
+        std::fs::write(
+            &path,
+            vec![b' '; crate::bounded_file::CONTROL_BYTES.saturating_add(1)],
+        )
+        .expect("oversized settings");
+
+        let failure = write_level_at(&path, LogLevel::Warn).expect_err("oversized settings");
+        assert!(failure.to_string().contains("could not be read safely"));
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().len(),
+            crate::bounded_file::CONTROL_BYTES.saturating_add(1) as u64
+        );
         std::fs::remove_dir_all(root).expect("cleanup");
     }
 
