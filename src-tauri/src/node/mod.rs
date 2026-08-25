@@ -247,7 +247,7 @@ where
     });
 
     let installed = tokio::task::spawn_blocking(move || {
-        crate::offline::verify(&artifact)
+        let file = crate::offline::verified_file(&artifact)
             .map_err(|cause| Error::NodeProvision(cause.to_string()))?;
         std::fs::create_dir_all(&root).map_err(|cause| {
             Error::NodeProvision(format!(
@@ -256,7 +256,7 @@ where
         })?;
         let staging = root.join(".offline-staging");
         let _ = std::fs::remove_dir_all(&staging);
-        let unpacked = archive::unpack(&artifact.file, &staging)?;
+        let unpacked = archive::unpack_file(file, &staging)?;
         let _ = std::fs::remove_dir_all(&destination);
         std::fs::rename(&unpacked, &destination).map_err(|cause| {
             Error::NodeProvision(format!(

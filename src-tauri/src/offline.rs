@@ -7,7 +7,7 @@
 //! of quietly turning an offline operation into a network request.
 
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek as _, SeekFrom};
 use std::path::{Component, Path, PathBuf};
 
 use serde::Deserialize;
@@ -174,8 +174,12 @@ fn artifact(root: &Path, file: String, sha256: String, version: String) -> Resul
     })
 }
 
-/// Hash an artifact immediately before extracting it.
-pub fn verify(artifact: &Artifact) -> Result<()> {
+/// Open, authenticate and rewind one immutable packaged artifact.
+///
+/// The returned handle is the one that was hashed. Callers extract from this
+/// handle so replacing the path between verification and extraction cannot
+/// substitute different bytes.
+pub(crate) fn verified_file(artifact: &Artifact) -> Result<File> {
     let file = File::open(&artifact.file)
         .map_err(|cause| Error::Install(format!("offline runtime could not be opened: {cause}")))?;
     let mut reader = BufReader::new(file);
@@ -197,14 +201,20 @@ pub fn verify(artifact: &Artifact) -> Result<()> {
             artifact.file.display()
         )));
     }
-    Ok(())
+    reader.seek(SeekFrom::Start(0)).map_err(|cause| {
+        Error::Install(format!("offline runtime could not be rewound: {cause}"))
+    })?;
+    Ok(reader.into_inner())
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::io::Read as _;
 
-    use super::read;
+    use sha2::{Digest as _, Sha256};
+
+    use super::{read, verified_file, Artifact};
 
     fn root(name: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
@@ -265,6 +275,30 @@ mod tests {
             .replace(crate::harness::install::PNPM_VERSION, "0.0.0");
         fs::write(root.join("manifest.json"), wrong_pnpm).unwrap();
         assert!(read(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn extraction_keeps_the_same_handle_that_passed_verification() {
+        let root = root("verified-handle");
+        fs::create_dir_all(&root).unwrap();
+        let path = root.join("runtime.tar.gz");
+        fs::write(&path, b"reviewed archive").unwrap();
+        let artifact = Artifact {
+            file: path.clone(),
+            sha256: format!("{:x}", Sha256::digest(b"reviewed archive")),
+            version: "v22.19.0".into(),
+        };
+
+        let mut verified = verified_file(&artifact).expect("verified handle");
+        fs::rename(&path, root.join("reviewed.tar.gz")).expect("move reviewed path");
+        fs::write(&path, b"replacement archive").expect("replace path");
+        let mut body = Vec::new();
+        verified
+            .read_to_end(&mut body)
+            .expect("read verified handle");
+
+        assert_eq!(body, b"reviewed archive");
         fs::remove_dir_all(root).unwrap();
     }
 }

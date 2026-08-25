@@ -531,15 +531,10 @@ pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
     write_journal(&journal)?;
 
     let prepared = (|| {
-        crate::offline::verify(artifact)?;
+        let file = crate::offline::verified_file(artifact)?;
         std::fs::create_dir_all(&staging).map_err(|cause| {
             Error::Install(format!(
                 "could not create the offline install directory: {cause}"
-            ))
-        })?;
-        let file = std::fs::File::open(&artifact.file).map_err(|cause| {
-            Error::Install(format!(
-                "could not open the offline Harness archive: {cause}"
             ))
         })?;
         let decoded = flate2::read::GzDecoder::new(std::io::BufReader::new(file));

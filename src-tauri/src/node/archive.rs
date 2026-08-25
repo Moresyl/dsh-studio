@@ -15,16 +15,21 @@ use crate::error::{Error, Result};
 
 /// Expand `archive` into `staging` and return the release directory inside it.
 pub fn unpack(archive: &Path, staging: &Path) -> Result<PathBuf> {
+    let file = std::fs::File::open(archive).map_err(unreadable)?;
+    unpack_file(file, staging)
+}
+
+/// Expand an already-open archive, preserving the caller's verified handle.
+pub fn unpack_file(file: std::fs::File, staging: &Path) -> Result<PathBuf> {
     std::fs::create_dir_all(staging).map_err(|cause| {
         Error::NodeProvision(format!("nowhere to unpack the download: {cause}"))
     })?;
-    expand(archive, staging)?;
+    expand(file, staging)?;
     sole_directory(staging)
 }
 
 #[cfg(windows)]
-fn expand(archive: &Path, staging: &Path) -> Result<()> {
-    let file = std::fs::File::open(archive).map_err(unreadable)?;
+fn expand(file: std::fs::File, staging: &Path) -> Result<()> {
     let mut zip = zip::ZipArchive::new(std::io::BufReader::new(file)).map_err(|cause| {
         Error::NodeProvision(format!("the download is not a readable zip: {cause}"))
     })?;
@@ -35,8 +40,7 @@ fn expand(archive: &Path, staging: &Path) -> Result<()> {
 }
 
 #[cfg(not(windows))]
-fn expand(archive: &Path, staging: &Path) -> Result<()> {
-    let file = std::fs::File::open(archive).map_err(unreadable)?;
+fn expand(file: std::fs::File, staging: &Path) -> Result<()> {
     let decoded = flate2::read::GzDecoder::new(std::io::BufReader::new(file));
 
     // Node's tarballs contain symlinks — `bin/npm` points into
