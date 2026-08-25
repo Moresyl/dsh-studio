@@ -419,6 +419,8 @@ export interface ArchivePackage {
   /** The file it was read out of. */
   path: string
   bytes: number
+  /** SHA-256 of the exact archive displayed in the confirmation. */
+  integrity: string
 }
 
 /**
@@ -432,8 +434,8 @@ export const pluginArchive = (path: string): Promise<ArchivePackage> =>
   invoke('plugin_archive', { path })
 
 /** Install from an archive instead of the registry; answers with the profile. */
-export const pluginImport = (path: string): Promise<PluginState> =>
-  invoke('plugin_import', { path })
+export const pluginImport = (path: string, integrity: string): Promise<PluginState> =>
+  invoke('plugin_import', { path, integrity })
 
 /* -------------------------------------------------------------------------- */
 /* Profiles                                                                   */

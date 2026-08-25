@@ -15,6 +15,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+use sha2::{Digest as _, Sha256};
 
 use crate::error::{Error, Result};
 use crate::paths;
@@ -47,6 +48,21 @@ pub struct Package {
     /// The file it was read from, so a confirmation can name it.
     pub path: String,
     pub bytes: u64,
+    /// Digest of the exact archive reviewed by the user.
+    pub integrity: String,
+}
+
+struct DigestReader<R> {
+    inner: R,
+    digest: Sha256,
+}
+
+impl<R: Read> Read for DigestReader<R> {
+    fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
+        let read = self.inner.read(buffer)?;
+        self.digest.update(&buffer[..read]);
+        Ok(read)
+    }
 }
 
 /// A staged archive: where the copy went, and whether staging is what put it
@@ -68,32 +84,44 @@ pub fn read(path: &Path) -> Result<Package> {
         .map_err(|cause| Error::Plugin(format!("{} could not be opened: {cause}", show(path))))?;
     let bytes = file.metadata().map(|meta| meta.len()).unwrap_or_default();
 
-    let decoded = flate2::read::GzDecoder::new(std::io::BufReader::new(file));
+    let source = DigestReader {
+        inner: file,
+        digest: Sha256::new(),
+    };
+    let decoded = flate2::read::GzDecoder::new(std::io::BufReader::new(source));
     let mut archive = tar::Archive::new(decoded.take(READ_CEILING));
-    let entries = archive.entries().map_err(|cause| unreadable(path, cause))?;
+    let raw = manifest(path, &mut archive)?.ok_or_else(|| {
+        Error::Plugin(format!(
+            "{} has no package.json in it, so it is not a package this can install",
+            show(path)
+        ))
+    })?;
 
+    // The manifest is normally near the front. Drain the raw input as well so
+    // the confirmation is bound to every archive byte, not only that prefix.
+    let decoded = archive.into_inner().into_inner();
+    let mut source = decoded.into_inner();
+    std::io::copy(&mut source, &mut std::io::sink()).map_err(|cause| unreadable(path, cause))?;
+    let integrity = format!("sha256:{:x}", source.into_inner().digest.finalize());
+    describe(path, &raw, bytes, integrity)
+}
+
+fn manifest<R: Read>(path: &Path, archive: &mut tar::Archive<R>) -> Result<Option<String>> {
+    let entries = archive.entries().map_err(|cause| unreadable(path, cause))?;
     for entry in entries {
         let entry = entry.map_err(|cause| unreadable(path, cause))?;
-        // A tar path can be anything at all, including nothing this platform can
-        // spell. One that cannot be read is one that is not the manifest.
         let Ok(inside) = entry.path() else { continue };
         if inside != Path::new(MANIFEST) {
             continue;
         }
-
         let mut raw = String::new();
         entry
             .take(MANIFEST_CEILING)
             .read_to_string(&mut raw)
             .map_err(|cause| unreadable(path, cause))?;
-
-        return describe(path, &raw, bytes);
+        return Ok(Some(raw));
     }
-
-    Err(Error::Plugin(format!(
-        "{} has no package.json in it, so it is not a package this can install",
-        show(path)
-    )))
+    Ok(None)
 }
 
 /// Put a copy of the archive somewhere it will still be tomorrow.
@@ -115,6 +143,7 @@ pub(super) fn stage(source: &Path, package: &Package) -> Result<Staged> {
     // Importing the kept copy again, which is what picking it out of this
     // directory comes to. Copying a file onto itself empties it.
     if same_file(source, &path) {
+        ensure_reviewed(&path, package)?;
         return Ok(Staged { path, fresh: false });
     }
 
@@ -122,7 +151,11 @@ pub(super) fn stage(source: &Path, package: &Package) -> Result<Staged> {
     // Overwritten on purpose when it is not fresh: the same name and version
     // being imported again is somebody who rebuilt it, and the new one is the
     // one they mean.
-    std::fs::copy(source, &path).map_err(|cause| {
+    crate::atomic::copy_checked(source, &path, |staged| {
+        ensure_reviewed(staged, package)
+            .map_err(|failure| std::io::Error::other(failure.to_string()))
+    })
+    .map_err(|cause| {
         Error::Plugin(format!(
             "{} could not be copied to {}: {cause}",
             show(source),
@@ -130,6 +163,16 @@ pub(super) fn stage(source: &Path, package: &Package) -> Result<Staged> {
         ))
     })?;
     Ok(Staged { path, fresh })
+}
+
+fn ensure_reviewed(path: &Path, expected: &Package) -> Result<()> {
+    let actual = read(path)?;
+    if actual.integrity != expected.integrity {
+        return Err(Error::Plugin(
+            "the plugin archive changed after it was reviewed; review it again".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// The argument the package manager has to be handed to install this file.
@@ -150,7 +193,7 @@ pub(super) fn spec(path: &Path) -> String {
 }
 
 /// Turn a package manifest into what the panel shows about it.
-fn describe(path: &Path, raw: &str, bytes: u64) -> Result<Package> {
+fn describe(path: &Path, raw: &str, bytes: u64, integrity: String) -> Result<Package> {
     let manifest: serde_json::Value = serde_json::from_str(raw).map_err(|cause| {
         Error::Plugin(format!(
             "the package.json in {} could not be read: {cause}",
@@ -180,6 +223,7 @@ fn describe(path: &Path, raw: &str, bytes: u64) -> Result<Package> {
         bundle: manifest.pointer("/dsh/bundle/patch").is_some(),
         path: path.display().to_string(),
         bytes,
+        integrity,
     })
 }
 
@@ -278,6 +322,8 @@ mod tests {
         assert_eq!(package.version, "1.4.0");
         assert!(package.bundle, "it declares a patch, so it is a plugin");
         assert!(package.bytes > 0, "the file has a size worth showing");
+        assert!(package.integrity.starts_with("sha256:"));
+        assert_eq!(package.integrity.len(), 71);
     }
 
     #[test]
@@ -305,6 +351,25 @@ mod tests {
             failure.to_string().contains("not a readable .tgz package"),
             "the sentence has to say what was wrong with the file: {failure}"
         );
+    }
+
+    #[test]
+    fn a_review_is_bound_to_every_byte_of_the_archive() {
+        let path = written(
+            "changed-after-review.tgz",
+            &packed(r#"{ "name": "dsh-helper", "version": "0.1.0" }"#),
+        );
+        let reviewed = read(&path).expect("preview");
+        let mut changed = std::fs::read(&path).expect("archive");
+        changed.push(b'x');
+        std::fs::write(&path, changed).expect("changed archive");
+
+        let failure = ensure_reviewed(&path, &reviewed).expect_err("stale review");
+
+        assert!(failure
+            .to_string()
+            .contains("changed after it was reviewed"));
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

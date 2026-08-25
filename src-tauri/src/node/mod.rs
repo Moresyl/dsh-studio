@@ -134,19 +134,7 @@ pub fn choose(path: PathBuf) -> Result<NodeInstallation> {
     })
     .map_err(|cause| Error::NodeSelection(format!("selection is invalid: {cause}")))?;
     body.push(b'\n');
-    let temporary = file.with_extension("dsh-studio.tmp");
-    std::fs::write(&temporary, body).map_err(|cause| {
-        Error::NodeSelection(format!(
-            "{} could not be written: {cause}",
-            temporary.display()
-        ))
-    })?;
-    if file.exists() {
-        std::fs::remove_file(&file).map_err(|cause| {
-            Error::NodeSelection(format!("{} could not be replaced: {cause}", file.display()))
-        })?;
-    }
-    std::fs::rename(&temporary, &file).map_err(|cause| {
+    crate::atomic::write(&file, body).map_err(|cause| {
         Error::NodeSelection(format!(
             "{} could not be committed: {cause}",
             file.display()

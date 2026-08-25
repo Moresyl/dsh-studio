@@ -384,6 +384,7 @@ pub async fn plugin_archive(path: String) -> Result<Package> {
 #[tauri::command]
 pub async fn plugin_import(
     path: String,
+    integrity: String,
     state: State<'_, AppState>,
     jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<PluginState> {
@@ -391,7 +392,7 @@ pub async fn plugin_import(
 
     let supervisor = Arc::clone(&state.supervisor);
     let reporter = Arc::clone(&supervisor);
-    let outcome = super::import(Path::new(&path), move |stream, line| {
+    let outcome = super::import(Path::new(&path), &integrity, move |stream, line| {
         reporter.note(stream, line)
     })
     .await;

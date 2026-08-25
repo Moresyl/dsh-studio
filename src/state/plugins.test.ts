@@ -74,6 +74,29 @@ describe('plugin installation identity', () => {
     expect(packageName('@vendor/plugin@0.4.0')).toBe('@vendor/plugin')
     expect(packageName('@vendor/plugin')).toBe('@vendor/plugin')
   })
+
+  it('binds an archive install to the digest shown in its review', async () => {
+    vi.mocked(ipc.pluginImport).mockResolvedValue({
+      profile: 'web',
+      profileDir: 'C:/Users/test/.dsh/profiles/web',
+      initialized: true,
+      plugins: [],
+      packageManager: true,
+    })
+    const archive: ipc.ArchivePackage = {
+      name: '@local/archive',
+      version: '1.0.0',
+      description: '',
+      bundle: true,
+      path: 'C:/Downloads/archive.tgz',
+      bytes: 128,
+      integrity: 'sha256:reviewed',
+    }
+
+    await usePlugins.getState().bringIn(archive)
+
+    expect(ipc.pluginImport).toHaveBeenCalledWith(archive.path, archive.integrity)
+  })
 })
 
 describe('installed plugin details', () => {

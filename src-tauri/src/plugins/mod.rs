@@ -447,11 +447,16 @@ where
 /// installed from, so the file becomes part of the profile — reinstalling or
 /// duplicating that profile reads the same path again, and the path the user
 /// picked may well have been on a stick that has since been taken out.
-pub async fn import<R>(path: &Path, report: R) -> Result<archive::Package>
+pub async fn import<R>(path: &Path, expected_integrity: &str, report: R) -> Result<archive::Package>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
     let package = archive::read(path)?;
+    if package.integrity != expected_integrity {
+        return Err(Error::Plugin(
+            "the plugin archive changed after it was reviewed; review it again".into(),
+        ));
+    }
     let kept = archive::stage(path, &package)?;
 
     let profile = crate::profiles::selected();

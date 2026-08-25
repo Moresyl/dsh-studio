@@ -511,7 +511,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     ++stateGeneration
     set({ working: archive.name, error: null })
     try {
-      landed(set, await ipc.pluginImport(archive.path))
+      landed(set, await ipc.pluginImport(archive.path, archive.integrity))
     } catch (cause) {
       failed(set, cause)
     } finally {

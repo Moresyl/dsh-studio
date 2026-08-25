@@ -770,10 +770,7 @@ fn write_journal(path: &Path) -> Result<()> {
     };
     let body = serde_json::to_vec_pretty(&journal)
         .map_err(|cause| Error::Install(format!("could not encode install state: {cause}")))?;
-    let temporary = path.with_extension("json.tmp");
-    std::fs::write(&temporary, body)
-        .map_err(|cause| Error::Install(format!("could not write install state: {cause}")))?;
-    std::fs::rename(&temporary, path)
+    crate::atomic::write(path, body)
         .map_err(|cause| Error::Install(format!("could not commit install state: {cause}")))
 }
 

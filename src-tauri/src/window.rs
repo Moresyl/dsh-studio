@@ -497,7 +497,7 @@ fn write_placement(placement: &Placement) {
         let _ = std::fs::create_dir_all(parent);
     }
     if let Ok(raw) = serde_json::to_vec(placement) {
-        let _ = std::fs::write(path, raw);
+        let _ = crate::atomic::write(&path, raw);
     }
 }
 

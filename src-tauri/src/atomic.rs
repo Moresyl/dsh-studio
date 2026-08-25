@@ -29,7 +29,28 @@ pub fn write(path: &Path, body: impl AsRef<[u8]>) -> Result<()> {
     result
 }
 
-fn stage(path: &Path) -> Result<(PathBuf, File)> {
+/// Copy and inspect the complete staging file before it can replace the target.
+pub fn copy_checked<F>(source: &Path, target: &Path, check: F) -> Result<u64>
+where
+    F: FnOnce(&Path) -> Result<()>,
+{
+    let (temporary, mut output) = stage(target)?;
+    let result = (|| {
+        let mut input = File::open(source)?;
+        let copied = std::io::copy(&mut input, &mut output)?;
+        output.sync_all()?;
+        drop(output);
+        check(&temporary)?;
+        replace(&temporary, target)?;
+        Ok(copied)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+    result
+}
+
+pub(crate) fn stage(path: &Path) -> Result<(PathBuf, File)> {
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
     let name = path
         .file_name()
@@ -61,12 +82,12 @@ fn stage(path: &Path) -> Result<(PathBuf, File)> {
 }
 
 #[cfg(not(windows))]
-fn replace(staged: &Path, target: &Path) -> Result<()> {
+pub(crate) fn replace(staged: &Path, target: &Path) -> Result<()> {
     std::fs::rename(staged, target)
 }
 
 #[cfg(windows)]
-fn replace(staged: &Path, target: &Path) -> Result<()> {
+pub(crate) fn replace(staged: &Path, target: &Path) -> Result<()> {
     use std::os::windows::ffi::OsStrExt as _;
     use windows_sys::Win32::Storage::FileSystem::{
         MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
@@ -151,6 +172,38 @@ mod tests {
         let saved = std::fs::read_to_string(&path).unwrap();
         assert!(saved == left || saved == right);
         assert_eq!(std::fs::read_dir(&root).unwrap().count(), 1);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn copy_replaces_the_target_without_leaving_staging_data() {
+        let root = root("copy");
+        let source = root.join("source.tgz");
+        let target = root.join("target.tgz");
+        std::fs::write(&source, b"new archive").unwrap();
+        std::fs::write(&target, b"old archive").unwrap();
+
+        assert_eq!(copy_checked(&source, &target, |_| Ok(())).unwrap(), 11);
+        assert_eq!(std::fs::read(&target).unwrap(), b"new archive");
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 2);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_rejected_copy_keeps_the_existing_target() {
+        let root = root("rejected-copy");
+        let source = root.join("source.tgz");
+        let target = root.join("target.tgz");
+        std::fs::write(&source, b"unreviewed").unwrap();
+        std::fs::write(&target, b"reviewed").unwrap();
+
+        let failure = copy_checked(&source, &target, |_| {
+            Err(Error::new(ErrorKind::InvalidData, "changed"))
+        });
+
+        assert!(failure.is_err());
+        assert_eq!(std::fs::read(&target).unwrap(), b"reviewed");
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 2);
         std::fs::remove_dir_all(root).unwrap();
     }
 }
