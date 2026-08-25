@@ -89,6 +89,8 @@ let generation = 0
 let previewGeneration = 0
 /** A source or profile mutation makes an older combined refresh stale. */
 let stateGeneration = 0
+/** A source edit invalidates work whose answer belongs to the previous catalog. */
+let sourceGeneration = 0
 
 type Write = (partial: Partial<PluginStore>) => void
 
@@ -162,10 +164,11 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   search: async (query, category, sort, page, refresh = false) => {
     const mine = ++generation
+    const source = sourceGeneration
     set({ searching: true, error: null })
     try {
       const answer = await ipc.pluginSearch(query, category, sort, page, refresh)
-      if (mine === generation) {
+      if (mine === generation && source === sourceGeneration) {
         set({
           results: answer.items,
           categories: answer.categories,
@@ -177,12 +180,12 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         })
       }
     } catch (cause) {
-      if (mine === generation) {
+      if (mine === generation && source === sourceGeneration) {
         failed(set, cause)
         set({ results: [], total: 0, hasMore: false })
       }
     } finally {
-      if (mine === generation) set({ searching: false })
+      if (mine === generation && source === sourceGeneration) set({ searching: false })
     }
   },
 
@@ -261,10 +264,14 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   selectSource: async (id) => {
     if (get().working || get().sourceWorking) return
+    ++generation
+    ++sourceGeneration
     ++previewGeneration
     ++stateGeneration
     set({
       sourceWorking: true,
+      searching: false,
+      checkingSource: null,
       previewing: false,
       previewToken: null,
       previewExpiresAt: null,
@@ -296,10 +303,14 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   addSource: async (label, endpoint) => {
     if (get().working || get().sourceWorking) return false
+    ++generation
+    ++sourceGeneration
     ++previewGeneration
     ++stateGeneration
     set({
       sourceWorking: true,
+      searching: false,
+      checkingSource: null,
       previewing: false,
       previewToken: null,
       previewExpiresAt: null,
@@ -330,10 +341,14 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   removeSource: async (id) => {
     if (get().working || get().sourceWorking) return
+    ++generation
+    ++sourceGeneration
     ++previewGeneration
     ++stateGeneration
     set({
       sourceWorking: true,
+      searching: false,
+      checkingSource: null,
       previewing: false,
       previewToken: null,
       previewExpiresAt: null,
@@ -362,14 +377,17 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   checkSource: async (id) => {
     if (get().checkingSource) return
+    const mine = sourceGeneration
     set({ checkingSource: id, error: null })
     try {
       const health = await ipc.pluginSourceHealth(id)
-      set((state) => ({ sourceHealth: { ...state.sourceHealth, [id]: health } }))
+      if (mine === sourceGeneration) {
+        set((state) => ({ sourceHealth: { ...state.sourceHealth, [id]: health } }))
+      }
     } catch (cause) {
-      failed(set, cause)
+      if (mine === sourceGeneration) failed(set, cause)
     } finally {
-      set({ checkingSource: null })
+      if (mine === sourceGeneration) set({ checkingSource: null })
     }
   },
 

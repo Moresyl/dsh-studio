@@ -40,11 +40,20 @@ const detail = (version: string): PluginDetail => ({
 beforeEach(() => {
   vi.clearAllMocks()
   usePlugins.setState({
+    results: [],
+    categories: [],
+    total: 0,
+    page: 0,
+    pageSize: 25,
+    hasMore: false,
+    indexedAt: 0,
+    sources: [],
     selected: null,
     selectedSource: null,
     selectedVersion: null,
     detail: null,
     loadingDetail: false,
+    searching: false,
     previewing: false,
     previewToken: null,
     previewExpiresAt: null,
@@ -192,6 +201,43 @@ describe('plugin install previews', () => {
 })
 
 describe('plugin catalog source changes', () => {
+  it('drops a slow search when the active source changes underneath it', async () => {
+    let finishSearch!: (answer: Awaited<ReturnType<typeof ipc.pluginSearch>>) => void
+    vi.mocked(ipc.pluginSearch).mockReturnValue(
+      new Promise((resolve) => {
+        finishSearch = resolve
+      }),
+    )
+    vi.mocked(ipc.pluginSourceSelect).mockResolvedValue([
+      {
+        id: 'other',
+        label: 'Other',
+        kind: 'standard-http-v1',
+        endpoint: 'https://other.example',
+        builtIn: false,
+        active: true,
+      },
+    ])
+
+    const search = usePlugins.getState().search('tool', null, 'relevance', 0)
+    const switchSource = usePlugins.getState().selectSource('other')
+    await switchSource
+    finishSearch({
+      items: [{ name: 'stale-tool' } as never],
+      categories: ['stale'],
+      total: 1,
+      page: 0,
+      pageSize: 25,
+      hasMore: false,
+      indexedAt: 1,
+    })
+    await search
+
+    expect(usePlugins.getState().results).toEqual([])
+    expect(usePlugins.getState().categories).toEqual([])
+    expect(usePlugins.getState().searching).toBe(false)
+  })
+
   it('serializes source edits that target the same settings document', async () => {
     let finish!: (answer: []) => void
     vi.mocked(ipc.pluginSourceAdd).mockReturnValue(
@@ -236,6 +282,32 @@ describe('plugin catalog source changes', () => {
     })
     await first
     expect(usePlugins.getState().sourceHealth.dshfind).toMatchObject({ items: 12, latencyMs: 42 })
+    expect(usePlugins.getState().checkingSource).toBeNull()
+  })
+
+  it('drops source health that returns after that source was removed', async () => {
+    let finishHealth!: (answer: ipc.CatalogHealth) => void
+    vi.mocked(ipc.pluginSourceHealth).mockReturnValue(
+      new Promise((resolve) => {
+        finishHealth = resolve
+      }),
+    )
+    vi.mocked(ipc.pluginSourceRemove).mockResolvedValue([])
+
+    const probe = usePlugins.getState().checkSource('retired')
+    await usePlugins.getState().removeSource('retired')
+    finishHealth({
+      sourceId: 'retired',
+      contract: 'standard-v1',
+      checkedAt: 1,
+      items: 1,
+      installable: 1,
+      latencyMs: 5,
+      warnings: [],
+    })
+    await probe
+
+    expect(usePlugins.getState().sourceHealth.retired).toBeUndefined()
     expect(usePlugins.getState().checkingSource).toBeNull()
   })
 
