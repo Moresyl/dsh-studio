@@ -18,6 +18,8 @@ use crate::paths;
 
 const DUMP_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_AUTOMATIC_REPAIRS: usize = 8;
+const MAX_DUMP_BYTES: usize = 8 << 20;
+const MAX_DIAGNOSTIC_BYTES: usize = 256 << 10;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Duplicate {
@@ -68,24 +70,47 @@ pub async fn preflight(plan: &LaunchPlan) -> Result<Vec<String>> {
 async fn dump(plan: &LaunchPlan) -> Result<String> {
     let mut command = plan.dump_command();
     command.kill_on_drop(true);
-    let output = tokio::time::timeout(DUMP_TIMEOUT, command.output())
-        .await
-        .map_err(|_| {
-            Error::Plugin(format!(
-                "profile composition did not finish within {}s",
-                DUMP_TIMEOUT.as_secs()
-            ))
-        })?
+    let mut child = command
+        .spawn()
         .map_err(|cause| Error::Plugin(format!("profile composition could not start: {cause}")))?;
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| Error::Plugin("profile composition provided no output pipe".into()))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| Error::Plugin("profile composition provided no diagnostic pipe".into()))?;
+    let (dump, diagnostic, status) = tokio::time::timeout(DUMP_TIMEOUT, async move {
+        tokio::join!(
+            crate::child_output::capture(stdout, MAX_DUMP_BYTES),
+            crate::child_output::capture(stderr, MAX_DIAGNOSTIC_BYTES),
+            child.wait()
+        )
+    })
+    .await
+    .map_err(|_| {
+        Error::Plugin(format!(
+            "profile composition did not finish within {}s",
+            DUMP_TIMEOUT.as_secs()
+        ))
+    })?;
+    let dump = dump
+        .map_err(|cause| Error::Plugin(format!("profile composition output is unsafe: {cause}")))?;
+    let diagnostic = diagnostic.map_err(|cause| {
+        Error::Plugin(format!("profile composition diagnostic is unsafe: {cause}"))
+    })?;
+    let status = status
+        .map_err(|cause| Error::Plugin(format!("profile composition could not finish: {cause}")))?;
 
-    if !output.status.success() {
-        let detail = concise(&String::from_utf8_lossy(&output.stderr));
+    if !status.success() {
+        let detail = concise(&String::from_utf8_lossy(&diagnostic));
         return Err(Error::Plugin(format!(
             "profile composition failed before startup: {detail}"
         )));
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    Ok(String::from_utf8_lossy(&dump).into_owned())
 }
 
 fn concise(raw: &str) -> String {

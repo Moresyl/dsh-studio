@@ -400,12 +400,25 @@ async fn ask_npm(node: &Path) -> String {
         command.creation_flags(0x0800_0000);
     }
 
-    let Ok(Ok(output)) = tokio::time::timeout(Duration::from_secs(15), command.output()).await
+    command.kill_on_drop(true);
+    let Ok(mut child) = command.spawn() else {
+        return DEFAULT_REGISTRY.to_string();
+    };
+    let Some(stdout) = child.stdout.take() else {
+        return DEFAULT_REGISTRY.to_string();
+    };
+    let Ok((Ok(answer), Ok(status))) = tokio::time::timeout(Duration::from_secs(15), async move {
+        tokio::join!(crate::child_output::capture(stdout, 16 << 10), child.wait())
+    })
+    .await
     else {
         return DEFAULT_REGISTRY.to_string();
     };
+    if !status.success() {
+        return DEFAULT_REGISTRY.to_string();
+    }
 
-    let answer = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let answer = String::from_utf8_lossy(&answer).trim().to_string();
     // npm prints `undefined` when a key is unset, and prints its usage text
     // when it dislikes the arguments. Either way, the public registry is the
     // right thing to fall back to.

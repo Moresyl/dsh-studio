@@ -62,13 +62,34 @@ where
     R: AsyncRead + Unpin,
 {
     let mut body = Vec::with_capacity(maximum.min(64 * 1024));
-    let mut limited = (&mut reader).take(maximum.saturating_add(1) as u64);
+    let mut limited = tokio::io::AsyncReadExt::take(&mut reader, maximum.saturating_add(1) as u64);
     limited.read_to_end(&mut body).await?;
     if body.len() <= maximum {
         return Ok(body);
     }
 
     tokio::io::copy(&mut reader, &mut tokio::io::sink()).await?;
+    Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!("child output exceeds the {maximum} byte safety limit"),
+    ))
+}
+
+/// Synchronous counterpart for the few startup probes that cannot make their
+/// caller async. It has the same retain-small, drain-rest contract as
+/// [`capture`].
+pub fn capture_sync<R>(mut reader: R, maximum: usize) -> std::io::Result<Vec<u8>>
+where
+    R: std::io::Read,
+{
+    let mut body = Vec::with_capacity(maximum.min(64 * 1024));
+    let mut limited = std::io::Read::take(&mut reader, maximum.saturating_add(1) as u64);
+    std::io::Read::read_to_end(&mut limited, &mut body)?;
+    if body.len() <= maximum {
+        return Ok(body);
+    }
+
+    std::io::copy(&mut reader, &mut std::io::sink())?;
     Err(std::io::Error::new(
         std::io::ErrorKind::InvalidData,
         format!("child output exceeds the {maximum} byte safety limit"),
@@ -114,5 +135,14 @@ mod tests {
             .await
             .expect_err("oversized output");
         assert_eq!(failure.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn synchronous_capture_has_the_same_limit() {
+        assert_eq!(capture_sync(b"12345".as_slice(), 5).unwrap(), b"12345");
+        assert_eq!(
+            capture_sync(b"123456".as_slice(), 5).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidData
+        );
     }
 }

@@ -876,11 +876,32 @@ fn npm_cli_works(node: &Path, npm_cli: &Path) -> bool {
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null());
     proc_guard::hide_console(&mut command);
-    command
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .is_some_and(|output| !output.stdout.iter().all(u8::is_ascii_whitespace))
+    let Ok(mut child) = command.spawn() else {
+        return false;
+    };
+    let Some(stdout) = child.stdout.take() else {
+        let _ = child.kill();
+        return false;
+    };
+    let output = std::thread::spawn(move || crate::child_output::capture_sync(stdout, 16 << 10));
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Some(status),
+            Ok(None) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Ok(None) | Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+        }
+    };
+    let Ok(Ok(output)) = output.join() else {
+        return false;
+    };
+    status.is_some_and(|status| status.success()) && !output.iter().all(u8::is_ascii_whitespace)
 }
 
 /// `PATH` with the chosen Node's directory in front.
