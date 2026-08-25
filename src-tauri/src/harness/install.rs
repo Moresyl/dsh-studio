@@ -422,11 +422,12 @@ fn stage_integration(target: &Path) -> Result<()> {
 fn qualify_runtime(target: &Path) -> Result<()> {
     let client = target
         .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
-    let mut body = std::fs::read_to_string(&client).map_err(|cause| {
-        Error::Install(format!(
-            "the qualified directory picker could not be read: {cause}"
-        ))
-    })?;
+    let mut body = crate::bounded_file::read_string(&client, crate::bounded_file::CONTROL_BYTES)
+        .map_err(|cause| {
+            Error::Install(format!(
+                "the qualified directory picker could not be read safely: {cause}"
+            ))
+        })?;
 
     body = replace_once(
         body,
@@ -655,7 +656,8 @@ pub fn runtime_version(target: &Path) -> Option<String> {
         .join("@deepseek-ai")
         .join("dsh")
         .join("package.json");
-    let raw = std::fs::read_to_string(manifest).ok()?;
+    let raw =
+        crate::bounded_file::read_string(&manifest, crate::bounded_file::CONTROL_BYTES).ok()?;
     let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
     let version = parsed.get("version")?.as_str()?.trim();
     (!version.is_empty()).then(|| version.to_string())
@@ -681,7 +683,8 @@ fn entry(target: &Path) -> PathBuf {
 
 pub fn pnpm_version(target: &Path) -> Option<String> {
     let manifest = target.join("node_modules/pnpm/package.json");
-    let raw = std::fs::read_to_string(manifest).ok()?;
+    let raw =
+        crate::bounded_file::read_string(&manifest, crate::bounded_file::CONTROL_BYTES).ok()?;
     let parsed: serde_json::Value = serde_json::from_str(&raw).ok()?;
     parsed.get("version")?.as_str().map(str::to_string)
 }
@@ -695,15 +698,20 @@ fn integration_entry(target: &Path) -> PathBuf {
 }
 
 fn runtime_schema(target: &Path) -> Option<u8> {
-    let raw = std::fs::read_to_string(target.join("dsh-studio-runtime.json")).ok()?;
+    let raw = crate::bounded_file::read_string(
+        &target.join("dsh-studio-runtime.json"),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .ok()?;
     let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
     value.get("schema")?.as_u64()?.try_into().ok()
 }
 
 fn qualified_picker(target: &Path) -> bool {
-    std::fs::read_to_string(
-        target
+    crate::bounded_file::read_string(
+        &target
             .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js"),
+        crate::bounded_file::CONTROL_BYTES,
     )
     .is_ok_and(|body| {
         body.contains("__DSH_DESKTOP_PICK_DIRECTORY__")
@@ -1160,6 +1168,29 @@ mod tests {
         let patched = fs::read_to_string(target).expect("patched picker");
         assert!(patched.contains("__DSH_DESKTOP_PICK_DIRECTORY__"));
         assert!(patched.contains("openDirectory(targetPath)"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn qualification_refuses_an_oversized_picker_bundle() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-picker-oversized-{}",
+            std::process::id()
+        ));
+        let target = root
+            .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(target.parent().expect("picker parent")).expect("picker directory");
+        fs::write(&target, vec![b' '; crate::bounded_file::CONTROL_BYTES + 1])
+            .expect("oversized picker");
+
+        let failure = qualify_runtime(&root).expect_err("oversized picker must be refused");
+
+        assert!(failure.to_string().contains("safety limit"));
+        assert_eq!(
+            fs::metadata(&target).expect("picker remains").len(),
+            (crate::bounded_file::CONTROL_BYTES + 1) as u64
+        );
         let _ = fs::remove_dir_all(root);
     }
 }
