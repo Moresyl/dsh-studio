@@ -54,28 +54,27 @@ export async function installUpdate(
   const update = await checkSignedUpdate(check)
   if (!update) return false
 
-  const actualVersion = exactVersion(update.version)
-  if (actualVersion !== exactVersion(expectedVersion)) {
-    await update.close()
-    throw new Error(`${UPDATE_CHANGED}\nExpected ${expectedVersion}; found ${actualVersion}`)
-  }
-
-  let downloaded = 0
-  let total: number | null = null
-  const report = (event: DownloadEvent) => {
-    if (event.event === 'Started') {
-      downloaded = 0
-      total = event.data.contentLength ?? null
-    } else if (event.event === 'Progress') {
-      downloaded += event.data.chunkLength
-      if (total !== null) downloaded = Math.min(downloaded, total)
-    } else if (total !== null) {
-      downloaded = total
-    }
-    onProgress({ downloaded, total })
-  }
-
   try {
+    const actualVersion = exactVersion(update.version)
+    if (actualVersion !== exactVersion(expectedVersion)) {
+      throw new Error(`${UPDATE_CHANGED}\nExpected ${expectedVersion}; found ${actualVersion}`)
+    }
+
+    let downloaded = 0
+    let total: number | null = null
+    const report = (event: DownloadEvent) => {
+      if (event.event === 'Started') {
+        downloaded = 0
+        total = event.data.contentLength ?? null
+      } else if (event.event === 'Progress') {
+        downloaded += event.data.chunkLength
+        if (total !== null) downloaded = Math.min(downloaded, total)
+      } else if (total !== null) {
+        downloaded = total
+      }
+      onProgress({ downloaded, total })
+    }
+
     try {
       await update.downloadAndInstall(report)
     } catch (cause) {
@@ -97,7 +96,11 @@ export async function installUpdate(
 function exactVersion(value: unknown): string {
   if (typeof value !== 'string') throw new Error('The signed update feed has no valid version.')
   const version = value.trim().replace(/^v/, '')
-  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(version)) {
+  if (
+    !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(
+      version,
+    )
+  ) {
     throw new Error(`The signed update feed contains an invalid version: ${version || '(empty)'}`)
   }
   return version

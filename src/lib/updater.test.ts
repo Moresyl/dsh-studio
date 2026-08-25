@@ -83,9 +83,7 @@ describe('installUpdate', () => {
     downloadAndInstall.mockRejectedValue(new Error('network lost'))
     check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
 
-    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(
-      /Full \/ Offline.*network lost/s,
-    )
+    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/Full \/ Offline.*network lost/s)
     expect(relaunch).not.toHaveBeenCalled()
     expect(close).toHaveBeenCalledOnce()
   })
@@ -94,6 +92,15 @@ describe('installUpdate', () => {
     check.mockResolvedValue({ version: '0.5.0', downloadAndInstall, close })
 
     await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/changed.*review/s)
+    expect(downloadAndInstall).not.toHaveBeenCalled()
+    expect(relaunch).not.toHaveBeenCalled()
+    expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('closes the native resource when install metadata has an invalid version', async () => {
+    check.mockResolvedValue({ version: null, downloadAndInstall, close })
+
+    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/valid version/)
     expect(downloadAndInstall).not.toHaveBeenCalled()
     expect(relaunch).not.toHaveBeenCalled()
     expect(close).toHaveBeenCalledOnce()
