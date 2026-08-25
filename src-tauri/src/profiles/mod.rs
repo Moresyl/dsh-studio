@@ -314,18 +314,11 @@ fn sync_studio_runtime_module() -> Result<()> {
         .join(SHARED_MODULES)
         .join("@moresyl")
         .join("dsh-studio-integration");
-    sync_runtime_module_in(&source, &target)
+    sync_runtime_module_in(&source, &target, &paths::profiles_dir())
 }
 
-fn sync_runtime_module_in(source: &Path, target: &Path) -> Result<()> {
-    if let Ok(metadata) = std::fs::symlink_metadata(target) {
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
-            return Err(Error::Profile(format!(
-                "{} is not a safe Studio module directory",
-                target.display()
-            )));
-        }
-    }
+fn sync_runtime_module_in(source: &Path, target: &Path, root: &Path) -> Result<()> {
+    create_safe_directory(root, target)?;
 
     for relative in STUDIO_MODULE_FILES {
         let source_file = source.join(relative);
@@ -341,6 +334,12 @@ fn sync_runtime_module_in(source: &Path, target: &Path) -> Result<()> {
                 source_file.display()
             )));
         }
+        if source_metadata.len() > crate::bounded_file::CONTROL_BYTES as u64 {
+            return Err(Error::Profile(format!(
+                "the managed Studio module file is too large at {}",
+                source_file.display()
+            )));
+        }
 
         let target_file = target.join(relative);
         if let Ok(metadata) = std::fs::symlink_metadata(&target_file) {
@@ -352,24 +351,59 @@ fn sync_runtime_module_in(source: &Path, target: &Path) -> Result<()> {
             }
         }
         let parent = target_file.parent().expect("a module file has a parent");
-        std::fs::create_dir_all(parent).map_err(|cause| {
-            Error::Profile(format!(
-                "{} could not be created: {cause}",
-                parent.display()
-            ))
-        })?;
-        let body = std::fs::read(&source_file).map_err(|cause| {
-            Error::Profile(format!(
-                "{} could not be read: {cause}",
-                source_file.display()
-            ))
-        })?;
-        std::fs::write(&target_file, body).map_err(|cause| {
+        create_safe_directory(root, parent)?;
+        let body = crate::bounded_file::read(&source_file, crate::bounded_file::CONTROL_BYTES)
+            .map_err(|cause| {
+                Error::Profile(format!(
+                    "{} could not be read: {cause}",
+                    source_file.display()
+                ))
+            })?;
+        crate::atomic::write(&target_file, body).map_err(|cause| {
             Error::Profile(format!(
                 "{} could not be written: {cause}",
                 target_file.display()
             ))
         })?;
+    }
+    Ok(())
+}
+
+fn create_safe_directory(root: &Path, target: &Path) -> Result<()> {
+    let relative = target.strip_prefix(root).map_err(|_| {
+        Error::Profile(format!(
+            "{} is outside the managed profile directory",
+            target.display()
+        ))
+    })?;
+    let mut current = root.to_path_buf();
+    for component in std::iter::once(None).chain(relative.components().map(Some)) {
+        if let Some(component) = component {
+            current.push(component);
+        }
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {}
+            Ok(_) => {
+                return Err(Error::Profile(format!(
+                    "{} is not a safe Studio module directory",
+                    current.display()
+                )));
+            }
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {
+                std::fs::create_dir(&current).map_err(|cause| {
+                    Error::Profile(format!(
+                        "{} could not be created: {cause}",
+                        current.display()
+                    ))
+                })?;
+            }
+            Err(cause) => {
+                return Err(Error::Profile(format!(
+                    "{} could not be inspected: {cause}",
+                    current.display()
+                )));
+            }
+        }
     }
     Ok(())
 }
@@ -1383,9 +1417,11 @@ mod tests {
             std::fs::write(file, format!("generation-one-{index}")).expect("source module file");
         }
 
-        sync_runtime_module_in(&source, &target).expect("first materialization");
+        sync_runtime_module_in(&source, &target, &root.join("profiles"))
+            .expect("first materialization");
         std::fs::write(source.join("lib/client.js"), "generation-two").expect("updated source");
-        sync_runtime_module_in(&source, &target).expect("idempotent update");
+        sync_runtime_module_in(&source, &target, &root.join("profiles"))
+            .expect("idempotent update");
 
         assert_eq!(
             std::fs::read_to_string(target.join("lib/client.js")).expect("copied client"),
@@ -1395,6 +1431,41 @@ mod tests {
             .iter()
             .all(|relative| target.join(relative).is_file()));
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn runtime_module_materialization_refuses_a_linked_parent() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-runtime-link-{}",
+            std::process::id()
+        ));
+        let source = root.join("source");
+        let profiles = root.join("profiles");
+        let modules = profiles.join("node_modules");
+        let outside = root.join("outside");
+        let linked = modules.join("@moresyl");
+        let target = linked.join("dsh-studio-integration");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&source).expect("source");
+        std::fs::create_dir_all(&modules).expect("module parent");
+        std::fs::create_dir_all(&outside).expect("outside");
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, &linked).expect("directory symlink");
+        #[cfg(windows)]
+        if std::os::windows::fs::symlink_dir(&outside, &linked).is_err() {
+            let _ = std::fs::remove_dir_all(root);
+            return;
+        }
+
+        let failure = sync_runtime_module_in(&source, &target, &profiles)
+            .expect_err("linked parent must be refused");
+
+        assert!(failure
+            .to_string()
+            .contains("not a safe Studio module directory"));
+        assert!(!outside.join("dsh-studio-integration").exists());
+        std::fs::remove_dir_all(root).expect("cleanup");
     }
 
     /// A profile with no workspace file of its own is written without one, and
