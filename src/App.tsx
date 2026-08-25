@@ -15,8 +15,10 @@ import { SETTINGS, VIEWS, type View } from '@/components/workbench-contract'
 import { t } from '@/lib/i18n'
 import { pushWorkspaceDrop } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
+import { ownAsync } from '@/lib/lifecycle'
 import { standby } from '@/lib/platform'
 import { useDialog } from '@/state/dialog'
+import { reportFailure } from '@/state/failure'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
 import { usePalette } from '@/state/palette'
@@ -134,10 +136,7 @@ export default function App() {
   }, [stage])
 
   useEffect(() => {
-    const pending = subscribeToHarness()
-    return () => {
-      void pending.then((unlisten) => unlisten())
-    }
+    return ownAsync(subscribeToHarness(), reportFailure)
   }, [])
 
   // Subscribed for the lifetime of the window, not from the pane that shows it:
@@ -145,10 +144,7 @@ export default function App() {
   // has to stop claiming otherwise even while the user is looking elsewhere.
   useEffect(() => {
     void refreshRemote()
-    const pending = subscribeToRemote()
-    return () => {
-      void pending.then((unlisten) => unlisten())
-    }
+    return ownAsync(subscribeToRemote(), reportFailure)
   }, [refreshRemote])
 
   // Shells have to keep printing while the user is looking at something else,
@@ -159,10 +155,10 @@ export default function App() {
     // Loading the event owner asynchronously also keeps xterm's emulator out
     // of the first-paint bundle. The import starts immediately, so shells still
     // have a window-lifetime listener before anybody can navigate to the pane.
-    const pending = import('@/state/terminals').then((module) => module.subscribeToTerminals())
-    return () => {
-      void pending.then((unlisten) => unlisten())
-    }
+    return ownAsync(
+      import('@/state/terminals').then((module) => module.subscribeToTerminals()),
+      reportFailure,
+    )
   }, [])
 
   // Windows are views onto one set of profiles, so a profile made, renamed or
@@ -170,10 +166,7 @@ export default function App() {
   // not from the manager, because the chip in the title bar reads the same
   // roster and is never closed.
   useEffect(() => {
-    const pending = subscribeToProfiles()
-    return () => {
-      void pending.then((unlisten) => unlisten())
-    }
+    return ownAsync(subscribeToProfiles(), reportFailure)
   }, [])
 
   // Also here rather than in the status bar that shows the result: the check
@@ -185,13 +178,13 @@ export default function App() {
   // rest of the chrome. Its update item enters the same checked state as the
   // About pane button and brings that evidence into view.
   useEffect(() => {
-    const pending = ipc.onApplicationCheckUpdate(() => {
-      show('about')
-      void useUpdate.getState().check(false)
-    })
-    return () => {
-      void pending.then((unlisten) => unlisten())
-    }
+    return ownAsync(
+      ipc.onApplicationCheckUpdate(() => {
+        show('about')
+        void useUpdate.getState().check(false)
+      }),
+      reportFailure,
+    )
   }, [show])
 
   // A native drop belongs to the surface the user can see. In the Studio
@@ -200,16 +193,16 @@ export default function App() {
   // a real Workspace row and session there instead of changing an unrelated
   // shell setting.
   useEffect(() => {
-    const pending = getCurrentWindow().onDragDropEvent((event) => {
-      if (event.payload.type !== 'drop' || event.payload.paths.length !== 1) return
-      const [path] = event.payload.paths
-      if (!path) return
-      if (!showPanel && origin) pushWorkspaceDrop(path, origin)
-      else void switchWorkspace(path)
-    })
-    return () => {
-      void pending.then((unlisten) => unlisten())
-    }
+    return ownAsync(
+      getCurrentWindow().onDragDropEvent((event) => {
+        if (event.payload.type !== 'drop' || event.payload.paths.length !== 1) return
+        const [path] = event.payload.paths
+        if (!path) return
+        if (!showPanel && origin) pushWorkspaceDrop(path, origin)
+        else void switchWorkspace(path)
+      }),
+      reportFailure,
+    )
   }, [origin, showPanel])
 
   // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, Ctrl+comma for settings, and

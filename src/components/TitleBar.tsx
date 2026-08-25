@@ -6,8 +6,10 @@ import { ProfileSwitch } from '@/components/ProfileSwitch'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
+import { ownAsync } from '@/lib/lifecycle'
 import { drawsWindowControls, isMac } from '@/lib/platform'
 import { contextMenu, SEPARATOR } from '@/state/menu'
+import { reportFailure } from '@/state/failure'
 import type { Presentation } from '@/state/presentation'
 
 /** Width the macOS traffic lights need before the title may start. */
@@ -62,10 +64,13 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
     }
 
     void sync()
-    const pending = appWindow.onResized(() => void sync())
+    const release = ownAsync(
+      appWindow.onResized(() => void sync()),
+      reportFailure,
+    )
     return () => {
       cancelled = true
-      void pending.then((unlisten) => unlisten())
+      release()
     }
   }, [appWindow])
 

@@ -10,6 +10,7 @@ import { create } from 'zustand'
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type { Environment, HarnessEvent, LogLine, NodeProgress, Status } from '@/lib/ipc'
+import { acquireTogether } from '@/lib/lifecycle'
 import { reportFailure } from '@/state/failure'
 
 /** Matches the ring the supervisor keeps, so scrollback agrees on both sides. */
@@ -187,12 +188,9 @@ export const useHarness = create<HarnessStore>((set, get) => ({
 
 /** Wire the store to the Rust event streams for the lifetime of the app. */
 export const subscribeToHarness = async (): Promise<() => void> => {
-  const [harness, node] = await Promise.all([
-    ipc.onHarnessEvent((event) => useHarness.getState().apply(event)),
-    ipc.onNodeProgress((progress) => useHarness.getState().applyNodeProgress(progress)),
+  return await acquireTogether([
+    async () => await ipc.onHarnessEvent((event) => useHarness.getState().apply(event)),
+    async () =>
+      await ipc.onNodeProgress((progress) => useHarness.getState().applyNodeProgress(progress)),
   ])
-  return () => {
-    harness()
-    node()
-  }
 }

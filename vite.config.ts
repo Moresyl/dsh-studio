@@ -45,6 +45,7 @@ export default defineConfig({
         'src/lib/crash.ts',
         'src/lib/errors.ts',
         'src/lib/fuzzy.ts',
+        'src/lib/lifecycle.ts',
         'src/lib/updater.ts',
         'src/lib/usage.ts',
         'src/state/rates.ts',

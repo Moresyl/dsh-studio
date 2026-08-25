@@ -16,6 +16,7 @@ import { create } from 'zustand'
 
 import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
+import { acquireTogether } from '@/lib/lifecycle'
 import type { TerminalExit, TerminalSession } from '@/lib/ipc'
 import * as screens from '@/lib/screen'
 import type { Screen } from '@/lib/screen'
@@ -211,11 +212,11 @@ function retire(exit: TerminalExit): void {
  */
 export async function subscribeToTerminals(): Promise<() => void> {
   screens.reportProblemsTo((cause) => useTerminals.setState({ error: describe(cause) }))
-  const unfollowTheme = screens.followTheme()
 
-  const [unlistenOutput, unlistenExit] = await Promise.all([
-    ipc.onTerminalOutput((output) => screens.write(output.id, output.data)),
-    ipc.onTerminalExit(retire),
+  const unlisten = await acquireTogether([
+    async () => screens.followTheme(),
+    async () => await ipc.onTerminalOutput((output) => screens.write(output.id, output.data)),
+    async () => await ipc.onTerminalExit(retire),
   ])
 
   // Shells outlive the page in development, where a reload rebuilds every
@@ -223,9 +224,7 @@ export async function subscribeToTerminals(): Promise<() => void> {
   void useTerminals.getState().sync()
 
   return () => {
-    unlistenOutput()
-    unlistenExit()
-    unfollowTheme()
+    unlisten()
   }
 }
 
