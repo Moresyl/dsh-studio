@@ -111,7 +111,7 @@
                 </div>
               </div>
               <div class="cta">启动 harness</div>
-              <p class="footnote">127.0.0.1:52731 —— 端口由内核分配</p>
+              <p class="footnote">127.0.0.1:52731 —— 默认由内核分配</p>
             </div>
           </div>
         </div>
@@ -146,11 +146,11 @@
             </article>
 
             <article class="card">
-              <h3><span class="kicker">对外暴露</span>只听回环，端口谁都没挑</h3>
+              <h3><span class="kicker">对外暴露</span>只听回环，端口策略安全可控</h3>
               <p>
-                harness 以 <code>--port 0</code> 启动，外壳再把内核分配的端口读回来。它只绑
-                <code>127.0.0.1</code>，别的都不绑。这两点都刻意不做成可配置项 —— 毕竟这是一个会执行
-                shell 命令的进程。
+                harness 默认以 <code>--port 0</code> 启动，外壳再把内核分配的端口读回来；也可以保存
+                1024–65535 的固定端口，冲突会在 Node 启动前明确提示。它始终只绑定
+                <code>127.0.0.1</code>，不会监听其他地址。
               </p>
             </article>
 

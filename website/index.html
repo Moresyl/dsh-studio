@@ -114,7 +114,7 @@
                 </div>
               </div>
               <div class="cta">Start harness</div>
-              <p class="footnote">127.0.0.1:52731 — port assigned by the kernel</p>
+              <p class="footnote">127.0.0.1:52731 — kernel-assigned by default</p>
             </div>
           </div>
         </div>
@@ -150,11 +150,11 @@
             </article>
 
             <article class="card">
-              <h3><span class="kicker">Exposure</span>Loopback, on a port nobody chose</h3>
+              <h3><span class="kicker">Exposure</span>Loopback, with a safe port policy</h3>
               <p>
-                The harness starts with <code>--port 0</code> and the shell reads back whatever the
-                kernel assigned. It binds <code>127.0.0.1</code> and nothing else. Neither is
-                configurable, on purpose — this is a process that runs shell commands.
+                The harness uses <code>--port 0</code> by default and reads back the kernel-assigned
+                port. You can instead save a fixed port from 1024–65535; conflicts are reported
+                before Node starts. It always binds <code>127.0.0.1</code> and nothing else.
               </p>
             </article>
 
