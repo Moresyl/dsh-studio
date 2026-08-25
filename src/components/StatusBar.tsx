@@ -7,6 +7,7 @@ import { t } from '@/lib/i18n'
 import { formatVersion, type Environment, type Status } from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
 import { contextMenu } from '@/state/menu'
+import { reportAction } from '@/state/failure'
 import { isAnnounceable, useUpdate } from '@/state/update'
 
 /**
@@ -57,12 +58,12 @@ export function StatusBar({
             {
               label: t('menu.copyPath'),
               icon: Copy,
-              run: () => void navigator.clipboard.writeText(node.path),
+              run: () => void reportAction(() => navigator.clipboard.writeText(node.path)),
             },
             {
               label: t('statusbar.reveal'),
               icon: FolderOpen,
-              run: () => void revealItemInDir(node.path),
+              run: () => void reportAction(() => revealItemInDir(node.path)),
             },
           ])}
         >
@@ -86,12 +87,13 @@ export function StatusBar({
             {
               label: t('statusbar.reveal'),
               icon: FolderOpen,
-              run: () => void revealItemInDir(environment.workspace),
+              run: () => void reportAction(() => revealItemInDir(environment.workspace)),
             },
             {
               label: t('menu.copyPath'),
               icon: Copy,
-              run: () => void navigator.clipboard.writeText(environment.workspace),
+              run: () =>
+                void reportAction(() => navigator.clipboard.writeText(environment.workspace)),
             },
           ])}
         >

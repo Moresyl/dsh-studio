@@ -16,6 +16,7 @@ import { Copy } from 'lucide-react'
 
 import { t } from '@/lib/i18n'
 import { selectedText, useMenu } from '@/state/menu'
+import { reportAction } from '@/state/failure'
 
 /** Keys that only ever meant something to a browser. */
 const BROWSER_KEYS = new Set([
@@ -124,7 +125,7 @@ function onContextMenu(event: MouseEvent): void {
       label: t('menu.copy'),
       icon: Copy,
       disabled: selection.length === 0,
-      run: () => void navigator.clipboard.writeText(selection),
+      run: () => void reportAction(() => navigator.clipboard.writeText(selection)),
     },
   ])
 }

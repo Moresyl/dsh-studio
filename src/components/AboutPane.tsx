@@ -25,6 +25,7 @@ import * as ipc from '@/lib/ipc'
 import type { About } from '@/lib/ipc'
 import { notesForDisplay } from '@/lib/updater'
 import { contextMenu } from '@/state/menu'
+import { reportAction, reportFailure } from '@/state/failure'
 import { useUpdate } from '@/state/update'
 
 /** Where this build comes from. Our own repository, and the only link here. */
@@ -73,8 +74,12 @@ export function AboutPane() {
       .catch((cause: unknown) => setError(describe(cause)))
   }, [])
 
+  const fail = useCallback((cause: unknown) => {
+    setError(reportFailure(cause))
+  }, [])
+
   const reveal = (path: string) => {
-    void revealItemInDir(path).catch((cause: unknown) => setError(describe(cause)))
+    void revealItemInDir(path).catch(fail)
   }
 
   /**
@@ -90,12 +95,12 @@ export function AboutPane() {
     try {
       return await ipc.reportBuild()
     } catch (cause) {
-      setError(describe(cause))
+      fail(cause)
       return null
     } finally {
       setBuilding(false)
     }
-  }, [])
+  }, [fail])
 
   const copyReport = useCallback(async () => {
     const report = await build()
@@ -103,30 +108,33 @@ export function AboutPane() {
 
     // The webview's own clipboard rather than a plugin: this document is served
     // from localhost, a secure context, and a click is the gesture it asks for.
-    await navigator.clipboard.writeText(report.text)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1400)
-  }, [build])
+    try {
+      await navigator.clipboard.writeText(report.text)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1400)
+    } catch (cause) {
+      fail(cause)
+    }
+  }, [build, fail])
 
   const saveReport = useCallback(async () => {
     const report = await build()
     if (!report) return
 
-    const path = await pickPath({
-      title: t('about.reportTitle'),
-      defaultPath: report.archiveName,
-      filters: [{ name: t('about.reportKind'), extensions: ['zip'] }],
-    })
-    // Dismissed, which is an answer rather than a failure.
-    if (!path) return
-
     try {
+      const path = await pickPath({
+        title: t('about.reportTitle'),
+        defaultPath: report.archiveName,
+        filters: [{ name: t('about.reportKind'), extensions: ['zip'] }],
+      })
+      // Dismissed, which is an answer rather than a failure.
+      if (!path) return
       await ipc.reportArchive(path, report.text)
       await revealItemInDir(path)
     } catch (cause) {
-      setError(describe(cause))
+      fail(cause)
     }
-  }, [build])
+  }, [build, fail])
 
   const notes = release ? notesForDisplay(release.notes) : ''
   const percent =
@@ -206,7 +214,10 @@ export function AboutPane() {
               )}
 
               <div className="flex items-center justify-end gap-2">
-                <Button variant="secondary" onClick={() => void openUrl(release.url)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => void reportAction(() => openUrl(release.url))}
+                >
                   {t('about.release')}
                   <ArrowUpRight size={13} strokeWidth={2.3} />
                 </Button>
@@ -285,7 +296,7 @@ export function AboutPane() {
           <div className="flex items-center gap-4 text-[11.5px] text-faint">
             <button
               type="button"
-              onClick={() => void openUrl(SOURCE)}
+              onClick={() => void reportAction(() => openUrl(SOURCE))}
               className="inline-flex items-center gap-1.5 transition-colors duration-100 hover:text-brand"
             >
               <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden="true" />
@@ -314,7 +325,7 @@ function CommunityLink({
   return (
     <button
       type="button"
-      onClick={() => void openUrl(url)}
+      onClick={() => void reportAction(() => openUrl(url))}
       className="flex items-center justify-center gap-2 rounded-control border border-line bg-canvas-deep/50 px-3 py-2.5 text-[11.5px] text-muted transition-colors hover:border-line-strong hover:text-brand"
     >
       <Icon size={13} strokeWidth={2.1} aria-hidden="true" />
@@ -345,7 +356,7 @@ function PathRow({ label, path, onReveal }: PathRowProps) {
               {
                 label: t('menu.copyPath'),
                 icon: Copy,
-                run: () => void navigator.clipboard.writeText(path),
+                run: () => void reportAction(() => navigator.clipboard.writeText(path)),
               },
             ])}
             className="flex max-w-full items-center gap-1.5 font-mono text-[11.5px] text-muted transition-colors duration-100 hover:text-brand"

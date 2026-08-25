@@ -34,6 +34,7 @@ import { t, type MessageKey } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import { pressedBackdrop } from '@/lib/modal'
 import { ACCELERATOR, SHIFT } from '@/lib/platform'
+import { reportAction } from '@/state/failure'
 import { useHarness } from '@/state/harness'
 import { usePalette } from '@/state/palette'
 import { usePlugins } from '@/state/plugins'
@@ -201,7 +202,7 @@ function Palette({
       icon: AppWindow,
       label: t('window.new'),
       hint: NEW_WINDOW_KEYS,
-      run: close(() => void ipc.windowOpen()),
+      run: close(() => void reportAction(ipc.windowOpen)),
     })
 
     // Offered by what the supervisor last said, not by what a click implied: a

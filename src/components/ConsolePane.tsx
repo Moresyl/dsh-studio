@@ -13,6 +13,7 @@ import { t } from '@/lib/i18n'
 import { formatVersion, isAtLeast, type NodeInstallation, type NodeVersion } from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
 import { useHarness } from '@/state/harness'
+import { reportAction } from '@/state/failure'
 import { contextMenu } from '@/state/menu'
 
 /**
@@ -260,7 +261,8 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
   // from localhost, a secure context on every platform we ship, and a click is
   // the user gesture the API asks for.
   const copy = (value: string) => {
-    void navigator.clipboard.writeText(value).then(() => {
+    void reportAction(async () => {
+      await navigator.clipboard.writeText(value)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1200)
     })
@@ -274,12 +276,12 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
           <button
             type="button"
             data-hint={t('statusbar.open')}
-            onClick={() => void openUrl(origin)}
+            onClick={() => void reportAction(() => openUrl(origin))}
             onContextMenu={contextMenu([
               {
                 label: t('statusbar.open'),
                 icon: ExternalLink,
-                run: () => void openUrl(origin),
+                run: () => void reportAction(() => openUrl(origin)),
               },
               {
                 label: t('menu.copyAddress'),

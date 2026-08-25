@@ -19,6 +19,7 @@ import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
 import type { RemoteDevice, RemoteStatus } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
+import { reportAction } from '@/state/failure'
 import { useHarness } from '@/state/harness'
 import { useRemote } from '@/state/remote'
 
@@ -433,7 +434,8 @@ function CopyButton({ value, label }: { value: string; label: string }): ReactNo
   const [copied, setCopied] = useState(false)
 
   const copy = () => {
-    void navigator.clipboard.writeText(value).then(() => {
+    void reportAction(async () => {
+      await navigator.clipboard.writeText(value)
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1400)
     })

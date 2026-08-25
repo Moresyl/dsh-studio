@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useDialog } from '@/state/dialog'
-import { reportFailure } from '@/state/failure'
+import { reportAction, reportFailure } from '@/state/failure'
 import { t } from '@/lib/i18n'
 
 beforeEach(() => useDialog.setState({ pending: null }))
@@ -20,6 +20,17 @@ describe('reportFailure', () => {
     expect(useDialog.getState().pending).toMatchObject({
       kind: 'error',
       details: t('dialog.failure.unknown'),
+    })
+  })
+
+  it('returns successful action values and reports rejected user actions', async () => {
+    await expect(reportAction(async () => 'opened')).resolves.toBe('opened')
+    await expect(
+      reportAction(async () => await Promise.reject(new Error('shell opener unavailable'))),
+    ).resolves.toBeNull()
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'shell opener unavailable',
     })
   })
 })

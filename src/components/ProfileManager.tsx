@@ -35,6 +35,7 @@ import { t } from '@/lib/i18n'
 import type { Comparison, Difference, Profile, Standing } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { ask } from '@/state/dialog'
+import { reportAction } from '@/state/failure'
 import { useHarness } from '@/state/harness'
 import { contextMenu, SEPARATOR, useMenu, type MenuEntry } from '@/state/menu'
 import { isNewProfileName, switchProfile, useProfiles } from '@/state/profiles'
@@ -138,21 +139,27 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
 
   const exportProfile = useCallback(
     async (name: string) => {
-      const path = await pickPath({
-        title: t('profile.exportTitle'),
-        defaultPath: `${name}.dsh-profile.json`,
-        filters: [{ name: t('profile.fileKind'), extensions: ['json'] }],
-      })
+      const path = await reportAction(
+        async () =>
+          await pickPath({
+            title: t('profile.exportTitle'),
+            defaultPath: `${name}.dsh-profile.json`,
+            filters: [{ name: t('profile.fileKind'), extensions: ['json'] }],
+          }),
+      )
       if (path) await write(name, path)
     },
     [write],
   )
 
   const importProfile = useCallback(async () => {
-    const path = await pickFile({
-      title: t('profile.importTitle'),
-      filters: [{ name: t('profile.fileKind'), extensions: ['json'] }],
-    })
+    const path = await reportAction(
+      async () =>
+        await pickFile({
+          title: t('profile.importTitle'),
+          filters: [{ name: t('profile.fileKind'), extensions: ['json'] }],
+        }),
+    )
     if (typeof path !== 'string') return
 
     // Read before importing: the file carries the name it was exported under,

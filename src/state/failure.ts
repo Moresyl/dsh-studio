@@ -19,3 +19,19 @@ export function reportFailure(cause: unknown): string {
   })
   return details
 }
+
+/**
+ * Run one explicit user action without leaving a rejected Promise behind.
+ *
+ * Event handlers cannot await the Promise they start. Keeping this wrapper at
+ * that boundary makes native dialog, clipboard, opener and window failures use
+ * the same copyable application error as state-changing actions.
+ */
+export async function reportAction<T>(action: () => Promise<T>): Promise<T | null> {
+  try {
+    return await action()
+  } catch (cause) {
+    reportFailure(cause)
+    return null
+  }
+}

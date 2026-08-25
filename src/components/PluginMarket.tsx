@@ -32,6 +32,7 @@ import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import type { CatalogSource, InstalledPlugin, PluginListing, PluginSort } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
+import { reportAction } from '@/state/failure'
 import { useHarness } from '@/state/harness'
 import { isInstalled, usePlugins } from '@/state/plugins'
 
@@ -125,10 +126,13 @@ export function PluginMarket() {
   // is whatever the person who sent it typed; the package inside it is the thing
   // about to be added to this profile, and it is the one worth confirming.
   const importArchive = useCallback(async () => {
-    const path = await pickFile({
-      title: t('plugins.importTitle'),
-      filters: [{ name: t('plugins.importKind'), extensions: ['tgz', 'gz'] }],
-    })
+    const path = await reportAction(
+      async () =>
+        await pickFile({
+          title: t('plugins.importTitle'),
+          filters: [{ name: t('plugins.importKind'), extensions: ['tgz', 'gz'] }],
+        }),
+    )
     if (typeof path !== 'string') return
 
     const archive = await inspect(path)
@@ -477,7 +481,7 @@ function Sources({ sources, working, onSelect, onManage }: SourcesProps) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="secondary" onClick={() => void openUrl(DSH_HUB)}>
+          <Button variant="secondary" onClick={() => void reportAction(() => openUrl(DSH_HUB))}>
             <ExternalLink size={13} aria-hidden="true" />
             {t('plugins.hub.open')}
           </Button>

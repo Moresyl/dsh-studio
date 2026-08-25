@@ -23,6 +23,7 @@ import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import { isMac, isWindows } from '@/lib/platform'
 import { clipboardAction } from '@/lib/terminal-shortcuts'
+import { reportAction } from '@/state/failure'
 
 import '@xterm/xterm/css/xterm.css'
 
@@ -161,7 +162,7 @@ function create(): Screen {
   terminal.loadAddon(
     new WebLinksAddon((event, uri) => {
       event.preventDefault()
-      void openUrl(uri)
+      void reportAction(() => openUrl(uri))
     }),
   )
 
@@ -199,7 +200,9 @@ function clipboardKeys(terminal: Terminal, event: KeyboardEvent): boolean {
     const selection = terminal.getSelection()
     // Nothing highlighted is not a failed copy; it is a keystroke with nothing
     // to do, and replacing the clipboard with an empty string would be worse.
-    if (selection.length > 0) void navigator.clipboard.writeText(selection).catch(sink.report)
+    if (selection.length > 0) {
+      void reportAction(() => navigator.clipboard.writeText(selection))
+    }
   } else {
     pasteInto(terminal)
   }
@@ -211,7 +214,7 @@ function clipboardKeys(terminal: Terminal, event: KeyboardEvent): boolean {
  * honoured and a shell that asked to be told about pastes is told.
  */
 function pasteInto(terminal: Terminal): void {
-  readText().then((text) => terminal.paste(text), sink.report)
+  void reportAction(async () => terminal.paste(await readText()))
 }
 
 /** Paste into a terminal by id, which is what the context menu has. */
@@ -223,7 +226,7 @@ export function paste(id: string): void {
 /** Copy xterm's canvas selection, which the webview cannot copy by itself. */
 export function copy(id: string): void {
   const chosen = selection(id)
-  if (chosen.length > 0) void navigator.clipboard.writeText(chosen).catch(sink.report)
+  if (chosen.length > 0) void reportAction(() => navigator.clipboard.writeText(chosen))
 }
 
 /**

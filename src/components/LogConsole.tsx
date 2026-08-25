@@ -5,6 +5,7 @@ import { t } from '@/lib/i18n'
 import type { LogLine } from '@/lib/ipc'
 import { logTone } from '@/lib/log-tone'
 import { contextMenu, selectedText } from '@/state/menu'
+import { reportAction } from '@/state/failure'
 
 /**
  * Raw harness output, as a pane rather than a disclosure.
@@ -64,14 +65,16 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
               // Greyed rather than absent, so the menu does not change shape
               // between one right-click and the next.
               disabled: selection.length === 0,
-              run: () => void navigator.clipboard.writeText(selection),
+              run: () => void reportAction(() => navigator.clipboard.writeText(selection)),
             },
             {
               label: t('menu.copyAll'),
               icon: ClipboardCopy,
               disabled: lines.length === 0,
               run: () =>
-                void navigator.clipboard.writeText(lines.map((entry) => entry.line).join('\n')),
+                void reportAction(() =>
+                  navigator.clipboard.writeText(lines.map((entry) => entry.line).join('\n')),
+                ),
             },
             {
               label: t('menu.clearLog'),

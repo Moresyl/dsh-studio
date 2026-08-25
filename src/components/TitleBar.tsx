@@ -9,7 +9,7 @@ import * as ipc from '@/lib/ipc'
 import { ownAsync } from '@/lib/lifecycle'
 import { drawsWindowControls, isMac } from '@/lib/platform'
 import { contextMenu, SEPARATOR } from '@/state/menu'
-import { reportFailure } from '@/state/failure'
+import { reportAction, reportFailure } from '@/state/failure'
 import type { Presentation } from '@/state/presentation'
 
 /** Width the macOS traffic lights need before the title may start. */
@@ -63,9 +63,14 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
       if (!cancelled) setMaximized(next)
     }
 
-    void sync()
+    void sync().catch(() => {
+      // Window controls still work with the conservative restored icon when a
+      // transient native state read is unavailable.
+    })
     const release = ownAsync(
-      appWindow.onResized(() => void sync()),
+      appWindow.onResized(() => {
+        void sync().catch(() => {})
+      }),
       reportFailure,
     )
     return () => {
@@ -84,15 +89,18 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
     // one entry here that makes a window rather than changing this one. The
     // system's window menu has no equivalent to imitate, and this is the only
     // place a second window is reachable without knowing it exists.
-    { label: t('window.new'), run: () => void ipc.windowOpen() },
+    { label: t('window.new'), run: () => void reportAction(ipc.windowOpen) },
     SEPARATOR,
-    { label: t('window.minimize'), run: () => void appWindow.minimize() },
+    {
+      label: t('window.minimize'),
+      run: () => void reportAction(() => appWindow.minimize()),
+    },
     {
       label: maximized ? t('window.restore') : t('window.maximize'),
-      run: () => void appWindow.toggleMaximize(),
+      run: () => void reportAction(() => appWindow.toggleMaximize()),
     },
     SEPARATOR,
-    { label: closeLabel, run: () => void appWindow.close() },
+    { label: closeLabel, run: () => void reportAction(() => appWindow.close()) },
   ])
 
   return (
@@ -132,13 +140,16 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
 
       {drawsWindowControls && (
         <div className="flex items-stretch self-stretch">
-          <ControlButton label={t('window.minimize')} onClick={() => void appWindow.minimize()}>
+          <ControlButton
+            label={t('window.minimize')}
+            onClick={() => void reportAction(() => appWindow.minimize())}
+          >
             <line x1="1" y1="5.5" x2="10" y2="5.5" />
           </ControlButton>
 
           <ControlButton
             label={maximized ? t('window.restore') : t('window.maximize')}
-            onClick={() => void appWindow.toggleMaximize()}
+            onClick={() => void reportAction(() => appWindow.toggleMaximize())}
           >
             {maximized ? (
               <>
@@ -153,7 +164,11 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
           {/* While the harness is up the shell hides instead of quitting, so the
               tooltip has to say so — a window that vanishes while a service it
               started stays alive is exactly the surprise worth avoiding. */}
-          <ControlButton label={closeLabel} danger onClick={() => void appWindow.close()}>
+          <ControlButton
+            label={closeLabel}
+            danger
+            onClick={() => void reportAction(() => appWindow.close())}
+          >
             <path d="M1.5 1.5 9.5 9.5M9.5 1.5 1.5 9.5" />
           </ControlButton>
         </div>

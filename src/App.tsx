@@ -18,7 +18,7 @@ import * as ipc from '@/lib/ipc'
 import { ownAsync } from '@/lib/lifecycle'
 import { standby } from '@/lib/platform'
 import { useDialog } from '@/state/dialog'
-import { reportFailure } from '@/state/failure'
+import { reportAction, reportFailure } from '@/state/failure'
 import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
 import { usePalette } from '@/state/palette'
@@ -79,13 +79,15 @@ export default function App() {
   // this window re-renders on every line the harness prints.
   const manage = useCallback(() => setManaging(true), [])
   const chooseWorkspace = useCallback(async () => {
-    const chosen = await openDialog({
-      title: t('workspace.choose'),
-      defaultPath: useHarness.getState().environment?.workspace,
-      directory: true,
-      multiple: false,
+    await reportAction(async () => {
+      const chosen = await openDialog({
+        title: t('workspace.choose'),
+        defaultPath: useHarness.getState().environment?.workspace,
+        directory: true,
+        multiple: false,
+      })
+      if (typeof chosen === 'string') await switchWorkspace(chosen)
     })
-    if (typeof chosen === 'string') await switchWorkspace(chosen)
   }, [])
 
   // Showing a pane always means putting it in front. Anything else answers a
@@ -129,7 +131,12 @@ export default function App() {
 
     let frame = requestAnimationFrame(() => {
       frame = requestAnimationFrame(() => {
-        void getCurrentWindow().show()
+        void getCurrentWindow()
+          .show()
+          .catch(() => {
+            // Rust owns a separate startup-recovery deadline and will reveal a
+            // fallback surface when this renderer hint cannot cross IPC.
+          })
       })
     })
     return () => cancelAnimationFrame(frame)
@@ -235,7 +242,7 @@ export default function App() {
         event.preventDefault()
         // Held down, a key repeats — and this one asks for a whole webview every
         // time it does. The first press is the one somebody meant.
-        if (!event.repeat) void ipc.windowOpen()
+        if (!event.repeat) void reportAction(ipc.windowOpen)
         return
       }
 

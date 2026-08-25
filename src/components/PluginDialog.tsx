@@ -27,6 +27,7 @@ import { t } from '@/lib/i18n'
 import type { InstalledPlugin } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { useHarness } from '@/state/harness'
+import { reportAction } from '@/state/failure'
 import { installedPlugin, usePlugins } from '@/state/plugins'
 
 interface PluginDialogProps {
@@ -490,7 +491,7 @@ function Link({ href }: { href: string }) {
     <button
       type="button"
       data-hint={target}
-      onClick={() => void openUrl(target)}
+      onClick={() => void reportAction(() => openUrl(target))}
       className="inline-flex max-w-full items-center gap-1 transition-colors duration-100 hover:text-brand"
     >
       <span className="truncate">{target.replace(/^https?:\/\//, '')}</span>
