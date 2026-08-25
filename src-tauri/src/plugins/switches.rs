@@ -259,7 +259,12 @@ fn document(store: &Path) -> Result<Map<String, Value>> {
             )));
         }
     };
-    Ok(serde_json::from_str(&raw).unwrap_or_default())
+    serde_json::from_str(&raw).map_err(|cause| {
+        Error::Plugin(format!(
+            "{} is not valid plugin switch state: {cause}",
+            store.display()
+        ))
+    })
 }
 
 /// Record the whole switched-off list for one profile, replacing what was there.
@@ -454,6 +459,26 @@ mod tests {
             std::fs::metadata(&store).unwrap().len(),
             2 * 1024 * 1024 + 1
         );
+        std::fs::remove_dir_all(store.parent().unwrap()).expect("cleanup");
+    }
+
+    #[test]
+    fn an_invalid_switch_record_is_not_overwritten_by_a_mutation() {
+        let store = record("invalid-record");
+        std::fs::create_dir_all(store.parent().expect("record directory")).expect("directory");
+        std::fs::write(&store, "{not-json").expect("invalid record");
+
+        let failure = remember_in(
+            &store,
+            "web",
+            &BTreeSet::from(["@vendor/dsh-notes".to_string()]),
+        )
+        .expect_err("mutation must fail closed");
+
+        assert!(failure
+            .to_string()
+            .contains("not valid plugin switch state"));
+        assert_eq!(std::fs::read_to_string(&store).unwrap(), "{not-json");
         std::fs::remove_dir_all(store.parent().unwrap()).expect("cleanup");
     }
 

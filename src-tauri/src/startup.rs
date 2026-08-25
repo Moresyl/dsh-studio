@@ -10,7 +10,7 @@
 //! taken away from every other program on the machine — including the editor
 //! that had it first. Neither is ours to assume.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -199,7 +199,7 @@ pub fn startup_shortcut<R: Runtime>(
         keys.held.store(true, Ordering::Relaxed);
     }
 
-    let mut saved = read();
+    let mut saved = read_for_mutation()?;
     saved.shortcut = accelerator.clone();
     if let Err(failure) = write(&saved) {
         release(&app);
@@ -232,7 +232,7 @@ pub fn startup_notification<R: Runtime>(
         .changes
         .lock()
         .map_err(|_| Error::Startup("startup settings are unavailable".into()))?;
-    let mut saved = read();
+    let mut saved = read_for_mutation()?;
     match kind.as_str() {
         "turn-completed" => saved.notifications.turn_completed = enabled,
         "turn-failed" => saved.notifications.turn_failed = enabled,
@@ -298,7 +298,7 @@ pub fn startup_harness_port<R: Runtime>(
         .changes
         .lock()
         .map_err(|_| Error::Startup("startup settings are unavailable".into()))?;
-    let mut saved = read();
+    let mut saved = read_for_mutation()?;
     saved.harness_port = port;
     write(&saved)?;
     Ok(report(&app, &keys))
@@ -429,6 +429,29 @@ fn read() -> Saved {
         .unwrap_or_default()
 }
 
+fn read_for_mutation() -> Result<Saved> {
+    read_for_mutation_at(&file())
+}
+
+fn read_for_mutation_at(path: &Path) -> Result<Saved> {
+    let raw = match crate::bounded_file::read(path, crate::bounded_file::CONTROL_BYTES) {
+        Ok(raw) => raw,
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => return Ok(Saved::default()),
+        Err(cause) => {
+            return Err(Error::Startup(format!(
+                "{} could not be read safely: {cause}",
+                path.display()
+            )));
+        }
+    };
+    serde_json::from_slice(&raw).map_err(|cause| {
+        Error::Startup(format!(
+            "{} is not valid startup settings: {cause}",
+            path.display()
+        ))
+    })
+}
+
 /// Unlike the window's remembered placement, this one reports what went wrong.
 /// A convenience that fails silently costs a centred window; a setting that
 /// fails silently is a switch that flips back the next time the app starts.
@@ -518,5 +541,20 @@ mod tests {
         let saved: Saved =
             serde_json::from_str(r#"{"notifications":{"turnCompleted":false}}"#).unwrap();
         assert_eq!(saved.harness_port, None);
+    }
+
+    #[test]
+    fn mutations_refuse_to_replace_invalid_startup_settings() {
+        let path = std::env::temp_dir().join(format!(
+            "dsh-studio-startup-invalid-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&path, "{not-json").expect("invalid settings");
+
+        let failure = read_for_mutation_at(&path).expect_err("mutation must fail closed");
+
+        assert!(failure.to_string().contains("not valid startup settings"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{not-json");
+        std::fs::remove_file(path).expect("cleanup");
     }
 }
