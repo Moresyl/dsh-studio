@@ -5,7 +5,7 @@
 //! metadata by re-encoding a small PNG, and only then returns a data URL.
 
 use std::io::Cursor;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use base64::Engine as _;
@@ -45,7 +45,11 @@ pub async fn fetch(candidate: &Candidate) -> Result<Asset> {
             .await
             .map_err(|cause| Error::Network(format!("market image DNS lookup failed: {cause}")))?
             .collect();
-        if addresses.is_empty() || addresses.iter().any(|address| blocked(address.ip())) {
+        if addresses.is_empty()
+            || addresses
+                .iter()
+                .any(|address| super::catalog::blocked(address.ip()))
+        {
             return Err(Error::Network(
                 "market image resolved to a blocked local or special-use address".into(),
             ));
@@ -205,35 +209,10 @@ fn safe_url(value: &str, allowed: &[String]) -> Result<url::Url> {
     Ok(url)
 }
 
-fn blocked(ip: IpAddr) -> bool {
-    match ip {
-        IpAddr::V4(ip) => {
-            let octets = ip.octets();
-            ip.is_private()
-                || ip.is_loopback()
-                || ip.is_link_local()
-                || ip.is_multicast()
-                || ip.is_broadcast()
-                || ip.is_unspecified()
-                || octets[0] == 0
-                || (octets[0] == 100 && (64..=127).contains(&octets[1]))
-                || (octets[0] == 192 && octets[1] == 0 && octets[2] == 0)
-                || (octets[0] == 198 && (18..=19).contains(&octets[1]))
-                || octets[0] >= 224
-        }
-        IpAddr::V6(ip) => {
-            ip.is_loopback()
-                || ip.is_unspecified()
-                || ip.is_multicast()
-                || (ip.segments()[0] & 0xfe00) == 0xfc00
-                || (ip.segments()[0] & 0xffc0) == 0xfe80
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{blocked, normalize, normalized_hosts, safe_url};
+    use super::{normalize, normalized_hosts, safe_url};
+    use crate::plugins::catalog::blocked;
     use image::{DynamicImage, ImageFormat, RgbaImage};
     use std::io::Cursor;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -252,6 +231,9 @@ mod tests {
         assert!(blocked(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))));
         assert!(blocked(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1))));
         assert!(blocked(IpAddr::V6(Ipv6Addr::LOCALHOST)));
+        assert!(blocked(IpAddr::V6("::ffff:127.0.0.1".parse().unwrap())));
+        assert!(blocked(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 1))));
+        assert!(blocked(IpAddr::V6("2001:db8::1".parse().unwrap())));
         assert!(!blocked(IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8))));
     }
 

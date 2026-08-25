@@ -455,7 +455,7 @@ fn safe_url(value: &str) -> Result<url::Url> {
     Ok(url)
 }
 
-fn blocked(ip: IpAddr) -> bool {
+pub(super) fn blocked(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(ip) => {
             let octets = ip.octets();
