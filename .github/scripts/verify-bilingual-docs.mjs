@@ -50,13 +50,16 @@ export function validateBilingualPair(englishPath, english, chinesePath, chinese
   if (english.trim().length < 100) problems.push(`${englishPath} is empty or implausibly short`)
   if (chinese.trim().length < 100) problems.push(`${chinesePath} is empty or implausibly short`)
 
+  const normalizedEnglish = english.replaceAll('\r\n', '\n')
+  const normalizedChinese = chinese.replaceAll('\r\n', '\n')
+
   const contract = CONTRACTS.find((candidate) => candidate.pair === `${englishPath}|${chinesePath}`)
   for (const marker of contract?.english ?? []) {
-    if (!english.includes(marker))
+    if (!normalizedEnglish.includes(marker))
       problems.push(`${englishPath} is missing ${JSON.stringify(marker)}`)
   }
   for (const marker of contract?.chinese ?? []) {
-    if (!chinese.includes(marker))
+    if (!normalizedChinese.includes(marker))
       problems.push(`${chinesePath} is missing ${JSON.stringify(marker)}`)
   }
   return problems
