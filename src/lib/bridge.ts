@@ -202,9 +202,18 @@ export async function serveDesktop(origin: string): Promise<() => void> {
   // asked for. One that arrived before this frame existed is not pushed at all
   // — it is waiting in the handshake instead, which is the only way a link that
   // started the app reaches a page that took seconds to load.
-  const unlisten = await ipc.onDesktopLink((link) => {
-    tell({ dsh: PROTOCOL, event: 'link', link }, origin)
-  })
+  let unlisten: () => void
+  try {
+    unlisten = await ipc.onDesktopLink((link) => {
+      tell({ dsh: PROTOCOL, event: 'link', link }, origin)
+    })
+  } catch (cause) {
+    // The browser listener was installed first so no frame request can slip
+    // between setup steps. Put it back if the native half cannot be acquired;
+    // otherwise a retry would leave two handlers answering every request.
+    window.removeEventListener('message', onMessage)
+    throw cause
+  }
 
   return () => {
     window.removeEventListener('message', onMessage)

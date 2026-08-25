@@ -26,14 +26,7 @@ vi.mock('@/lib/ipc', () => ({
   onDesktopLink: vi.fn(),
 }))
 
-import {
-  accepts,
-  answer,
-  PROTOCOL,
-  pushWorkspaceDrop,
-  serveDesktop,
-  type Call,
-} from '@/lib/bridge'
+import { accepts, answer, PROTOCOL, pushWorkspaceDrop, serveDesktop, type Call } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
 
 const SERVING = 'http://127.0.0.1:57652'
@@ -382,6 +375,16 @@ group('desktop frame lifetime', () => {
     stop()
     expect(tree.root.removeEventListener).toHaveBeenCalledWith('message', listener)
     expect(unlisten).toHaveBeenCalledOnce()
+  })
+
+  it('rolls back the browser listener when the native link channel is unavailable', async () => {
+    const tree = windowTree()
+    const refusal = new Error('desktop link channel unavailable')
+    vi.mocked(ipc.onDesktopLink).mockRejectedValue(refusal)
+
+    await expect(serveDesktop(SERVING)).rejects.toBe(refusal)
+
+    expect(tree.root.removeEventListener).toHaveBeenCalledWith('message', tree.message())
   })
 
   it('pushes a trimmed native workspace only while an origin is trusted', () => {

@@ -15,6 +15,8 @@
 import { useEffect } from 'react'
 
 import { serveDesktop } from '@/lib/bridge'
+import { ownAsync } from '@/lib/lifecycle'
+import { reportFailure } from '@/state/failure'
 
 /** Capabilities the harness UI needs that a frame does not grant by default. */
 const PERMISSIONS = 'clipboard-read; clipboard-write'
@@ -33,10 +35,7 @@ export function HarnessFrame({ origin, hidden }: HarnessFrameProps) {
   // a session, and a plugin that finishes while it is out of sight is the one
   // with the most reason to send a notification.
   useEffect(() => {
-    const pending = serveDesktop(origin)
-    return () => {
-      void pending.then((stop) => stop())
-    }
+    return ownAsync(serveDesktop(origin), reportFailure)
   }, [origin])
 
   return (
