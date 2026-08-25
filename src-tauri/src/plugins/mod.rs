@@ -81,14 +81,14 @@ pub struct PluginState {
     pub package_manager: bool,
 }
 
-/// Guard so two clicks cannot run two package managers over one directory.
+/// Guard so two windows cannot mutate profile state at the same time.
 #[derive(Debug, Default)]
 pub struct PluginJobs {
     pub busy: AtomicBool,
 }
 
 impl PluginJobs {
-    /// Claim the one profile-wide package-manager slot.
+    /// Claim the one profile-wide mutation slot.
     ///
     /// The returned guard clears the flag on every exit path, including task
     /// cancellation when a window closes halfway through a profile import.
@@ -100,7 +100,7 @@ impl PluginJobs {
     }
 }
 
-/// A package-manager claim that cannot be stranded by an early return or a
+/// A profile mutation claim that cannot be stranded by an early return or a
 /// cancelled async command.
 pub(crate) struct PluginJob<'a>(&'a AtomicBool);
 

@@ -66,7 +66,7 @@ pub enum Error {
     #[error("{0}")]
     Plugin(String),
 
-    #[error("a plugin change is already running")]
+    #[error("a plugin or profile change is already running")]
     PluginBusy,
 
     #[error("{0}")]

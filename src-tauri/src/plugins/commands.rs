@@ -414,7 +414,9 @@ pub fn plugin_switch(
     name: String,
     enabled: bool,
     state: State<'_, AppState>,
+    jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<PluginState> {
+    let _busy = jobs.claim()?;
     super::switch(&name, enabled)?;
     state.supervisor.note(
         Stream::Stdout,

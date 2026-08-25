@@ -60,7 +60,9 @@ pub fn profile_recovery_acknowledge() -> Result<()> {
 pub fn profile_recovery_disable_plugin(
     name: String,
     generation: String,
+    jobs: State<'_, Arc<PluginJobs>>,
 ) -> Result<StartupRecovery> {
+    let _busy = jobs.claim()?;
     let notice = super::recovery_notice()
         .ok_or_else(|| Error::Profile("there is no profile startup recovery to change".into()))?;
     checked_generation(&notice.generation, &generation)?;
@@ -86,7 +88,11 @@ pub fn profile_recovery_disable_plugin(
 /// a separate frontend action so the existing supervisor remains the sole
 /// owner of process lifecycle and readiness checks.
 #[tauri::command]
-pub fn profile_recovery_retry(generation: String) -> Result<Roster> {
+pub fn profile_recovery_retry(
+    generation: String,
+    jobs: State<'_, Arc<PluginJobs>>,
+) -> Result<Roster> {
+    let _busy = jobs.claim()?;
     let notice = super::recovery_notice()
         .ok_or_else(|| Error::Profile("there is no profile startup recovery to retry".into()))?;
     checked_generation(&notice.generation, &generation)?;
@@ -109,7 +115,12 @@ fn checked_generation(current: &str, offered: &str) -> Result<()> {
 /// here: a running harness has sessions in it, and ending them is the user's
 /// call to make in the window, not a side effect of a menu click.
 #[tauri::command]
-pub fn profile_select(name: String, state: State<'_, AppState>) -> Result<Roster> {
+pub fn profile_select(
+    name: String,
+    state: State<'_, AppState>,
+    jobs: State<'_, Arc<PluginJobs>>,
+) -> Result<Roster> {
+    let _busy = jobs.claim()?;
     super::select(&name)?;
     state.supervisor.note(
         Stream::Stdout,
@@ -125,7 +136,8 @@ pub fn profile_select(name: String, state: State<'_, AppState>) -> Result<Roster
 /// already on the machine, so there is nothing to download and nothing to wait
 /// for.
 #[tauri::command]
-pub fn profile_create(name: String) -> Result<Roster> {
+pub fn profile_create(name: String, jobs: State<'_, Arc<PluginJobs>>) -> Result<Roster> {
+    let _busy = jobs.claim()?;
     super::create(&name)?;
     Ok(super::roster())
 }
