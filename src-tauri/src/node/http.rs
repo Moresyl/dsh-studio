@@ -101,9 +101,9 @@ pub async fn text(client: &Client, url: &str) -> Result<String> {
         .await
         .map_err(|cause| Error::Network(format!("{url} sent an unreadable reply: {cause}")))?
     {
-        let size = bounded_size(body.len() as u64, chunk.len() as u64, MAX_METADATA_BYTES)
+        bounded_size(body.len() as u64, chunk.len() as u64, MAX_METADATA_BYTES)
             .ok_or_else(|| Error::Network(format!("{url} sent more than 4 MiB of metadata")))?;
-        body.reserve(size.saturating_sub(body.len() as u64) as usize);
+        body.reserve(chunk.len());
         body.extend_from_slice(&chunk);
     }
     String::from_utf8(body)
