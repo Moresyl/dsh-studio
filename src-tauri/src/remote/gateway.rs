@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, OwnedSemaphorePermit, Semaphore};
 
 use super::access::Access;
 
@@ -37,6 +37,7 @@ const MAX_HEAD: usize = 16 * 1024;
 
 /// How long a connection may take to produce a complete request head.
 const HEAD_TIMEOUT: Duration = Duration::from_secs(20);
+const MAX_CONNECTIONS: usize = 128;
 
 /// How long a paired browser stays paired without rescanning.
 const COOKIE_MAX_AGE: u32 = 60 * 60 * 12;
@@ -66,6 +67,7 @@ pub async fn serve(
     mut closing: broadcast::Receiver<()>,
     changed: broadcast::Sender<()>,
 ) {
+    let permits = Arc::new(Semaphore::new(MAX_CONNECTIONS));
     loop {
         let accepted = tokio::select! {
             _ = closing.recv() => break,
@@ -77,6 +79,10 @@ pub async fn serve(
             // to stop listening. Anything fatal will fail again next time round.
             continue;
         };
+        let Some(permit) = connection_permit(&permits) else {
+            counters.refused.fetch_add(1, Ordering::Relaxed);
+            continue;
+        };
 
         let access = Arc::clone(&access);
         let counters = Arc::clone(&counters);
@@ -85,6 +91,7 @@ pub async fn serve(
         let connection_closing = closing.resubscribe();
         let changed = changed.clone();
         tokio::spawn(async move {
+            let _permit = permit;
             let _ = socket.set_nodelay(true);
             relay(
                 socket,
@@ -100,6 +107,10 @@ pub async fn serve(
             let _ = changed.send(());
         });
     }
+}
+
+fn connection_permit(permits: &Arc<Semaphore>) -> Option<OwnedSemaphorePermit> {
+    Arc::clone(permits).try_acquire_owned().ok()
 }
 
 async fn relay(
@@ -258,6 +269,9 @@ impl Head {
     /// every `Referer` the page later sends.
     fn path_without_code(&self) -> String {
         let target = self.target();
+        if !safe_local_target(target) {
+            return "/".into();
+        }
         let Some((path, query)) = target.split_once('?') else {
             return target.to_string();
         };
@@ -336,11 +350,10 @@ async fn read_head(socket: &mut TcpStream) -> Option<Head> {
     tokio::pin!(deadline);
 
     let end = loop {
-        if let Some(at) = find_blank_line(&buffer) {
-            break at;
-        }
-        if buffer.len() > MAX_HEAD {
-            return None;
+        match bounded_head_end(&buffer) {
+            Ok(Some(at)) => break at,
+            Err(()) => return None,
+            Ok(None) => {}
         }
 
         let read = tokio::select! {
@@ -376,6 +389,21 @@ async fn read_head(socket: &mut TcpStream) -> Option<Head> {
 /// Offset of the `\r\n\r\n` that ends a header block.
 fn find_blank_line(buffer: &[u8]) -> Option<usize> {
     buffer.windows(4).position(|window| window == b"\r\n\r\n")
+}
+
+fn bounded_head_end(buffer: &[u8]) -> Result<Option<usize>, ()> {
+    match find_blank_line(buffer) {
+        Some(at) if at.saturating_add(4) <= MAX_HEAD => Ok(Some(at)),
+        Some(_) => Err(()),
+        None if buffer.len() > MAX_HEAD => Err(()),
+        None => Ok(None),
+    }
+}
+
+fn safe_local_target(target: &str) -> bool {
+    target.starts_with('/')
+        && !target.starts_with("//")
+        && !target.bytes().any(|byte| byte.is_ascii_control())
 }
 
 fn pair_response(cookie: &str, destination: &str) -> String {
@@ -473,6 +501,35 @@ mod tests {
             "GET /?k={code} HTTP/1.1\r\nHost: 192.168.1.5:9\r\n\r\n"
         ));
         assert!(matches!(decide(&request, &access), Decision::Pair { .. }));
+    }
+
+    #[test]
+    fn pairing_redirects_never_leave_the_local_gateway() {
+        let ordinary = head("GET /work?k=code&tab=1 HTTP/1.1\r\nHost: h\r\n\r\n");
+        assert_eq!(ordinary.path_without_code(), "/work?tab=1");
+
+        let external = head("GET //example.com/?k=code HTTP/1.1\r\nHost: h\r\n\r\n");
+        assert_eq!(external.path_without_code(), "/");
+    }
+
+    #[test]
+    fn request_head_limit_includes_the_terminating_blank_line() {
+        let mut exact = vec![b'x'; MAX_HEAD - 4];
+        exact.extend_from_slice(b"\r\n\r\n");
+        assert_eq!(bounded_head_end(&exact), Ok(Some(MAX_HEAD - 4)));
+
+        let mut oversized = vec![b'x'; MAX_HEAD - 3];
+        oversized.extend_from_slice(b"\r\n\r\n");
+        assert_eq!(bounded_head_end(&oversized), Err(()));
+    }
+
+    #[test]
+    fn connection_limit_fails_closed_without_waiting() {
+        let permits = Arc::new(Semaphore::new(1));
+        let held = connection_permit(&permits).expect("first connection");
+        assert!(connection_permit(&permits).is_none());
+        drop(held);
+        assert!(connection_permit(&permits).is_some());
     }
 
     #[test]
