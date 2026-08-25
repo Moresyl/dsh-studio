@@ -377,8 +377,9 @@ fn sync_runtime_module_in(source: &Path, target: &Path) -> Result<()> {
 /// Make a profile with the interface bundles in it and nothing else.
 pub fn create(name: &str) -> Result<()> {
     let bundles = interface_bundles()?;
+    let workspace = workspace(DEFAULT)?;
     build(name, |dir| {
-        initialize(dir, &bundles, EMPTY_PATCH, workspace(DEFAULT).as_deref())
+        initialize(dir, &bundles, EMPTY_PATCH, workspace.as_deref())
     })
 }
 
@@ -419,14 +420,11 @@ pub fn duplicate(source: &str, name: &str) -> Result<Vec<String>> {
         .into_iter()
         .filter(|bundle| !installed.contains_key(bundle))
         .collect();
+    let patch = patch(&source)?.unwrap_or_else(|| EMPTY_PATCH.to_string());
+    let workspace = workspace(&source)?;
 
     build(name, |dir| {
-        initialize(
-            dir,
-            &carried,
-            &patch(&source).unwrap_or_else(|| EMPTY_PATCH.to_string()),
-            workspace(&source).as_deref(),
-        )?;
+        initialize(dir, &carried, &patch, workspace.as_deref())?;
         switches::copy(&source, name)
     })?;
     Ok(specs)
@@ -484,7 +482,7 @@ pub fn export(name: &str) -> Result<Declaration> {
         version: DECLARATION_VERSION,
         plugins: dependencies(&manifest),
         disabled: switches::switched_off(&name).into_iter().collect(),
-        patch: patch(&name).unwrap_or_else(|| EMPTY_PATCH.to_string()),
+        patch: patch(&name)?.unwrap_or_else(|| EMPTY_PATCH.to_string()),
         name,
         integrity: None,
         verified: true,
@@ -596,14 +594,10 @@ pub fn import(declaration: &Declaration, name: &str) -> Result<Vec<String>> {
         .filter(|package| declaration.plugins.contains_key(*package))
         .cloned()
         .collect();
+    let workspace = workspace(DEFAULT)?;
 
     build(name, |dir| {
-        initialize(
-            dir,
-            &bundles,
-            &declaration.patch,
-            workspace(DEFAULT).as_deref(),
-        )?;
+        initialize(dir, &bundles, &declaration.patch, workspace.as_deref())?;
         if off.is_empty() {
             return Ok(());
         }
@@ -912,13 +906,28 @@ fn write(path: &Path, contents: &str) -> Result<()> {
 }
 
 /// A profile's patch layer, if it has one.
-fn patch(name: &str) -> Option<String> {
-    std::fs::read_to_string(paths::profile_dir(name).join(PATCH)).ok()
+fn patch(name: &str) -> Result<Option<String>> {
+    optional_profile_file(name, PATCH)
 }
 
 /// A profile's workspace file, if it has one.
-fn workspace(name: &str) -> Option<String> {
-    std::fs::read_to_string(paths::profile_dir(name).join(WORKSPACE)).ok()
+fn workspace(name: &str) -> Result<Option<String>> {
+    optional_profile_file(name, WORKSPACE)
+}
+
+fn optional_profile_file(name: &str, leaf: &str) -> Result<Option<String>> {
+    optional_file(&paths::profile_dir(name).join(leaf))
+}
+
+fn optional_file(path: &Path) -> Result<Option<String>> {
+    match crate::bounded_file::read_string(path, crate::bounded_file::CONTROL_BYTES) {
+        Ok(body) => Ok(Some(body)),
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(cause) => Err(Error::Profile(format!(
+            "{} could not be read safely: {cause}",
+            path.display()
+        ))),
+    }
 }
 
 pub use selection::RecoveryNotice as StartupRecoveryNotice;
@@ -1133,6 +1142,22 @@ mod tests {
         let failure = declaration(&path).expect_err("oversized backup");
 
         assert!(failure.to_string().contains("2 MiB"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn oversized_profile_layers_fail_instead_of_becoming_empty_copies() {
+        let path = backup_path("oversized-layer");
+        std::fs::write(&path, vec![b' '; crate::bounded_file::CONTROL_BYTES + 1])
+            .expect("large layer");
+
+        let failure = optional_file(&path).expect_err("large layer must not disappear");
+
+        assert!(failure.to_string().contains("safety limit"));
+        assert_eq!(
+            optional_file(&path.with_extension("missing")).unwrap(),
+            None
+        );
         let _ = std::fs::remove_file(path);
     }
 
