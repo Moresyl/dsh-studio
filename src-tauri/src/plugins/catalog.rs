@@ -7,6 +7,7 @@
 
 use std::collections::BTreeSet;
 use std::net::{IpAddr, SocketAddr};
+use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -162,7 +163,7 @@ pub fn select(id: &str) -> Result<Vec<Source>> {
     if !roster.iter().any(|source| source.id == id) {
         return Err(Error::Plugin(format!("unknown catalog source {id}")));
     }
-    let mut settings = load();
+    let mut settings = load_for_mutation()?;
     settings.active = id.to_string();
     save(&settings)?;
     Ok(sources())
@@ -176,7 +177,7 @@ pub async fn add(label: &str, endpoint: &str) -> Result<Vec<Source>> {
     let value = restricted_json(endpoint.as_str(), MAX_CUSTOM_BODY, DEFAULT_USER_AGENT).await?;
     parse_standard(&value, "registration", &label, "", endpoint.as_str()).map(|_| ())?;
 
-    let mut settings = load();
+    let mut settings = load_for_mutation()?;
     if settings.custom.len() >= MAX_CUSTOM {
         return Err(Error::Plugin(format!(
             "at most {MAX_CUSTOM} custom catalog sources are allowed"
@@ -203,7 +204,7 @@ pub async fn add(label: &str, endpoint: &str) -> Result<Vec<Source>> {
 }
 
 pub fn remove(id: &str) -> Result<Vec<Source>> {
-    let mut settings = load();
+    let mut settings = load_for_mutation()?;
     let before = settings.custom.len();
     settings.custom.retain(|source| source.id != id);
     if settings.custom.len() == before {
@@ -1075,16 +1076,43 @@ fn custom_id(endpoint: &str) -> String {
 }
 
 fn load() -> Settings {
-    let mut settings: Settings = crate::bounded_file::read(
-        &crate::paths::market_sources_file(),
-        crate::bounded_file::CONTROL_BYTES,
-    )
-    .ok()
-    .and_then(|body| serde_json::from_slice(&body).ok())
-    .unwrap_or_else(|| Settings {
+    load_for_mutation().unwrap_or_else(|_| fresh_settings())
+}
+
+fn load_for_mutation() -> Result<Settings> {
+    load_for_mutation_at(&crate::paths::market_sources_file())
+}
+
+fn load_for_mutation_at(path: &Path) -> Result<Settings> {
+    let body = match crate::bounded_file::read(path, crate::bounded_file::CONTROL_BYTES) {
+        Ok(body) => body,
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(fresh_settings());
+        }
+        Err(cause) => {
+            return Err(Error::Plugin(format!(
+                "{} could not be read safely: {cause}",
+                path.display()
+            )));
+        }
+    };
+    let settings = serde_json::from_slice(&body).map_err(|cause| {
+        Error::Plugin(format!(
+            "{} is not valid catalog settings: {cause}",
+            path.display()
+        ))
+    })?;
+    Ok(sanitize(settings))
+}
+
+fn fresh_settings() -> Settings {
+    Settings {
         active: default_active(),
         custom: Vec::new(),
-    });
+    }
+}
+
+fn sanitize(mut settings: Settings) -> Settings {
     settings.custom.truncate(MAX_CUSTOM);
     let mut seen_ids = BTreeSet::new();
     settings.custom.retain(|source| {
@@ -1132,8 +1160,28 @@ mod tests {
 
     use super::{
         admissible_address, blocked, dshfind_detail_url, dshfind_page_url, exact_listing,
-        parse_dshfind_item, parse_dshfind_page, parse_standard, parse_store, safe_url, Health,
+        load_for_mutation_at, parse_dshfind_item, parse_dshfind_page, parse_standard, parse_store,
+        safe_url, Health,
     };
+
+    #[test]
+    fn mutations_refuse_to_replace_oversized_catalog_settings() {
+        let path = std::env::temp_dir().join(format!(
+            "dsh-studio-catalog-oversized-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&path, vec![b' '; crate::bounded_file::CONTROL_BYTES + 1])
+            .expect("oversized settings");
+
+        let failure = load_for_mutation_at(&path).expect_err("mutation must fail closed");
+
+        assert!(failure.to_string().contains("safety limit"));
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().len(),
+            (crate::bounded_file::CONTROL_BYTES + 1) as u64
+        );
+        std::fs::remove_file(path).expect("cleanup");
+    }
 
     #[test]
     fn catalog_network_rejects_credentials_ports_and_private_addresses() {
