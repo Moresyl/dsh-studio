@@ -252,6 +252,22 @@ pub fn prepare_for_studio(name: &str) -> Result<bool> {
 }
 
 fn prepare_for_studio_in(dir: &Path, bootstrap_web: bool) -> Result<bool> {
+    match std::fs::symlink_metadata(dir) {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {}
+        Ok(_) => {
+            return Err(Error::Profile(format!(
+                "{} is not a safe profile directory",
+                dir.display()
+            )));
+        }
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {}
+        Err(cause) => {
+            return Err(Error::Profile(format!(
+                "{} could not be inspected: {cause}",
+                dir.display()
+            )));
+        }
+    }
     if !dir.join(MANIFEST).is_file() {
         if !bootstrap_web {
             return Ok(false);
@@ -610,11 +626,29 @@ pub fn save(declaration: &Declaration, path: &Path) -> Result<()> {
 /// A copy missing what it was copying is not a copy, and leaving one behind
 /// makes the user clean up after a failure they did not cause.
 pub fn discard(name: &str) -> Result<()> {
+    if !is_name(name) {
+        return Err(Error::Profile(format!("{name} is not a profile name")));
+    }
     let dir = paths::profile_dir(name);
-    if dir.is_dir() {
-        std::fs::remove_dir_all(&dir).map_err(|cause| {
-            Error::Profile(format!("{} could not be removed: {cause}", dir.display()))
-        })?;
+    match std::fs::symlink_metadata(&dir) {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+            std::fs::remove_dir_all(&dir).map_err(|cause| {
+                Error::Profile(format!("{} could not be removed: {cause}", dir.display()))
+            })?;
+        }
+        Ok(_) => {
+            return Err(Error::Profile(format!(
+                "{} is not a safe profile directory",
+                dir.display()
+            )));
+        }
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {}
+        Err(cause) => {
+            return Err(Error::Profile(format!(
+                "{} could not be inspected: {cause}",
+                dir.display()
+            )));
+        }
     }
     switches::forget(name)
 }
@@ -709,7 +743,11 @@ fn scan() -> Vec<String> {
         .into_iter()
         .flatten()
         .flatten()
-        .filter(|entry| entry.path().is_dir())
+        .filter(|entry| {
+            entry
+                .file_type()
+                .is_ok_and(|kind| kind.is_dir() && !kind.is_symlink())
+        })
         .filter_map(|entry| entry.file_name().into_string().ok())
         .filter(|name| is_name(name))
         .collect();
@@ -908,7 +946,7 @@ fn expect_profile(name: &str) -> Result<String> {
     if !is_name(name) {
         return Err(Error::Profile(format!("{name} is not a profile name")));
     }
-    if !paths::profile_dir(name).is_dir() {
+    if !is_safe_directory(&paths::profile_dir(name)) {
         return Err(Error::Profile(format!("there is no profile called {name}")));
     }
     Ok(name.to_string())
@@ -924,12 +962,26 @@ fn free_dir(name: &str) -> Result<PathBuf> {
     }
 
     let dir = paths::profile_dir(name);
-    if dir.exists() {
-        return Err(Error::Profile(format!(
-            "there is already a profile called {name}"
-        )));
+    match std::fs::symlink_metadata(&dir) {
+        Ok(_) => {
+            return Err(Error::Profile(format!(
+                "there is already a profile called {name}"
+            )));
+        }
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {}
+        Err(cause) => {
+            return Err(Error::Profile(format!(
+                "{} could not be inspected: {cause}",
+                dir.display()
+            )));
+        }
     }
     Ok(dir)
+}
+
+fn is_safe_directory(path: &Path) -> bool {
+    std::fs::symlink_metadata(path)
+        .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
 }
 
 /// Whether a name is one this shell will treat as a profile at all.
@@ -1343,6 +1395,50 @@ mod tests {
         assert!(!is_name(".hidden"));
         assert!(!is_name("../elsewhere"));
         assert!(!is_name("nested\\name"));
+    }
+
+    #[test]
+    fn only_real_directories_are_accepted_as_profile_roots() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-root-kind-{}",
+            std::process::id()
+        ));
+        let directory = root.join("directory");
+        let file = root.join("file");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&directory).expect("directory fixture");
+        std::fs::write(&file, b"not a profile").expect("file fixture");
+
+        assert!(is_safe_directory(&directory));
+        assert!(!is_safe_directory(&file));
+        assert!(!is_safe_directory(&root.join("missing")));
+
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn linked_directories_are_not_accepted_as_profile_roots() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-root-link-{}",
+            std::process::id()
+        ));
+        let target = root.join("target");
+        let linked = root.join("linked");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&target).expect("target fixture");
+
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&target, &linked).expect("directory symlink");
+        #[cfg(windows)]
+        if std::os::windows::fs::symlink_dir(&target, &linked).is_err() {
+            let _ = std::fs::remove_dir_all(root);
+            return;
+        }
+
+        assert!(!is_safe_directory(&linked));
+        assert!(prepare_for_studio_in(&linked, true).is_err());
+        assert!(!target.join(MANIFEST).exists());
+        std::fs::remove_dir_all(root).expect("cleanup");
     }
 
     /// A profile made from a terminal is still the user's, whatever it is called.
