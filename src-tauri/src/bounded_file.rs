@@ -20,6 +20,11 @@ pub fn read(path: &Path, maximum: usize) -> std::io::Result<Vec<u8>> {
     Ok(body)
 }
 
+pub fn read_string(path: &Path, maximum: usize) -> std::io::Result<String> {
+    String::from_utf8(read(path, maximum)?)
+        .map_err(|cause| Error::new(ErrorKind::InvalidData, cause))
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -39,6 +44,21 @@ mod tests {
         assert_eq!(read(&path, 5).expect("at limit"), b"12345");
         assert_eq!(
             read(&path, 4).expect_err("over limit").kind(),
+            ErrorKind::InvalidData
+        );
+        std::fs::remove_file(path).expect("cleanup");
+    }
+
+    #[test]
+    fn text_reads_reject_invalid_utf8() {
+        let path = std::env::temp_dir().join(format!(
+            "dsh-studio-bounded-text-{}-{}",
+            std::process::id(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::write(&path, [0xff]).expect("fixture");
+        assert_eq!(
+            read_string(&path, 1).expect_err("invalid text").kind(),
             ErrorKind::InvalidData
         );
         std::fs::remove_file(path).expect("cleanup");

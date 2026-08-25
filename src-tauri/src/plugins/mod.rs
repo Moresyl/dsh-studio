@@ -286,7 +286,11 @@ pub fn state() -> PluginState {
 }
 
 pub(crate) fn read_manifest(profile_dir: &Path) -> Option<serde_json::Value> {
-    let raw = std::fs::read_to_string(profile_dir.join("package.json")).ok()?;
+    let raw = crate::bounded_file::read_string(
+        &profile_dir.join("package.json"),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .ok()?;
     serde_json::from_str(&raw).ok()
 }
 
@@ -1032,7 +1036,7 @@ fn managed_manager() -> Option<PathBuf> {
 /// to find, so nothing here has to write a shim of its own.
 fn manager_in(root: &Path) -> Option<PathBuf> {
     let manifest = root.join("node_modules/pnpm/package.json");
-    let version = std::fs::read_to_string(manifest)
+    let version = crate::bounded_file::read_string(&manifest, crate::bounded_file::CONTROL_BYTES)
         .ok()
         .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
         .and_then(|value| value.get("version")?.as_str().map(str::to_string));
@@ -1051,18 +1055,20 @@ fn manager_in(root: &Path) -> Option<PathBuf> {
 /// a new profile and gets Studio's stable store.
 fn profile_store_dir(profile_dir: &Path) -> PathBuf {
     let marker = profile_dir.join("node_modules/.modules.yaml");
-    let recorded = std::fs::read_to_string(marker).ok().and_then(|raw| {
-        serde_json::from_str::<serde_json::Value>(&raw)
-            .ok()
-            .and_then(|value| value.get("storeDir")?.as_str().map(PathBuf::from))
-            .or_else(|| {
-                raw.lines().find_map(|line| {
-                    let value = line.trim().strip_prefix("storeDir:")?.trim();
-                    let value = value.trim_matches(['\'', '"']);
-                    (!value.is_empty()).then(|| PathBuf::from(value))
+    let recorded = crate::bounded_file::read_string(&marker, crate::bounded_file::CONTROL_BYTES)
+        .ok()
+        .and_then(|raw| {
+            serde_json::from_str::<serde_json::Value>(&raw)
+                .ok()
+                .and_then(|value| value.get("storeDir")?.as_str().map(PathBuf::from))
+                .or_else(|| {
+                    raw.lines().find_map(|line| {
+                        let value = line.trim().strip_prefix("storeDir:")?.trim();
+                        let value = value.trim_matches(['\'', '"']);
+                        (!value.is_empty()).then(|| PathBuf::from(value))
+                    })
                 })
-            })
-    });
+        });
     recorded
         .filter(|path| path.is_absolute())
         .unwrap_or_else(paths::plugin_store_dir)

@@ -150,9 +150,12 @@ fn scan(root: &Path, shipped: bool, into: &mut Vec<Preset>) {
             continue;
         }
 
-        let metadata = std::fs::read_to_string(directory.join(METADATA))
-            .map(|raw| describe(&raw))
-            .unwrap_or_default();
+        let metadata = crate::bounded_file::read_string(
+            &directory.join(METADATA),
+            crate::bounded_file::CONTROL_BYTES,
+        )
+        .map(|raw| describe(&raw))
+        .unwrap_or_default();
 
         into.push(Preset {
             id: id.to_string(),
@@ -445,7 +448,10 @@ fn edit(document: &str, id: &str) -> Result<String> {
 
 /// Read the default out of the harness's settings document.
 fn current_default() -> Option<String> {
-    read_default(&std::fs::read_to_string(settings_file()).ok()?)
+    read_default(
+        &crate::bounded_file::read_string(&settings_file(), crate::bounded_file::CONTROL_BYTES)
+            .ok()?,
+    )
 }
 
 /* -------------------------------------------------------------------------- */
@@ -475,7 +481,17 @@ pub fn preset_choose(id: String) -> Result<Roster> {
     // A missing document is the first-run case, not a failure: the harness
     // creates it when it first needs to write something, and until then the
     // default is whatever its own configuration says.
-    let document = std::fs::read_to_string(&path).unwrap_or_default();
+    let document = match crate::bounded_file::read_string(&path, crate::bounded_file::CONTROL_BYTES)
+    {
+        Ok(document) => document,
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(cause) => {
+            return Err(Error::Preset(format!(
+                "{} could not be read safely: {cause}",
+                path.display()
+            )));
+        }
+    };
     let edited = edit(&document, &id)?;
 
     if let Some(parent) = path.parent() {

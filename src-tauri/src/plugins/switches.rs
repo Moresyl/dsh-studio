@@ -43,7 +43,8 @@ pub fn switched_off(profile: &str) -> BTreeSet<String> {
 }
 
 fn off_in(store: &Path, profile: &str) -> BTreeSet<String> {
-    let Ok(raw) = std::fs::read_to_string(store) else {
+    let Ok(raw) = crate::bounded_file::read_string(store, crate::bounded_file::CONTROL_BYTES)
+    else {
         return BTreeSet::new();
     };
     let Ok(document) = serde_json::from_str::<Value>(&raw) else {
@@ -207,7 +208,7 @@ pub fn forget(profile: &str) -> Result<()> {
 }
 
 fn forget_in(store: &Path, profile: &str) -> Result<()> {
-    let mut document = document(store);
+    let mut document = document(store)?;
     let Some(disabled) = document.get_mut("disabled").and_then(Value::as_object_mut) else {
         return Ok(());
     };
@@ -222,7 +223,10 @@ fn manifest_path(profile_dir: &Path) -> PathBuf {
 }
 
 fn read(path: &Path) -> Option<Value> {
-    serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
+    serde_json::from_str(
+        &crate::bounded_file::read_string(path, crate::bounded_file::CONTROL_BYTES).ok()?,
+    )
+    .ok()
 }
 
 fn write(path: &Path, manifest: &Value) -> Result<()> {
@@ -237,11 +241,18 @@ fn write(path: &Path, manifest: &Value) -> Result<()> {
 }
 
 /// The record as it stands, or an empty one when there is nothing to read.
-fn document(store: &Path) -> Map<String, Value> {
-    std::fs::read_to_string(store)
-        .ok()
-        .and_then(|raw| serde_json::from_str::<Map<String, Value>>(&raw).ok())
-        .unwrap_or_default()
+fn document(store: &Path) -> Result<Map<String, Value>> {
+    let raw = match crate::bounded_file::read_string(store, crate::bounded_file::CONTROL_BYTES) {
+        Ok(raw) => raw,
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => return Ok(Map::new()),
+        Err(cause) => {
+            return Err(Error::Plugin(format!(
+                "{} could not be read safely: {cause}",
+                store.display()
+            )));
+        }
+    };
+    Ok(serde_json::from_str(&raw).unwrap_or_default())
 }
 
 /// Record the whole switched-off list for one profile, replacing what was there.
@@ -253,7 +264,7 @@ pub(crate) fn remember(profile: &str, names: &BTreeSet<String>) -> Result<()> {
 }
 
 fn remember_in(store: &Path, profile: &str, names: &BTreeSet<String>) -> Result<()> {
-    let mut document = document(store);
+    let mut document = document(store)?;
 
     let mut disabled = document
         .get("disabled")
@@ -415,6 +426,28 @@ mod tests {
 
         assert!(apply_in(&record("absent"), "web", &directory).is_ok());
         assert!(relist(&directory, "@vendor/dsh-notes").is_ok());
+    }
+
+    #[test]
+    fn an_oversized_switch_record_is_not_overwritten_by_a_mutation() {
+        let store = record("oversized-record");
+        std::fs::create_dir_all(store.parent().expect("record directory")).expect("directory");
+        std::fs::write(&store, vec![b' '; crate::bounded_file::CONTROL_BYTES + 1])
+            .expect("oversized record");
+
+        let failure = remember_in(
+            &store,
+            "web",
+            &BTreeSet::from(["@vendor/dsh-notes".to_string()]),
+        )
+        .expect_err("mutation must fail closed");
+
+        assert!(failure.to_string().contains("safety limit"));
+        assert_eq!(
+            std::fs::metadata(&store).unwrap().len(),
+            2 * 1024 * 1024 + 1
+        );
+        std::fs::remove_dir_all(store.parent().unwrap()).expect("cleanup");
     }
 
     /// Install, switch off, install again, restart — still off.
