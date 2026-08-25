@@ -486,7 +486,8 @@ const TITLE_BAR_DEPTH: i32 = 18;
 
 /// No file on the first launch, and a corrupt one is no worse than none.
 fn read_placement() -> Option<Placement> {
-    let raw = std::fs::read(placement_file()).ok()?;
+    let raw =
+        crate::bounded_file::read(&placement_file(), crate::bounded_file::CONTROL_BYTES).ok()?;
     serde_json::from_slice(&raw).ok()
 }
 

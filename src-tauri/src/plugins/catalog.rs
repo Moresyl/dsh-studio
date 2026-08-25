@@ -1075,13 +1075,16 @@ fn custom_id(endpoint: &str) -> String {
 }
 
 fn load() -> Settings {
-    let mut settings: Settings = std::fs::read(crate::paths::market_sources_file())
-        .ok()
-        .and_then(|body| serde_json::from_slice(&body).ok())
-        .unwrap_or_else(|| Settings {
-            active: default_active(),
-            custom: Vec::new(),
-        });
+    let mut settings: Settings = crate::bounded_file::read(
+        &crate::paths::market_sources_file(),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .ok()
+    .and_then(|body| serde_json::from_slice(&body).ok())
+    .unwrap_or_else(|| Settings {
+        active: default_active(),
+        custom: Vec::new(),
+    });
     settings.custom.truncate(MAX_CUSTOM);
     let mut seen_ids = BTreeSet::new();
     settings.custom.retain(|source| {

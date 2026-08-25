@@ -423,7 +423,7 @@ fn file() -> PathBuf {
 
 /// No file before the first change, and a corrupt one is no worse than none.
 fn read() -> Saved {
-    std::fs::read(file())
+    crate::bounded_file::read(&file(), crate::bounded_file::CONTROL_BYTES)
         .ok()
         .and_then(|raw| serde_json::from_slice(&raw).ok())
         .unwrap_or_default()

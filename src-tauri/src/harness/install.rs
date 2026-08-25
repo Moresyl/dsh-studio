@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use proc_guard::ProcessGuard;
 use serde::{Deserialize, Serialize};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::BufReader;
 use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::time::Instant;
@@ -326,7 +326,7 @@ where
             "{label} did not provide its diagnostic pipes"
         )));
     };
-    let (activity, mut observed) = mpsc::unbounded_channel();
+    let (activity, mut observed) = mpsc::channel(1);
     let mut out = tokio::spawn(forward(
         stdout,
         Stream::Stdout,
@@ -778,7 +778,7 @@ fn write_journal(path: &Path) -> Result<()> {
 }
 
 fn read_journal(path: &Path) -> Result<InstallJournal> {
-    let raw = std::fs::read(path)
+    let raw = crate::bounded_file::read(path, crate::bounded_file::CONTROL_BYTES)
         .map_err(|cause| Error::Install(format!("could not read install state: {cause}")))?;
     let journal: InstallJournal = serde_json::from_slice(&raw)
         .map_err(|cause| Error::Install(format!("install state is invalid: {cause}")))?;
@@ -811,15 +811,21 @@ fn remove_dir_if_exists(path: &Path) -> Result<()> {
         .map_err(|cause| Error::Install(format!("could not remove {}: {cause}", path.display())))
 }
 
-async fn forward<P, R>(pipe: P, stream: Stream, report: R, activity: mpsc::UnboundedSender<()>)
+async fn forward<P, R>(pipe: P, stream: Stream, report: R, activity: mpsc::Sender<()>)
 where
     P: tokio::io::AsyncRead + Unpin,
     R: Fn(Stream, String),
 {
-    let mut lines = BufReader::new(pipe).lines();
-    while let Ok(Some(line)) = lines.next_line().await {
-        let _ = activity.send(());
-        report(stream, line);
+    let mut lines = BufReader::new(pipe);
+    let mut raw = Vec::new();
+    while matches!(
+        crate::child_output::next_line(&mut lines, &mut raw).await,
+        Ok(true)
+    ) {
+        // Activity is an edge; one pending wakeup is enough to reset the idle
+        // deadline and keeps a noisy child from allocating an unbounded queue.
+        let _ = activity.try_send(());
+        report(stream, String::from_utf8_lossy(&raw).trim_end().to_string());
     }
 }
 

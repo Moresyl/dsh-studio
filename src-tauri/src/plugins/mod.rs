@@ -34,7 +34,7 @@ use std::time::{Duration, Instant};
 
 use proc_guard::ProcessGuard;
 use serde::Serialize;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::BufReader;
 use tokio::process::Command;
 use tokio::sync::mpsc;
 use tokio::time::Instant as TokioInstant;
@@ -726,9 +726,9 @@ where
     // precisely the moment someone has a reason to read it.
     loop {
         raw.clear();
-        match reader.read_until(b'\n', &mut raw).await {
-            Ok(0) | Err(_) => break,
-            Ok(_) => {}
+        match crate::child_output::next_line(&mut reader, &mut raw).await {
+            Ok(false) | Err(_) => break,
+            Ok(true) => {}
         }
 
         let line = String::from_utf8_lossy(&raw).trim_end().to_string();

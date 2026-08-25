@@ -482,15 +482,16 @@ pub fn export(name: &str) -> Result<Declaration> {
 /// Its own step so the manager can show what a file contains and let someone
 /// name the profile before anything is written.
 pub fn declaration(path: &Path) -> Result<Declaration> {
-    let raw = std::fs::read(path).map_err(|cause| {
-        Error::Profile(format!("{} could not be read: {cause}", path.display()))
+    let raw = crate::bounded_file::read(path, MAX_DECLARATION_BYTES).map_err(|cause| {
+        if cause.kind() == std::io::ErrorKind::InvalidData {
+            Error::Profile(format!(
+                "{} is larger than the 2 MiB profile backup limit",
+                path.display()
+            ))
+        } else {
+            Error::Profile(format!("{} could not be read: {cause}", path.display()))
+        }
     })?;
-    if raw.len() > MAX_DECLARATION_BYTES {
-        return Err(Error::Profile(format!(
-            "{} is larger than the 2 MiB profile backup limit",
-            path.display()
-        )));
-    }
     let mut declaration: Declaration = serde_json::from_slice(&raw).map_err(|cause| {
         Error::Profile(format!(
             "{} is not an exported profile: {cause}",

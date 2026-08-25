@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use proc_guard::ProcessGuard;
 use serde::Serialize;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::BufReader;
 use tokio::process::{Child, Command};
 use tokio::sync::{broadcast, oneshot};
 
@@ -422,8 +422,13 @@ impl Supervisor {
         R: tokio::io::AsyncRead + Unpin,
     {
         let mut tail = VecDeque::with_capacity(STARTUP_STDERR_LINES);
-        let mut lines = BufReader::new(pipe).lines();
-        while let Ok(Some(line)) = lines.next_line().await {
+        let mut lines = BufReader::new(pipe);
+        let mut raw = Vec::new();
+        while matches!(
+            crate::child_output::next_line(&mut lines, &mut raw).await,
+            Ok(true)
+        ) {
+            let line = String::from_utf8_lossy(&raw).trim_end().to_string();
             if ready.is_some() {
                 if let Some(announcement) = readiness::parse(&line) {
                     // `take` leaves `None`, so a second announcement is ignored

@@ -64,7 +64,7 @@ fn installed_version(profile_dir: &Path, package_name: &str) -> Option<String> {
         .join("node_modules")
         .join(package_name)
         .join("package.json");
-    let body = std::fs::read(manifest).ok()?;
+    let body = crate::bounded_file::read(&manifest, MAX_FILE as usize).ok()?;
     serde_json::from_slice::<serde_json::Value>(&body)
         .ok()?
         .get("version")?
@@ -162,7 +162,7 @@ fn load(profile: &str, profile_dir: &Path) -> Result<Store> {
     if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > MAX_FILE {
         return Err(Error::Plugin("the market receipt store is unsafe".into()));
     }
-    let body = std::fs::read(&path)
+    let body = crate::bounded_file::read(&path, MAX_FILE as usize)
         .map_err(|cause| Error::Plugin(format!("could not read market receipts: {cause}")))?;
     let store: Store = serde_json::from_slice(&body)
         .map_err(|cause| Error::Plugin(format!("market receipts are invalid: {cause}")))?;

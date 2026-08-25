@@ -70,10 +70,13 @@ struct Selection {
 /// an install outside Studio, so the newest supported runtime remains a safe
 /// fallback instead of making the harness unstartable.
 pub fn selected(runtimes: &[NodeInstallation]) -> Option<NodeInstallation> {
-    let remembered = std::fs::read(paths::node_selection_file())
-        .ok()
-        .and_then(|body| serde_json::from_slice::<Selection>(&body).ok())
-        .map(|selection| selection.path);
+    let remembered = crate::bounded_file::read(
+        &paths::node_selection_file(),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .ok()
+    .and_then(|body| serde_json::from_slice::<Selection>(&body).ok())
+    .map(|selection| selection.path);
     pick(runtimes, remembered.as_deref())
 }
 

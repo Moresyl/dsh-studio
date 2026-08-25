@@ -93,9 +93,11 @@ pub fn edition() -> &'static str {
 }
 
 fn read(root: &Path) -> Result<Payload> {
-    let raw = std::fs::read(root.join("manifest.json")).map_err(|cause| {
-        Error::Install(format!("offline runtime manifest cannot be read: {cause}"))
-    })?;
+    let raw = crate::bounded_file::read(
+        &root.join("manifest.json"),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .map_err(|cause| Error::Install(format!("offline runtime manifest cannot be read: {cause}")))?;
     let manifest: Manifest = serde_json::from_slice(&raw)
         .map_err(|cause| Error::Install(format!("offline runtime manifest is invalid: {cause}")))?;
 

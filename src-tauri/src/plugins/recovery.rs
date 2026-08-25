@@ -177,7 +177,7 @@ impl Store {
                 "profile file {name} is too large to back up safely"
             )));
         }
-        let body = std::fs::read(&source)
+        let body = crate::bounded_file::read(&source, MAX_CONTROL_FILE as usize)
             .map_err(|cause| Error::Plugin(format!("could not back up {name}: {cause}")))?;
         let digest = hex(&Sha256::digest(&body));
         std::fs::write(self.backups().join(name), &body)
@@ -205,7 +205,11 @@ impl Store {
         let mut bodies = Vec::with_capacity(journal.files.len());
         for image in &journal.files {
             let body = if image.present {
-                let body = std::fs::read(self.backups().join(&image.name)).map_err(|cause| {
+                let body = crate::bounded_file::read(
+                    &self.backups().join(&image.name),
+                    MAX_CONTROL_FILE as usize,
+                )
+                .map_err(|cause| {
                     Error::Plugin(format!("plugin recovery backup is unavailable: {cause}"))
                 })?;
                 if body.len() as u64 != image.size || hex(&Sha256::digest(&body)) != image.sha256 {
@@ -429,11 +433,8 @@ fn reject_symlink_directory(path: &Path) -> Result<()> {
 }
 
 fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> Result<T> {
-    let body = std::fs::read(path)
+    let body = crate::bounded_file::read(path, MAX_CONTROL_FILE as usize)
         .map_err(|cause| Error::Plugin(format!("could not read plugin recovery state: {cause}")))?;
-    if body.len() as u64 > MAX_CONTROL_FILE {
-        return Err(Error::Plugin("plugin recovery state is too large".into()));
-    }
     serde_json::from_slice(&body)
         .map_err(|cause| Error::Plugin(format!("plugin recovery state is invalid: {cause}")))
 }

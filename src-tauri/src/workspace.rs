@@ -39,7 +39,7 @@ impl Store {
     }
 
     fn selected(&self) -> PathBuf {
-        std::fs::read(&self.file)
+        crate::bounded_file::read(&self.file, crate::bounded_file::CONTROL_BYTES)
             .ok()
             .and_then(|body| serde_json::from_slice::<Selection>(&body).ok())
             .map(|selection| selection.path)

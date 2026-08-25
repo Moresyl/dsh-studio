@@ -316,7 +316,7 @@ fn settings_file() -> PathBuf {
 }
 
 fn read_level() -> LogLevel {
-    std::fs::read(settings_file())
+    crate::bounded_file::read(&settings_file(), crate::bounded_file::CONTROL_BYTES)
         .ok()
         .and_then(|raw| serde_json::from_slice::<Settings>(&raw).ok())
         .unwrap_or_default()

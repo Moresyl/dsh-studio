@@ -81,9 +81,10 @@ impl Store {
     }
 
     fn read(&self) -> State {
-        let stored = std::fs::read(self.selection_path())
-            .ok()
-            .and_then(|body| serde_json::from_slice::<StoredState>(&body).ok());
+        let stored =
+            crate::bounded_file::read(&self.selection_path(), crate::bounded_file::CONTROL_BYTES)
+                .ok()
+                .and_then(|body| serde_json::from_slice::<StoredState>(&body).ok());
 
         let Some(stored) = stored else {
             let fallback = self.fallback();
@@ -282,7 +283,7 @@ pub fn remove(name: &str) -> Result<()> {
 
 pub fn notice() -> Option<RecoveryNotice> {
     let store = Store::managed();
-    std::fs::read(store.notice_path())
+    crate::bounded_file::read(&store.notice_path(), crate::bounded_file::CONTROL_BYTES)
         .ok()
         .and_then(|body| serde_json::from_slice(&body).ok())
 }

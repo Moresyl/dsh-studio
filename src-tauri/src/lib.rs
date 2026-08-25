@@ -3,6 +3,8 @@
 mod about;
 mod application_menu;
 mod atomic;
+mod bounded_file;
+mod child_output;
 mod desktop;
 mod diagnostics;
 mod error;
