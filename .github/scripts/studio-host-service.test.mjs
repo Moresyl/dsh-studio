@@ -42,7 +42,7 @@ function environment(web) {
   return {
     DSH_STUDIO_PROFILE: 'web',
     DSH_STUDIO_PROFILE_DIR: web,
-    DSH_STUDIO_VERSION: '0.7.8',
+    DSH_STUDIO_VERSION: '0.8.0',
     DSH_STUDIO_RUNTIME_VERSION: '0.1.1-rc.2',
   }
 }

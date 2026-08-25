@@ -9,6 +9,42 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-25
+
+### Added
+
+- Added a native startup watchdog and static recovery window that do not depend on React, Harness, Node
+  or the network. If the renderer never completes its first handshake, users can still inspect redacted
+  diagnostics, retry startup or exit instead of being left with an inert blank window.
+- Added Extended presentation mode, combining the complete upstream page with a compact desktop toolbar.
+  The Harness may keep a random port or use a persisted local port from 1024–65535 with preflight conflict checks.
+- Added read-only Host Protocol 1 to the SDK and runtime integration. Harness plugins can inspect bounded
+  version and Profile facts without command, native-handle, package-mutation or Profile-mutation privileges.
+- Added native catalog protocol/latency/installability health checks, SHA-256 verified Profile restore previews,
+  local monthly budget status and spreadsheet-safe daily CSV usage export.
+
+### Changed
+
+- The GitHub Actions release matrix cold-installs the complete runtime graph on Windows, Linux and macOS and
+  boots a real Profile, Loader, web port and Host probe before proceeding.
+- Persistent exports, settings, Profiles and plugin recovery state now use same-directory staging, write-through
+  and atomic replacement. Cancellation reliably releases Profile and plugin operation locks.
+- Update approval is bound to the exact reviewed release. Accessibility, bilingual-document and production
+  bundle-budget checks are release gates; the terminal emulator is loaded on demand and the entry bundle is capped at 450 KiB.
+
+### Fixed
+
+- Fixed renderer startup failures leaving only a blank window with no desktop recovery or diagnostic export path.
+- Fixed cancelled Profile or plugin operations retaining task locks and making later actions appear permanently busy.
+- Fixed an update check changing during confirmation and allowing a different release to inherit stale approval.
+- Fixed failed replacement writes potentially damaging an existing valid setting, export or recovery file.
+- Explicit user-action failures now open localized, selectable and copyable dialogs while background refresh errors remain non-modal.
+
+### Performance and polish
+
+- Workbench, Profile Manager and xterm are lazy-loaded to reduce initial parsing when those features are unused.
+- Expanded bilingual documentation, public-contract, accessibility, bundle-budget, refusal-path and desktop-bridge lifecycle coverage.
+
 ## [0.7.8] — 2026-08-24
 
 ### Added
@@ -110,7 +146,6 @@ pre-1.0 caveat that anything may still move.
   all rendered as errors; warnings and genuine errors remain distinct.
 - Startup failure details are width-bounded, wrapped and internally scrollable
   so they cannot push the workspace out of its layout.
-
 
 ## [0.7.5] — 2026-08-22
 
@@ -695,7 +730,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...v0.8.0
 [0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6

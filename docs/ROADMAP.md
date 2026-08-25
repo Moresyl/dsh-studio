@@ -53,8 +53,8 @@ The remaining gaps are concentrated in:
 | Platforms               | Windows x64 and macOS Universal           | Windows x64, Linux x64, macOS Intel/Apple Silicon, plus Universal Lite image                                                           |
 | Process lifetime        | Electron runtime ownership                | Windows Job Object / Unix process group owns the full Node, PTY and tool tree                                                          |
 | Diagnostics             | Logs/recovery                             | Redacted bounded ZIP, rotated logs, crash evidence, Windows minidump and headless export command                                       |
-| Durable writes          | File-backed recovery contracts            | Same-directory unique staging, full flush and atomic Windows/Unix replacement for exports and persistent state                        |
-| Accessibility           | Native-frame refinements                  | Keyboard/dialog/form semantics gate, reduced motion, forced colours and bilingual manual acceptance matrix                            |
+| Durable writes          | File-backed recovery contracts            | Same-directory unique staging, full flush and atomic Windows/Unix replacement for exports and persistent state                         |
+| Accessibility           | Native-frame refinements                  | Keyboard/dialog/form semantics gate, reduced motion, forced colours and bilingual manual acceptance matrix                             |
 | Startup payload         | Bundled Electron surface                  | Terminal emulator is lazy; entry JavaScript is gated below 450 KiB and currently 364,959 bytes                                         |
 | Update                  | Desktop updater                           | Mandatory Tauri signature, GitHub + verified Pages manifest fallback, asset matrix and SHA256SUMS gates                                |
 | Package managers        | Website installers                        | Scoop live; winget/Homebrew/AUR/Flathub manifests generated and natively validated, but not all externally submitted                   |
@@ -76,8 +76,8 @@ The remaining gaps are concentrated in:
 - `39bc348`: atomic export, settings, Profile and plugin-recovery writes.
 - `ff21525`: terminal-emulator code split and a release bundle-size budget.
 
-These commits are not a published version. This work explicitly creates no tag,
-push or Release.
+These commits are included in the v0.8.0 release candidate. Final availability
+still depends on verifying the tagged pipeline, public assets, updater signatures and checksums.
 
 ## Next phase
 

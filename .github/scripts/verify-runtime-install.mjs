@@ -87,7 +87,7 @@ try {
     entry,
     runtimeRoot: directory,
     dshHome,
-    studioVersion: '0.7.8',
+    studioVersion: '0.8.0',
     harnessVersion: expected,
   })
   console.log(

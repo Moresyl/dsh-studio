@@ -9,6 +9,42 @@
 
 ## [未发布]
 
+## [0.8.0] —— 2026-08-25
+
+### 新增
+
+- 新增不依赖 React、Harness、Node 或网络的原生启动 watchdog 与静态恢复窗口；渲染器未完成首次握手时，
+  用户仍可查看脱敏诊断、重试启动或退出，而不是停留在无响应空白页。
+- 新增 Extended 展示模式，在保留完整上游页面的同时提供紧凑桌面工具栏；Harness 端口可继续随机分配，
+  也可固定为 1024–65535 的本地端口，并在 Node 启动前报告占用冲突。
+- SDK 与运行时集成新增只读 Host Protocol 1，向 Harness 插件公开当前版本和有界 Profile 清单，
+  不提供命令执行、原生句柄、包安装或 Profile 修改能力。
+- 插件目录来源新增原生协议、延迟和可安装性健康检查；Profile 备份在恢复前校验 SHA-256 并显示预览。
+- 用量报告新增本地月预算状态和逐日 CSV 趋势导出，并防止电子表格公式注入。
+
+### 变更
+
+- GitHub Actions 现在会在 Windows、Linux 与 macOS 发布矩阵中冷安装完整运行时依赖图，并真实启动
+  Profile、Loader、Web 端口和 Host 探针后才允许继续。
+- 所有持久导出、设置、Profile 与插件恢复状态统一使用同目录暂存、写穿和原子替换，避免中途失败留下
+  半写入文件；取消操作会可靠释放 Profile 与插件任务锁。
+- 更新确认绑定到用户实际审查的精确版本；版本变化后旧确认不能继续安装。
+- 新增键盘、对话框、辅助名称、减少动画和强制颜色发布门禁；终端仿真延迟加载，主入口包强制低于
+  450 KiB。
+
+### 修复
+
+- 修复渲染器启动失败时只能看到空白窗口、无法从桌面恢复或导出诊断的问题。
+- 修复已取消的 Profile/插件操作可能长期占用任务锁，导致后续操作被误报为忙碌的问题。
+- 修复更新确认期间检查结果变化后，界面仍可能对不同版本执行安装的问题。
+- 修复部分设置、导出和恢复文件在覆盖写入失败后可能损坏已有有效内容的问题。
+- 显式用户操作失败现在统一显示本地化、可选择和可复制的错误弹窗；后台刷新仍保持非模态，避免打断工作。
+
+### 性能与打磨
+
+- Workbench、Profile Manager 与 xterm 终端按需加载，降低不使用这些功能时的首屏解析负担。
+- 补充双语文档、公开协议、无障碍与生产包体积自动门禁，并完善拒绝路径和桌面桥接生命周期测试。
+
 ## [0.7.8] —— 2026-08-24
 
 ### 新增
@@ -90,7 +126,6 @@
   Windows/Linux Shell 中夺走。
 - npm cache、解析进度与普通信息即使写到 stderr 也不再全部标红；警告和真实错误仍保持醒目。
 - 左侧启动失败提示现在有宽度边界、自动换行与内部滚动，不会再挤坏右侧工作区。
-
 
 ## [0.7.5] —— 2026-08-22
 
@@ -576,7 +611,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...v0.8.0
 [0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/Moresyl/dsh-studio/compare/v0.7.5...v0.7.6
