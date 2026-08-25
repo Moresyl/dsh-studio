@@ -47,6 +47,37 @@ export function validateVersions(rootPackage, sdkPackage, tauriConfig) {
   }
 }
 
+/** Keep the local renderer on the smallest native plugin permission surface it uses. */
+export function validateCapabilities(capabilities) {
+  const permissions = capabilities?.permissions
+  if (!Array.isArray(permissions)) {
+    throw new Error('desktop capabilities must declare a permission list')
+  }
+  const identifiers = permissions.map((permission) =>
+    typeof permission === 'string' ? permission : permission?.identifier,
+  )
+  const exact = [
+    'dialog:allow-open',
+    'dialog:allow-save',
+    'clipboard-manager:allow-read-text',
+    'opener:allow-reveal-item-in-dir',
+    'opener:allow-open-url',
+    'process:allow-restart',
+    'updater:allow-check',
+    'updater:allow-download-and-install',
+  ]
+  for (const identifier of exact) {
+    if (!identifiers.includes(identifier)) {
+      throw new Error(`desktop capabilities must retain ${identifier}`)
+    }
+  }
+  for (const broad of ['dialog:default', 'opener:default', 'process:default', 'updater:default']) {
+    if (identifiers.includes(broad)) {
+      throw new Error(`desktop capabilities must not grant broad ${broad}`)
+    }
+  }
+}
+
 /** Verify every duplicated public-contract marker against authoritative source. */
 export async function verifyPublicContracts(root = DEFAULT_ROOT) {
   const files = await Promise.all(
@@ -66,6 +97,7 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
       'package.json',
       'sdk/package.json',
       'src-tauri/tauri.conf.json',
+      'src-tauri/capabilities/default.json',
     ].map((path) => readFile(join(root, path), 'utf8')),
   )
   const [
@@ -84,6 +116,7 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     rootPackageRaw,
     sdkPackageRaw,
     tauriConfigRaw,
+    capabilitiesRaw,
   ] = files
 
   const protocols = [
@@ -132,6 +165,7 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     JSON.parse(sdkPackageRaw),
     JSON.parse(tauriConfigRaw),
   )
+  validateCapabilities(JSON.parse(capabilitiesRaw))
   return {
     protocol: protocols[0],
     hostProtocol: hostProtocols[0],

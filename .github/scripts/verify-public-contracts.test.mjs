@@ -3,10 +3,33 @@ import test from 'node:test'
 
 import {
   protocolNumber,
+  validateCapabilities,
   validateCatalogSchema,
   validateVersions,
   verifyPublicContracts,
 } from './verify-public-contracts.mjs'
+
+test('desktop plugin capabilities stay on the reviewed least-privilege surface', () => {
+  const permissions = [
+    'dialog:allow-open',
+    'dialog:allow-save',
+    'clipboard-manager:allow-read-text',
+    'opener:allow-reveal-item-in-dir',
+    { identifier: 'opener:allow-open-url', allow: [{ url: 'https://*' }] },
+    'process:allow-restart',
+    'updater:allow-check',
+    'updater:allow-download-and-install',
+  ]
+  assert.doesNotThrow(() => validateCapabilities({ permissions }))
+  assert.throws(
+    () => validateCapabilities({ permissions: [...permissions, 'process:default'] }),
+    /broad process:default/,
+  )
+  assert.throws(
+    () => validateCapabilities({ permissions: permissions.filter((item) => item !== 'dialog:allow-save') }),
+    /dialog:allow-save/,
+  )
+})
 
 test('protocol declarations require one positive integer', () => {
   assert.equal(protocolNumber('PROTOCOL = 3', /PROTOCOL = (\d+)/g, 'fixture'), 3)

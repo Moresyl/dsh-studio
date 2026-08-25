@@ -14,14 +14,16 @@
     "core:window:allow-is-maximized",
     "core:window:allow-close",
     "core:webview:allow-webview-close",
-    "dialog:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
     "clipboard-manager:allow-read-text",
     "opener:allow-reveal-item-in-dir",
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "http://*" }, { "url": "https://*" }]
     },
-    "process:default",
-    "updater:default"
+    "process:allow-restart",
+    "updater:allow-check",
+    "updater:allow-download-and-install"
   ]
 }
