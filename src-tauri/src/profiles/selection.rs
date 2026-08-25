@@ -187,7 +187,33 @@ impl Store {
     }
 
     fn rename(&self, from: &str, to: &str) -> Result<()> {
-        let mut state = self.read();
+        let raw = match crate::bounded_file::read(
+            &self.selection_path(),
+            crate::bounded_file::CONTROL_BYTES,
+        ) {
+            Ok(raw) => raw,
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(cause) => {
+                return Err(Error::Profile(format!(
+                    "{} could not be read safely: {cause}",
+                    self.selection_path().display()
+                )));
+            }
+        };
+        let Ok(stored) = serde_json::from_slice::<StoredState>(&raw) else {
+            return Ok(());
+        };
+        // Renaming the directory necessarily creates a moment when `from` is no
+        // longer usable. Reusing `read` here used to discard that exact value
+        // before it could be renamed, silently selecting the fallback profile.
+        let legacy = stored.selected;
+        let active = stored.active.or(legacy).unwrap_or_else(|| self.fallback());
+        let mut state = State {
+            schema: SCHEMA,
+            last_known_good: stored.last_known_good.unwrap_or_else(|| active.clone()),
+            active,
+            pending: stored.pending,
+        };
         replace(&mut state.active, from, to);
         replace(&mut state.last_known_good, from, to);
         if state.pending.as_deref() == Some(from) {
@@ -373,6 +399,24 @@ mod tests {
         assert_eq!(state.active, "work");
         assert_eq!(state.last_known_good, "work");
         assert!(state.pending.is_none());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn rename_keeps_selection_after_the_old_directory_has_moved() {
+        let (store, base) = store("rename-after-move");
+        std::fs::create_dir_all(store.profiles.join("work")).expect("work profile");
+        store.choose("work").expect("choose");
+        store.mark_healthy("work").expect("healthy");
+        std::fs::rename(store.profiles.join("work"), store.profiles.join("renamed"))
+            .expect("directory moved");
+
+        store.rename("work", "renamed").expect("state renamed");
+
+        assert_eq!(store.chosen(), "renamed");
+        let state = store.read();
+        assert_eq!(state.active, "renamed");
+        assert_eq!(state.last_known_good, "renamed");
         let _ = std::fs::remove_dir_all(base);
     }
 }

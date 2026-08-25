@@ -473,20 +473,78 @@ pub fn rename(from: &str, to: &str) -> Result<()> {
         )));
     }
 
+    let source = paths::profile_dir(&from);
     let target = free_dir(to)?;
-    std::fs::rename(paths::profile_dir(&from), &target).map_err(|cause| {
+    rename_in(
+        &source,
+        &target,
+        &from,
+        to,
+        switches::rename,
+        selection::rename,
+    )
+}
+
+fn rename_in<S, T>(
+    source: &Path,
+    target: &Path,
+    from: &str,
+    to: &str,
+    mut rename_switches: S,
+    mut rename_selection: T,
+) -> Result<()>
+where
+    S: FnMut(&str, &str) -> Result<()>,
+    T: FnMut(&str, &str) -> Result<()>,
+{
+    std::fs::rename(source, target).map_err(|cause| {
         Error::Profile(format!(
             "{from} could not be renamed: {cause}. Close anything using it — the harness included — and try again"
         ))
     })?;
 
-    // The manifest carries the name too. The harness only reads it when it makes
-    // the profile, so a stale one changes nothing today and misleads whoever
-    // opens the file next.
-    rename_in_manifest(&target, to)?;
-    switches::rename(&from, to)?;
-    selection::rename(&from, to)?;
-    Ok(())
+    let mut manifest_changed = false;
+    let mut switches_changed = false;
+    let outcome = (|| {
+        // The manifest carries the name too. The harness only reads it when it
+        // makes the profile, so a stale one changes nothing today and misleads
+        // whoever opens the file next.
+        rename_in_manifest(target, to)?;
+        manifest_changed = true;
+        rename_switches(from, to)?;
+        switches_changed = true;
+        rename_selection(from, to)
+    })();
+    let Err(failure) = outcome else {
+        return Ok(());
+    };
+
+    let mut rollback = Vec::new();
+    if switches_changed {
+        if let Err(cause) = rename_switches(to, from) {
+            rollback.push(format!("plugin state: {cause}"));
+        }
+    }
+    if manifest_changed {
+        if let Err(cause) = rename_in_manifest(target, from) {
+            rollback.push(format!("manifest: {cause}"));
+        }
+    }
+    if let Err(cause) = std::fs::rename(target, source) {
+        rollback.push(format!("directory: {cause}"));
+    }
+
+    let rollback = if rollback.is_empty() {
+        "; the partial change was rolled back".to_string()
+    } else {
+        format!(
+            "; rollback also failed for {}, so neither name should be used until those files are recovered",
+            rollback.join(", ")
+        )
+    };
+    Err(Error::Profile(format!(
+        "{from} could not be renamed to {to}: {failure}{rollback}"
+    )))
 }
 
 /// Take a profile away, with everything in it.
@@ -1060,6 +1118,7 @@ fn is_new_name(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
 
     fn plugin(
         name: &str,
@@ -1110,6 +1169,96 @@ mod tests {
             "dsh-studio-profile-backup-{label}-{}.json",
             std::process::id()
         ))
+    }
+
+    fn rename_root(label: &str) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-rename-{label}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("rename root");
+        root
+    }
+
+    #[test]
+    fn a_failed_profile_rename_restores_the_directory_and_manifest() {
+        let root = rename_root("switch-failure");
+        let source = root.join("source");
+        let target = root.join("target");
+        initialize(&source, &[], EMPTY_PATCH, None).expect("source profile");
+
+        let failure = rename_in(
+            &source,
+            &target,
+            "source",
+            "target",
+            |_, _| Err(Error::Plugin("switch record unavailable".into())),
+            |_, _| Ok(()),
+        )
+        .expect_err("rename must fail");
+
+        assert!(failure.to_string().contains("rolled back"));
+        assert!(source.is_dir());
+        assert!(!target.exists());
+        assert_eq!(
+            plugins::read_manifest(&source).unwrap()["name"],
+            "dsh-profile-source"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_late_profile_rename_failure_reverses_every_completed_state_move() {
+        let root = rename_root("selection-failure");
+        let source = root.join("source");
+        let target = root.join("target");
+        initialize(&source, &[], EMPTY_PATCH, None).expect("source profile");
+        let switch_moves = RefCell::new(Vec::new());
+        let selection_moves = RefCell::new(Vec::new());
+
+        rename_in(
+            &source,
+            &target,
+            "source",
+            "target",
+            |from, to| {
+                switch_moves
+                    .borrow_mut()
+                    .push((from.to_string(), to.to_string()));
+                Ok(())
+            },
+            |from, to| {
+                selection_moves
+                    .borrow_mut()
+                    .push((from.to_string(), to.to_string()));
+                if from == "source" {
+                    Err(Error::Profile("selection unavailable".into()))
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .expect_err("rename must fail");
+
+        assert_eq!(
+            *switch_moves.borrow(),
+            [
+                ("source".to_string(), "target".to_string()),
+                ("target".to_string(), "source".to_string())
+            ]
+        );
+        assert_eq!(
+            *selection_moves.borrow(),
+            [("source".to_string(), "target".to_string())]
+        );
+        assert!(source.is_dir());
+        assert!(!target.exists());
+        assert_eq!(
+            plugins::read_manifest(&source).unwrap()["name"],
+            "dsh-profile-source"
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

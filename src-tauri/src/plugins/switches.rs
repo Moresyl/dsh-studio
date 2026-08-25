@@ -190,12 +190,19 @@ pub fn copy(from: &str, to: &str) -> Result<()> {
 /// Follow a profile that was renamed. The record is keyed by name, so without
 /// this a rename would silently switch everything back on.
 pub fn rename(from: &str, to: &str) -> Result<()> {
-    let store = store();
-    let off = off_in(&store, from);
-    if !off.is_empty() {
-        remember_in(&store, to, &off)?;
-    }
-    forget_in(&store, from)
+    rename_in(&store(), from, to)
+}
+
+fn rename_in(store: &Path, from: &str, to: &str) -> Result<()> {
+    let mut document = document(store)?;
+    let Some(disabled) = document.get_mut("disabled").and_then(Value::as_object_mut) else {
+        return Ok(());
+    };
+    let Some(entry) = disabled.remove(from) else {
+        return Ok(());
+    };
+    disabled.insert(to.to_string(), entry);
+    write(store, &Value::Object(document))
 }
 
 /// Drop a profile's record once the profile itself is gone.
@@ -510,6 +517,20 @@ mod tests {
         forget_in(&store, "web").expect("forgotten");
 
         assert!(off_in(&store, "web").is_empty());
+        assert_eq!(off_in(&store, "api"), off("@vendor/dsh-charts"));
+    }
+
+    #[test]
+    fn renaming_a_profile_moves_its_record_in_one_document_write() {
+        let store = record("rename");
+        let off = |name: &str| BTreeSet::from([name.to_string()]);
+        remember_in(&store, "web", &off("@vendor/dsh-notes")).expect("recorded");
+        remember_in(&store, "api", &off("@vendor/dsh-charts")).expect("recorded");
+
+        rename_in(&store, "web", "work").expect("renamed");
+
+        assert!(off_in(&store, "web").is_empty());
+        assert_eq!(off_in(&store, "work"), off("@vendor/dsh-notes"));
         assert_eq!(off_in(&store, "api"), off("@vendor/dsh-charts"));
     }
 

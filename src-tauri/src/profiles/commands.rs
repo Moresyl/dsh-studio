@@ -149,14 +149,25 @@ pub async fn profile_duplicate(
 }
 
 #[tauri::command]
-pub fn profile_rename(from: String, to: String, state: State<'_, AppState>) -> Result<Roster> {
+pub fn profile_rename(
+    from: String,
+    to: String,
+    state: State<'_, AppState>,
+    jobs: State<'_, Arc<PluginJobs>>,
+) -> Result<Roster> {
+    let _busy = jobs.claim()?;
     idle(&from, &state)?;
     super::rename(&from, &to)?;
     Ok(super::roster())
 }
 
 #[tauri::command]
-pub fn profile_remove(name: String, state: State<'_, AppState>) -> Result<Roster> {
+pub fn profile_remove(
+    name: String,
+    state: State<'_, AppState>,
+    jobs: State<'_, Arc<PluginJobs>>,
+) -> Result<Roster> {
+    let _busy = jobs.claim()?;
     idle(&name, &state)?;
     super::remove(&name)?;
     Ok(super::roster())
