@@ -36,6 +36,8 @@ use proc_guard::ProcessGuard;
 use serde::Serialize;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
+use tokio::sync::mpsc;
+use tokio::time::Instant as TokioInstant;
 
 use crate::error::{Error, Result};
 use crate::harness::install;
@@ -111,6 +113,23 @@ impl Drop for PluginJob<'_> {
 const INTENT_TTL: Duration = Duration::from_secs(2 * 60);
 const MAX_INTENTS: usize = 64;
 
+const COMMAND_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+const COMMAND_TOTAL_TIMEOUT: Duration = Duration::from_secs(20 * 60);
+const PIPE_DRAIN_TIMEOUT: Duration = Duration::from_secs(2);
+
+#[derive(Clone, Copy)]
+struct CommandLimits {
+    idle: Duration,
+    total: Duration,
+    drain: Duration,
+}
+
+const COMMAND_LIMITS: CommandLimits = CommandLimits {
+    idle: COMMAND_IDLE_TIMEOUT,
+    total: COMMAND_TOTAL_TIMEOUT,
+    drain: PIPE_DRAIN_TIMEOUT,
+};
+
 #[derive(Clone, Debug)]
 pub struct InstallIntent {
     pub profile: String,
@@ -176,7 +195,9 @@ impl PluginIntents {
                     "the install confirmation expired or was already used; preview it again".into(),
                 )
             })?;
-        let (_, intent) = entries.remove(index).expect("the intent index exists");
+        let (_, intent) = entries.remove(index).ok_or_else(|| {
+            Error::Plugin("the install confirmation changed while it was being used".into())
+        })?;
         if intent.profile != profile {
             return Err(Error::Plugin(
                 "the active profile changed after the install preview; preview it again".into(),
@@ -340,7 +361,6 @@ pub async fn change_finalize<R, F>(
     change: Change,
     spec: &str,
     retry: recovery::RetryPlan,
-    guard: &ProcessGuard,
     report: R,
     finalize: F,
 ) -> Result<()>
@@ -355,7 +375,7 @@ where
     }
 
     let profile = crate::profiles::selected();
-    change_profile_finalize(&profile, change, spec, retry, guard, report, finalize).await
+    change_profile_finalize(&profile, change, spec, retry, report, finalize).await
 }
 
 /// The same transaction against an explicit profile, used only by a
@@ -365,7 +385,6 @@ pub async fn change_profile_finalize<R, F>(
     change: Change,
     spec: &str,
     retry: recovery::RetryPlan,
-    guard: &ProcessGuard,
     report: R,
     finalize: F,
 ) -> Result<()>
@@ -382,7 +401,6 @@ where
     let outcome = run(
         profile,
         &[change.verb().to_string(), spec.to_string()],
-        guard,
         report,
     )
     .await;
@@ -429,7 +447,7 @@ where
 /// installed from, so the file becomes part of the profile — reinstalling or
 /// duplicating that profile reads the same path again, and the path the user
 /// picked may well have been on a stick that has since been taken out.
-pub async fn import<R>(path: &Path, guard: &ProcessGuard, report: R) -> Result<archive::Package>
+pub async fn import<R>(path: &Path, report: R) -> Result<archive::Package>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
@@ -441,7 +459,6 @@ where
     let installed = run(
         &profile,
         &[Change::Add.verb().to_string(), archive::spec(&kept.path)],
-        guard,
         report,
     )
     .await;
@@ -485,7 +502,7 @@ where
 /// original had installed, and that is the same command with different arguments.
 /// Both go through here so there is one place that knows how to find a package
 /// manager and where the child's working directory has to be.
-pub async fn run<R>(profile: &str, args: &[String], guard: &ProcessGuard, report: R) -> Result<()>
+pub async fn run<R>(profile: &str, args: &[String], report: R) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
@@ -546,18 +563,13 @@ where
         command.creation_flags(0x0800_0000);
     }
 
-    let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
-    let stdout = child.stdout.take().expect("stdout was piped");
-    let stderr = child.stderr.take().expect("stderr was piped");
-    let out = tokio::spawn(forward(stdout, Stream::Stdout, report.clone()));
-    let err = tokio::spawn(forward(stderr, Stream::Stderr, report));
-
-    let status = child.wait().await.map_err(|cause| {
-        Error::Plugin(format!(
-            "the plugin command could not be waited on: {cause}"
-        ))
-    })?;
-    let (out, err) = tokio::join!(out, err);
+    // One Job Object/process-group per package-manager invocation. On Windows
+    // a Job cannot terminate only one member tree, so sharing the Harness Job
+    // would either leak a lifecycle descendant or kill the running Harness.
+    let guard = ProcessGuard::new().map_err(Error::Spawn)?;
+    let child = guard.spawn(&mut command).map_err(Error::Spawn)?;
+    let (status, out, err) =
+        wait_package_command(child, &guard, report, "plugin command", COMMAND_LIMITS).await?;
 
     if !status.success() {
         // Every line went to the console, but the button that started this is in
@@ -581,7 +593,7 @@ where
 /// unpublished, made private, or is absent from the configured mirror. Running
 /// the same pinned pnpm with a lockfile-only install catches that class without
 /// running lifecycle scripts or writing to the user's profile.
-pub async fn verify_installable<R>(spec: &str, guard: &ProcessGuard, report: R) -> Result<()>
+pub async fn verify_installable<R>(spec: &str, report: R) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
@@ -639,17 +651,16 @@ where
     #[cfg(windows)]
     command.creation_flags(0x0800_0000);
 
-    let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
-    let stdout = child.stdout.take().expect("stdout was piped");
-    let stderr = child.stderr.take().expect("stderr was piped");
-    let out = tokio::spawn(forward(stdout, Stream::Stdout, report.clone()));
-    let err = tokio::spawn(forward(stderr, Stream::Stderr, report));
-    let status = child.wait().await.map_err(|cause| {
-        Error::Plugin(format!(
-            "dependency preflight could not be waited on: {cause}"
-        ))
-    })?;
-    let (out, err) = tokio::join!(out, err);
+    let guard = ProcessGuard::new().map_err(Error::Spawn)?;
+    let child = guard.spawn(&mut command).map_err(Error::Spawn)?;
+    let (status, out, err) = wait_package_command(
+        child,
+        &guard,
+        report,
+        "dependency preflight",
+        COMMAND_LIMITS,
+    )
+    .await?;
     if status.success() {
         return Ok(());
     }
@@ -695,7 +706,12 @@ pub fn switch(name: &str, enabled: bool) -> Result<()> {
 const TAIL_LINES: usize = 16;
 
 /// Report every line of a stream, and hand back the last few of them.
-async fn forward<P, R>(pipe: P, stream: Stream, report: R) -> Vec<String>
+async fn forward<P, R>(
+    pipe: P,
+    stream: Stream,
+    report: R,
+    activity: Option<mpsc::Sender<()>>,
+) -> Vec<String>
 where
     P: tokio::io::AsyncRead + Unpin,
     R: Fn(Stream, String),
@@ -724,9 +740,124 @@ where
         }
         tail.push_back(line.clone());
         report(stream, line);
+        if let Some(activity) = &activity {
+            // Activity is an edge, not one queued item per package. A single
+            // pending wakeup bounds memory even when pnpm floods the console.
+            let _ = activity.try_send(());
+        }
     }
 
     tail.into()
+}
+
+async fn wait_package_command<R>(
+    mut child: tokio::process::Child,
+    guard: &ProcessGuard,
+    report: R,
+    label: &str,
+    limits: CommandLimits,
+) -> Result<(
+    std::process::ExitStatus,
+    std::result::Result<Vec<String>, tokio::task::JoinError>,
+    std::result::Result<Vec<String>, tokio::task::JoinError>,
+)>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    let pid = child.id();
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let (Some(stdout), Some(stderr)) = (stdout, stderr) else {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        if let Some(pid) = pid {
+            let _ = guard.finish(pid);
+        }
+        return Err(Error::Plugin(format!(
+            "the {label} did not provide its diagnostic pipes"
+        )));
+    };
+
+    let (activity, mut observed) = mpsc::channel(1);
+    let mut out = tokio::spawn(forward(
+        stdout,
+        Stream::Stdout,
+        report.clone(),
+        Some(activity.clone()),
+    ));
+    let mut err = tokio::spawn(forward(
+        stderr,
+        Stream::Stderr,
+        report,
+        Some(activity.clone()),
+    ));
+    drop(activity);
+
+    let idle = tokio::time::sleep(limits.idle);
+    let total = tokio::time::sleep(limits.total);
+    tokio::pin!(idle, total);
+    let mut observing = true;
+    let waited = loop {
+        tokio::select! {
+            biased;
+            waited = child.wait() => break waited,
+            activity = observed.recv(), if observing => match activity {
+                Some(()) => idle.as_mut().reset(TokioInstant::now() + limits.idle),
+                None => observing = false,
+            },
+            _ = &mut idle => {
+                let _ = guard.terminate_all();
+                let _ = child.wait().await;
+                out.abort();
+                err.abort();
+                return Err(Error::Plugin(format!(
+                    "the {label} produced no output for {} seconds and was stopped; check the registry connection and retry",
+                    limits.idle.as_secs()
+                )));
+            },
+            _ = &mut total => {
+                let _ = guard.terminate_all();
+                let _ = child.wait().await;
+                out.abort();
+                err.abort();
+                return Err(Error::Plugin(format!(
+                    "the {label} exceeded the {} second safety limit and was stopped",
+                    limits.total.as_secs()
+                )));
+            },
+        }
+    };
+
+    // Lifecycle descendants can outlive pnpm and retain both pipe handles.
+    // This invocation owns its guard, so reclaiming the remaining Job/group is
+    // safe and prevents a successful parent exit from hanging the UI forever.
+    let tree = guard.terminate_all();
+    if let Some(pid) = pid {
+        guard.finish(pid).map_err(|cause| {
+            Error::Plugin(format!(
+                "the {label} process tree could not be reclaimed: {cause}"
+            ))
+        })?;
+    }
+    tree.map_err(|cause| {
+        Error::Plugin(format!(
+            "the {label} process tree could not be reclaimed: {cause}"
+        ))
+    })?;
+
+    let drained =
+        tokio::time::timeout(limits.drain, async { tokio::join!(&mut out, &mut err) }).await;
+    let (out, err) = match drained {
+        Ok(results) => results,
+        Err(_) => {
+            out.abort();
+            err.abort();
+            tokio::join!(out, err)
+        }
+    };
+    let status = waited
+        .map_err(|cause| Error::Plugin(format!("the {label} could not be waited on: {cause}")))?;
+    Ok((status, out, err))
 }
 
 /// What a stream said last, as one line an error message can carry.
@@ -1031,6 +1162,7 @@ fn is_name_segment(segment: &str) -> bool {
 mod tests {
     use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
+    use std::time::Duration;
 
     #[cfg(windows)]
     use std::path::Path;
@@ -1041,8 +1173,11 @@ mod tests {
     use super::path_with;
     use super::{
         forward, is_package_spec, list, manager_cli, manager_in, package_manager_reason,
-        profile_store_dir, split_spec, PluginIntents, PluginJobs, PreflightProject, Stream,
+        profile_store_dir, split_spec, wait_package_command, CommandLimits, PluginIntents,
+        PluginJobs, PreflightProject, Stream,
     };
+    use proc_guard::ProcessGuard;
+    use tokio::process::Command;
 
     fn manifest(raw: &str) -> serde_json::Value {
         serde_json::from_str(raw).expect("test manifest")
@@ -1196,7 +1331,7 @@ mod tests {
             move |_: Stream, line: String| seen.lock().expect("not poisoned").push(line)
         };
 
-        let tail = forward(raw, Stream::Stdout, record).await;
+        let tail = forward(raw, Stream::Stdout, record, None).await;
 
         assert_eq!(
             seen.lock().expect("not poisoned").len(),
@@ -1207,6 +1342,44 @@ mod tests {
         // heading, and that shape is part of what the console is showing.
         assert_eq!(tail.len(), 5, "a bounded tail keeps every short failure");
         assert_eq!(tail.last().map(String::as_str), Some("fourth"));
+    }
+
+    #[tokio::test]
+    async fn a_silent_package_manager_is_stopped_instead_of_hanging_the_ui() {
+        #[cfg(windows)]
+        let mut command = {
+            let mut command = Command::new("cmd");
+            command.args(["/c", "ping -n 60 127.0.0.1 >nul"]);
+            command
+        };
+        #[cfg(not(windows))]
+        let mut command = {
+            let mut command = Command::new("sh");
+            command.args(["-c", "sleep 60"]);
+            command
+        };
+        command
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+
+        let guard = ProcessGuard::new().expect("process guard");
+        let child = guard.spawn(&mut command).expect("silent child");
+        let failure = wait_package_command(
+            child,
+            &guard,
+            |_, _| {},
+            "test package manager",
+            CommandLimits {
+                idle: Duration::from_millis(50),
+                total: Duration::from_secs(2),
+                drain: Duration::from_millis(50),
+            },
+        )
+        .await
+        .expect_err("silent child must hit its idle deadline");
+
+        assert!(failure.to_string().contains("produced no output"));
     }
 
     #[test]

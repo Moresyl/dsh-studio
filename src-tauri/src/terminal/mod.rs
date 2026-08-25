@@ -29,11 +29,11 @@ mod shell;
 
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{OsStr, OsString};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use portable_pty::{ChildKiller, CommandBuilder, MasterPty, PtySize};
 use proc_guard::ProcessGuard;
@@ -42,6 +42,8 @@ use tauri::{AppHandle, Emitter};
 
 use crate::error::{Error, Result};
 use crate::paths;
+
+type PtyChild = Box<dyn portable_pty::Child + Send + Sync>;
 
 /// Channel the terminal pane listens on for output.
 const OUTPUT_CHANNEL: &str = "terminal://output";
@@ -154,21 +156,39 @@ impl Terminals {
         // problem to reclaim, however this process ends. A pid is all the pty layer
         // offers, and on Windows that leaves a gap of microseconds between creation
         // and adoption — `ProcessGuard::adopt` says so in full.
-        if let Some(pid) = child.process_id() {
-            if let Err(failure) = self.guard.adopt(pid) {
-                let _ = child.kill();
-                return Err(Error::Terminal(format!(
-                    "could not put the terminal under process reclamation: {failure}"
-                )));
-            }
+        let Some(pid) = child.process_id() else {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(Error::Terminal(
+                "the terminal process did not report an id for process reclamation".into(),
+            ));
+        };
+        if let Err(failure) = self.guard.adopt(pid) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(Error::Terminal(format!(
+                "could not put the terminal under process reclamation: {failure}"
+            )));
         }
 
-        let reader = pair.master.try_clone_reader().map_err(|failure| {
-            Error::Terminal(format!("could not read the terminal: {failure}"))
-        })?;
-        let writer = pair.master.take_writer().map_err(|failure| {
-            Error::Terminal(format!("could not write to the terminal: {failure}"))
-        })?;
+        let reader = match pair.master.try_clone_reader() {
+            Ok(reader) => reader,
+            Err(failure) => {
+                self.reclaim_child(pid, &mut child);
+                return Err(Error::Terminal(format!(
+                    "could not read the terminal: {failure}"
+                )));
+            }
+        };
+        let writer = match pair.master.take_writer() {
+            Ok(writer) => writer,
+            Err(failure) => {
+                self.reclaim_child(pid, &mut child);
+                return Err(Error::Terminal(format!(
+                    "could not write to the terminal: {failure}"
+                )));
+            }
+        };
 
         // Split off the ability to signal the shell before the child itself goes
         // to the waiter thread, which will be blocked inside `wait` and unable to
@@ -186,7 +206,7 @@ impl Terminals {
 
         // Registered before the threads start, so a shell that exits immediately
         // cannot be forgotten before it was ever remembered.
-        self.live.lock().expect("terminals poisoned").insert(
+        self.sessions().insert(
             id.clone(),
             Live {
                 master: pair.master,
@@ -219,9 +239,20 @@ impl Terminals {
             },
         );
 
-        spawn_reader(app.clone(), id.clone(), reader);
-        spawn_writer(queued, writer);
-        spawn_waiter(Arc::clone(self), app.clone(), id, child);
+        if let Err(failure) = spawn_reader(app.clone(), id.clone(), reader) {
+            self.abort_open(&id, pid, &mut child);
+            return Err(thread_start_error("reader", failure));
+        }
+        if let Err(failure) = spawn_writer(id.clone(), queued, writer) {
+            self.abort_open(&id, pid, &mut child);
+            return Err(thread_start_error("writer", failure));
+        }
+        if let Err((failure, mut child)) =
+            spawn_waiter(Arc::clone(self), app.clone(), id, pid, child)
+        {
+            self.abort_open(&describe.id, pid, &mut child);
+            return Err(thread_start_error("waiter", failure));
+        }
 
         Ok(describe)
     }
@@ -232,7 +263,7 @@ impl Terminals {
     /// otherwise block the command, and through it whichever runtime worker was
     /// unlucky enough to be running it.
     pub fn write(&self, id: &str, data: &str) -> Result<()> {
-        let live = self.live.lock().expect("terminals poisoned");
+        let live = self.sessions();
         let session = live.get(id).ok_or_else(|| Self::gone(id))?;
         session
             .input
@@ -242,7 +273,7 @@ impl Terminals {
 
     /// Tell the shell the pane changed size.
     pub fn resize(&self, id: &str, rows: u16, cols: u16) -> Result<()> {
-        let live = self.live.lock().expect("terminals poisoned");
+        let live = self.sessions();
         let session = live.get(id).ok_or_else(|| Self::gone(id))?;
         session
             .master
@@ -262,7 +293,7 @@ impl Terminals {
     /// that closes because someone typed `exit` take exactly the same path — and
     /// the tab hears about both the same way.
     pub fn close(&self, id: &str) -> Result<()> {
-        let mut live = self.live.lock().expect("terminals poisoned");
+        let mut live = self.sessions();
         let session = live.get_mut(id).ok_or_else(|| Self::gone(id))?;
         session
             .killer
@@ -272,9 +303,7 @@ impl Terminals {
 
     /// Every open terminal, so a pane that remounted can rebuild its tabs.
     pub fn list(&self) -> Vec<Session> {
-        self.live
-            .lock()
-            .expect("terminals poisoned")
+        self.sessions()
             .values()
             .map(|session| session.describe.clone())
             .collect()
@@ -287,8 +316,34 @@ impl Terminals {
     /// Doing it under the lock would stall every other terminal for as long as
     /// that takes.
     fn forget(&self, id: &str) {
-        let session = self.live.lock().expect("terminals poisoned").remove(id);
+        let session = self.sessions().remove(id);
         drop(session);
+    }
+
+    /// Stop a half-open session after one of its worker threads could not start.
+    ///
+    /// Killing first prevents a shell from surviving without a waiter. Dropping
+    /// the session afterwards closes the pty and the input channel, which also
+    /// releases any reader or writer thread that was already created.
+    fn abort_open(&self, id: &str, pid: u32, child: &mut PtyChild) {
+        self.forget(id);
+        self.reclaim_child(pid, child);
+    }
+
+    fn reclaim_child(&self, pid: u32, child: &mut PtyChild) {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = self.guard.finish(pid);
+    }
+
+    /// Live sessions, even if a previous holder unwound while updating the map.
+    ///
+    /// Process and pty operations happen outside this lock, so poisoning can
+    /// only leave an interrupted `HashMap` bookkeeping operation. The standard
+    /// library keeps that map memory-safe; recovering it gives the UI a chance
+    /// to close or recreate affected sessions instead of panicking every command.
+    fn sessions(&self) -> MutexGuard<'_, HashMap<String, Live>> {
+        self.live.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     fn gone(id: &str) -> Error {
@@ -389,7 +444,7 @@ fn join_search_path(
 }
 
 /// Forward everything the shell prints to the pane that is showing it.
-fn spawn_reader(app: AppHandle, id: String, mut reader: Box<dyn Read + Send>) {
+fn spawn_reader(app: AppHandle, id: String, mut reader: Box<dyn Read + Send>) -> io::Result<()> {
     std::thread::Builder::new()
         .name(format!("pty-read-{id}"))
         .spawn(move || {
@@ -424,13 +479,17 @@ fn spawn_reader(app: AppHandle, id: String, mut reader: Box<dyn Read + Send>) {
                 }
             }
         })
-        .expect("spawn a pty reader thread");
+        .map(|_| ())
 }
 
 /// Drain the input queue into the shell, in order.
-fn spawn_writer(queued: mpsc::Receiver<Vec<u8>>, mut writer: Box<dyn Write + Send>) {
+fn spawn_writer(
+    id: String,
+    queued: mpsc::Receiver<Vec<u8>>,
+    mut writer: Box<dyn Write + Send>,
+) -> io::Result<()> {
     std::thread::Builder::new()
-        .name("pty-write".into())
+        .name(format!("pty-write-{id}"))
         .spawn(move || {
             // Ends when the sender is dropped, which is when the session is
             // forgotten — and dropping the writer then sends EOF to the shell.
@@ -440,7 +499,7 @@ fn spawn_writer(queued: mpsc::Receiver<Vec<u8>>, mut writer: Box<dyn Write + Sen
                 }
             }
         })
-        .expect("spawn a pty writer thread");
+        .map(|_| ())
 }
 
 /// Wait for the shell to finish, then take the session down with it.
@@ -448,12 +507,27 @@ fn spawn_waiter(
     terminals: Arc<Terminals>,
     app: AppHandle,
     id: String,
-    mut child: Box<dyn portable_pty::Child + Send + Sync>,
-) {
-    std::thread::Builder::new()
+    pid: u32,
+    child: PtyChild,
+) -> std::result::Result<(), (io::Error, PtyChild)> {
+    // Keep a second handle to the closure's payload until the thread exists.
+    // `Builder::spawn` consumes and drops its closure on failure; capturing the
+    // child directly would then lose the only wait handle and could leave a
+    // killed Unix process as a zombie until Studio itself exits.
+    let child = Arc::new(Mutex::new(Some(child)));
+    let waiting = Arc::clone(&child);
+    match std::thread::Builder::new()
         .name(format!("pty-wait-{id}"))
         .spawn(move || {
+            let Some(mut child) = waiting
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take()
+            else {
+                return;
+            };
             let status = child.wait().ok();
+            let _ = terminals.guard.finish(pid);
 
             // Forgetting the session closes the pty, which is what ends the reader
             // and writer threads. Without this they would wait on a shell that no
@@ -468,16 +542,32 @@ fn spawn_waiter(
                     code: status.map(|status| status.exit_code()),
                 },
             );
-        })
-        .expect("spawn a pty waiter thread");
+        }) {
+        Ok(_) => Ok(()),
+        Err(failure) => {
+            let child = child
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take()
+                .expect("a failed spawn cannot consume its child");
+            Err((failure, child))
+        }
+    }
+}
+
+fn thread_start_error(role: &str, failure: io::Error) -> Error {
+    Error::Terminal(format!(
+        "could not start the terminal {role} worker: {failure}"
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
+    use std::panic::{self, AssertUnwindSafe};
     use std::path::PathBuf;
 
-    use super::join_search_path;
+    use super::{join_search_path, thread_start_error, Terminals};
 
     #[test]
     fn recovered_login_path_wins_over_the_gui_process_path() {
@@ -509,5 +599,30 @@ mod tests {
     #[test]
     fn no_input_does_not_invent_a_path() {
         assert_eq!(join_search_path(Vec::new(), None, None), None::<OsString>);
+    }
+
+    #[test]
+    fn poisoned_session_bookkeeping_remains_recoverable() {
+        let terminals = Terminals::new().expect("process guard");
+        let _ = panic::catch_unwind(AssertUnwindSafe(|| {
+            let _held = terminals.live.lock().expect("initial lock");
+            panic!("poison the terminal map");
+        }));
+
+        assert!(terminals.sessions().is_empty());
+        assert!(terminals.list().is_empty());
+    }
+
+    #[test]
+    fn worker_start_failure_is_actionable() {
+        let error = thread_start_error(
+            "reader",
+            std::io::Error::new(std::io::ErrorKind::OutOfMemory, "thread quota reached"),
+        );
+
+        assert_eq!(
+            error.to_string(),
+            "could not start the terminal reader worker: thread quota reached"
+        );
     }
 }

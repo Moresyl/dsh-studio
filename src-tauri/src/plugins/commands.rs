@@ -86,7 +86,6 @@ pub async fn plugin_recovery_retry(
                 Change::Add,
                 &spec,
                 retry,
-                supervisor.guard(),
                 move |stream, line| reporter.note(stream, line),
                 move || {
                     super::receipts::record(
@@ -109,7 +108,6 @@ pub async fn plugin_recovery_retry(
                 Change::Remove,
                 &name,
                 retry,
-                supervisor.guard(),
                 move |stream, line| reporter.note(stream, line),
                 move || super::receipts::remove(&receipt_profile, &profile_dir, &receipt_name),
             )
@@ -393,7 +391,7 @@ pub async fn plugin_import(
 
     let supervisor = Arc::clone(&state.supervisor);
     let reporter = Arc::clone(&supervisor);
-    let outcome = super::import(Path::new(&path), supervisor.guard(), move |stream, line| {
+    let outcome = super::import(Path::new(&path), move |stream, line| {
         reporter.note(stream, line)
     })
     .await;
@@ -460,7 +458,6 @@ where
         change,
         spec,
         retry,
-        supervisor.guard(),
         move |stream, line| reporter.note(stream, line),
         finalize,
     )
@@ -518,10 +515,7 @@ fn settle(supervisor: &Supervisor, outcome: Result<String>) -> Result<PluginStat
 async fn verify_dependency_graph(spec: &str, state: &State<'_, AppState>) -> Result<()> {
     let supervisor = Arc::clone(&state.supervisor);
     let reporter = Arc::clone(&supervisor);
-    super::verify_installable(spec, supervisor.guard(), move |stream, line| {
-        reporter.note(stream, line)
-    })
-    .await
+    super::verify_installable(spec, move |stream, line| reporter.note(stream, line)).await
 }
 
 /// The Node runtime every registry call runs through.

@@ -144,6 +144,40 @@ async fn dropping_the_guard_ends_an_adopted_grandchild() {
     let _ = fs::remove_dir_all(&workspace);
 }
 
+/// A completed leader must be removed from the Unix pgid ledger only after its
+/// descendants are gone. Otherwise a later OS pid reuse could make Drop signal
+/// an unrelated process group.
+#[cfg(not(windows))]
+#[tokio::test]
+async fn finish_reclaims_descendants_after_the_leader_exits() {
+    let workspace = scratch_dir("finish");
+    let ticks = workspace.join("ticks.log");
+    let inner = write_inner_fixture(&workspace, &ticks);
+
+    let guard = ProcessGuard::new().expect("create guard");
+    let mut command = shell(&[&format!("sh '{}' >/dev/null 2>&1 &", inner.display())]);
+    let mut child = guard.spawn(&mut command).expect("spawn leader");
+    let pid = child.id().expect("leader exited before registration");
+    child.wait().await.expect("wait for leader");
+
+    let alive = wait_until_growing(&ticks).await;
+    assert!(alive > 0, "the descendant never started ticking");
+
+    guard.finish(pid).expect("finish process group");
+    tokio::time::sleep(SETTLE).await;
+    let after_finish = size_of(&ticks);
+    tokio::time::sleep(SETTLE).await;
+    assert_eq!(
+        size_of(&ticks),
+        after_finish,
+        "a descendant survived ProcessGuard::finish"
+    );
+
+    // The finished pgid is gone from the ledger, so a later shutdown is a no-op.
+    guard.terminate_all().expect("finished guard is empty");
+    let _ = fs::remove_dir_all(&workspace);
+}
+
 /// Wait for the fixture to prove it is alive, returning the size it reached.
 async fn wait_until_growing(ticks: &Path) -> u64 {
     let deadline = Instant::now() + STARTUP_GRACE;
@@ -248,6 +282,24 @@ fn write_tree_fixture(workspace: &Path, ticks: &Path) -> PathBuf {
             .expect("make outer fixture executable");
         outer
     }
+}
+
+#[cfg(not(windows))]
+fn write_inner_fixture(workspace: &Path, ticks: &Path) -> PathBuf {
+    use std::os::unix::fs::PermissionsExt;
+
+    let inner = workspace.join("inner.sh");
+    fs::write(
+        &inner,
+        format!(
+            "#!/bin/sh\nwhile :; do echo tick >> \"{ticks}\"; sleep 1; done\n",
+            ticks = ticks.display()
+        ),
+    )
+    .expect("write inner fixture");
+    fs::set_permissions(&inner, fs::Permissions::from_mode(0o700))
+        .expect("make inner fixture executable");
+    inner
 }
 
 /// A private directory under the system temp, unique to this run.

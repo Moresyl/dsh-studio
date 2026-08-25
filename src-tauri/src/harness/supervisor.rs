@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use proc_guard::ProcessGuard;
@@ -216,46 +216,27 @@ impl Supervisor {
         self.events.subscribe()
     }
 
-    /// The guard that owns every process this shell starts.
-    ///
-    /// Shared so that work adjacent to the harness — installing it, for one —
-    /// is reclaimed by the same mechanism rather than a second one.
-    pub(crate) fn guard(&self) -> &ProcessGuard {
-        &self.guard
-    }
-
     /// Add a line to the shell's activity log from outside the supervisor.
     pub(crate) fn note(&self, stream: Stream, line: String) {
         self.record(stream, line);
     }
 
     pub fn status(&self) -> Status {
-        self.status.lock().expect("status poisoned").clone()
+        self.status_guard().clone()
     }
 
     /// Recent harness output, oldest first.
     pub fn recent_log(&self) -> Vec<(Stream, String)> {
-        self.log
-            .lock()
-            .expect("log poisoned")
-            .iter()
-            .cloned()
-            .collect()
+        self.log_guard().iter().cloned().collect()
     }
 
     pub fn persistent_log_path(&self) -> Option<PathBuf> {
-        self.persistent_log
-            .lock()
-            .expect("persistent log poisoned")
-            .path()
+        self.persistent_log_guard().path()
     }
 
     /// Change the disk log threshold without filtering the live console.
     pub fn set_log_level(&self, level: crate::logging::LogLevel) -> Result<()> {
-        self.persistent_log
-            .lock()
-            .expect("persistent log poisoned")
-            .set_level(level)
+        self.persistent_log_guard().set_level(level)
     }
 
     /// Start the harness and return the origin it is serving on.
@@ -360,9 +341,20 @@ impl Supervisor {
     async fn launch_once(self: Arc<Self>, plan: &LaunchPlan) -> Result<(Child, String)> {
         let mut command = plan.to_command();
         let mut child = self.guard.spawn(&mut command).map_err(Error::Spawn)?;
+        let pid = child.id();
 
-        let stdout = child.stdout.take().expect("stdout was piped");
-        let stderr = child.stderr.take().expect("stderr was piped");
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+        let (Some(stdout), Some(stderr)) = (stdout, stderr) else {
+            let _ = child.kill().await;
+            let _ = child.wait().await;
+            if let Some(pid) = pid {
+                let _ = self.guard.finish(pid);
+            }
+            return Err(Error::Readiness(
+                "harness did not provide its diagnostic pipes".into(),
+            ));
+        };
         let (ready_tx, ready_rx) = oneshot::channel();
 
         tokio::spawn(Arc::clone(&self).pump(stdout, Stream::Stdout, Some(ready_tx), false));
@@ -393,6 +385,14 @@ impl Supervisor {
             Err(failure) => {
                 let _ = child.kill().await;
                 let _ = child.wait().await;
+                if let Some(pid) = pid {
+                    if let Err(cause) = self.guard.finish(pid) {
+                        self.record(
+                            Stream::Stderr,
+                            format!("could not finish reclaiming the failed harness process tree: {cause}"),
+                        );
+                    }
+                }
                 let stderr = match tokio::time::timeout(
                     STARTUP_STDERR_DRAIN_TIMEOUT,
                     &mut stderr_task,
@@ -449,6 +449,7 @@ impl Supervisor {
         let mut child = first;
 
         loop {
+            let pid = child.id();
             let exit = tokio::select! {
                 exit = child.wait() => exit,
                 // A wedged harness is ended here rather than restarted here, so
@@ -459,6 +460,14 @@ impl Supervisor {
                     child.wait().await
                 }
             };
+            if let Some(pid) = pid {
+                if let Err(cause) = self.guard.finish(pid) {
+                    self.record(
+                        Stream::Stderr,
+                        format!("could not finish reclaiming the harness process tree: {cause}"),
+                    );
+                }
+            }
             if self.stopping.load(Ordering::SeqCst) {
                 break;
             }
@@ -547,23 +556,38 @@ impl Supervisor {
     }
 
     fn publish(&self, status: Status) {
-        *self.status.lock().expect("status poisoned") = status.clone();
+        *self.status_guard() = status.clone();
         let _ = self.events.send(Event::Status(status));
     }
 
     fn record(&self, stream: Stream, line: String) {
-        self.persistent_log
-            .lock()
-            .expect("persistent log poisoned")
-            .write(stream, &line);
+        self.persistent_log_guard().write(stream, &line);
         {
-            let mut log = self.log.lock().expect("log poisoned");
+            let mut log = self.log_guard();
             if log.len() == LOG_HISTORY {
                 log.pop_front();
             }
             log.push_back((stream, line.clone()));
         }
         let _ = self.events.send(Event::Log { stream, line });
+    }
+
+    /// Status bookkeeping remains usable after an unrelated unwind.
+    fn status_guard(&self) -> MutexGuard<'_, Status> {
+        self.status.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The in-memory log owns only a bounded deque and is safe to recover.
+    fn log_guard(&self) -> MutexGuard<'_, VecDeque<(Stream, String)>> {
+        self.log.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// Persistent logging already reports I/O errors without unwinding; a
+    /// poisoned mutex only means a caller elsewhere panicked while holding it.
+    fn persistent_log_guard(&self) -> MutexGuard<'_, crate::logging::PersistentLog> {
+        self.persistent_log
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 }
 
@@ -609,7 +633,37 @@ impl Drop for Supervisor {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::{self, AssertUnwindSafe};
+
     use super::*;
+
+    #[test]
+    fn poisoned_status_bookkeeping_remains_readable() {
+        let supervisor = Supervisor::new().expect("process guard");
+        let _ = panic::catch_unwind(AssertUnwindSafe(|| {
+            let _held = supervisor.status.lock().expect("initial lock");
+            panic!("poison status bookkeeping");
+        }));
+
+        assert_eq!(supervisor.status(), Status::Stopped);
+        supervisor.publish(Status::Starting);
+        assert_eq!(supervisor.status(), Status::Starting);
+    }
+
+    #[test]
+    fn poisoned_log_bookkeeping_still_accepts_diagnostics() {
+        let supervisor = Supervisor::new().expect("process guard");
+        let _ = panic::catch_unwind(AssertUnwindSafe(|| {
+            let _held = supervisor.log.lock().expect("initial lock");
+            panic!("poison in-memory log bookkeeping");
+        }));
+
+        supervisor.note(Stream::Stderr, "recoverable diagnostic".into());
+        assert!(supervisor
+            .recent_log()
+            .iter()
+            .any(|(_, line)| line == "recoverable diagnostic"));
+    }
 
     #[test]
     fn runtime_patches_are_launcher_flags_before_web_application_arguments() {

@@ -80,6 +80,18 @@ impl ProcessGuard {
     pub fn terminate_all(&self) -> io::Result<()> {
         self.inner.terminate_all()
     }
+
+    /// Finish ownership after the direct child has been waited on.
+    ///
+    /// Unix process groups can outlive their leader, so this first kills any
+    /// remaining descendants and only then removes the pgid from the guard's
+    /// ledger. Without the removal a long-running process could later reuse the
+    /// same id and be mistaken for Studio's child during shutdown. Windows Job
+    /// Objects track kernel membership rather than reusable numeric ids, so the
+    /// corresponding operation is intentionally a no-op there.
+    pub fn finish(&self, pid: u32) -> io::Result<()> {
+        self.inner.finish(pid)
+    }
 }
 
 impl Drop for ProcessGuard {

@@ -313,8 +313,19 @@ where
     // owned by the supervisor's independent guard.
     let guard = ProcessGuard::new().map_err(Error::Spawn)?;
     let mut child = guard.spawn(&mut command).map_err(Error::Spawn)?;
-    let stdout = child.stdout.take().expect("stdout was piped");
-    let stderr = child.stderr.take().expect("stderr was piped");
+    let pid = child.id();
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let (Some(stdout), Some(stderr)) = (stdout, stderr) else {
+        let _ = child.kill().await;
+        let _ = child.wait().await;
+        if let Some(pid) = pid {
+            let _ = guard.finish(pid);
+        }
+        return Err(Error::Install(format!(
+            "{label} did not provide its diagnostic pipes"
+        )));
+    };
     let (activity, mut observed) = mpsc::unbounded_channel();
     let mut out = tokio::spawn(forward(
         stdout,
@@ -333,6 +344,15 @@ where
         tokio::select! {
             biased;
             result = child.wait() => {
+                if let Some(pid) = pid {
+                    if let Err(cause) = guard.finish(pid) {
+                        out.abort();
+                        err.abort();
+                        return Err(Error::Install(format!(
+                            "{label} process tree could not be reclaimed: {cause}"
+                        )));
+                    }
+                }
                 break result.map_err(|cause| {
                     Error::Install(format!("{label} could not be waited on: {cause}"))
                 })?;
@@ -346,6 +366,9 @@ where
             _ = &mut idle => {
                 let _ = guard.terminate_all();
                 let _ = child.wait().await;
+                if let Some(pid) = pid {
+                    let _ = guard.finish(pid);
+                }
                 out.abort();
                 err.abort();
                 return Err(Error::Install(format!(
@@ -355,6 +378,9 @@ where
             _ = &mut total => {
                 let _ = guard.terminate_all();
                 let _ = child.wait().await;
+                if let Some(pid) = pid {
+                    let _ = guard.finish(pid);
+                }
                 out.abort();
                 err.abort();
                 return Err(Error::Install(format!(

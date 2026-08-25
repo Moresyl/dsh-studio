@@ -225,10 +225,7 @@ async fn install_into(name: &str, specs: Vec<String>, state: &State<'_, AppState
     args.extend(specs);
 
     let reporter = Arc::clone(&supervisor);
-    let outcome = plugins::run(name, &args, supervisor.guard(), move |stream, line| {
-        reporter.note(stream, line)
-    })
-    .await;
+    let outcome = plugins::run(name, &args, move |stream, line| reporter.note(stream, line)).await;
 
     match outcome {
         // The harness has just built the layer list from what it installed, which

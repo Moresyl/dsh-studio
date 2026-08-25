@@ -89,7 +89,13 @@ impl Inner {
             return Err(failure);
         }
 
-        resume_process(pid)?;
+        if let Err(failure) = resume_process(pid) {
+            // It is already in the Job but the guard itself can live for the
+            // whole application. Do not leave a permanently suspended child
+            // occupying handles and a pid until that distant Drop.
+            unsafe { TerminateProcess(handle, 1) };
+            return Err(failure);
+        }
         Ok(child)
     }
 
@@ -115,6 +121,13 @@ impl Inner {
         }
         Ok(())
     }
+
+    pub(crate) fn finish(&self, _pid: u32) -> io::Result<()> {
+        // Job membership is a kernel object reference, not a reusable PID
+        // ledger. Descendants remain safely owned until they exit or the Job is
+        // terminated, so there is nothing to unregister here.
+        Ok(())
+    }
 }
 
 /// Resume the threads of a process created with `CREATE_SUSPENDED`.
@@ -137,9 +150,11 @@ fn resume_process(pid: u32) -> io::Result<()> {
         if entry.th32OwnerProcessID == pid {
             let thread = unsafe { OpenThread(THREAD_SUSPEND_RESUME, 0, entry.th32ThreadID) };
             if !thread.is_null() {
-                unsafe { ResumeThread(thread) };
+                let previous = unsafe { ResumeThread(thread) };
                 unsafe { CloseHandle(thread) };
-                resumed = true;
+                // u32::MAX is the Win32 failure sentinel. Counting that as a
+                // resume would return a child that can never execute.
+                resumed |= previous != u32::MAX;
             }
         }
         // Thread32Next overwrites the entry, dwSize included.
