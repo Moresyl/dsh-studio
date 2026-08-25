@@ -30,7 +30,7 @@ pub mod qr;
 
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use serde::Serialize;
 use tokio::net::TcpListener;
@@ -39,8 +39,6 @@ use tokio::sync::broadcast;
 use crate::error::{Error, Result};
 use access::{Access, DeviceView, CODE_LIFETIME};
 use gateway::Counters;
-
-const POISONED: &str = "remote session poisoned";
 
 /// What the remote panel renders.
 #[derive(Debug, Serialize)]
@@ -107,7 +105,7 @@ impl Remote {
     }
 
     pub fn is_open(&self) -> bool {
-        self.session.lock().expect(POISONED).is_some()
+        self.session().is_some()
     }
 
     /// Open the door in front of a harness already serving at `origin`.
@@ -145,7 +143,7 @@ impl Remote {
         // Storing replaces whatever was there, and dropping the old session
         // shuts its tasks down — so even the race two simultaneous callers could
         // win leaves exactly one door open.
-        *self.session.lock().expect(POISONED) = Some(Session {
+        *self.session() = Some(Session {
             access,
             host,
             port,
@@ -159,7 +157,7 @@ impl Remote {
 
     /// Close the door. Safe to call when it is already closed.
     pub fn close(&self) {
-        let previous = self.session.lock().expect(POISONED).take();
+        let previous = self.session().take();
         if previous.is_some() {
             let _ = self.changed.send(());
         }
@@ -187,7 +185,7 @@ impl Remote {
     }
 
     pub fn status(&self) -> RemoteStatus {
-        let guard = self.session.lock().expect(POISONED);
+        let guard = self.session();
 
         let Some(session) = guard.as_ref() else {
             return RemoteStatus {
@@ -233,11 +231,24 @@ impl Remote {
     /// every caller goes on to read [`Self::status`] — which takes the same
     /// lock, and would deadlock on a guard still held.
     fn access(&self) -> Option<Arc<Access>> {
-        self.session
-            .lock()
-            .expect(POISONED)
+        self.session()
             .as_ref()
             .map(|session| Arc::clone(&session.access))
+    }
+
+    /// A poisoned session fails closed. Dropping it closes the listener and all
+    /// relays; preserving a possibly half-mutated authentication door would be
+    /// the less safe recovery policy.
+    fn session(&self) -> MutexGuard<'_, Option<Session>> {
+        match self.session.lock() {
+            Ok(session) => session,
+            Err(poisoned) => {
+                let mut session = PoisonError::into_inner(poisoned);
+                *session = None;
+                self.session.clear_poison();
+                session
+            }
+        }
     }
 }
 
@@ -268,6 +279,8 @@ fn upstream_from(origin: &str) -> Result<SocketAddr> {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::{self, AssertUnwindSafe};
+
     use super::{upstream_from, Remote};
 
     #[test]
@@ -293,6 +306,18 @@ mod tests {
         assert!(status.code_seconds_left.is_none());
         assert!(status.devices.is_empty());
         assert_eq!(status.active, 0);
+    }
+
+    #[test]
+    fn poisoned_remote_session_fails_closed_without_cascading_panics() {
+        let remote = Remote::new();
+        let _ = panic::catch_unwind(AssertUnwindSafe(|| {
+            let _held = remote.session.lock().expect("initial lock");
+            panic!("poison remote session");
+        }));
+
+        assert!(!remote.is_open());
+        assert!(!remote.status().open);
     }
 
     #[test]

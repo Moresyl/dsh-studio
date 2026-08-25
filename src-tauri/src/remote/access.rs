@@ -17,7 +17,7 @@
 //! Nothing here is written to disk. Closing the door drops the whole structure,
 //! codes and devices together.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -36,8 +36,6 @@ const SECRET_BYTES: usize = 16;
 
 /// Separates a device's id from its secret inside the cookie.
 const COOKIE_SEPARATOR: char = '.';
-
-const POISONED: &str = "remote access poisoned";
 
 /// The credentials one open door will accept.
 pub struct Access {
@@ -112,14 +110,14 @@ impl Access {
     /// carries, not the credentials it has already handed out.
     pub fn renew(&self) -> Result<()> {
         let code = Code::mint()?;
-        self.state.lock().expect(POISONED).code = Some(code);
+        self.state().code = Some(code);
         Ok(())
     }
 
     /// The code the panel should show, or `None` once it has been used or has
     /// run out of time.
     pub fn pairing(&self) -> Option<Pairing> {
-        let state = self.state.lock().expect(POISONED);
+        let state = self.state();
         let code = state.code.as_ref()?;
         Some(Pairing {
             code: code.secret.clone(),
@@ -132,7 +130,7 @@ impl Access {
     /// Returns the cookie value to hand back, or `None` if the code was wrong,
     /// spent, or out of time — the three of which are deliberately one answer.
     pub fn pair(&self, offered: &str, agent: &str) -> Option<String> {
-        let mut state = self.state.lock().expect(POISONED);
+        let mut state = self.state();
 
         let code = state.code.as_ref()?;
         if code.seconds_left().is_none() || !constant_time_eq(offered.as_bytes(), &code.secret) {
@@ -155,7 +153,7 @@ impl Access {
     /// list of phones rather than a list of pairings.
     pub fn admit(&self, cookie: &str) -> Option<String> {
         let (id, secret) = cookie.split_once(COOKIE_SEPARATOR)?;
-        let mut state = self.state.lock().expect(POISONED);
+        let mut state = self.state();
 
         let device = state.devices.iter_mut().find(|device| device.id == id)?;
         if !constant_time_eq(secret.as_bytes(), &device.secret) {
@@ -171,7 +169,7 @@ impl Access {
     /// Answers whether there was anything to forget, so a caller can tell a
     /// revocation from a repeated click.
     pub fn forget(&self, id: &str) -> bool {
-        let mut state = self.state.lock().expect(POISONED);
+        let mut state = self.state();
         let before = state.devices.len();
         state.devices.retain(|device| device.id != id);
 
@@ -183,13 +181,7 @@ impl Access {
     }
 
     pub fn devices(&self) -> Vec<DeviceView> {
-        self.state
-            .lock()
-            .expect(POISONED)
-            .devices
-            .iter()
-            .map(Device::view)
-            .collect()
+        self.state().devices.iter().map(Device::view).collect()
     }
 
     /// Follow revocations, for a relay that has to end when its device does.
@@ -197,10 +189,26 @@ impl Access {
         self.revoked.subscribe()
     }
 
+    /// Authentication fails closed after an unwind. Poisoning means a mutation
+    /// may have stopped halfway through, so discard every code and device once,
+    /// clear the poison, and let the owner deliberately renew from a clean state.
+    fn state(&self) -> MutexGuard<'_, State> {
+        match self.state.lock() {
+            Ok(state) => state,
+            Err(poisoned) => {
+                let mut state = PoisonError::into_inner(poisoned);
+                state.code = None;
+                state.devices.clear();
+                self.state.clear_poison();
+                state
+            }
+        }
+    }
+
     /// Make the code lapse without waiting two minutes for it.
     #[cfg(test)]
     fn lapse(&self) {
-        if let Some(code) = self.state.lock().expect(POISONED).code.as_mut() {
+        if let Some(code) = self.state().code.as_mut() {
             code.expires = Instant::now();
         }
     }
@@ -323,6 +331,8 @@ fn constant_time_eq(left: &[u8], right: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::{self, AssertUnwindSafe};
+
     use super::*;
 
     fn open() -> Access {
@@ -342,6 +352,23 @@ mod tests {
         assert!(pairing.code.chars().all(|c| c.is_ascii_hexdigit()));
         assert!(pairing.seconds_left <= CODE_LIFETIME.as_secs() as u32);
         assert!(access.devices().is_empty());
+    }
+
+    #[test]
+    fn poisoned_authentication_state_fails_closed_and_can_be_renewed() {
+        let access = open();
+        let code = code_of(&access);
+        assert!(access.pair(&code, "").is_some());
+
+        let _ = panic::catch_unwind(AssertUnwindSafe(|| {
+            let _held = access.state.lock().expect("initial lock");
+            panic!("poison authentication state");
+        }));
+
+        assert!(access.devices().is_empty());
+        assert!(access.pairing().is_none());
+        access.renew().expect("renew after recovery");
+        assert!(access.pairing().is_some());
     }
 
     #[test]
