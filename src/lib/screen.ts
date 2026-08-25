@@ -13,13 +13,13 @@
  * should: a terminal is the one part of it that is more document than view.
  */
 import { readText } from '@tauri-apps/plugin-clipboard-manager'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { FitAddon } from '@xterm/addon-fit'
 import { Unicode11Addon } from '@xterm/addon-unicode11'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { Terminal, type ITheme } from '@xterm/xterm'
 
 import { t } from '@/lib/i18n'
+import { openExternalUrl } from '@/lib/external-url'
 import * as ipc from '@/lib/ipc'
 import { isMac, isWindows } from '@/lib/platform'
 import { clipboardAction } from '@/lib/terminal-shortcuts'
@@ -162,7 +162,7 @@ function create(): Screen {
   terminal.loadAddon(
     new WebLinksAddon((event, uri) => {
       event.preventDefault()
-      void reportAction(() => openUrl(uri))
+      void reportAction(() => openExternalUrl(uri))
     }),
   )
 

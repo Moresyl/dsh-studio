@@ -18,12 +18,12 @@ import {
   TriangleAlert,
   X,
 } from 'lucide-react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 
 import { Button } from '@/components/Button'
 import { Switch } from '@/components/Switch'
 import { count, day } from '@/lib/format'
 import { t } from '@/lib/i18n'
+import { normalizeExternalUrl, openExternalUrl } from '@/lib/external-url'
 import type { InstalledPlugin } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { useHarness } from '@/state/harness'
@@ -485,13 +485,18 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 /** A published link, opened in the user's own browser rather than in here. */
 function Link({ href }: { href: string }) {
-  const target = href.replace(/^git\+/, '').replace(/\.git$/, '')
+  let target: string
+  try {
+    target = normalizeExternalUrl(href)
+  } catch {
+    return <span className="text-faint">{t('common.unavailable')}</span>
+  }
 
   return (
     <button
       type="button"
       data-hint={target}
-      onClick={() => void reportAction(() => openUrl(target))}
+      onClick={() => void reportAction(() => openExternalUrl(target))}
       className="inline-flex max-w-full items-center gap-1 transition-colors duration-100 hover:text-brand"
     >
       <span className="truncate">{target.replace(/^https?:\/\//, '')}</span>

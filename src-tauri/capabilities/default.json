@@ -16,8 +16,11 @@
     "core:webview:allow-webview-close",
     "dialog:default",
     "clipboard-manager:allow-read-text",
-    "opener:default",
-    "opener:allow-open-url",
+    "opener:allow-reveal-item-in-dir",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "http://*" }, { "url": "https://*" }]
+    },
     "process:default",
     "updater:default"
   ]

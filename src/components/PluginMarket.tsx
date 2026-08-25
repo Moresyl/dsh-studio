@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { open as pickFile } from '@tauri-apps/plugin-dialog'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import {
   Check,
   ChevronLeft,
@@ -29,6 +28,7 @@ import { Switch } from '@/components/Switch'
 import { TabButton } from '@/components/TabButton'
 import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
+import { openExternalUrl } from '@/lib/external-url'
 import * as ipc from '@/lib/ipc'
 import type { CatalogSource, InstalledPlugin, PluginListing, PluginSort } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
@@ -481,7 +481,10 @@ function Sources({ sources, working, onSelect, onManage }: SourcesProps) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="secondary" onClick={() => void reportAction(() => openUrl(DSH_HUB))}>
+          <Button
+            variant="secondary"
+            onClick={() => void reportAction(() => openExternalUrl(DSH_HUB))}
+          >
             <ExternalLink size={13} aria-hidden="true" />
             {t('plugins.hub.open')}
           </Button>

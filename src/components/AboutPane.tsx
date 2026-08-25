@@ -14,13 +14,14 @@ import {
   MessagesSquare,
 } from 'lucide-react'
 import { save as pickPath } from '@tauri-apps/plugin-dialog'
-import { openUrl, revealItemInDir } from '@tauri-apps/plugin-opener'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
 
 import { BrandMark } from '@/components/BrandMark'
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
+import { openExternalUrl } from '@/lib/external-url'
 import * as ipc from '@/lib/ipc'
 import type { About } from '@/lib/ipc'
 import { notesForDisplay } from '@/lib/updater'
@@ -216,7 +217,7 @@ export function AboutPane() {
               <div className="flex items-center justify-end gap-2">
                 <Button
                   variant="secondary"
-                  onClick={() => void reportAction(() => openUrl(release.url))}
+                  onClick={() => void reportAction(() => openExternalUrl(release.url))}
                 >
                   {t('about.release')}
                   <ArrowUpRight size={13} strokeWidth={2.3} />
@@ -296,7 +297,7 @@ export function AboutPane() {
           <div className="flex items-center gap-4 text-[11.5px] text-faint">
             <button
               type="button"
-              onClick={() => void reportAction(() => openUrl(SOURCE))}
+              onClick={() => void reportAction(() => openExternalUrl(SOURCE))}
               className="inline-flex items-center gap-1.5 transition-colors duration-100 hover:text-brand"
             >
               <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden="true" />
@@ -325,7 +326,7 @@ function CommunityLink({
   return (
     <button
       type="button"
-      onClick={() => void reportAction(() => openUrl(url))}
+      onClick={() => void reportAction(() => openExternalUrl(url))}
       className="flex items-center justify-center gap-2 rounded-control border border-line bg-canvas-deep/50 px-3 py-2.5 text-[11.5px] text-muted transition-colors hover:border-line-strong hover:text-brand"
     >
       <Icon size={13} strokeWidth={2.1} aria-hidden="true" />

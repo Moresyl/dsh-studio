@@ -44,6 +44,7 @@ export default defineConfig({
         'src/lib/bridge.ts',
         'src/lib/crash.ts',
         'src/lib/errors.ts',
+        'src/lib/external-url.ts',
         'src/lib/fuzzy.ts',
         'src/lib/lifecycle.ts',
         'src/lib/updater.ts',

@@ -493,6 +493,7 @@ const en = {
   'extended.actions': 'Extended Harness actions',
   'extended.label': 'Quick actions',
   'common.loading': 'Loading…',
+  'common.unavailable': 'Unavailable',
   'settings.logLevel': 'Persistent log level',
   'settings.logLevelHint':
     'Controls bounded files on disk. The live console always keeps every line.',
@@ -604,7 +605,8 @@ const en = {
   'dialog.error.copied': 'Copied',
   'dialog.error.close': 'Close',
   'dialog.failure.title': 'Operation failed',
-  'dialog.failure.body': 'The requested action did not complete. You can copy the details for diagnosis.',
+  'dialog.failure.body':
+    'The requested action did not complete. You can copy the details for diagnosis.',
   'dialog.failure.unknown': 'The operation failed without error details.',
   'plugins.error.title': 'Plugin operation failed',
   'plugins.error.body':
@@ -1114,6 +1116,7 @@ const zh: Record<MessageKey, string> = {
   'extended.actions': 'Harness 扩展操作',
   'extended.label': '快捷操作',
   'common.loading': '正在加载…',
+  'common.unavailable': '不可用',
   'settings.logLevel': '持久日志级别',
   'settings.logLevelHint': '控制磁盘上的限额日志；实时控制台始终保留全部输出。',
   'settings.logLevel.debug': '调试',
