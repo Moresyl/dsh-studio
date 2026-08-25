@@ -58,6 +58,18 @@ interface TerminalStore {
  */
 const closing = new Set<string>()
 
+/** Exit events that beat their own `terminal_open` response back to this window. */
+const earlyExits = new Map<string, TerminalExit>()
+
+/** Unknown native events cannot grow a window-lifetime map without a bound. */
+const EARLY_EXIT_LIMIT = 32
+
+/** Invalidates list responses after a shell was opened, exited, or removed. */
+let sessionGeneration = 0
+
+/** Makes concurrent list requests last-request-wins. */
+let syncGeneration = 0
+
 /** The tab to show once `id` is gone: the one after it, else the one before. */
 function neighbour(tabs: TerminalTab[], id: string): string | null {
   const index = tabs.findIndex((tab) => tab.id === id)
@@ -72,8 +84,20 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
   error: null,
 
   sync: async () => {
+    // Reconcile only sessions that existed when this read began. A new shell
+    // can be opened while the IPC request is in flight, and an older list must
+    // not mistake that later tab for a process that disappeared.
+    const observed = new Set(
+      get()
+        .tabs.filter((tab) => tab.exit === null)
+        .map((tab) => tab.id),
+    )
+    const request = ++syncGeneration
+    const sessionsAtStart = sessionGeneration
     try {
       const sessions = await ipc.terminalList()
+      if (request !== syncGeneration || sessionsAtStart !== sessionGeneration) return
+      const stale: string[] = []
       set((state) => {
         // What Rust lists is what is *running*, so absence from it is not
         // evidence a tab never existed: a finished tab is a transcript someone
@@ -81,7 +105,11 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
         // not in the answer is the other way round — its shell is gone and its
         // exit was never heard, so there is nothing left to keep.
         const running = new Set(sessions.map((session) => session.id))
-        const kept = state.tabs.filter((tab) => running.has(tab.id) || tab.exit !== null)
+        const kept = state.tabs.filter((tab) => {
+          const missing = observed.has(tab.id) && tab.exit === null && !running.has(tab.id)
+          if (missing) stale.push(tab.id)
+          return !missing
+        })
 
         const known = new Set(state.tabs.map((tab) => tab.id))
         const found = sessions
@@ -95,6 +123,12 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
 
         return { tabs, active }
       })
+      // A missing exit event must not leave an invisible emulator and its
+      // listeners behind after the tab itself has been reconciled away.
+      for (const id of stale) {
+        closing.delete(id)
+        screens.dispose(id)
+      }
     } catch (cause) {
       set({ error: describe(cause) })
     }
@@ -119,7 +153,13 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
       // id back across the boundary — and this is the line that decides whether
       // that prompt lands in the terminal or in the buffer waiting for it.
       screens.adopt(opened.id, screen)
+      sessionGeneration += 1
       set((state) => ({ tabs: [...state.tabs, { ...opened, exit: null }], active: opened.id }))
+      const early = earlyExits.get(opened.id)
+      if (early) {
+        earlyExits.delete(opened.id)
+        retire(early)
+      }
     } catch (cause) {
       if (session) {
         // `adopt` registers the screen before wiring its input and resize
@@ -175,6 +215,7 @@ export const useTerminals = create<TerminalStore>((set, get) => ({
 function forget(id: string): void {
   closing.delete(id)
   screens.dispose(id)
+  sessionGeneration += 1
   useTerminals.setState((state) => ({
     tabs: state.tabs.filter((tab) => tab.id !== id),
     active: state.active === id ? neighbour(state.tabs, id) : state.active,
@@ -190,12 +231,26 @@ function forget(id: string): void {
  * vanishes takes the reason with it.
  */
 function retire(exit: TerminalExit): void {
+  // A shell is allowed to finish immediately. Rust registers and starts its
+  // waiter before the IPC response returns, so the exit event can arrive while
+  // `open` is still waiting and before this store knows the id. Hold it just as
+  // `lib/screen` holds early output, then settle it once the tab is adopted.
+  if (!useTerminals.getState().tabs.some((tab) => tab.id === exit.id)) {
+    if (!earlyExits.has(exit.id) && earlyExits.size >= EARLY_EXIT_LIMIT) {
+      const oldest = earlyExits.keys().next().value
+      if (oldest !== undefined) earlyExits.delete(oldest)
+    }
+    earlyExits.set(exit.id, exit)
+    return
+  }
+
   if (exit.code === 0 || closing.has(exit.id)) {
     forget(exit.id)
     return
   }
 
   screens.retire(exit.id, exit.code)
+  sessionGeneration += 1
   useTerminals.setState((state) => ({
     tabs: state.tabs.map((tab) =>
       tab.id === exit.id ? { ...tab, exit: { code: exit.code } } : tab,

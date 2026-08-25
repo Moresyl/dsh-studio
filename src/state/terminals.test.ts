@@ -186,6 +186,45 @@ describe('opening a shell', () => {
     })
     expect(useTerminals.getState().opening).toBe(false)
   })
+
+  it('settles a clean exit that arrives before the open response', async () => {
+    let finish!: (session: TerminalSession) => void
+    vi.mocked(ipc.terminalOpen).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    vi.mocked(screens.adopt).mockImplementation(() => {})
+
+    const opening = useTerminals.getState().open({} as never, 24, 80)
+    ended({ id: 'early-clean', code: 0 })
+    finish(shell('early-clean'))
+    await opening
+
+    expect(useTerminals.getState().tabs.some((tab) => tab.id === 'early-clean')).toBe(false)
+    expect(screens.dispose).toHaveBeenCalledWith('early-clean')
+    expect(useTerminals.getState().opening).toBe(false)
+  })
+
+  it('keeps an early failed exit as a readable transcript', async () => {
+    let finish!: (session: TerminalSession) => void
+    vi.mocked(ipc.terminalOpen).mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    vi.mocked(screens.adopt).mockImplementation(() => {})
+
+    const opening = useTerminals.getState().open({} as never, 24, 80)
+    ended({ id: 'early-failed', code: 7 })
+    finish(shell('early-failed'))
+    await opening
+
+    expect(
+      useTerminals.getState().tabs.find((tab) => tab.id === 'early-failed')?.exit,
+    ).toEqual({ code: 7 })
+    expect(screens.retire).toHaveBeenCalledWith('early-failed', 7)
+  })
 })
 
 describe('reading the strip', () => {
@@ -215,5 +254,62 @@ describe('reading the strip', () => {
 
     expect(useTerminals.getState().tabs.map((tab) => tab.id)).toEqual(['t1', 't3'])
     expect(useTerminals.getState().active).toBe('t1')
+    expect(screens.dispose).toHaveBeenCalledWith('t2')
+  })
+
+  it('does not remove a shell opened while an older list request was in flight', async () => {
+    let answer!: (sessions: TerminalSession[]) => void
+    vi.mocked(ipc.terminalList).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+
+    const syncing = useTerminals.getState().sync()
+    vi.mocked(ipc.terminalOpen).mockResolvedValue(shell('t4'))
+    vi.mocked(screens.adopt).mockImplementation(() => {})
+    await useTerminals.getState().open({} as never, 24, 80)
+    answer([shell('t1'), shell('t2'), shell('t3')])
+    await syncing
+
+    expect(useTerminals.getState().tabs.map((tab) => tab.id)).toEqual(['t1', 't2', 't3', 't4'])
+    expect(useTerminals.getState().active).toBe('t4')
+    expect(screens.dispose).not.toHaveBeenCalledWith('t4')
+  })
+
+  it('ignores an older list response that arrives after a newer one', async () => {
+    const answers: Array<(sessions: TerminalSession[]) => void> = []
+    vi.mocked(ipc.terminalList).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          answers.push(resolve)
+        }),
+    )
+
+    const first = useTerminals.getState().sync()
+    const second = useTerminals.getState().sync()
+    answers[1]?.([shell('t1'), shell('t3')])
+    await second
+    answers[0]?.([shell('t1'), shell('t2'), shell('t3')])
+    await first
+
+    expect(useTerminals.getState().tabs.map((tab) => tab.id)).toEqual(['t1', 't3'])
+    expect(screens.dispose).toHaveBeenCalledWith('t2')
+  })
+
+  it('does not resurrect a shell that exited while a list request was in flight', async () => {
+    let answer!: (sessions: TerminalSession[]) => void
+    vi.mocked(ipc.terminalList).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve
+      }),
+    )
+
+    const syncing = useTerminals.getState().sync()
+    ended({ id: 't2', code: 0 })
+    answer([shell('t1'), shell('t2'), shell('t3')])
+    await syncing
+
+    expect(useTerminals.getState().tabs.map((tab) => tab.id)).toEqual(['t1', 't3'])
   })
 })
