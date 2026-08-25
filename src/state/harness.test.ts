@@ -61,6 +61,52 @@ describe('supervisor actions', () => {
     expect(useHarness.getState().error).toBe('environment probe failed')
   })
 
+  it('does not let an older environment probe overwrite a newer answer', async () => {
+    let answerOldEnvironment!: (value: never) => void
+    let answerOldStatus!: (value: never) => void
+    let answerOldLog!: (value: never) => void
+    vi.mocked(ipc.environment)
+      .mockReturnValueOnce(new Promise((resolve) => (answerOldEnvironment = resolve)))
+      .mockResolvedValueOnce({ node: { path: 'new-node' } } as never)
+    vi.mocked(ipc.status)
+      .mockReturnValueOnce(new Promise((resolve) => (answerOldStatus = resolve)))
+      .mockResolvedValueOnce({ phase: 'ready', origin: 'http://127.0.0.1:2', pid: 2 })
+    vi.mocked(ipc.log)
+      .mockReturnValueOnce(new Promise((resolve) => (answerOldLog = resolve)))
+      .mockResolvedValueOnce([{ stream: 'stdout', line: 'new' }])
+
+    const old = useHarness.getState().inspect()
+    await useHarness.getState().inspect()
+    answerOldEnvironment({ node: { path: 'old-node' } } as never)
+    answerOldStatus({ phase: 'stopped' } as never)
+    answerOldLog([{ stream: 'stdout', line: 'old' }] as never)
+    await old
+
+    expect(useHarness.getState()).toMatchObject({
+      environment: { node: { path: 'new-node' } },
+      status: { phase: 'ready', origin: 'http://127.0.0.1:2', pid: 2 },
+      lines: [{ stream: 'stdout', line: 'new' }],
+      error: null,
+    })
+  })
+
+  it('does not show a stale probe failure after a newer probe succeeded', async () => {
+    let rejectOld!: (cause: unknown) => void
+    vi.mocked(ipc.environment)
+      .mockReturnValueOnce(new Promise((_, reject) => (rejectOld = reject)))
+      .mockResolvedValueOnce({ node: { path: 'healthy-node' } } as never)
+
+    const old = useHarness.getState().inspect()
+    await useHarness.getState().inspect()
+    rejectOld(new Error('stale probe failure'))
+    await expect(old).rejects.toThrow('stale probe failure')
+
+    expect(useHarness.getState()).toMatchObject({
+      environment: { node: { path: 'healthy-node' } },
+      error: null,
+    })
+  })
+
   it('shows a start failure globally and releases the operation slot', async () => {
     vi.mocked(ipc.start).mockRejectedValue(new Error('duplicate loader entry id'))
 

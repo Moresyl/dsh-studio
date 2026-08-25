@@ -1,13 +1,7 @@
-import { useEffect, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
-import { AboutPane } from '@/components/AboutPane'
 import { ConsolePane } from '@/components/ConsolePane'
-import { PluginMarket } from '@/components/PluginMarket'
-import { RemotePane } from '@/components/RemotePane'
-import { SessionsPane } from '@/components/SessionsPane'
-import { SettingsPane } from '@/components/SettingsPane'
-import { TerminalPane } from '@/components/TerminalPane'
 import { t } from '@/lib/i18n'
 import { ACCELERATOR } from '@/lib/platform'
 import { SETTINGS, SETTINGS_KEYS, VIEWS, type View } from '@/components/workbench-contract'
@@ -15,6 +9,28 @@ import { usePlugins } from '@/state/plugins'
 import { useRemote } from '@/state/remote'
 import { runningCount, useTerminals } from '@/state/terminals'
 import { useUpdate } from '@/state/update'
+
+// The console is the default workspace and stays mounted to preserve its live
+// log. Every other pane is paid for only when opened; plugin discovery, session
+// rendering and xterm are substantial desktop features, not startup work.
+const AboutPane = lazy(() =>
+  import('@/components/AboutPane').then((module) => ({ default: module.AboutPane })),
+)
+const PluginMarket = lazy(() =>
+  import('@/components/PluginMarket').then((module) => ({ default: module.PluginMarket })),
+)
+const RemotePane = lazy(() =>
+  import('@/components/RemotePane').then((module) => ({ default: module.RemotePane })),
+)
+const SessionsPane = lazy(() =>
+  import('@/components/SessionsPane').then((module) => ({ default: module.SessionsPane })),
+)
+const SettingsPane = lazy(() =>
+  import('@/components/SettingsPane').then((module) => ({ default: module.SettingsPane })),
+)
+const TerminalPane = lazy(() =>
+  import('@/components/TerminalPane').then((module) => ({ default: module.TerminalPane })),
+)
 
 export type { View } from '@/components/workbench-contract'
 
@@ -113,13 +129,27 @@ export function Workbench({ hidden, view, onSelect }: WorkbenchProps) {
         <div className={view === 'console' ? 'flex min-h-0 flex-1' : 'hidden'}>
           <ConsolePane />
         </div>
-        {view === 'terminal' && <TerminalPane />}
-        {view === 'sessions' && <SessionsPane />}
-        {view === 'plugins' && <PluginMarket />}
-        {view === 'remote' && <RemotePane />}
-        {view === 'about' && <AboutPane />}
-        {view === 'settings' && <SettingsPane />}
+        <Suspense fallback={<PaneLoading />}>
+          {view === 'terminal' && <TerminalPane />}
+          {view === 'sessions' && <SessionsPane />}
+          {view === 'plugins' && <PluginMarket />}
+          {view === 'remote' && <RemotePane />}
+          {view === 'about' && <AboutPane />}
+          {view === 'settings' && <SettingsPane />}
+        </Suspense>
       </div>
+    </div>
+  )
+}
+
+function PaneLoading() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted"
+    >
+      {t('common.loading')}
     </div>
   )
 }

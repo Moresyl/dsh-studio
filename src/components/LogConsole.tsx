@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { ClipboardCopy, Copy, Eraser, TerminalSquare } from 'lucide-react'
 
 import { t } from '@/lib/i18n'
@@ -95,26 +95,24 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
             <p className="font-sans text-[12px]">{t('log.empty')}</p>
           </div>
         ) : (
-          lines.map((entry, index) => {
-            const tone = logTone(entry)
-            return (
-              <p
-                key={index}
-                className={[
-                  'break-words whitespace-pre-wrap',
-                  tone === 'error'
-                    ? 'text-danger'
-                    : tone === 'warning'
-                      ? 'text-warn'
-                      : 'text-muted',
-                ].join(' ')}
-              >
-                {entry.line}
-              </p>
-            )
-          })
+          lines.map((entry, index) => <LogRow key={index} entry={entry} />)
         )}
       </div>
     </section>
   )
 }
+
+/** Existing rows keep their object identity when one line is appended. */
+const LogRow = memo(function LogRow({ entry }: { entry: LogLine }) {
+  const tone = logTone(entry)
+  return (
+    <p
+      className={[
+        'break-words whitespace-pre-wrap',
+        tone === 'error' ? 'text-danger' : tone === 'warning' ? 'text-warn' : 'text-muted',
+      ].join(' ')}
+    >
+      {entry.line}
+    </p>
+  )
+})

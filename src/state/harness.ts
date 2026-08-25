@@ -25,6 +25,9 @@ const MAX_LINES = 2000
  */
 const NPM_PACKAGE_LINE = /^npm http (?:fetch|cache) /
 
+/** Invalidates an older machine probe when a newer re-check finishes first. */
+let inspectionGeneration = 0
+
 interface HarnessStore {
   environment: Environment | null
   status: Status
@@ -74,6 +77,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   error: null,
 
   inspect: async () => {
+    const generation = ++inspectionGeneration
     set({ error: null })
     try {
       const [environment, status, lines] = await Promise.all([
@@ -81,13 +85,13 @@ export const useHarness = create<HarnessStore>((set, get) => ({
         ipc.status(),
         ipc.log(),
       ])
-      set({ environment, status, lines })
+      if (generation === inspectionGeneration) set({ environment, status, lines })
     } catch (cause) {
       // Re-check is a visible action as well as the first startup probe. Keep a
       // reason beside the controls that requested it. Reject as well so a
       // caller coordinating a workspace or install does not continue after a
       // refresh that never actually landed.
-      set({ error: describe(cause) })
+      if (generation === inspectionGeneration) set({ error: describe(cause) })
       throw cause
     }
   },

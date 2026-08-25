@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronRight, Copy, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
-import { openUrl } from '@tauri-apps/plugin-opener'
 
 import { Ambient } from '@/components/Ambient'
 import { BrandMark } from '@/components/BrandMark'
@@ -10,6 +9,7 @@ import { LogConsole } from '@/components/LogConsole'
 import { PresetPicker } from '@/components/PresetPicker'
 import { StatusDot } from '@/components/StatusDot'
 import { t } from '@/lib/i18n'
+import { openExternalUrl } from '@/lib/external-url'
 import { formatVersion, isAtLeast, type NodeInstallation, type NodeVersion } from '@/lib/ipc'
 import { labelOf, toneOf } from '@/lib/status'
 import { useHarness } from '@/state/harness'
@@ -36,20 +36,30 @@ import { contextMenu } from '@/state/menu'
  * belongs and what turns the leftover height into margin instead of a hole.
  */
 export function ConsolePane() {
-  const {
-    environment,
-    status,
-    lines,
-    busy,
-    installing,
-    provisioningNode,
-    selectNode,
-    error,
-    inspect,
-    start,
-    stop,
-    clear,
-  } = useHarness()
+  return (
+    <div className="flex min-h-0 flex-1 animate-rise">
+      <ConsoleRail />
+      <HarnessLog />
+    </div>
+  )
+}
+
+/**
+ * Runtime controls are isolated from the hot log subscription. A busy harness
+ * can emit hundreds of lines per second; none of them changes this rail, so it
+ * should not rebuild the environment cards and menus for every line.
+ */
+function ConsoleRail() {
+  const environment = useHarness((state) => state.environment)
+  const status = useHarness((state) => state.status)
+  const busy = useHarness((state) => state.busy)
+  const installing = useHarness((state) => state.installing)
+  const provisioningNode = useHarness((state) => state.provisioningNode)
+  const selectNode = useHarness((state) => state.selectNode)
+  const error = useHarness((state) => state.error)
+  const inspect = useHarness((state) => state.inspect)
+  const start = useHarness((state) => state.start)
+  const stop = useHarness((state) => state.stop)
 
   const runnable =
     environment !== null &&
@@ -63,123 +73,126 @@ export function ConsolePane() {
   const runtimes = environment?.allNodeRuntimes ?? []
 
   return (
-    <div className="flex min-h-0 flex-1 animate-rise">
-      <aside className="chrome relative flex w-[340px] shrink-0 flex-col border-r border-line">
-        <Ambient />
+    <aside className="chrome relative flex w-[340px] shrink-0 flex-col border-r border-line">
+      <Ambient />
 
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
-          <div className="flex items-center gap-3">
-            <BrandMark size={38} className="rounded-[9px] shadow-lift" />
-            <div className="flex min-w-0 flex-col gap-1">
-              <h1 className="text-[15px] leading-none font-semibold tracking-[-0.01em] text-text">
-                DSH Studio
-              </h1>
-              <p className="flex items-center gap-1.5 text-[12px] leading-none text-muted">
-                <StatusDot tone={toneOf(status)} size={6} />
-                {labelOf(status)}
-              </p>
-            </div>
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
+        <div className="flex items-center gap-3">
+          <BrandMark size={38} className="rounded-[9px] shadow-lift" />
+          <div className="flex min-w-0 flex-col gap-1">
+            <h1 className="text-[15px] leading-none font-semibold tracking-[-0.01em] text-text">
+              DSH Studio
+            </h1>
+            <p className="flex items-center gap-1.5 text-[12px] leading-none text-muted">
+              <StatusDot tone={toneOf(status)} size={6} />
+              {labelOf(status)}
+            </p>
           </div>
+        </div>
 
-          <Section
-            title={t('section.environment')}
-            action={
-              <Button
-                variant="ghost"
-                className="h-5 px-1.5 text-[11.5px]"
-                // The store already puts the reason beside this control; catch
-                // here so a manual failed probe is not also an unhandled browser
-                // promise rejection.
-                onClick={() => void inspect().catch(() => {})}
-                disabled={working}
-              >
-                <RotateCw size={11} strokeWidth={2.4} />
-                {t('action.recheck')}
-              </Button>
-            }
-          >
-            <EnvironmentChecks />
-          </Section>
+        <Section
+          title={t('section.environment')}
+          action={
+            <Button
+              variant="ghost"
+              className="h-5 px-1.5 text-[11.5px]"
+              // The store already puts the reason beside this control; catch
+              // here so a manual failed probe is not also an unhandled browser
+              // promise rejection.
+              onClick={() => void inspect().catch(() => {})}
+              disabled={working}
+            >
+              <RotateCw size={11} strokeWidth={2.4} />
+              {t('action.recheck')}
+            </Button>
+          }
+        >
+          <EnvironmentChecks />
+        </Section>
 
-          {/* A decision and not a diagnostic, so it stays out on the rail: the
+        {/* A decision and not a diagnostic, so it stays out on the rail: the
               guide asks it once on a first run, and this is where it is asked
               again afterwards. */}
-          <Section title={t('section.agent')}>
-            <PresetPicker />
-          </Section>
+        <Section title={t('section.agent')}>
+          <PresetPicker />
+        </Section>
 
-          {/* Nothing in here is needed to use the app, and both of them only
+        {/* Nothing in here is needed to use the app, and both of them only
               exist some of the time — one runtime installed makes the list a
               repeat of the check above it, and there is no address until
               something is serving. A fold that is empty is not offered at all. */}
-          {(runtimes.length > 1 || running) && (
-            <Advanced>
-              {runtimes.length > 1 && environment && (
-                <Section title={t('section.runtimes')}>
-                  <RuntimeList
-                    runtimes={runtimes}
-                    activePath={environment.node?.path ?? null}
-                    minimum={environment.minimumNode}
-                    disabled={running || starting || working}
-                    onSelect={(path) => void selectNode(path)}
-                  />
-                </Section>
-              )}
+        {(runtimes.length > 1 || running) && (
+          <Advanced>
+            {runtimes.length > 1 && environment && (
+              <Section title={t('section.runtimes')}>
+                <RuntimeList
+                  runtimes={runtimes}
+                  activePath={environment.node?.path ?? null}
+                  minimum={environment.minimumNode}
+                  disabled={running || starting || working}
+                  onSelect={(path) => void selectNode(path)}
+                />
+              </Section>
+            )}
 
-              {status.phase === 'ready' && (
-                <Section title={t('section.service')}>
-                  <ServiceFacts origin={status.origin} pid={status.pid} />
-                </Section>
+            {status.phase === 'ready' && (
+              <Section title={t('section.service')}>
+                <ServiceFacts origin={status.origin} pid={status.pid} />
+              </Section>
+            )}
+          </Advanced>
+        )}
+
+        <EnvironmentProgress />
+
+        <div className="mt-auto flex flex-col gap-2">
+          {running ? (
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => void stop()}
+              disabled={busy}
+            >
+              <Square size={13} strokeWidth={2.6} />
+              {t('action.stop')}
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              className="w-full"
+              onClick={() => void start()}
+              disabled={!runnable || starting || working}
+            >
+              {starting ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  {t('action.starting')}
+                </>
+              ) : (
+                <>
+                  <Terminal size={14} strokeWidth={2.3} />
+                  {status.phase === 'failed' ? t('action.retry') : t('action.start')}
+                </>
               )}
-            </Advanced>
+            </Button>
           )}
 
-          <EnvironmentProgress />
-
-          <div className="mt-auto flex flex-col gap-2">
-            {running ? (
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={() => void stop()}
-                disabled={busy}
-              >
-                <Square size={13} strokeWidth={2.6} />
-                {t('action.stop')}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                className="w-full"
-                onClick={() => void start()}
-                disabled={!runnable || starting || working}
-              >
-                {starting ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    {t('action.starting')}
-                  </>
-                ) : (
-                  <>
-                    <Terminal size={14} strokeWidth={2.3} />
-                    {status.phase === 'failed' ? t('action.retry') : t('action.start')}
-                  </>
-                )}
-              </Button>
-            )}
-
-            {error && (
-              <p className="selectable max-h-36 min-w-0 overflow-y-auto rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-danger [overflow-wrap:anywhere]">
-                {error}
-              </p>
-            )}
-          </div>
+          {error && (
+            <p className="selectable max-h-36 min-w-0 overflow-y-auto rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-danger [overflow-wrap:anywhere]">
+              {error}
+            </p>
+          )}
         </div>
-      </aside>
-
-      <LogConsole lines={lines} onClear={clear} />
-    </div>
+      </div>
+    </aside>
   )
+}
+
+/** The only component that redraws when a new process line arrives. */
+function HarnessLog() {
+  const lines = useHarness((state) => state.lines)
+  const clear = useHarness((state) => state.clear)
+  return <LogConsole lines={lines} onClear={clear} />
 }
 
 /** A titled group in the rail: tracked-out caption, optional trailing control. */
@@ -276,12 +289,12 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
           <button
             type="button"
             data-hint={t('statusbar.open')}
-            onClick={() => void reportAction(() => openUrl(origin))}
+            onClick={() => void reportAction(() => openExternalUrl(origin))}
             onContextMenu={contextMenu([
               {
                 label: t('statusbar.open'),
                 icon: ExternalLink,
-                run: () => void reportAction(() => openUrl(origin)),
+                run: () => void reportAction(() => openExternalUrl(origin)),
               },
               {
                 label: t('menu.copyAddress'),
