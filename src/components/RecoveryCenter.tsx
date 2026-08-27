@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { Archive, CheckCircle2, Loader2, RotateCcw, ShieldAlert, TriangleAlert } from 'lucide-react'
+import {
+  Archive,
+  CheckCircle2,
+  LifeBuoy,
+  Loader2,
+  RotateCcw,
+  ShieldAlert,
+  TriangleAlert,
+} from 'lucide-react'
 import { save as pickPath } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 
@@ -27,7 +35,7 @@ export function RecoveryCenter() {
   const [preview, setPreview] = useState<Preview | null>(null)
   const [evidenceGeneration, setEvidenceGeneration] = useState<string | null>(null)
   const [evidencePath, setEvidencePath] = useState<string | null>(null)
-  const [working, setWorking] = useState<'evidence' | 'apply' | null>(null)
+  const [working, setWorking] = useState<'evidence' | 'apply' | 'safe-mode' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const card = useRef<HTMLDivElement>(null)
 
@@ -137,6 +145,25 @@ export function RecoveryCenter() {
       setWorking(null)
     }
   }, [current, evidenceReady, generation, preview, working])
+
+  const startSafeMode = useCallback(async () => {
+    if (!current || working !== null) return
+    setWorking('safe-mode')
+    setError(null)
+    try {
+      await ipc.startSafeMode()
+      // Keep the native recovery record for the next ordinary start, but let
+      // this window reach the isolated renderer now so diagnostics and profile
+      // repairs remain available.
+      setPlugin(null)
+      setProfile(null)
+      setPreview(null)
+    } catch (cause) {
+      setError(describe(cause))
+    } finally {
+      setWorking(null)
+    }
+  }, [current, working])
 
   if (!loaded || current === null) return null
 
@@ -290,6 +317,20 @@ export function RecoveryCenter() {
             </>
           ) : (
             <>
+              <Button
+                variant="secondary"
+                disabled={working !== null}
+                onClick={() => void startSafeMode()}
+              >
+                {working === 'safe-mode' ? (
+                  <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <LifeBuoy size={13} aria-hidden="true" />
+                )}
+                {working === 'safe-mode'
+                  ? t('recovery.safeModeStarting')
+                  : t('recovery.safeMode')}
+              </Button>
               <Button variant="ghost" disabled={working !== null} onClick={() => void dismiss()}>
                 {t('recovery.continue')}
               </Button>

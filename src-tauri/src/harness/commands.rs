@@ -61,6 +61,34 @@ pub async fn harness_start(state: State<'_, AppState>) -> Result<String> {
     start_managed(&state).await
 }
 
+/// Stop any current Harness and boot the Studio-owned isolated recovery
+/// profile. The user's selected profile and plugin files are not changed.
+#[tauri::command]
+pub async fn harness_safe_mode_start(state: State<'_, AppState>) -> Result<String> {
+    let _lifecycle = state.lifecycle.lock().await;
+    state.supervisor.stop().await;
+    state.supervisor.wait_until_inactive().await?;
+
+    let shell = super::shell_environment::resolve().await;
+    state.supervisor.note(
+        Stream::Stdout,
+        match shell.fallback_reason {
+            Some(reason) => format!("GUI shell environment: {} ({reason})", shell.source),
+            None => format!("GUI shell environment: {}", shell.source),
+        },
+    );
+    let mut plan = super::safe_mode_launch_plan()?;
+    plan.environment = shell.updates;
+    for notice in super::composition::preflight(&plan).await? {
+        state.supervisor.note(Stream::Stderr, notice);
+    }
+    state.supervisor.note(
+        Stream::Stdout,
+        "starting isolated safe mode; the selected profile is unchanged".into(),
+    );
+    Arc::clone(&state.supervisor).start(plan).await
+}
+
 /// Start through the one managed-runtime lifecycle gate.
 ///
 /// Kept separate from the Tauri wrapper because the tray owns the same action

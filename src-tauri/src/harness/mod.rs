@@ -77,6 +77,21 @@ pub fn environment() -> Environment {
 pub fn launch_plan() -> Result<LaunchPlan> {
     let environment = environment();
 
+    launch_plan_for_profile(environment, crate::profiles::selected(), true)
+}
+
+/// Build an isolated recovery launch without changing the selected profile.
+pub fn safe_mode_launch_plan() -> Result<LaunchPlan> {
+    let environment = environment();
+    let profile = crate::profiles::prepare_safe_mode()?;
+    launch_plan_for_profile(environment, profile, false)
+}
+
+fn launch_plan_for_profile(
+    environment: Environment,
+    profile: String,
+    check_plugin_recovery: bool,
+) -> Result<LaunchPlan> {
     let node = environment.node.ok_or(Error::NoNodeRuntime {
         minimum: node_runtime::MINIMUM_SUPPORTED,
     })?;
@@ -101,10 +116,11 @@ pub fn launch_plan() -> Result<LaunchPlan> {
                 .unwrap_or_else(|| "the workspace is not safe to use".into()),
         ));
     }
-    let profile = crate::profiles::selected();
     let serves_studio = crate::profiles::prepare_for_studio(&profile)?;
-    if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {
-        return Err(Error::Plugin(problem));
+    if check_plugin_recovery {
+        if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {
+            return Err(Error::Plugin(problem));
+        }
     }
 
     Ok(LaunchPlan {

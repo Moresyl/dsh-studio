@@ -86,6 +86,9 @@ export const status = (): Promise<Status> => invoke('harness_status')
 /** Start the harness; resolves with the origin it is serving on. */
 export const start = (): Promise<string> => invoke('harness_start')
 
+/** Boot the isolated official-only recovery profile without changing selection. */
+export const startSafeMode = (): Promise<string> => invoke('harness_safe_mode_start')
+
 export const stop = (): Promise<void> => invoke('harness_stop')
 
 /** Install the harness, or replace it with the latest release. */
@@ -609,6 +612,25 @@ export const presetRoster = (): Promise<PresetRoster> => invoke('preset_roster')
  * creates, so this changes the next one and leaves open ones alone.
  */
 export const presetChoose = (id: string): Promise<PresetRoster> => invoke('preset_choose', { id })
+
+export interface PresetPackagePreview {
+  id: string
+  name: string | null
+  description: string | null
+  files: number
+  bytes: number
+  /** Archive consistency only; this is not publisher identity. */
+  integrityVerified: boolean
+}
+
+export const presetExport = (id: string, path: string): Promise<void> =>
+  invoke('preset_export', { id, path })
+
+export const presetPackage = (path: string): Promise<PresetPackagePreview> =>
+  invoke('preset_package', { path })
+
+export const presetImport = (path: string): Promise<PresetRoster> =>
+  invoke('preset_import', { path })
 
 /* -------------------------------------------------------------------------- */
 /* Terminal                                                                   */

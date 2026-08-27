@@ -15,9 +15,11 @@
 //! a round trip through a YAML library would reorder keys and drop comments, and
 //! a diff nobody asked for is worse than a document this refuses to touch.
 
-use std::path::{Path, PathBuf};
+use std::io::{Read, Write};
+use std::path::{Component, Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::error::{Error, Result};
 use crate::paths;
@@ -36,6 +38,15 @@ const NAMESPACE: &str = "agent-presets";
 
 /// The one key inside it the shell writes.
 const KEY: &str = "default";
+
+const PACKAGE_KIND: &str = "dsh-agent-preset";
+const PACKAGE_VERSION: u32 = 1;
+const PACKAGE_MANIFEST: &str = "manifest.json";
+const PACKAGE_PAYLOAD: &str = "preset/";
+const PACKAGE_MAX_FILES: usize = 128;
+const PACKAGE_MAX_ENTRY_BYTES: u64 = 4 * 1024 * 1024;
+const PACKAGE_MAX_TOTAL_BYTES: u64 = 16 * 1024 * 1024;
+const PACKAGE_MAX_MANIFEST_BYTES: u64 = 256 * 1024;
 
 /// What the picker shows for one preset.
 #[derive(Clone, Debug, Serialize)]
@@ -63,6 +74,36 @@ pub struct Roster {
     /// What new sessions use now, which may name a preset that is not in the
     /// list — a settings document outlives the directory it points at.
     pub default: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PackageFile {
+    path: String,
+    size: u64,
+    sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PackageManifest {
+    kind: String,
+    version: u32,
+    id: String,
+    files: Vec<PackageFile>,
+}
+
+/// Safe, bounded preview returned before an imported preset changes disk.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackagePreview {
+    pub id: String,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub files: usize,
+    pub bytes: u64,
+    /// Internal archive integrity, not publisher identity or code trust.
+    pub integrity_verified: bool,
 }
 
 /// The presets the harness shipped, inside its own install.
@@ -509,9 +550,440 @@ pub fn preset_choose(id: String) -> Result<Roster> {
     Ok(roster())
 }
 
+/// Export one user-authored preset as a portable, integrity-described package.
+#[tauri::command]
+pub fn preset_export(id: String, path: PathBuf) -> Result<()> {
+    export_from(&user_root(), &id, &path)
+}
+
+/// Verify every archive entry and checksum without writing a preset.
+#[tauri::command]
+pub fn preset_package(path: PathBuf) -> Result<PackagePreview> {
+    inspect_package(&path).map(|package| package.preview)
+}
+
+/// Verify again and atomically install a portable preset into the user root.
+#[tauri::command]
+pub fn preset_import(path: PathBuf) -> Result<Roster> {
+    import_into(&path, &user_root())?;
+    Ok(roster())
+}
+
+struct InspectedPackage {
+    manifest: PackageManifest,
+    preview: PackagePreview,
+}
+
+fn export_from(root: &Path, id: &str, destination: &Path) -> Result<()> {
+    if !is_id(id) {
+        return Err(Error::Preset(format!("{id} is not an agent preset id")));
+    }
+    let source = root.join(id);
+    if !safe_directory(&source) || !source.join(COMPOSITION).is_file() {
+        return Err(Error::Preset(format!(
+            "there is no user-authored preset called {id}"
+        )));
+    }
+    let files = collect_files(&source)?;
+    let manifest = PackageManifest {
+        kind: PACKAGE_KIND.into(),
+        version: PACKAGE_VERSION,
+        id: id.into(),
+        files,
+    };
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest)
+        .map_err(|cause| Error::Preset(format!("preset package manifest failed: {cause}")))?;
+    if manifest_bytes.len() as u64 > PACKAGE_MAX_MANIFEST_BYTES {
+        return Err(Error::Preset("preset package manifest is too large".into()));
+    }
+
+    let (temporary, file) = crate::atomic::stage(destination)
+        .map_err(|cause| Error::Preset(format!("preset package could not be staged: {cause}")))?;
+    let result = write_package(file, &source, &manifest, &manifest_bytes);
+    if let Err(failure) = result {
+        let _ = std::fs::remove_file(&temporary);
+        return Err(failure);
+    }
+    if let Err(cause) = crate::atomic::replace(&temporary, destination) {
+        let _ = std::fs::remove_file(temporary);
+        return Err(Error::Preset(format!(
+            "preset package could not be published: {cause}"
+        )));
+    }
+    Ok(())
+}
+
+fn write_package(
+    file: std::fs::File,
+    source: &Path,
+    manifest: &PackageManifest,
+    manifest_bytes: &[u8],
+) -> Result<()> {
+    let mut zip = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated)
+        .unix_permissions(0o600);
+    zip.start_file(PACKAGE_MANIFEST, options)
+        .and_then(|_| {
+            zip.write_all(manifest_bytes)
+                .map_err(zip::result::ZipError::Io)
+        })
+        .map_err(package_write_error)?;
+    for entry in &manifest.files {
+        let relative = safe_relative(&entry.path)?;
+        let bytes = crate::bounded_file::read(&source.join(&relative), entry.size as usize)
+            .map_err(|cause| {
+                Error::Preset(format!(
+                    "preset file {} could not be read: {cause}",
+                    entry.path
+                ))
+            })?;
+        zip.start_file(format!("{PACKAGE_PAYLOAD}{}", entry.path), options)
+            .and_then(|_| zip.write_all(&bytes).map_err(zip::result::ZipError::Io))
+            .map_err(package_write_error)?;
+    }
+    zip.finish().map(|_| ()).map_err(package_write_error)
+}
+
+fn package_write_error(cause: zip::result::ZipError) -> Error {
+    Error::Preset(format!("preset package could not be written: {cause}"))
+}
+
+fn collect_files(root: &Path) -> Result<Vec<PackageFile>> {
+    fn visit(root: &Path, directory: &Path, files: &mut Vec<PackageFile>) -> Result<()> {
+        let entries = std::fs::read_dir(directory).map_err(|cause| {
+            Error::Preset(format!(
+                "{} could not be read: {cause}",
+                directory.display()
+            ))
+        })?;
+        for entry in entries {
+            let entry = entry.map_err(|cause| {
+                Error::Preset(format!("preset directory could not be read: {cause}"))
+            })?;
+            let path = entry.path();
+            let metadata = std::fs::symlink_metadata(&path).map_err(|cause| {
+                Error::Preset(format!(
+                    "{} could not be inspected: {cause}",
+                    path.display()
+                ))
+            })?;
+            if metadata.file_type().is_symlink() {
+                return Err(Error::Preset(format!(
+                    "preset packages cannot contain links: {}",
+                    path.display()
+                )));
+            }
+            if metadata.is_dir() {
+                visit(root, &path, files)?;
+                continue;
+            }
+            if !metadata.is_file() {
+                return Err(Error::Preset(format!(
+                    "preset packages can contain only regular files: {}",
+                    path.display()
+                )));
+            }
+            if files.len() == PACKAGE_MAX_FILES {
+                return Err(Error::Preset(format!(
+                    "preset package exceeds the {PACKAGE_MAX_FILES} file limit"
+                )));
+            }
+            if metadata.len() > PACKAGE_MAX_ENTRY_BYTES {
+                return Err(Error::Preset(format!(
+                    "preset file {} exceeds the 4 MiB limit",
+                    path.display()
+                )));
+            }
+            let used = files.iter().map(|file| file.size).sum::<u64>();
+            if used.saturating_add(metadata.len()) > PACKAGE_MAX_TOTAL_BYTES {
+                return Err(Error::Preset(
+                    "preset package exceeds the 16 MiB uncompressed limit".into(),
+                ));
+            }
+            let relative = path.strip_prefix(root).map_err(|_| {
+                Error::Preset(format!("{} escaped the preset root", path.display()))
+            })?;
+            let portable = portable_relative(relative)?;
+            let bytes =
+                crate::bounded_file::read(&path, metadata.len() as usize).map_err(|cause| {
+                    Error::Preset(format!("{} could not be read: {cause}", path.display()))
+                })?;
+            files.push(PackageFile {
+                path: portable,
+                size: bytes.len() as u64,
+                sha256: format!("sha256:{:x}", Sha256::digest(&bytes)),
+            });
+        }
+        Ok(())
+    }
+
+    let mut files = Vec::new();
+    visit(root, root, &mut files)?;
+    files.sort_by(|left, right| left.path.cmp(&right.path));
+    if !files.iter().any(|file| file.path == COMPOSITION) {
+        return Err(Error::Preset(format!(
+            "preset has no required {COMPOSITION}"
+        )));
+    }
+    Ok(files)
+}
+
+fn inspect_package(path: &Path) -> Result<InspectedPackage> {
+    let file = std::fs::File::open(path)
+        .map_err(|cause| Error::Preset(format!("preset package could not be opened: {cause}")))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|cause| Error::Preset(format!("preset package is not a readable zip: {cause}")))?;
+    if archive.len() > PACKAGE_MAX_FILES + 1 {
+        return Err(Error::Preset(format!(
+            "preset package exceeds the {} entry limit",
+            PACKAGE_MAX_FILES + 1
+        )));
+    }
+    let manifest_bytes = {
+        let entry = archive
+            .by_name(PACKAGE_MANIFEST)
+            .map_err(|_| Error::Preset(format!("preset package has no {PACKAGE_MANIFEST}")))?;
+        if entry.size() > PACKAGE_MAX_MANIFEST_BYTES || entry.is_dir() || entry_is_link(&entry) {
+            return Err(Error::Preset("preset package manifest is unsafe".into()));
+        }
+        let mut bytes = Vec::new();
+        entry
+            .take(PACKAGE_MAX_MANIFEST_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|cause| {
+                Error::Preset(format!("preset manifest could not be read: {cause}"))
+            })?;
+        bytes
+    };
+    let manifest: PackageManifest = serde_json::from_slice(&manifest_bytes)
+        .map_err(|cause| Error::Preset(format!("preset manifest is invalid: {cause}")))?;
+    validate_manifest(&manifest)?;
+
+    let mut seen = std::collections::BTreeSet::new();
+    let mut metadata = None;
+    let mut total = 0_u64;
+    for file in &manifest.files {
+        let name = format!("{PACKAGE_PAYLOAD}{}", file.path);
+        let entry = archive
+            .by_name(&name)
+            .map_err(|_| Error::Preset(format!("preset package is missing {}", file.path)))?;
+        if entry.is_dir() || entry_is_link(&entry) || entry.size() != file.size {
+            return Err(Error::Preset(format!(
+                "preset package entry {} is unsafe or has the wrong size",
+                file.path
+            )));
+        }
+        let mut bytes = Vec::new();
+        entry
+            .take(PACKAGE_MAX_ENTRY_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|cause| Error::Preset(format!("{} could not be read: {cause}", file.path)))?;
+        let digest = format!("sha256:{:x}", Sha256::digest(&bytes));
+        if digest != file.sha256 {
+            return Err(Error::Preset(format!(
+                "preset package integrity check failed for {}",
+                file.path
+            )));
+        }
+        total = total.saturating_add(bytes.len() as u64);
+        seen.insert(name);
+        if file.path == METADATA {
+            metadata = std::str::from_utf8(&bytes).ok().map(describe);
+        }
+    }
+    for index in 0..archive.len() {
+        let entry = archive.by_index(index).map_err(|cause| {
+            Error::Preset(format!("preset archive entry could not be read: {cause}"))
+        })?;
+        let name = entry.name();
+        if name != PACKAGE_MANIFEST && !seen.contains(name) {
+            return Err(Error::Preset(format!(
+                "preset package contains undeclared entry {name}"
+            )));
+        }
+    }
+    let metadata = metadata.unwrap_or_default();
+    Ok(InspectedPackage {
+        preview: PackagePreview {
+            id: manifest.id.clone(),
+            name: metadata.name,
+            description: metadata.description,
+            files: manifest.files.len(),
+            bytes: total,
+            integrity_verified: true,
+        },
+        manifest,
+    })
+}
+
+fn validate_manifest(manifest: &PackageManifest) -> Result<()> {
+    if manifest.kind != PACKAGE_KIND || manifest.version != PACKAGE_VERSION {
+        return Err(Error::Preset(format!(
+            "preset package is not {PACKAGE_KIND} version {PACKAGE_VERSION}"
+        )));
+    }
+    if !is_id(&manifest.id) {
+        return Err(Error::Preset("preset package id is invalid".into()));
+    }
+    if manifest.files.is_empty() || manifest.files.len() > PACKAGE_MAX_FILES {
+        return Err(Error::Preset("preset package file count is invalid".into()));
+    }
+    let mut paths = std::collections::BTreeSet::new();
+    let mut total = 0_u64;
+    for file in &manifest.files {
+        safe_relative(&file.path)?;
+        if !paths.insert(file.path.clone()) {
+            return Err(Error::Preset(format!(
+                "preset package declares {} more than once",
+                file.path
+            )));
+        }
+        if file.size > PACKAGE_MAX_ENTRY_BYTES {
+            return Err(Error::Preset(format!(
+                "preset package entry {} exceeds the 4 MiB limit",
+                file.path
+            )));
+        }
+        total = total.saturating_add(file.size);
+        if total > PACKAGE_MAX_TOTAL_BYTES {
+            return Err(Error::Preset(
+                "preset package exceeds the 16 MiB uncompressed limit".into(),
+            ));
+        }
+        let digest = file.sha256.strip_prefix("sha256:").unwrap_or_default();
+        if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Err(Error::Preset(format!(
+                "preset package digest is invalid for {}",
+                file.path
+            )));
+        }
+    }
+    if !paths.contains(COMPOSITION) {
+        return Err(Error::Preset(format!(
+            "preset package has no required {COMPOSITION}"
+        )));
+    }
+    Ok(())
+}
+
+fn import_into(package: &Path, root: &Path) -> Result<String> {
+    let inspected = inspect_package(package)?;
+    std::fs::create_dir_all(root).map_err(|cause| {
+        Error::Preset(format!("{} could not be created: {cause}", root.display()))
+    })?;
+    let target = root.join(&inspected.manifest.id);
+    if std::fs::symlink_metadata(&target).is_ok() {
+        return Err(Error::Preset(format!(
+            "a preset called {} already exists; remove or rename it before importing",
+            inspected.manifest.id
+        )));
+    }
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let staging = root.join(format!(
+        ".{}.importing-{}-{nonce}",
+        inspected.manifest.id,
+        std::process::id()
+    ));
+    std::fs::create_dir(&staging)
+        .map_err(|cause| Error::Preset(format!("preset import could not be staged: {cause}")))?;
+    let outcome = extract_package(package, &staging, &inspected.manifest)
+        .and_then(|_| {
+            std::fs::rename(&staging, &target).map_err(|cause| {
+                Error::Preset(format!("preset import could not be activated: {cause}"))
+            })
+        })
+        .map(|_| inspected.manifest.id);
+    if outcome.is_err() {
+        let _ = std::fs::remove_dir_all(staging);
+    }
+    outcome
+}
+
+fn extract_package(path: &Path, staging: &Path, manifest: &PackageManifest) -> Result<()> {
+    let file = std::fs::File::open(path)
+        .map_err(|cause| Error::Preset(format!("preset package could not be reopened: {cause}")))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|cause| Error::Preset(format!("preset package could not be reopened: {cause}")))?;
+    for file in &manifest.files {
+        let relative = safe_relative(&file.path)?;
+        let target = staging.join(relative);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent).map_err(|cause| {
+                Error::Preset(format!("preset directory could not be created: {cause}"))
+            })?;
+        }
+        let entry = archive
+            .by_name(&format!("{PACKAGE_PAYLOAD}{}", file.path))
+            .map_err(|_| Error::Preset(format!("preset package is missing {}", file.path)))?;
+        let mut bytes = Vec::new();
+        entry
+            .take(file.size + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|cause| Error::Preset(format!("{} could not be read: {cause}", file.path)))?;
+        crate::atomic::write(&target, bytes).map_err(|cause| {
+            Error::Preset(format!(
+                "{} could not be installed: {cause}",
+                target.display()
+            ))
+        })?;
+    }
+    Ok(())
+}
+
+fn safe_directory(path: &Path) -> bool {
+    std::fs::symlink_metadata(path)
+        .is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink())
+}
+
+fn portable_relative(path: &Path) -> Result<String> {
+    let checked = safe_relative(&path.to_string_lossy().replace('\\', "/"))?;
+    Ok(checked
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/"))
+}
+
+fn safe_relative(value: &str) -> Result<PathBuf> {
+    if value.is_empty() || value.contains('\\') || value.starts_with('/') {
+        return Err(Error::Preset(format!(
+            "preset package path is unsafe: {value}"
+        )));
+    }
+    let path = Path::new(value);
+    if path.components().any(|component| {
+        !matches!(component, Component::Normal(_)) || component.as_os_str().is_empty()
+    }) {
+        return Err(Error::Preset(format!(
+            "preset package path is unsafe: {value}"
+        )));
+    }
+    Ok(path.to_path_buf())
+}
+
+fn entry_is_link(entry: &zip::read::ZipFile<'_, std::fs::File>) -> bool {
+    entry
+        .unix_mode()
+        .is_some_and(|mode| mode & 0o170000 == 0o120000)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn package_fixture(label: &str) -> (PathBuf, PathBuf, PathBuf) {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-preset-package-{label}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("fixture root");
+        (root.join("users"), root.join("portable.dshpreset"), root)
+    }
 
     /// A `preset.yml` exactly as the harness ships it, Chinese text and all.
     const SHIPPED: &str = "name: 标准模式\ndescription: 功能完整的编码 Agent，支持文件编辑、Shell、文件与网页检索、Skills、计划、目标、子代理和工作流。\norder: 1\n";
@@ -700,6 +1172,72 @@ mod tests {
                 "also-undeclared",
                 "undeclared"
             ]
+        );
+    }
+
+    #[test]
+    fn a_portable_preset_is_verified_and_imported_atomically() {
+        let (users, package, root) = package_fixture("round-trip");
+        let source = users.join("team-code");
+        std::fs::create_dir_all(source.join("instructions")).expect("preset directories");
+        std::fs::write(source.join(COMPOSITION), "- name: agent\n").expect("composition");
+        std::fs::write(
+            source.join(METADATA),
+            "name: Team Code\ndescription: Shared coding policy\norder: 9\n",
+        )
+        .expect("metadata");
+        std::fs::write(source.join("instructions/system.md"), "Use the tests.\n")
+            .expect("instruction");
+
+        export_from(&users, "team-code", &package).expect("portable package");
+        let inspected = inspect_package(&package).expect("verified package");
+        assert_eq!(inspected.preview.id, "team-code");
+        assert_eq!(inspected.preview.name.as_deref(), Some("Team Code"));
+        assert_eq!(inspected.preview.files, 3);
+        assert!(inspected.preview.integrity_verified);
+
+        std::fs::remove_dir_all(&users).expect("simulate another machine");
+        assert_eq!(
+            import_into(&package, &users).expect("atomic import"),
+            "team-code"
+        );
+        assert_eq!(
+            std::fs::read_to_string(users.join("team-code/instructions/system.md")).unwrap(),
+            "Use the tests.\n"
+        );
+        assert!(!std::fs::read_dir(&users)
+            .unwrap()
+            .flatten()
+            .any(|entry| entry.file_name().to_string_lossy().contains(".importing-")));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn importing_never_overwrites_an_existing_preset() {
+        let (users, package, root) = package_fixture("collision");
+        let source = users.join("team-code");
+        std::fs::create_dir_all(&source).expect("preset directory");
+        std::fs::write(source.join(COMPOSITION), "- name: original\n").expect("composition");
+        export_from(&users, "team-code", &package).expect("portable package");
+
+        let failure = import_into(&package, &users).expect_err("collision must stop");
+
+        assert!(failure.to_string().contains("already exists"));
+        assert_eq!(
+            std::fs::read_to_string(source.join(COMPOSITION)).unwrap(),
+            "- name: original\n"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn package_paths_cannot_escape_the_staging_directory() {
+        for path in ["../settings.yaml", "/absolute", "nested\\windows", "./same"] {
+            assert!(safe_relative(path).is_err(), "{path} must be rejected");
+        }
+        assert_eq!(
+            safe_relative("instructions/system.md").unwrap(),
+            PathBuf::from("instructions/system.md")
         );
     }
 }

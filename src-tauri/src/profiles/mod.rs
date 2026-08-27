@@ -41,6 +41,11 @@ use crate::plugins::{self, switches, InstalledPlugin};
 /// until somebody chooses another.
 pub const DEFAULT: &str = "web";
 
+/// Studio-owned recovery profile. It is deliberately absent from the normal
+/// roster: safe mode is a transient diagnostic environment, not another user
+/// profile to configure or accidentally select for everyday work.
+pub const SAFE_MODE: &str = "studio-safe-mode";
+
 /// Names the harness ships a template for and re-creates by itself. Renaming or
 /// deleting one of these would leave the user with a copy and a fresh original.
 const SHIPPED: [&str; 2] = ["web", "headless"];
@@ -53,6 +58,8 @@ const SHARED_MODULES: &str = "node_modules";
 const MANIFEST: &str = "package.json";
 const PATCH: &str = "cordis.patch.yml";
 const WORKSPACE: &str = "pnpm-workspace.yaml";
+const SAFE_MODE_MARKER: &str = ".dsh-studio-safe-mode";
+const SAFE_MODE_MARKER_BODY: &str = "dsh-studio-safe-mode-v1\n";
 
 /// An empty patch layer.
 ///
@@ -249,6 +256,69 @@ pub fn prepare_for_studio(name: &str) -> Result<bool> {
         sync_studio_runtime_module()?;
     }
     Ok(serves_studio)
+}
+
+/// Reset the private recovery profile to the smallest known-good web stack.
+///
+/// The directory is only ever rewritten after its ownership marker has been
+/// verified. A pre-existing user profile with the reserved name is therefore
+/// never adopted or overwritten. Installed packages can remain in its
+/// `node_modules`, but the fresh manifest has no dependencies and no
+/// third-party layer entries, so none of them can be composed or executed.
+pub fn prepare_safe_mode() -> Result<String> {
+    let directory = paths::profile_dir(SAFE_MODE);
+    prepare_safe_mode_in(&directory)?;
+    switches::forget(SAFE_MODE)?;
+    sync_studio_runtime_module()?;
+    Ok(SAFE_MODE.to_string())
+}
+
+fn prepare_safe_mode_in(directory: &Path) -> Result<()> {
+    let marker = directory.join(SAFE_MODE_MARKER);
+    match std::fs::symlink_metadata(directory) {
+        Ok(metadata) if metadata.is_dir() && !metadata.file_type().is_symlink() => {
+            let owner = crate::bounded_file::read_string(
+                &marker,
+                crate::bounded_file::CONTROL_BYTES,
+            )
+            .map_err(|_| {
+                Error::Profile(format!(
+                    "{} already exists and is not owned by DSH Studio; rename it before using safe mode",
+                    directory.display()
+                ))
+            })?;
+            if owner != SAFE_MODE_MARKER_BODY {
+                return Err(Error::Profile(format!(
+                    "{} has an invalid safe-mode ownership marker",
+                    directory.display()
+                )));
+            }
+        }
+        Ok(_) => {
+            return Err(Error::Profile(format!(
+                "{} is not a safe profile directory",
+                directory.display()
+            )));
+        }
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {
+            std::fs::create_dir_all(directory).map_err(|cause| {
+                Error::Profile(format!(
+                    "{} could not be made for safe mode: {cause}",
+                    directory.display()
+                ))
+            })?;
+            write(&marker, SAFE_MODE_MARKER_BODY)?;
+        }
+        Err(cause) => {
+            return Err(Error::Profile(format!(
+                "{} could not be inspected: {cause}",
+                directory.display()
+            )));
+        }
+    }
+
+    let bundles = WEB_PROFILE_BUNDLES.map(str::to_string);
+    initialize(directory, &bundles, EMPTY_PATCH, Some(PROFILE_WORKSPACE))
 }
 
 fn prepare_for_studio_in(dir: &Path, bootstrap_web: bool) -> Result<bool> {
@@ -891,7 +961,7 @@ fn scan() -> Vec<String> {
                 .is_ok_and(|kind| kind.is_dir() && !kind.is_symlink())
         })
         .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| is_name(name))
+        .filter(|name| is_name(name) && name != SAFE_MODE)
         .collect();
     names.sort();
     names
@@ -1163,6 +1233,7 @@ fn is_name(name: &str) -> bool {
 /// above, because a profile somebody made from a terminal is still theirs.
 fn is_new_name(name: &str) -> bool {
     is_name(name)
+        && name != SAFE_MODE
         && !name.starts_with(['-', '_'])
         && name.chars().all(|character| {
             character.is_ascii_lowercase()
@@ -1587,6 +1658,70 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(root.join(WORKSPACE)).expect("workspace"),
             PROFILE_WORKSPACE
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn safe_mode_rewrites_only_a_studio_owned_profile_to_official_layers() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-safe-owned-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).expect("safe profile root");
+        write(&root.join(SAFE_MODE_MARKER), SAFE_MODE_MARKER_BODY).expect("ownership marker");
+        initialize(
+            &root,
+            &[
+                "@deepseek-ai/dsh-base".into(),
+                WEB_APP_BUNDLE.into(),
+                "third-party-plugin".into(),
+            ],
+            "- name: third-party\n",
+            Some(PROFILE_WORKSPACE),
+        )
+        .expect("dirty safe profile");
+
+        prepare_safe_mode_in(&root).expect("safe profile reset");
+
+        let manifest = plugins::read_manifest(&root).expect("safe manifest");
+        assert_eq!(bundles(&manifest), WEB_PROFILE_BUNDLES);
+        assert!(dependencies(&manifest).is_empty());
+        assert_eq!(
+            std::fs::read_to_string(root.join(PATCH)).unwrap(),
+            EMPTY_PATCH
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join(SAFE_MODE_MARKER)).unwrap(),
+            SAFE_MODE_MARKER_BODY
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn safe_mode_never_adopts_an_unmarked_existing_profile() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-profile-safe-unowned-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        initialize(
+            &root,
+            &["user-plugin".into()],
+            "- name: user\n",
+            Some(PROFILE_WORKSPACE),
+        )
+        .expect("user profile");
+
+        let failure = prepare_safe_mode_in(&root).expect_err("unowned profile must be preserved");
+
+        assert!(failure.to_string().contains("not owned by DSH Studio"));
+        let manifest = plugins::read_manifest(&root).expect("user manifest preserved");
+        assert_eq!(bundles(&manifest), ["user-plugin"]);
+        assert_eq!(
+            std::fs::read_to_string(root.join(PATCH)).unwrap(),
+            "- name: user\n"
         );
         let _ = std::fs::remove_dir_all(root);
     }
