@@ -29,12 +29,13 @@ pub mod lan;
 pub mod qr;
 
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use serde::Serialize;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
+use tokio::sync::Mutex as AsyncMutex;
 
 use crate::error::{Error, Result};
 use access::{Access, DeviceView, CODE_LIFETIME};
@@ -45,6 +46,9 @@ use gateway::Counters;
 #[serde(rename_all = "camelCase")]
 pub struct RemoteStatus {
     pub open: bool,
+    /// True while the Harness is restarting and the LAN door is being rebuilt.
+    /// Paired devices are retained in memory during this short transition.
+    pub suspended: bool,
     /// Addresses this machine could be reached on. Present whether or not the
     /// door is open, so the panel can say what would happen before it happens.
     pub addresses: Vec<String>,
@@ -78,9 +82,22 @@ struct Session {
     _shutdown: broadcast::Sender<()>,
 }
 
+/// The LAN listener is intentionally gone while Harness is unavailable, but a
+/// transient restart must not make every phone pair again. The credential is
+/// retained only in memory and is discarded by an explicit remote close.
+struct Suspended {
+    access: Arc<Access>,
+    host: Ipv4Addr,
+    port: u16,
+    counters: Arc<Counters>,
+}
+
 /// Owns whether the harness is reachable from anywhere but this machine.
 pub struct Remote {
     session: Mutex<Option<Session>>,
+    suspended: Mutex<Option<Suspended>>,
+    opening: AsyncMutex<()>,
+    requested: AtomicBool,
     changed: broadcast::Sender<()>,
 }
 
@@ -94,6 +111,9 @@ impl Remote {
     pub fn new() -> Self {
         Self {
             session: Mutex::new(None),
+            suspended: Mutex::new(None),
+            opening: AsyncMutex::new(()),
+            requested: AtomicBool::new(false),
             changed: broadcast::channel(16).0,
         }
     }
@@ -108,25 +128,92 @@ impl Remote {
         self.session().is_some()
     }
 
+    pub fn is_suspended(&self) -> bool {
+        self.suspended().is_some()
+    }
+
     /// Open the door in front of a harness already serving at `origin`.
     ///
     /// Calling this twice returns the door that is already open, credentials and
     /// all, rather than replacing it — the phones already paired through it have
     /// to keep working.
     pub async fn open(&self, origin: &str) -> Result<RemoteStatus> {
+        self.requested.store(true, Ordering::Release);
+        self.connect(origin).await
+    }
+
+    async fn connect(&self, origin: &str) -> Result<RemoteStatus> {
+        let _opening = self.opening.lock().await;
+        if !self.requested.load(Ordering::Acquire) {
+            return Ok(self.status());
+        }
         if self.is_open() {
             return Ok(self.status());
         }
 
+        let suspended = self.suspended().take();
+        let status = self.open_listener(origin, suspended.as_ref()).await;
+        if status.is_err() {
+            // A failed rebind must not throw away the phone credentials.
+            if self.requested.load(Ordering::Acquire) {
+                if let Some(suspended) = suspended {
+                    *self.suspended() = Some(suspended);
+                } else {
+                    self.requested.store(false, Ordering::Release);
+                }
+            } else {
+                // An explicit Close won the race with the failed rebind.
+                // Dropping the captured state is the credential revocation.
+            }
+        }
+        status
+    }
+
+    /// Rebuild a deliberately suspended door after Harness becomes ready.
+    /// A remote session the user closed is not reopened by this path.
+    pub async fn resume(&self, origin: &str) -> Result<RemoteStatus> {
+        if !self.requested.load(Ordering::Acquire) || !self.is_suspended() {
+            return Ok(self.status());
+        }
+        self.connect(origin).await
+    }
+
+    /// Temporarily remove the LAN listener while Harness is restarting.
+    /// Explicit `close` remains the only operation that forgets devices.
+    pub fn suspend(&self) {
+        let Some(session) = self.session().take() else {
+            return;
+        };
+        *self.suspended() = Some(Suspended {
+            access: session.access,
+            host: session.host,
+            port: session.port,
+            counters: session.counters,
+        });
+        let _ = self.changed.send(());
+    }
+
+    async fn open_listener(
+        &self,
+        origin: &str,
+        suspended: Option<&Suspended>,
+    ) -> Result<RemoteStatus> {
         let upstream = upstream_from(origin)?;
-        let host = lan::best_address().ok_or(Error::RemoteNoNetwork)?;
-        let listener = TcpListener::bind(SocketAddrV4::new(host, 0))
-            .await
-            .map_err(Error::RemoteBind)?;
+        let host = suspended
+            .map(|state| state.host)
+            .or_else(lan::best_address)
+            .ok_or(Error::RemoteNoNetwork)?;
+        let requested_port = suspended.map_or(0, |state| state.port);
+        let listener = bind_listener(host, requested_port).await?;
         let port = listener.local_addr().map_err(Error::RemoteBind)?.port();
 
-        let access = Arc::new(Access::open()?);
-        let counters = Arc::new(Counters::default());
+        let access = match suspended {
+            Some(state) => Arc::clone(&state.access),
+            None => Arc::new(Access::open()?),
+        };
+        let counters = suspended
+            .map(|state| Arc::clone(&state.counters))
+            .unwrap_or_else(|| Arc::new(Counters::default()));
         let shutdown = broadcast::channel::<()>(1).0;
 
         tokio::spawn(gateway::serve(
@@ -150,6 +237,10 @@ impl Remote {
             counters,
             _shutdown: shutdown,
         });
+        if !self.requested.load(Ordering::Acquire) {
+            self.session().take();
+            return Ok(self.status());
+        }
         let _ = self.changed.send(());
 
         Ok(self.status())
@@ -157,8 +248,10 @@ impl Remote {
 
     /// Close the door. Safe to call when it is already closed.
     pub fn close(&self) {
+        self.requested.store(false, Ordering::Release);
         let previous = self.session().take();
-        if previous.is_some() {
+        let suspended = self.suspended().take();
+        if previous.is_some() || suspended.is_some() {
             let _ = self.changed.send(());
         }
     }
@@ -186,23 +279,40 @@ impl Remote {
 
     pub fn status(&self) -> RemoteStatus {
         let guard = self.session();
-
         let Some(session) = guard.as_ref() else {
+            drop(guard);
+            let suspended = self.suspended();
+            let devices = suspended
+                .as_ref()
+                .map(|state| state.access.devices())
+                .unwrap_or_default();
+            let address = suspended
+                .as_ref()
+                .map(|state| state.host)
+                .or_else(lan::best_address);
+            let url = suspended
+                .as_ref()
+                .map(|state| format!("http://{}:{}/", state.host, state.port));
             return RemoteStatus {
                 open: false,
-                addresses: lan::addresses()
+                suspended: suspended.is_some(),
+                addresses: address
                     .into_iter()
                     .map(|address| address.to_string())
                     .collect(),
-                url: None,
+                url,
                 pairing_url: None,
                 qr: None,
                 code_seconds_left: None,
                 code_lifetime_seconds: CODE_LIFETIME.as_secs() as u32,
-                devices: Vec::new(),
+                devices,
                 active: 0,
-                served: 0,
-                refused: 0,
+                served: suspended
+                    .as_ref()
+                    .map_or(0, |state| state.counters.served.load(Ordering::Relaxed)),
+                refused: suspended
+                    .as_ref()
+                    .map_or(0, |state| state.counters.refused.load(Ordering::Relaxed)),
             };
         };
 
@@ -212,6 +322,7 @@ impl Remote {
 
         RemoteStatus {
             open: true,
+            suspended: false,
             addresses: vec![session.host.to_string()],
             qr: pairing.as_deref().and_then(qr::encode),
             code_seconds_left: live.as_ref().map(|code| code.seconds_left),
@@ -231,9 +342,15 @@ impl Remote {
     /// every caller goes on to read [`Self::status`] — which takes the same
     /// lock, and would deadlock on a guard still held.
     fn access(&self) -> Option<Arc<Access>> {
-        self.session()
+        let live = self
+            .session()
             .as_ref()
-            .map(|session| Arc::clone(&session.access))
+            .map(|session| Arc::clone(&session.access));
+        live.or_else(|| {
+            self.suspended()
+                .as_ref()
+                .map(|suspended| Arc::clone(&suspended.access))
+        })
     }
 
     /// A poisoned session fails closed. Dropping it closes the listener and all
@@ -250,6 +367,39 @@ impl Remote {
             }
         }
     }
+
+    fn suspended(&self) -> MutexGuard<'_, Option<Suspended>> {
+        match self.suspended.lock() {
+            Ok(suspended) => suspended,
+            Err(poisoned) => {
+                let mut suspended = PoisonError::into_inner(poisoned);
+                *suspended = None;
+                self.suspended.clear_poison();
+                suspended
+            }
+        }
+    }
+}
+
+/// Rebinding the same address is what lets a phone reconnect without learning a
+/// new URL. The previous gateway exits asynchronously, so a resume gets a short
+/// bounded retry window for the old listener to release its socket.
+async fn bind_listener(host: Ipv4Addr, port: u16) -> Result<TcpListener> {
+    const RETRIES: usize = 20;
+    const RETRY_DELAY: std::time::Duration = std::time::Duration::from_millis(50);
+
+    let address = SocketAddrV4::new(host, port);
+    let mut last = None;
+    for attempt in 0..=if port == 0 { 0 } else { RETRIES } {
+        match TcpListener::bind(address).await {
+            Ok(listener) => return Ok(listener),
+            Err(cause) => last = Some(cause),
+        }
+        if attempt < RETRIES {
+            tokio::time::sleep(RETRY_DELAY).await;
+        }
+    }
+    Err(Error::RemoteBind(last.expect("a bind attempt always ran")))
 }
 
 /// The loopback socket behind a serving origin.
@@ -279,9 +429,17 @@ fn upstream_from(origin: &str) -> Result<SocketAddr> {
 
 #[cfg(test)]
 mod tests {
+    use std::net::Ipv4Addr;
     use std::panic::{self, AssertUnwindSafe};
+    use std::sync::atomic::Ordering;
+    use std::sync::Arc;
 
-    use super::{upstream_from, Remote};
+    use super::access::Access;
+    use super::gateway::{self, Counters};
+    use super::{upstream_from, Remote, Session};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::{TcpListener, TcpStream};
+    use tokio::sync::broadcast;
 
     #[test]
     fn reads_the_loopback_socket_out_of_a_serving_origin() {
@@ -338,6 +496,118 @@ mod tests {
         assert!(renewed.code_seconds_left.is_none());
         assert!(remote.forget("whatever").devices.is_empty());
         assert!(!remote.is_open());
+    }
+
+    #[test]
+    fn transient_suspend_keeps_devices_and_explicit_close_forgets_them() {
+        let remote = Remote::new();
+        let access = Arc::new(Access::open().expect("entropy"));
+        let code = access.pairing().expect("pairing code").code;
+        assert!(access.pair(&code, "iPhone Safari").is_some());
+        let shutdown = broadcast::channel::<()>(1).0;
+
+        *remote.session() = Some(Session {
+            access,
+            host: Ipv4Addr::new(192, 168, 1, 5),
+            port: 43123,
+            counters: Arc::new(Counters::default()),
+            _shutdown: shutdown,
+        });
+
+        remote.suspend();
+        let paused = remote.status();
+        assert!(!paused.open);
+        assert!(paused.suspended);
+        assert_eq!(paused.url.as_deref(), Some("http://192.168.1.5:43123/"));
+        assert_eq!(paused.devices.len(), 1);
+
+        remote.close();
+        let closed = remote.status();
+        assert!(!closed.open);
+        assert!(!closed.suspended);
+        assert!(closed.devices.is_empty());
+    }
+
+    async fn echoing_upstream(mark: &'static str) -> std::net::SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind upstream");
+        let address = listener.local_addr().expect("upstream address");
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let mut request = [0u8; 2048];
+                let _ = socket.read(&mut request).await;
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{mark}",
+                    mark.len()
+                );
+                let _ = socket.write_all(response.as_bytes()).await;
+            }
+        });
+        address
+    }
+
+    async fn request(address: std::net::SocketAddr, credential: &str) -> String {
+        let mut socket = TcpStream::connect(address).await.expect("connect gateway");
+        socket
+            .write_all(
+                format!(
+                    "GET / HTTP/1.1\r\nHost: phone\r\nCookie: dsh_studio_remote={credential}\r\nConnection: close\r\n\r\n"
+                )
+                .as_bytes(),
+            )
+            .await
+            .expect("write request");
+        let mut response = String::new();
+        socket
+            .read_to_string(&mut response)
+            .await
+            .expect("read response");
+        response
+    }
+
+    #[tokio::test]
+    async fn resume_reuses_the_url_and_device_credential_with_a_new_upstream() {
+        let first_upstream = echoing_upstream("first").await;
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind gateway");
+        let address = listener.local_addr().expect("gateway address");
+        let access = Arc::new(Access::open().expect("entropy"));
+        let code = access.pairing().expect("pairing").code;
+        let credential = access.pair(&code, "iPhone Safari").expect("paired");
+        let counters = Arc::new(Counters::default());
+        let shutdown = broadcast::channel::<()>(1).0;
+        let remote = Remote::new();
+        remote.requested.store(true, Ordering::Release);
+
+        tokio::spawn(gateway::serve(
+            listener,
+            Arc::clone(&access),
+            first_upstream,
+            Arc::clone(&counters),
+            shutdown.subscribe(),
+            remote.changed.clone(),
+        ));
+        *remote.session() = Some(Session {
+            access,
+            host: Ipv4Addr::LOCALHOST,
+            port: address.port(),
+            counters,
+            _shutdown: shutdown,
+        });
+        assert!(request(address, &credential).await.ends_with("first"));
+
+        remote.suspend();
+        let second_upstream = echoing_upstream("second").await;
+        remote
+            .resume(&format!("http://{second_upstream}"))
+            .await
+            .expect("resume");
+
+        assert_eq!(remote.status().url, Some(format!("http://{address}/")));
+        assert!(request(address, &credential).await.ends_with("second"));
+        remote.close();
     }
 
     #[tokio::test]

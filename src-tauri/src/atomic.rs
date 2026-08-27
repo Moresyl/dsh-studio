@@ -95,18 +95,27 @@ pub(crate) fn replace(staged: &Path, target: &Path) -> Result<()> {
 
     let staged: Vec<u16> = staged.as_os_str().encode_wide().chain(Some(0)).collect();
     let target: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
-    let moved = unsafe {
-        MoveFileExW(
-            staged.as_ptr(),
-            target.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if moved == 0 {
-        Err(Error::last_os_error())
-    } else {
-        Ok(())
+    // Windows may briefly keep the destination open while Defender, indexers,
+    // or another Studio window closes its handle. A bounded retry preserves
+    // atomic replacement without turning a real permission error into a hang.
+    for attempt in 0..8 {
+        let moved = unsafe {
+            MoveFileExW(
+                staged.as_ptr(),
+                target.as_ptr(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+            )
+        };
+        if moved != 0 {
+            return Ok(());
+        }
+        let cause = Error::last_os_error();
+        if !matches!(cause.raw_os_error(), Some(5 | 32)) || attempt == 7 {
+            return Err(cause);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(15));
     }
+    unreachable!("the retry loop returns on success or final failure")
 }
 
 #[cfg(test)]

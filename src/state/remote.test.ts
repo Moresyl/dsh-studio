@@ -9,6 +9,7 @@ vi.mock('@/lib/ipc')
 
 const status = (open: boolean): RemoteStatus => ({
   open,
+  suspended: false,
   addresses: [],
   url: open ? 'http://192.0.2.1:57652' : null,
   pairingUrl: null,

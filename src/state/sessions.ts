@@ -25,6 +25,7 @@ import { reportFailure } from '@/state/failure'
 interface SessionStore {
   /** Every session, newest first. Null until the first read lands. */
   cards: SessionCard[] | null
+  archived: string[]
   /** What the last search found, or null when nothing is being searched for. */
   hits: SessionHit[] | null
   query: string
@@ -47,6 +48,7 @@ interface SessionStore {
   narrow: (project: string | null) => Promise<void>
   open: (id: string) => Promise<void>
   close: () => void
+  archive: (id: string, archived: boolean) => Promise<boolean>
 
   /**
    * Render a session and put it on the clipboard.
@@ -77,6 +79,7 @@ let openingGeneration = 0
 
 export const useSessions = create<SessionStore>((set, get) => ({
   cards: null,
+  archived: [],
   hits: null,
   query: '',
   project: null,
@@ -91,8 +94,8 @@ export const useSessions = create<SessionStore>((set, get) => ({
     if (get().scanning) return
     set({ scanning: true, error: null })
     try {
-      const { cards } = await ipc.sessionRoster()
-      set({ cards })
+      const { cards, archived } = await ipc.sessionRoster()
+      set({ cards, archived })
     } catch (cause) {
       set({ error: describe(cause) })
     } finally {
@@ -146,6 +149,17 @@ export const useSessions = create<SessionStore>((set, get) => ({
   close: () => {
     openingGeneration += 1
     set({ opened: null, opening: null, error: null })
+  },
+
+  archive: async (id, archived) => {
+    try {
+      const shelf = await ipc.sessionArchive(id, archived)
+      set({ cards: shelf.cards, archived: shelf.archived, error: null })
+      return true
+    } catch (cause) {
+      set({ error: reportFailure(cause) })
+      return false
+    }
   },
 
   copyOut: async (id, format) => {

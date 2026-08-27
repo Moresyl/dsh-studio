@@ -31,6 +31,7 @@ beforeEach(() => {
   useDialog.setState({ pending: null })
   useSessions.setState({
     cards: null,
+    archived: [],
     hits: null,
     query: '',
     project: null,
@@ -50,7 +51,7 @@ beforeEach(() => {
 
 describe('session reads', () => {
   it('runs only one shelf refresh while the first is in flight', async () => {
-    let finish!: (answer: { cards: SessionCard[]; loaded: number }) => void
+    let finish!: (answer: { cards: SessionCard[]; loaded: number; archived: string[] }) => void
     vi.mocked(ipc.sessionRoster).mockReturnValue(
       new Promise((resolve) => {
         finish = resolve
@@ -61,7 +62,7 @@ describe('session reads', () => {
     await useSessions.getState().refresh()
 
     expect(ipc.sessionRoster).toHaveBeenCalledOnce()
-    finish({ cards: [card('current')], loaded: 1 })
+    finish({ cards: [card('current')], loaded: 1, archived: [] })
     await first
   })
 
@@ -98,6 +99,20 @@ describe('session reads', () => {
     await reading
 
     expect(useSessions.getState().opened).toBeNull()
+  })
+
+  it('updates the shelf only after native archive state was saved', async () => {
+    vi.mocked(ipc.sessionArchive).mockResolvedValue({
+      cards: [card('archived')],
+      loaded: 1,
+      archived: ['session-1'],
+    })
+
+    await expect(useSessions.getState().archive('session-1', true)).resolves.toBe(true)
+
+    expect(ipc.sessionArchive).toHaveBeenCalledWith('session-1', true)
+    expect(useSessions.getState().archived).toEqual(['session-1'])
+    expect(useSessions.getState().cards?.at(0)?.title).toBe('archived')
   })
 })
 

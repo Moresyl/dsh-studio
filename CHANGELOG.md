@@ -9,7 +9,34 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Added
+
+- Added an isolated Studio-owned Safe Mode Profile that rebuilds only the official
+  base/web layers, never adopts an unmarked user Profile and leaves the selected
+  Profile unchanged.
+- Added portable `.dshpreset` import/export with a versioned manifest, per-file
+  SHA-256 verification, strict path and size limits, preview, collision refusal
+  and atomic activation. Only user-authored preset files are exported.
+- Added plugin trust and resource evidence covering runtime compatibility,
+  registry integrity, repository identity, lifecycle scripts, deprecation,
+  direct dependency count, unpacked size and native-build declarations.
+- Added native Git worktree discovery and collision-safe branch worktree creation,
+  plus a Worktree Manager that can reveal or switch to each isolated workspace.
+- Added reversible session archiving. Studio persists only the archive index and
+  never edits or deletes the Harness-owned append-only session logs.
+
+### Changed
+
+- LAN remote access now suspends during a transient Harness restart and resumes
+  on the same address and port with the same in-memory per-device credentials.
+  Explicit Close still revokes every credential and prevents automatic reopen.
+
 ### Fixed
+
+- Fixed concurrent atomic replacements on Windows intermittently failing with an
+  access/sharing violation while another writer, Defender or an indexer was
+  releasing the destination. Only those two transient Windows errors receive a
+  short bounded retry; all other permission errors still fail immediately.
 
 - Fixed upgrades from 0.7.8/0.8.0 opening an empty desktop surface when the saved
   presentation expected an upstream page but Harness was stopped. Compatibility,

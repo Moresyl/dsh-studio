@@ -37,6 +37,16 @@ pub async fn session_read(library: State<'_, Arc<Library>>, id: String) -> Resul
     open(library, id).await
 }
 
+#[tauri::command]
+pub async fn session_archive(
+    library: State<'_, Arc<Library>>,
+    id: String,
+    archived: bool,
+) -> Result<Shelved> {
+    let library = Arc::clone(&library);
+    away(move || library.set_archived(&id, archived)).await?
+}
+
 /// A rendered session, and what to call the file it should go in.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

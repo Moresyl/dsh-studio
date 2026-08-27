@@ -130,6 +130,7 @@ export function WorktreeManager() {
               <Button
                 variant="ghost"
                 data-hint={t('statusbar.reveal')}
+                aria-label={t('statusbar.reveal')}
                 onClick={() => void revealItemInDir(item.path)}
               >
                 <FolderOpen size={12} aria-hidden="true" />

@@ -171,6 +171,7 @@ pub fn run() {
             sessions::commands::session_roster,
             sessions::commands::session_search,
             sessions::commands::session_read,
+            sessions::commands::session_archive,
             sessions::commands::session_export,
             sessions::commands::session_save,
             startup::startup_state,
@@ -218,6 +219,7 @@ pub fn export_diagnostics_cli() -> std::result::Result<std::path::PathBuf, Strin
 /// does, so the two cannot end up describing different states.
 fn forward_events(app: &tauri::AppHandle, supervisor: &Arc<Supervisor>, remote: &Arc<Remote>) {
     let handle = app.clone();
+    let supervisor = Arc::clone(supervisor);
     let remote = Arc::clone(remote);
     let mut events = supervisor.subscribe();
 
@@ -227,11 +229,31 @@ fn forward_events(app: &tauri::AppHandle, supervisor: &Arc<Supervisor>, remote: 
                 Ok(event) => {
                     if let Event::Status(status) = &event {
                         tray::sync(&handle, status);
-                        // A door onto a service that is no longer serving is a
-                        // door onto nothing. It closes with the service rather
-                        // than waiting for someone to notice.
-                        if !matches!(status, Status::Ready { .. }) {
-                            remote.close();
+                        // Stop exposing the LAN socket while Harness is down,
+                        // but retain paired devices in memory across routine
+                        // restarts. An explicit remote Close still forgets all
+                        // devices and prevents this automatic resume.
+                        if let Status::Ready { origin, .. } = status {
+                            if remote.is_suspended() {
+                                let remote = Arc::clone(&remote);
+                                let supervisor = Arc::clone(&supervisor);
+                                let origin = origin.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    match remote.resume(&origin).await {
+                                        Ok(_) => supervisor.note(
+                                            harness::supervisor::Stream::Stdout,
+                                            "remote access resumed after Harness restart"
+                                                .to_string(),
+                                        ),
+                                        Err(cause) => supervisor.note(
+                                            harness::supervisor::Stream::Stderr,
+                                            format!("remote access is waiting to resume: {cause}"),
+                                        ),
+                                    }
+                                });
+                            }
+                        } else {
+                            remote.suspend();
                         }
                     }
                     let _ = handle.emit(EVENT_CHANNEL, event);

@@ -81,6 +81,7 @@ export function RemotePane() {
 
   const serving = phase === 'ready'
   const isOpen = status?.open ?? false
+  const suspended = status?.suspended ?? false
 
   useEffect(() => {
     if (!isOpen) return
@@ -99,13 +100,23 @@ export function RemotePane() {
             }}
             size={6}
           />
-          {isOpen ? t('remote.state.open') : t('remote.state.closed')}
+          {isOpen ? t('remote.state.open') : suspended ? t('remote.state.reconnecting') : t('remote.state.closed')}
         </span>
 
         {isOpen ? (
           <Button variant="secondary" onClick={() => void close()} disabled={busy}>
             {t('remote.close')}
           </Button>
+        ) : suspended ? (
+          <span className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => void close()} disabled={busy}>
+              {t('remote.close')}
+            </Button>
+            <Button variant="primary" onClick={() => void open()} disabled={!serving || busy}>
+              {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              {t('remote.reconnect')}
+            </Button>
+          </span>
         ) : (
           <Button variant="primary" onClick={() => void open()} disabled={!serving || busy}>
             {busy ? (
@@ -115,7 +126,7 @@ export function RemotePane() {
               </>
             ) : (
               <>
-                <Wifi size={13} strokeWidth={2.3} />
+              <Wifi size={13} strokeWidth={2.3} />
                 {t('remote.open')}
               </>
             )}
@@ -133,6 +144,12 @@ export function RemotePane() {
             </>
           ) : (
             <Closed serving={serving} addresses={status?.addresses ?? []} />
+          )}
+
+          {suspended && (
+            <p className="selectable rounded-control border border-warn/30 bg-warn/10 px-3 py-2 text-[12px] leading-relaxed text-warn">
+              {t('remote.reconnectingHint')}
+            </p>
           )}
 
           {error && (

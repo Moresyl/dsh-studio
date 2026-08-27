@@ -39,7 +39,7 @@ pub async fn remote_open(
 
 #[tauri::command]
 pub fn remote_close(state: State<'_, AppState>, remote: State<'_, Arc<Remote>>) -> RemoteStatus {
-    if remote.is_open() {
+    if remote.is_open() || remote.is_suspended() {
         state
             .supervisor
             .note(Stream::Stdout, "remote access closed".to_string());

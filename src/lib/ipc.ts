@@ -162,6 +162,8 @@ export interface RemoteDevice {
 
 export interface RemoteStatus {
   open: boolean
+  /** The Harness is restarting; the LAN listener is paused but paired devices are retained. */
+  suspended: boolean
   /** Addresses this machine could be reached on, open or not. */
   addresses: string[]
   /** Where the harness is reachable, without any secret in it. */
@@ -775,6 +777,8 @@ export interface Shelved {
   cards: SessionCard[]
   /** Sessions whose text is in memory right now, of the ones listed. */
   loaded: number
+  /** Session ids hidden by Studio without modifying Harness-owned logs. */
+  archived: string[]
 }
 
 /**
@@ -814,6 +818,9 @@ export const sessionSearch = (query: string, project?: string): Promise<SessionH
 
 export const sessionRead = (id: string): Promise<SessionTranscript> =>
   invoke('session_read', { id })
+
+export const sessionArchive = (id: string, archived: boolean): Promise<Shelved> =>
+  invoke('session_archive', { id, archived })
 
 /**
  * The three shapes a conversation can leave in.

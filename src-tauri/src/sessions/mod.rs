@@ -25,14 +25,14 @@ pub mod find;
 pub mod read;
 
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::SystemTime;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::paths;
 
@@ -165,6 +165,8 @@ pub struct Shelved {
     pub cards: Vec<Card>,
     /// Sessions whose text is in memory right now, of the ones listed.
     pub loaded: usize,
+    /// Hidden from the active shelf without touching Harness-owned logs.
+    pub archived: Vec<String>,
 }
 
 /// Every session on the machine, kept read so it can be searched.
@@ -176,11 +178,23 @@ pub struct Library {
     /// Ticks once per use, so the least recently wanted text is the text that
     /// goes when the corpus is full.
     clock: AtomicU64,
+    archive_file: PathBuf,
+    archived: Mutex<BTreeSet<String>>,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ArchiveState {
+    version: u8,
+    session_ids: BTreeSet<String>,
 }
 
 impl Default for Library {
     fn default() -> Library {
-        Library::at(paths::dsh_home().join(SESSIONS))
+        Library::at_with_archive(
+            paths::dsh_home().join(SESSIONS),
+            paths::app_data_dir().join("session-archive.json"),
+        )
     }
 }
 
@@ -216,11 +230,20 @@ impl Stamp {
 
 impl Library {
     /// A library over one session store.
+    #[cfg(test)]
     pub fn at(root: PathBuf) -> Library {
+        let archive_file = root.join(".dsh-studio-archive.json");
+        Library::at_with_archive(root, archive_file)
+    }
+
+    fn at_with_archive(root: PathBuf, archive_file: PathBuf) -> Library {
+        let archived = read_archive(&archive_file);
         Library {
             root,
             shelves: Mutex::default(),
             clock: AtomicU64::new(0),
+            archive_file,
+            archived: Mutex::new(archived),
         }
     }
 
@@ -238,7 +261,40 @@ impl Library {
                 .filter(|shelf| shelf.lines.is_some())
                 .count(),
             cards,
+            archived: self.archived().iter().cloned().collect(),
         }
+    }
+
+    /// Hide or restore a session in Studio without altering its append-only log.
+    pub fn set_archived(&self, id: &str, archived: bool) -> crate::error::Result<Shelved> {
+        self.refresh();
+        if !self.shelves().values().any(|shelf| shelf.card.id == id) {
+            return Err(crate::error::Error::Session(
+                "that session is no longer on disk".into(),
+            ));
+        }
+
+        {
+            let mut ids = self.archived();
+            let mut snapshot = ids.clone();
+            if archived {
+                snapshot.insert(id.to_string());
+            } else {
+                snapshot.remove(id);
+            }
+            let state = ArchiveState {
+                version: 1,
+                session_ids: snapshot.clone(),
+            };
+            let text = serde_json::to_string_pretty(&state).map_err(|cause| {
+                crate::error::Error::Session(format!("saving the session archive failed: {cause}"))
+            })?;
+            crate::atomic::write(&self.archive_file, text).map_err(|cause| {
+                crate::error::Error::Session(format!("saving the session archive failed: {cause}"))
+            })?;
+            *ids = snapshot;
+        }
+        Ok(self.roster())
     }
 
     /// The sessions a query describes, best answer first.
@@ -395,6 +451,22 @@ impl Library {
     fn shelves(&self) -> MutexGuard<'_, HashMap<PathBuf, Shelf>> {
         self.shelves.lock().unwrap_or_else(PoisonError::into_inner)
     }
+
+    fn archived(&self) -> MutexGuard<'_, BTreeSet<String>> {
+        self.archived.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+fn read_archive(path: &Path) -> BTreeSet<String> {
+    let Ok(text) = crate::bounded_file::read_string(path, crate::bounded_file::CONTROL_BYTES)
+    else {
+        return BTreeSet::new();
+    };
+    serde_json::from_str::<ArchiveState>(&text)
+        .ok()
+        .filter(|state| state.version == 1)
+        .map(|state| state.session_ids)
+        .unwrap_or_default()
 }
 
 impl Shelf {
@@ -647,6 +719,56 @@ mod tests {
         assert_eq!(transcript.card.project, "D:\\work");
         assert_eq!(transcript.lines[0].text, "移植 zstd 解析器");
 
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn archiving_is_persistent_reversible_and_never_changes_the_harness_log() {
+        let root = store(
+            "archive",
+            &[(
+                "--D--work--",
+                "one",
+                &["{\"type\":\"session\",\"version\":0,\"id\":\"one\",\"createdAt\":1000}\n"],
+            )],
+        );
+        let log = root
+            .join("--D--work--")
+            .join("one")
+            .join("session.jsonl.zstd");
+        let before = fs::read(&log).expect("session log");
+
+        let library = Library::at(root.clone());
+        let archived = library.set_archived("one", true).expect("archive");
+        assert_eq!(archived.archived, vec!["one"]);
+        assert_eq!(fs::read(&log).expect("session log"), before);
+
+        let reopened = Library::at(root.clone());
+        assert_eq!(reopened.roster().archived, vec!["one"]);
+        assert!(
+            reopened.transcript("one").is_some(),
+            "archive is not deletion"
+        );
+
+        let restored = reopened.set_archived("one", false).expect("restore");
+        assert!(restored.archived.is_empty());
+        assert_eq!(fs::read(&log).expect("session log"), before);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_corrupt_archive_file_degrades_to_an_empty_archive() {
+        let root = store(
+            "bad-archive",
+            &[(
+                "--D--work--",
+                "one",
+                &["{\"type\":\"session\",\"version\":0,\"id\":\"one\",\"createdAt\":1000}\n"],
+            )],
+        );
+        fs::write(root.join(".dsh-studio-archive.json"), "not json").expect("bad state");
+
+        assert!(Library::at(root.clone()).roster().archived.is_empty());
         let _ = fs::remove_dir_all(&root);
     }
 

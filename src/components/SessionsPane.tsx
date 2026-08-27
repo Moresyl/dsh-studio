@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   ArrowLeft,
+  Archive,
+  ArchiveRestore,
   Bot,
   Braces,
   Check,
@@ -124,6 +126,7 @@ const RAIL: Record<Role, string> = {
  */
 export function SessionsPane() {
   const cards = useSessions((state) => state.cards)
+  const archived = useSessions((state) => state.archived)
   const hits = useSessions((state) => state.hits)
   const asked = useSessions((state) => state.query)
   const project = useSessions((state) => state.project)
@@ -145,7 +148,7 @@ export function SessionsPane() {
   // The statement is a second reading of the same shelf, not a seventh pane in
   // the rail: nobody goes looking for "usage" without a session in mind, and a
   // rail that grows an entry per question stops being a rail.
-  const [tab, setTab] = useState<'list' | 'usage'>('list')
+  const [tab, setTab] = useState<'list' | 'archived' | 'usage'>('list')
 
   useEffect(() => {
     void refresh()
@@ -159,8 +162,18 @@ export function SessionsPane() {
   }, [query, search])
 
   const listed = useMemo(
-    () => (cards ?? []).filter((card) => project === null || card.project === project),
-    [cards, project],
+    () =>
+      (cards ?? []).filter(
+        (card) =>
+          (project === null || card.project === project) &&
+          (tab === 'archived' ? archived.includes(card.id) : !archived.includes(card.id)),
+      ),
+    [archived, cards, project, tab],
+  )
+
+  const visibleHits = useMemo(
+    () => hits?.filter((hit) => listed.some((card) => card.id === hit.card.id)) ?? hits,
+    [hits, listed],
   )
 
   const reach = useMemo(() => projects(cards ?? []), [cards])
@@ -190,13 +203,18 @@ export function SessionsPane() {
     <section className="flex min-h-0 flex-1 animate-rise flex-col bg-canvas">
       <PaneHeader
         title={t('sessions.title')}
-        subtitle={tab === 'list' ? t('sessions.subtitle') : t('usage.subtitle')}
+        subtitle={tab === 'usage' ? t('usage.subtitle') : tab === 'archived' ? t('sessions.archiveSubtitle') : t('sessions.subtitle')}
       >
         <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
           <TabButton
             label={t('sessions.tab.list')}
             active={tab === 'list'}
             onClick={() => setTab('list')}
+          />
+          <TabButton
+            label={t('sessions.tab.archived')}
+            active={tab === 'archived'}
+            onClick={() => setTab('archived')}
           />
           <TabButton
             label={t('sessions.tab.usage')}
@@ -271,13 +289,13 @@ export function SessionsPane() {
             <Filter project={project} reach={reach} onPick={(picked) => void narrow(picked)} />
           </div>
 
-          {listed.length > 0 && <Totals cards={listed} hits={hits} />}
+          {listed.length > 0 && <Totals cards={listed} hits={visibleHits} />}
 
           {error && <Warning message={error} />}
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {hits ? (
-              hits.length === 0 ? (
+            {visibleHits ? (
+              visibleHits.length === 0 ? (
                 <Empty
                   icon={Search}
                   message={
@@ -287,7 +305,7 @@ export function SessionsPane() {
                 />
               ) : (
                 <ul>
-                  {hits.map((hit) => (
+                  {visibleHits.map((hit) => (
                     <Entry
                       key={hit.card.id}
                       card={hit.card}
@@ -300,10 +318,10 @@ export function SessionsPane() {
               )
             ) : listed.length === 0 ? (
               <Empty
-                icon={scanning ? Loader2 : MessagesSquare}
+                icon={scanning ? Loader2 : tab === 'archived' ? Archive : MessagesSquare}
                 spin={scanning}
-                message={scanning ? t('sessions.scanning') : t('sessions.empty')}
-                hint={scanning ? undefined : t('sessions.emptyHint')}
+                message={scanning ? t('sessions.scanning') : tab === 'archived' ? t('sessions.archiveEmpty') : t('sessions.empty')}
+                hint={scanning ? undefined : tab === 'archived' ? t('sessions.archiveEmptyHint') : t('sessions.emptyHint')}
               />
             ) : (
               <ul>
@@ -467,6 +485,8 @@ interface ReaderProps {
 /** One session, read back in full. */
 function Reader({ card, lines, anchor, onBack }: ReaderProps) {
   const error = useSessions((state) => state.error)
+  const archived = useSessions((state) => state.archived)
+  const archive = useSessions((state) => state.archive)
   const body = useRef<HTMLDivElement>(null)
 
   // The point of a search result is the moment inside the session, so arriving
@@ -497,6 +517,16 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
         subtitleHint={card?.project}
       >
         {card && <Export id={card.id} />}
+
+        {card && (
+          <Button
+            variant="secondary"
+            onClick={() => void archive(card.id, !archived.includes(card.id)).then((done) => done && onBack())}
+          >
+            {archived.includes(card.id) ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+            {archived.includes(card.id) ? t('sessions.restore') : t('sessions.archive')}
+          </Button>
+        )}
 
         <Button variant="secondary" onClick={onBack}>
           <ArrowLeft size={13} strokeWidth={2.3} />

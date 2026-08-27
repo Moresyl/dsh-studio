@@ -135,6 +135,7 @@ const installed: InstalledPlugin[] = [
 
 const remote: RemoteStatus = {
   open: false,
+  suspended: false,
   addresses: [LAN_ADDRESS, '172.20.10.2'],
   url: null,
   pairingUrl: null,
