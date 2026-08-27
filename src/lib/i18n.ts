@@ -486,6 +486,19 @@ const en = {
 
   'settings.title': 'Settings',
   'settings.subtitle': 'Desktop behavior and background attention',
+  'worktrees.title': 'Parallel agent worktrees',
+  'worktrees.subtitle':
+    'Give each agent task its own branch and directory so concurrent edits cannot overwrite each other.',
+  'worktrees.branch': 'New worktree branch',
+  'worktrees.branchPlaceholder': 'agent/task-name',
+  'worktrees.create': 'Create worktree',
+  'worktrees.creating': 'Creating…',
+  'worktrees.guard':
+    'Worktrees are created from the current HEAD. DSH Studio never force-removes them; review and merge with normal Git tools.',
+  'worktrees.primary': 'primary',
+  'worktrees.dirty': 'uncommitted',
+  'worktrees.use': 'Use workspace',
+  'worktrees.empty': 'The selected workspace is not inside a Git repository.',
   'settings.autostart': 'Start at login',
   'settings.autostartHint':
     'Wait in the tray as soon as you sign in. The harness is not started until you ask for it.',
@@ -1138,6 +1151,17 @@ const zh: Record<MessageKey, string> = {
 
   'settings.title': '设置',
   'settings.subtitle': '桌面行为与后台提醒',
+  'worktrees.title': '多 Agent 并行工作树',
+  'worktrees.subtitle': '让每个 Agent 任务使用独立分支和目录，避免并发修改互相覆盖。',
+  'worktrees.branch': '新工作树分支',
+  'worktrees.branchPlaceholder': 'agent/task-name',
+  'worktrees.create': '创建工作树',
+  'worktrees.creating': '正在创建…',
+  'worktrees.guard': '工作树从当前 HEAD 创建；DSH Studio 不会强制删除，审查与合并仍使用正常 Git 流程。',
+  'worktrees.primary': '主工作树',
+  'worktrees.dirty': '有未提交修改',
+  'worktrees.use': '切换工作区',
+  'worktrees.empty': '当前工作区不在 Git 仓库内。',
   'settings.autostart': '开机自启',
   'settings.autostartHint': '登录后即在托盘待命。Harness 仍要由你启动，不会自行运行。',
   'settings.shortcut': '全局快捷键',

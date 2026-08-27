@@ -212,6 +212,19 @@ export const workspaceSelect = (path: string): Promise<Environment['workspaceAdm
 export const workspaceInspect = (path: string): Promise<Environment['workspaceAdmission']> =>
   invoke('workspace_inspect', { path })
 
+export interface GitWorktree {
+  path: string
+  branch: string
+  head: string
+  primary: boolean
+  dirty: boolean
+}
+
+export const workspaceWorktrees = (): Promise<GitWorktree[]> => invoke('workspace_worktrees')
+
+export const workspaceWorktreeCreate = (branch: string): Promise<GitWorktree[]> =>
+  invoke('workspace_worktree_create', { branch })
+
 /* -------------------------------------------------------------------------- */
 /* Plugins                                                                    */
 /* -------------------------------------------------------------------------- */

@@ -18,6 +18,7 @@ import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { Switch } from '@/components/Switch'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
+import { WorktreeManager } from '@/components/WorktreeManager'
 import { t } from '@/lib/i18n'
 import { readCombination, spellCombination } from '@/lib/keys'
 import { isMac } from '@/lib/platform'
@@ -242,6 +243,8 @@ export function SettingsPane() {
               </Button>
             </Row>
           </div>
+
+          <WorktreeManager />
 
           {error && (
             <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
