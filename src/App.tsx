@@ -16,6 +16,7 @@ import { t } from '@/lib/i18n'
 import { pushWorkspaceDrop } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
 import { ownAsync } from '@/lib/lifecycle'
+import { needsWorkbench, rendererDocument } from '@/lib/renderer-recovery'
 import { standby } from '@/lib/platform'
 import { useDialog } from '@/state/dialog'
 import { reportAction, reportFailure } from '@/state/failure'
@@ -60,20 +61,11 @@ export default function App() {
   const showPanel = origin === null || presentation === 'advanced'
   const [view, setView] = useState<View>('console')
   const [workbenchLoaded, setWorkbenchLoaded] = useState(presentation === 'advanced')
+  const [inspected, setInspected] = useState(false)
   // Held by the window rather than by the title bar that opens it: the manager
   // covers the window, and a modal inside a strip 36px tall would be positioned
   // against a strip 36px tall.
   const [managing, setManaging] = useState(false)
-
-  // This effect can only run after React committed the application root. Rust
-  // uses that fact to cancel the static startup-recovery deadline; it is not a
-  // Harness health signal and deliberately does not wait for Node or a profile.
-  useEffect(() => {
-    void ipc.rendererReady().catch(() => {
-      // A browser preview has no native recovery channel. The visible UI still
-      // works, and Rust retains its deadline in a real desktop window.
-    })
-  }, [])
 
   // Stable, because the palette rebuilds its command list from its props and
   // this window re-renders on every line the harness prints.
@@ -113,7 +105,14 @@ export default function App() {
   // or does not because of it. Settled on both paths — `inspect` records and
   // rejects a failed probe, and that failure still has to let the window open.
   useEffect(() => {
-    const settle = () => consider(useHarness.getState().environment)
+    const settle = () => {
+      const latest = useHarness.getState()
+      consider(latest.environment)
+      setInspected(true)
+      if (needsWorkbench(latest.status.phase === 'ready', usePresentation.getState().mode, false)) {
+        setWorkbenchLoaded(true)
+      }
+    }
     void inspect().then(settle, settle)
   }, [inspect, consider])
 
@@ -277,38 +276,39 @@ export default function App() {
         onManageProfiles={stage === 'guiding' ? undefined : manage}
       />
 
-      {stage === 'guiding' ? (
-        // Unmounted, not hidden. There is nothing behind the guide yet worth
-        // preserving — no harness running, no search typed — and mounting the
-        // workbench underneath it would start the panes off answering questions
-        // about a machine the user is still setting up.
-        <Onboarding />
-      ) : (
-        <div className="relative flex min-h-0 flex-1">
-          {origin && (
-            <div className="flex min-h-0 flex-1 flex-col" hidden={showPanel}>
-              {presentation === 'extended' && (
-                <ExtendedToolbar
-                  onView={show}
-                  onProfiles={manage}
-                  onWorkspace={() => void chooseWorkspace()}
-                />
-              )}
-              <div className="relative min-h-0 flex-1">
-                <HarnessFrame origin={origin} hidden={false} />
+      <Suspense fallback={<LoadingSurface />}>
+        {stage === 'guiding' ? (
+          // Unmounted, not hidden. There is nothing behind the guide yet worth
+          // preserving — no harness running, no search typed — and mounting the
+          // workbench underneath it would start the panes off answering questions
+          // about a machine the user is still setting up.
+          <Onboarding />
+        ) : (
+          <div className="relative flex min-h-0 flex-1">
+            {origin && (
+              <div className="flex min-h-0 flex-1 flex-col" hidden={showPanel}>
+                {presentation === 'extended' && (
+                  <ExtendedToolbar
+                    onView={show}
+                    onProfiles={manage}
+                    onWorkspace={() => void chooseWorkspace()}
+                  />
+                )}
+                <div className="relative min-h-0 flex-1">
+                  <HarnessFrame origin={origin} hidden={false} />
+                </div>
               </div>
-            </div>
-          )}
-          {/* Hidden rather than unmounted, for the same reason the frame is: a
-              search someone typed and a pairing code on screen must survive a
-              glance at the harness. */}
-          {workbenchLoaded && (
-            <Suspense fallback={<LoadingSurface />}>
+            )}
+            {/* Hidden rather than unmounted, for the same reason the frame is: a
+                search someone typed and a pairing code on screen must survive a
+                glance at the harness. */}
+            {inspected && needsWorkbench(origin !== null, presentation, workbenchLoaded) && (
               <Workbench hidden={!showPanel} view={view} onSelect={show} />
-            </Suspense>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
+        {inspected && <RendererReady />}
+      </Suspense>
 
       <StatusBar
         status={status}
@@ -388,4 +388,15 @@ function LoadingSurface({ overlay = false }: { overlay?: boolean }) {
       {t('common.loading')}
     </div>
   )
+}
+
+/** Cancel native recovery only after the critical startup surface resolved. */
+function RendererReady() {
+  useEffect(() => {
+    void ipc.rendererReady(rendererDocument).catch(() => {
+      // Browser previews have no native recovery channel. The committed UI is
+      // still visible, and a desktop window keeps its Rust deadline on failure.
+    })
+  }, [])
+  return null
 }

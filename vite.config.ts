@@ -47,6 +47,7 @@ export default defineConfig({
         'src/lib/external-url.ts',
         'src/lib/fuzzy.ts',
         'src/lib/lifecycle.ts',
+        'src/lib/renderer-recovery.ts',
         'src/lib/updater.ts',
         'src/lib/usage.ts',
         'src/state/rates.ts',

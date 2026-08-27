@@ -38,4 +38,16 @@ describe('presentation preference', () => {
     const { usePresentation } = await import('@/state/presentation')
     expect(usePresentation.getState().mode).toBe('extended')
   })
+
+  it('preserves the 0.7.8 advanced value and safely rejects unknown values', async () => {
+    stored.set('dsh-studio.presentation', 'advanced')
+    vi.resetModules()
+    let presentation = await import('@/state/presentation')
+    expect(presentation.usePresentation.getState().mode).toBe('advanced')
+
+    stored.set('dsh-studio.presentation', 'future-mode')
+    vi.resetModules()
+    presentation = await import('@/state/presentation')
+    expect(presentation.usePresentation.getState().mode).toBe('compatibility')
+  })
 })

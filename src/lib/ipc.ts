@@ -1018,8 +1018,13 @@ export const frontendCrash = (payload: {
   url: string
 }): Promise<void> => invoke('report_frontend_crash', payload)
 
-/** Mark this window healthy only after React committed the application root. */
-export const rendererReady = (): Promise<void> => invoke('renderer_ready')
+/** Mark this document healthy only after its critical startup surface committed. */
+export const rendererReady = (document: string): Promise<void> =>
+  invoke('renderer_ready', { document })
+
+/** Rearm native recovery before replacing the current document. */
+export const rendererReloading = (document: string): Promise<void> =>
+  invoke('renderer_reloading', { document })
 const APPLICATION_CHECK_UPDATE = 'application://check-update'
 
 /** The native macOS application menu asked for an interactive update check. */

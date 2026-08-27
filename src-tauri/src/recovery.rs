@@ -5,7 +5,7 @@
 //! document is a pair of static files bundled beside `index.html`; it does not
 //! import the application bundle, start Harness, execute Node, or use a network.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -29,20 +29,34 @@ pub struct RendererFailure {
 
 #[derive(Default)]
 pub struct RendererHealth {
-    ready: Mutex<HashSet<String>>,
+    windows: Mutex<HashMap<String, WindowHealth>>,
     failure: Mutex<Option<RendererFailure>>,
 }
 
+#[derive(Default)]
+struct WindowHealth {
+    generation: u64,
+    ready: bool,
+    document: Option<String>,
+}
+
 impl RendererHealth {
-    fn watch(&self, label: &str) {
-        if let Ok(mut ready) = self.ready.lock() {
-            ready.remove(label);
-        }
+    fn watch(&self, label: &str) -> u64 {
+        let Ok(mut windows) = self.windows.lock() else {
+            return 0;
+        };
+        let state = windows.entry(label.to_string()).or_default();
+        state.generation = state.generation.saturating_add(1);
+        state.ready = false;
+        state.document = None;
+        state.generation
     }
 
-    fn ready(&self, label: &str) {
-        if let Ok(mut ready) = self.ready.lock() {
-            ready.insert(label.to_string());
+    fn ready(&self, label: &str, document: String) {
+        if let Ok(mut windows) = self.windows.lock() {
+            let state = windows.entry(label.to_string()).or_default();
+            state.ready = true;
+            state.document = Some(document);
         }
         if let Ok(mut failure) = self.failure.lock() {
             if failure
@@ -54,13 +68,34 @@ impl RendererHealth {
         }
     }
 
-    fn fail_if_pending(&self, label: &str, reason: &str) -> Option<RendererFailure> {
-        if self
-            .ready
+    fn rearm(&self, label: &str, document: &str) -> Option<u64> {
+        let mut windows = self.windows.lock().ok()?;
+        let state = windows.get_mut(label)?;
+        if state.document.as_deref() != Some(document) {
+            return None;
+        }
+        state.generation = state.generation.saturating_add(1);
+        state.ready = false;
+        Some(state.generation)
+    }
+
+    fn fail_if_pending(
+        &self,
+        label: &str,
+        generation: u64,
+        reason: &str,
+    ) -> Option<RendererFailure> {
+        let pending = self
+            .windows
             .lock()
-            .map(|ready| ready.contains(label))
-            .unwrap_or(false)
-        {
+            .ok()
+            .and_then(|windows| {
+                windows
+                    .get(label)
+                    .map(|state| state.generation == generation && !state.ready)
+            })
+            .unwrap_or(false);
+        if !pending {
             return None;
         }
         let failure = RendererFailure {
@@ -71,6 +106,11 @@ impl RendererHealth {
             *current = Some(failure.clone());
         }
         Some(failure)
+    }
+
+    fn fail_current(&self, label: &str, reason: &str) -> Option<RendererFailure> {
+        let generation = self.windows.lock().ok()?.get(label)?.generation;
+        self.fail_if_pending(label, generation, reason)
     }
 
     fn failure(&self) -> Option<RendererFailure> {
@@ -86,12 +126,17 @@ fn bounded_reason(reason: &str) -> String {
 pub fn watch<R: Runtime>(window: &WebviewWindow<R>) {
     let label = window.label().to_string();
     let app = window.app_handle().clone();
-    app.state::<RendererHealth>().watch(&label);
+    let generation = app.state::<RendererHealth>().watch(&label);
+    watch_generation(app, label, generation);
+}
+
+fn watch_generation<R: Runtime>(app: AppHandle<R>, label: String, generation: u64) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(DEADLINE).await;
         let health = app.state::<RendererHealth>();
         if let Some(failure) = health.fail_if_pending(
             &label,
+            generation,
             "the application renderer did not complete its first frame",
         ) {
             show(&app, &failure);
@@ -101,18 +146,43 @@ pub fn watch<R: Runtime>(window: &WebviewWindow<R>) {
 
 /// First committed React frame. Idempotent because Strict Mode mounts twice in development.
 #[tauri::command]
-pub fn renderer_ready(window: WebviewWindow, health: tauri::State<RendererHealth>) {
-    health.ready(window.label());
+pub fn renderer_ready(
+    window: WebviewWindow,
+    health: tauri::State<RendererHealth>,
+    document: String,
+) {
+    health.ready(window.label(), document);
     if let Some(recovery) = window.app_handle().get_webview_window(LABEL) {
         let _ = recovery.close();
     }
+}
+
+/// Re-arm the native deadline immediately before a renderer document reloads.
+///
+/// A stale split chunk can fail after the first React commit, when the normal
+/// watchdog has already been cancelled. The next document must get its own
+/// deadline, and the old timer must not be allowed to race it.
+#[tauri::command]
+pub fn renderer_reloading(
+    window: WebviewWindow,
+    health: tauri::State<RendererHealth>,
+    document: String,
+) {
+    let Some(generation) = health.rearm(window.label(), &document) else {
+        return;
+    };
+    watch_generation(
+        window.app_handle().clone(),
+        window.label().to_string(),
+        generation,
+    );
 }
 
 /// Uncaught startup failure captured before the renderer became healthy.
 pub fn renderer_failed<R: Runtime>(window: &WebviewWindow<R>, reason: &str) {
     let app = window.app_handle();
     let health = app.state::<RendererHealth>();
-    if let Some(failure) = health.fail_if_pending(window.label(), reason) {
+    if let Some(failure) = health.fail_current(window.label(), reason) {
         show(app, &failure);
     }
 }
@@ -193,23 +263,24 @@ mod tests {
     #[test]
     fn healthy_renderer_cannot_be_failed_by_an_old_deadline() {
         let health = RendererHealth::default();
-        health.watch("main");
-        health.ready("main");
-        assert_eq!(health.fail_if_pending("main", "late timer"), None);
+        let generation = health.watch("main");
+        health.ready("main", "document-1".into());
+        assert_eq!(
+            health.fail_if_pending("main", generation, "late timer"),
+            None
+        );
         assert_eq!(health.failure(), None);
     }
 
     #[test]
     fn retry_rearms_only_the_named_window() {
         let health = RendererHealth::default();
-        health.ready("main");
-        health.ready("work-2");
-        health.watch("work-2");
-        assert!(health
-            .fail_if_pending("main", "should stay healthy")
-            .is_none());
+        health.ready("main", "main-document".into());
+        health.ready("work-2", "work-document".into());
+        let work_generation = health.watch("work-2");
+        assert!(health.fail_current("main", "should stay healthy").is_none());
         assert_eq!(
-            health.fail_if_pending("work-2", "did not paint"),
+            health.fail_if_pending("work-2", work_generation, "did not paint"),
             Some(RendererFailure {
                 window: "work-2".into(),
                 reason: "did not paint".into(),
@@ -221,7 +292,33 @@ mod tests {
     fn failure_reason_is_bounded_before_crossing_into_static_ui() {
         let health = RendererHealth::default();
         let reason = "x".repeat(2_048);
-        let failure = health.fail_if_pending("main", &reason).unwrap();
+        let generation = health.watch("main");
+        let failure = health.fail_if_pending("main", generation, &reason).unwrap();
         assert_eq!(failure.reason.chars().count(), 1_024);
+    }
+
+    #[test]
+    fn an_old_deadline_cannot_fail_a_reloaded_document() {
+        let health = RendererHealth::default();
+        let old = health.watch("main");
+        health.ready("main", "old-document".into());
+        let current = health.watch("main");
+
+        assert_eq!(health.fail_if_pending("main", old, "old timer"), None);
+        assert!(health
+            .fail_if_pending("main", current, "current timer")
+            .is_some());
+    }
+
+    #[test]
+    fn a_late_rearm_from_an_old_document_cannot_replace_new_health() {
+        let health = RendererHealth::default();
+        health.watch("main");
+        health.ready("main", "old-document".into());
+        assert!(health.rearm("main", "old-document").is_some());
+        health.ready("main", "new-document".into());
+
+        assert_eq!(health.rearm("main", "old-document"), None);
+        assert!(health.fail_current("main", "new page is healthy").is_none());
     }
 }

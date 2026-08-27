@@ -188,6 +188,7 @@ pub fn run() {
             diagnostics::report_archive,
             diagnostics::report_frontend_crash,
             recovery::renderer_ready,
+            recovery::renderer_reloading,
             recovery::recovery_state,
             recovery::recovery_retry,
             recovery::recovery_export_diagnostics,

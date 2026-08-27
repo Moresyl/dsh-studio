@@ -9,6 +9,17 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed upgrades from 0.7.8/0.8.0 opening an empty desktop surface when the saved
+  presentation expected an upstream page but Harness was stopped. Compatibility,
+  Extended and Advanced preferences remain intact, while the local Workbench is
+  now always available whenever no upstream surface exists.
+- Split-chunk failures now rearm generation-safe native startup recovery, reload
+  at most once per window and fall back to a visible renderer error surface rather
+  than a blank or looping window. The native ready handshake waits for the critical
+  lazy startup surface, and the static document remains legible before JavaScript.
+
 ## [0.8.0] — 2026-08-25
 
 ### Added

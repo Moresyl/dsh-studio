@@ -17,6 +17,12 @@
         html:not([data-material]) {
           background: #eef1fa;
         }
+        #startup-fallback {
+          color: #596579;
+        }
+        #startup-fallback strong {
+          color: #172033;
+        }
       }
       html,
       body,
@@ -24,10 +30,36 @@
         height: 100%;
         margin: 0;
       }
+      #startup-fallback {
+        min-height: 100%;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+        color: #aeb9c8;
+        font:
+          14px/1.55 system-ui,
+          sans-serif;
+        text-align: center;
+      }
+      #startup-fallback strong {
+        display: block;
+        margin-bottom: 6px;
+        color: #e8edf5;
+        font-size: 16px;
+      }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="startup-fallback">
+        <p>
+          <strong>DSH Studio</strong>
+          界面仍在加载；如果此提示持续显示，请重新打开应用安全重试。<br />
+          The interface is still loading. If this remains, reopen the application to retry safely.
+        </p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
