@@ -282,6 +282,11 @@ mod tests {
             deprecated: None,
             repository_verified: true,
             integrity_verified: true,
+            trust: super::super::registry::TrustReport {
+                level: super::super::registry::TrustLevel::Verified,
+                signals: Vec::new(),
+            },
+            resources: super::super::registry::ResourceFootprint::default(),
         }
     }
 

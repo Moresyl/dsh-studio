@@ -314,6 +314,20 @@ export interface PluginDetail {
   deprecated: string | null
   repositoryVerified: boolean
   integrityVerified: boolean
+  trust: {
+    level: 'verified' | 'review' | 'blocked'
+    signals: Array<{
+      code: string
+      state: 'verified' | 'review' | 'blocked'
+      detail: string
+    }>
+  }
+  resources: {
+    directDependencies: number
+    unpackedBytes: number | null
+    publishedFiles: number | null
+    nativeBuildDeclared: boolean
+  }
 }
 
 export const pluginState = (): Promise<PluginState> => invoke('plugin_state')

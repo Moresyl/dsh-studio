@@ -35,6 +35,13 @@ const detail = (version: string): PluginDetail => ({
   deprecated: null,
   repositoryVerified: true,
   integrityVerified: true,
+  trust: { level: 'verified', signals: [] },
+  resources: {
+    directDependencies: 0,
+    unpackedBytes: null,
+    publishedFiles: null,
+    nativeBuildDeclared: false,
+  },
 })
 
 beforeEach(() => {

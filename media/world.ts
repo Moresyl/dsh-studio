@@ -281,6 +281,13 @@ const DETAILS: Record<string, PluginDetail> = {
     deprecated: null,
     repositoryVerified: true,
     integrityVerified: true,
+    trust: { level: 'verified', signals: [] },
+    resources: {
+      directDependencies: 0,
+      unpackedBytes: null,
+      publishedFiles: null,
+      nativeBuildDeclared: false,
+    },
   },
 }
 
@@ -306,6 +313,13 @@ const detailFor = (name: string): PluginDetail => {
     deprecated: null,
     repositoryVerified: true,
     integrityVerified: true,
+    trust: { level: 'verified', signals: [] },
+    resources: {
+      directDependencies: 0,
+      unpackedBytes: null,
+      publishedFiles: null,
+      nativeBuildDeclared: false,
+    },
   }
 }
 

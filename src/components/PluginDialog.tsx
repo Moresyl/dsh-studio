@@ -21,7 +21,7 @@ import {
 
 import { Button } from '@/components/Button'
 import { Switch } from '@/components/Switch'
-import { count, day } from '@/lib/format'
+import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { normalizeExternalUrl, openExternalUrl } from '@/lib/external-url'
 import type { InstalledPlugin } from '@/lib/ipc'
@@ -206,6 +206,106 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                 />
                 {detail.bundle ? t('plugins.declaresPatch') : t('plugins.noPatch')}
               </div>
+
+              <section className="rounded-control border border-line bg-canvas-deep/45 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck
+                      size={14}
+                      className={
+                        detail.trust.level === 'verified'
+                          ? 'text-ok'
+                          : detail.trust.level === 'review'
+                            ? 'text-warn'
+                            : 'text-danger'
+                      }
+                      aria-hidden="true"
+                    />
+                    <h3 className="text-[11.5px] font-medium text-text">
+                      {t('plugins.trust.title')}
+                    </h3>
+                  </div>
+                  <span
+                    className={[
+                      'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                      detail.trust.level === 'verified'
+                        ? 'bg-ok/15 text-ok'
+                        : detail.trust.level === 'review'
+                          ? 'bg-warn/15 text-warn'
+                          : 'bg-danger/15 text-danger',
+                    ].join(' ')}
+                  >
+                    {detail.trust.level === 'verified'
+                      ? t('plugins.trust.verified')
+                      : detail.trust.level === 'review'
+                        ? t('plugins.trust.review')
+                        : t('plugins.trust.blocked')}
+                  </span>
+                </div>
+                <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {detail.trust.signals.map((signal) => (
+                    <li
+                      key={signal.code}
+                      data-hint={signal.detail}
+                      className="flex items-center gap-2 rounded-[5px] border border-line bg-surface/55 px-2 py-1.5 text-[10.5px]"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={[
+                          'size-1.5 shrink-0 rounded-full',
+                          signal.state === 'verified'
+                            ? 'bg-ok'
+                            : signal.state === 'review'
+                              ? 'bg-warn'
+                              : 'bg-danger',
+                        ].join(' ')}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-muted">
+                        {trustSignalLabel(signal.code)}
+                      </span>
+                      <span
+                        className={
+                          signal.state === 'verified'
+                            ? 'text-ok'
+                            : signal.state === 'review'
+                              ? 'text-warn'
+                              : 'text-danger'
+                        }
+                      >
+                        {signal.state === 'verified'
+                          ? t('plugins.trust.pass')
+                          : signal.state === 'review'
+                            ? t('plugins.trust.reviewShort')
+                            : t('plugins.trust.stop')}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line pt-2 text-[10.5px]">
+                  <dt className="text-faint">{t('plugins.resources.dependencies')}</dt>
+                  <dd className="text-right tabular-nums text-muted">
+                    {detail.resources.directDependencies}
+                  </dd>
+                  <dt className="text-faint">{t('plugins.resources.size')}</dt>
+                  <dd className="text-right tabular-nums text-muted">
+                    {detail.resources.unpackedBytes === null
+                      ? t('common.unavailable')
+                      : filesize(detail.resources.unpackedBytes)}
+                  </dd>
+                  <dt className="text-faint">{t('plugins.resources.files')}</dt>
+                  <dd className="text-right tabular-nums text-muted">
+                    {detail.resources.publishedFiles ?? t('common.unavailable')}
+                  </dd>
+                  <dt className="text-faint">{t('plugins.resources.native')}</dt>
+                  <dd
+                    className={`text-right ${detail.resources.nativeBuildDeclared ? 'text-warn' : 'text-ok'}`}
+                  >
+                    {detail.resources.nativeBuildDeclared
+                      ? t('plugins.resources.declared')
+                      : t('plugins.resources.none')}
+                  </dd>
+                </dl>
+              </section>
 
               {!here && reviewing && (
                 <section className="rounded-control border border-warn/35 bg-warn/7 p-3">
@@ -503,4 +603,23 @@ function Link({ href }: { href: string }) {
       <ExternalLink size={10} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />
     </button>
   )
+}
+
+function trustSignalLabel(code: string): string {
+  switch (code) {
+    case 'harness-compatibility':
+      return t('plugins.trust.compatibility')
+    case 'registry-integrity':
+      return t('plugins.trust.integrity')
+    case 'source-identity':
+      return t('plugins.trust.identity')
+    case 'lifecycle-scripts':
+      return t('plugins.trust.lifecycle')
+    case 'publisher-status':
+      return t('plugins.trust.publisher')
+    case 'profile-patch':
+      return t('plugins.trust.patch')
+    default:
+      return code
+  }
 }

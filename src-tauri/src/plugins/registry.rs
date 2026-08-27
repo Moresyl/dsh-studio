@@ -99,6 +99,43 @@ pub struct Detail {
     pub repository_verified: bool,
     /// True only for a complete SHA-512 Subresource Integrity value.
     pub integrity_verified: bool,
+    /// Evidence-derived verdict. It deliberately avoids a numeric score: the
+    /// concrete checks below are more actionable than an invented confidence.
+    pub trust: TrustReport,
+    /// Published package footprint, shown before disk or process access.
+    pub resources: ResourceFootprint,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TrustLevel {
+    Verified,
+    Review,
+    Blocked,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustSignal {
+    pub code: String,
+    pub state: String,
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustReport {
+    pub level: TrustLevel,
+    pub signals: Vec<TrustSignal>,
+}
+
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceFootprint {
+    pub direct_dependencies: usize,
+    pub unpacked_bytes: Option<u64>,
+    pub published_files: Option<u64>,
+    pub native_build_declared: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -264,7 +301,22 @@ fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) 
             .collect()
     });
     let integrity_verified = integrity.as_deref().is_some_and(valid_sha512_integrity);
-    Detail {
+    let resources = ResourceFootprint {
+        direct_dependencies: manifest
+            .get("dependencies")
+            .and_then(serde_json::Value::as_object)
+            .map_or(0, serde_json::Map::len),
+        unpacked_bytes: manifest
+            .pointer("/dist/unpackedSize")
+            .and_then(serde_json::Value::as_u64),
+        published_files: manifest
+            .pointer("/dist/fileCount")
+            .and_then(serde_json::Value::as_u64),
+        native_build_declared: manifest.get("gypfile").and_then(serde_json::Value::as_bool)
+            == Some(true)
+            || manifest.get("binary").is_some(),
+    };
+    let mut detail = Detail {
         name: string(manifest, "name").unwrap_or_else(|| name.to_string()),
         install_spec: format!("{name}@{version}"),
         version,
@@ -289,7 +341,117 @@ fn detail_from_manifest(name: &str, source: &str, manifest: &serde_json::Value) 
         deprecated,
         repository_verified: false,
         integrity_verified,
+        trust: TrustReport {
+            level: TrustLevel::Blocked,
+            signals: Vec::new(),
+        },
+        resources,
+    };
+    refresh_trust(&mut detail);
+    detail
+}
+
+/// Recompute after the catalog command has verified repository provenance.
+pub(crate) fn refresh_trust(detail: &mut Detail) {
+    let mut signals = Vec::new();
+    let mut blocked = false;
+    let mut review = false;
+    let mut signal = |code: &str, state: &str, text: String| {
+        if state == "blocked" {
+            blocked = true;
+        } else if state == "review" {
+            review = true;
+        }
+        signals.push(TrustSignal {
+            code: code.into(),
+            state: state.into(),
+            detail: text,
+        });
+    };
+
+    match &detail.compatibility {
+        Compatibility::Compatible { requirement } => signal(
+            "harness-compatibility",
+            "verified",
+            format!("declares {requirement}"),
+        ),
+        Compatibility::Unknown => signal(
+            "harness-compatibility",
+            "review",
+            "no Harness version range declared".into(),
+        ),
+        Compatibility::Incompatible { reason, .. } => {
+            signal("harness-compatibility", "blocked", reason.clone())
+        }
     }
+    signal(
+        "registry-integrity",
+        if detail.integrity_verified {
+            "verified"
+        } else {
+            "blocked"
+        },
+        if detail.integrity_verified {
+            "complete SHA-512 package integrity".into()
+        } else {
+            "missing or weak registry integrity".into()
+        },
+    );
+    signal(
+        "source-identity",
+        if detail.repository_verified {
+            "verified"
+        } else {
+            "blocked"
+        },
+        if detail.repository_verified {
+            "catalog and registry identity agree".into()
+        } else {
+            "catalog and registry identity were not matched".into()
+        },
+    );
+    signal(
+        "lifecycle-scripts",
+        if detail.lifecycle_scripts.is_empty() {
+            "verified"
+        } else {
+            "blocked"
+        },
+        if detail.lifecycle_scripts.is_empty() {
+            "no install lifecycle scripts declared".into()
+        } else {
+            format!("declares {}", detail.lifecycle_scripts.join(", "))
+        },
+    );
+    signal(
+        "publisher-status",
+        if detail.deprecated.is_none() {
+            "verified"
+        } else {
+            "blocked"
+        },
+        detail
+            .deprecated
+            .clone()
+            .unwrap_or_else(|| "not deprecated by the publisher".into()),
+    );
+    if !detail.bundle {
+        signal(
+            "profile-patch",
+            "review",
+            "package declares no DSH profile patch".into(),
+        );
+    }
+    detail.trust = TrustReport {
+        level: if blocked {
+            TrustLevel::Blocked
+        } else if review {
+            TrustLevel::Review
+        } else {
+            TrustLevel::Verified
+        },
+        signals,
+    };
 }
 
 fn valid_sha512_integrity(value: &str) -> bool {
@@ -491,8 +653,8 @@ fn string(value: &serde_json::Value, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        compatibility, detail_from_manifest, exact_requested_version, listing, repository_identity,
-        validate_preflight, Compatibility,
+        compatibility, detail_from_manifest, exact_requested_version, listing, refresh_trust,
+        repository_identity, validate_preflight, Compatibility, TrustLevel,
     };
 
     #[test]
@@ -644,6 +806,40 @@ mod tests {
             }),
         );
         assert!(validate_preflight(&deprecated).is_err());
+    }
+
+    #[test]
+    fn trust_report_and_resource_footprint_are_derived_from_install_evidence() {
+        let integrity = format!("sha512-{}==", "A".repeat(86));
+        let mut detail = detail_from_manifest(
+            "safe-plugin",
+            "npm",
+            &serde_json::json!({
+                "name": "safe-plugin",
+                "version": "1.2.3",
+                "peerDependencies": { "@deepseek-ai/dsh": "^0.1.1-rc.1" },
+                "dependencies": { "one": "1.0.0", "two": "2.0.0" },
+                "dsh": { "bundle": { "patch": [] } },
+                "dist": {
+                    "integrity": integrity,
+                    "unpackedSize": 12345,
+                    "fileCount": 17
+                }
+            }),
+        );
+        detail.repository_verified = true;
+        refresh_trust(&mut detail);
+
+        assert!(matches!(detail.trust.level, TrustLevel::Verified));
+        assert_eq!(detail.trust.signals.len(), 5);
+        assert_eq!(detail.resources.direct_dependencies, 2);
+        assert_eq!(detail.resources.unpacked_bytes, Some(12345));
+        assert_eq!(detail.resources.published_files, Some(17));
+        assert!(!detail.resources.native_build_declared);
+
+        detail.lifecycle_scripts.push("postinstall".into());
+        refresh_trust(&mut detail);
+        assert!(matches!(detail.trust.level, TrustLevel::Blocked));
     }
 
     #[test]

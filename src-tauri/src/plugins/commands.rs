@@ -549,6 +549,7 @@ async fn reviewed_detail(
         // npm is the authority being compared with itself; no third-party
         // catalog repository assertion exists in this view.
         detail.repository_verified = true;
+        super::registry::refresh_trust(&mut detail);
         return Ok(detail);
     }
     let source = super::catalog::sources()
@@ -579,6 +580,7 @@ async fn reviewed_detail(
                 .and_then(super::registry::repository_identity),
         )
         .is_some_and(|(catalog, registry)| catalog == registry);
+    super::registry::refresh_trust(&mut detail);
     if enforce && !detail.repository_verified {
         return Err(Error::Plugin(
             "the npm package repository did not match the selected catalog".into(),

@@ -253,6 +253,13 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         deprecated: null,
         repositoryVerified: false,
         integrityVerified: false,
+        trust: { level: 'review', signals: [] },
+        resources: {
+          directDependencies: 0,
+          unpackedBytes: null,
+          publishedFiles: null,
+          nativeBuildDeclared: false,
+        },
       },
       loadingDetail: false,
       previewing: false,
