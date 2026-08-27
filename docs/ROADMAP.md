@@ -2,15 +2,12 @@
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-08-26. The refreshed benchmark head is
-`anywhere-labs/dsh-desktop` at
-`2172b1b2f2b0de4c2b3a1d8b55f11f8083a9305e`, with its Harness submodule at
-`b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` (`dsh-v0.1.1-rc.2`). Its current
-package identifies itself as 2.0.3 even though the preceding verified snapshot
-`bd5ba85a275258318134632b3cc13d6b5ea8088b` identified itself as Benchmark
-2.0.4, so this comparison uses commit identity rather than treating the
-non-monotonic package field as a release ordering. The DSH Studio comparison
-started at `9d608e7245e74662a67fe754222fd1b845270092`.
+Updated 2026-08-28. The refreshed benchmark head is
+`dataelement/dsh-desktop` at
+`c52f450d61a0efd33e63a9e8efa629b3cfe3cd9e`, with the official Harness head at
+`b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` (`dsh-v0.1.1-rc.2`). The benchmark
+package identifies itself as 0.1.1; commit identity remains the comparison key.
+The DSH Studio comparison started at `9d608e7245e74662a67fe754222fd1b845270092`.
 
 The product-depth review also sampled `vastsa/PI-Desktop`,
 `jasonsuhari/gridbash`, `wess/sinclair`, `BraydenPB/agent-grid`,
@@ -37,9 +34,9 @@ The remaining gaps are concentrated in:
    signed macOS install, update, notification, login item, or terminal flow.
 3. **Packaged UI automation:** logic coverage and a real Harness boot gate exist,
    but final installers still need repeatable WebView/window interaction smoke.
-4. **Parallel-agent workspace depth:** Harness already owns subagents and Studio
-   owns real PTYs, but Studio does not yet provide worktree-first isolation,
-   persistent split layouts, or a native review/merge surface for several agents.
+4. **Parallel-agent workspace depth:** native worktree discovery and creation are
+   delivered; persistent split layouts and a guarded native review/merge surface
+   for several agents remain.
 
 ## Current capability matrix
 
@@ -55,7 +52,7 @@ The remaining gaps are concentrated in:
 | Plugin market           | Built-in Community Market                 | Multi-source catalogs, pagination/limits, exact npm revalidation, preview token, integrity receipt, transaction rollback and UI errors |
 | Catalog health          | Source management and tests               | Native contract/latency/installability health checks for npm, dshfind, 1024Store and custom sources                                    |
 | Terminal                | Built in                                  | PTY, Unicode 11 and process-tree ownership; no external CMD flash                                                                      |
-| Parallel agent workspace | Upstream subagents                        | Harness subagents and tabbed PTYs today; native worktree isolation, persistent splits and orchestration review remain planned          |
+| Parallel agent workspace | Upstream subagents                        | Harness subagents, tabbed PTYs and native Git worktree isolation; persistent splits and guarded orchestration review remain planned     |
 | Mobile remote           | Planned                                   | Delivered: loopback Harness plus separate LAN gateway, one-use QR and revocable per-device credentials                                 |
 | Sessions                | Primarily upstream UI                     | Local full-text search, project filter, per-model token/cost reports and Markdown/HTML/JSON export                                     |
 | Usage controls          | Upstream session UI                       | Local monthly budget status, complete-price guard and spreadsheet-safe daily CSV trend export                                          |
@@ -125,9 +122,10 @@ still depends on verifying the tagged pipeline, public assets, updater signature
 
 ### P1 — isolated agent workspaces
 
-- Add a bounded native worktree registry: repository preflight, explicit branch
-  identity, collision-safe paths, durable ownership receipts and recovery after
-  interrupted create/remove. Never delete a dirty or externally owned worktree.
+- Native worktree discovery, repository preflight, explicit safe branch identity
+  and collision-safe sibling creation are delivered. Durable ownership receipts,
+  interrupted-operation recovery and guarded removal remain; Studio still never
+  deletes a dirty or externally owned worktree.
 - Associate each managed terminal/session with one workspace identity. Restore
   layout and launch intent after restart, but do not claim that killed child
   processes survived application exit.
