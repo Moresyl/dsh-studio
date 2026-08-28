@@ -50,10 +50,7 @@ test('form controls need ARIA, an associated label, or a wrapping label', () => 
     ),
     [],
   )
-  assert.deepEqual(
-    validateAccessibilitySource('fixture.tsx', '<label>Search<input /></label>'),
-    [],
-  )
+  assert.deepEqual(validateAccessibilitySource('fixture.tsx', '<label>Search<input /></label>'), [])
 })
 
 test('repository accessibility contracts stay enforced', async () => {

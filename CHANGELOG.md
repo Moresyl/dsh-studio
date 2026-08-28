@@ -9,6 +9,8 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-28
+
 ### Added
 
 - Added an isolated Studio-owned Safe Mode Profile that rebuilds only the official
@@ -768,7 +770,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...v0.8.0
 [0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7

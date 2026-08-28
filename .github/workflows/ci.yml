@@ -9,6 +9,25 @@ permissions:
   contents: read
 
 jobs:
+  supply-chain:
+    name: Supply-chain audit
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-audit
+      - name: Audit production JavaScript dependencies
+        run: pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org/
+      - name: Audit Rust dependencies
+        run: cargo audit --file src-tauri/Cargo.lock
+
   runtime-contract:
     name: Cold runtime install and full profile boot (${{ matrix.os }})
     strategy:

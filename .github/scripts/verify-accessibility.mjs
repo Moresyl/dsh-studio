@@ -28,7 +28,9 @@ function hasAccessibleName(opening, children) {
     if (ts.isJsxText(child)) return child.text.trim().length > 0
     if (ts.isJsxExpression(child)) return child.expression !== undefined
     if (ts.isJsxElement(child)) {
-      return !isHidden(child.openingElement) && hasAccessibleName(child.openingElement, child.children)
+      return (
+        !isHidden(child.openingElement) && hasAccessibleName(child.openingElement, child.children)
+      )
     }
     return false
   })
@@ -84,12 +86,16 @@ export function validateAccessibilitySource(path, source) {
       const named = hasAccessibleName(opening, node.children)
 
       if ((tag === 'button' || tag === 'Button') && !named) {
-        problems.push(`${path}:${file.getLineAndCharacterOfPosition(node.getStart()).line + 1} button has no accessible name`)
+        problems.push(
+          `${path}:${file.getLineAndCharacterOfPosition(node.getStart()).line + 1} button has no accessible name`,
+        )
       }
       if (role === 'button') {
         const line = file.getLineAndCharacterOfPosition(node.getStart()).line + 1
-        if (!attribute(opening, 'tabIndex')) problems.push(`${path}:${line} role=button has no tabIndex`)
-        if (!attribute(opening, 'onKeyDown')) problems.push(`${path}:${line} role=button has no keyboard handler`)
+        if (!attribute(opening, 'tabIndex'))
+          problems.push(`${path}:${line} role=button has no tabIndex`)
+        if (!attribute(opening, 'onKeyDown'))
+          problems.push(`${path}:${line} role=button has no keyboard handler`)
         if (!named) problems.push(`${path}:${line} role=button has no accessible name`)
       }
       if (role === 'dialog' || role === 'alertdialog') {
@@ -130,7 +136,11 @@ export async function verifyAccessibility(root = DEFAULT_ROOT) {
   }
 
   const styles = await readFile(join(root, 'src/styles/app.css'), 'utf8')
-  for (const marker of [':focus-visible', 'prefers-reduced-motion: reduce', 'forced-colors: active']) {
+  for (const marker of [
+    ':focus-visible',
+    'prefers-reduced-motion: reduce',
+    'forced-colors: active',
+  ]) {
     if (!styles.includes(marker)) problems.push(`src/styles/app.css is missing ${marker}`)
   }
 
@@ -142,6 +152,8 @@ export async function verifyAccessibility(root = DEFAULT_ROOT) {
 
 const invoked = process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href
 if (invoked) {
-  const result = await verifyAccessibility(process.argv[2] ? resolve(process.argv[2]) : DEFAULT_ROOT)
+  const result = await verifyAccessibility(
+    process.argv[2] ? resolve(process.argv[2]) : DEFAULT_ROOT,
+  )
   console.log(`verified accessibility contracts across ${result.files} TSX files`)
 }

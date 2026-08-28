@@ -19,11 +19,13 @@ export function validateBundleInventory(files, entryName) {
   const terminals = files.filter(
     (file) => file.name.startsWith('terminals-') && file.name.endsWith('.js'),
   )
-  if (terminals.length !== 1) problems.push('exactly one lazy terminal JavaScript chunk is required')
+  if (terminals.length !== 1)
+    problems.push('exactly one lazy terminal JavaScript chunk is required')
   else if (terminals[0].size > TERMINAL_CEILING) {
     problems.push(`terminal chunk is ${terminals[0].size} bytes; limit is ${TERMINAL_CEILING}`)
   }
-  if (entryName.startsWith('terminals-')) problems.push('the terminal chunk cannot be the entry script')
+  if (entryName.startsWith('terminals-'))
+    problems.push('the terminal chunk cannot be the entry script')
   return problems
 }
 

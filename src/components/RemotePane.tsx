@@ -100,7 +100,11 @@ export function RemotePane() {
             }}
             size={6}
           />
-          {isOpen ? t('remote.state.open') : suspended ? t('remote.state.reconnecting') : t('remote.state.closed')}
+          {isOpen
+            ? t('remote.state.open')
+            : suspended
+              ? t('remote.state.reconnecting')
+              : t('remote.state.closed')}
         </span>
 
         {isOpen ? (
@@ -126,7 +130,7 @@ export function RemotePane() {
               </>
             ) : (
               <>
-              <Wifi size={13} strokeWidth={2.3} />
+                <Wifi size={13} strokeWidth={2.3} />
                 {t('remote.open')}
               </>
             )}

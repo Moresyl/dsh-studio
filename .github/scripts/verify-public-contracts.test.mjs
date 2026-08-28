@@ -26,7 +26,10 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
     /broad process:default/,
   )
   assert.throws(
-    () => validateCapabilities({ permissions: permissions.filter((item) => item !== 'dialog:allow-save') }),
+    () =>
+      validateCapabilities({
+        permissions: permissions.filter((item) => item !== 'dialog:allow-save'),
+      }),
     /dialog:allow-save/,
   )
 })
@@ -73,6 +76,6 @@ test('repository public contracts agree end to end', async () => {
     protocol: 3,
     hostProtocol: 1,
     schema: '1.0.0',
-    version: '0.8.0',
+    version: '0.9.0',
   })
 })

@@ -29,7 +29,9 @@ describe('terminal clipboard shortcuts', () => {
 
   it('rejects extra modifiers and keyup events', () => {
     expect(clipboardAction(key('c', { metaKey: true, shiftKey: true }), true)).toBeNull()
-    expect(clipboardAction(key('c', { ctrlKey: true, shiftKey: true, altKey: true }), false)).toBeNull()
+    expect(
+      clipboardAction(key('c', { ctrlKey: true, shiftKey: true, altKey: true }), false),
+    ).toBeNull()
     expect(clipboardAction({ ...key('c', { metaKey: true }), type: 'keyup' }, true)).toBeNull()
   })
 })

@@ -34,7 +34,10 @@ describe('renderer crash evidence', () => {
 
     expect(report).toHaveBeenCalledTimes(2)
     expect(report).toHaveBeenNthCalledWith(1, expect.objectContaining({ message: 'render failed' }))
-    expect(report).toHaveBeenNthCalledWith(2, expect.objectContaining({ message: 'promise failed' }))
+    expect(report).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ message: 'promise failed' }),
+    )
 
     dispose()
     target.dispatchEvent(rejection)

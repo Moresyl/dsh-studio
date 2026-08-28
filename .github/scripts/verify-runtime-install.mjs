@@ -9,6 +9,10 @@ const expectedPnpm = '11.7.0'
 const directory = await mkdtemp(join(tmpdir(), 'dsh-runtime-contract-'))
 
 try {
+  const studioVersion = JSON.parse(await readFile('package.json', 'utf8')).version
+  if (!/^\d+\.\d+\.\d+$/.test(studioVersion ?? '')) {
+    throw new Error('Studio package.json has no stable semantic version')
+  }
   const npm =
     process.platform === 'win32'
       ? {
@@ -87,7 +91,7 @@ try {
     entry,
     runtimeRoot: directory,
     dshHome,
-    studioVersion: '0.8.0',
+    studioVersion,
     harnessVersion: expected,
   })
   console.log(

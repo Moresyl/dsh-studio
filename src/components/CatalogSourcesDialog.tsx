@@ -78,72 +78,71 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
               const health = sourceHealth[source.id]
               return (
                 <li
-                key={source.id}
-                className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-[12px] font-medium text-text">
-                      {source.label}
-                    </span>
-                    {source.active && (
-                      <span className="rounded-full bg-ok/10 px-1.5 py-0.5 text-[9.5px] text-ok">
-                        {t('plugins.sources.active')}
+                  key={source.id}
+                  className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-[12px] font-medium text-text">
+                        {source.label}
                       </span>
-                    )}
-                    {source.builtIn && (
-                      <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9.5px] text-faint">
-                        {t('plugins.builtin')}
-                      </span>
+                      {source.active && (
+                        <span className="rounded-full bg-ok/10 px-1.5 py-0.5 text-[9.5px] text-ok">
+                          {t('plugins.sources.active')}
+                        </span>
+                      )}
+                      {source.builtIn && (
+                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9.5px] text-faint">
+                          {t('plugins.builtin')}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 truncate font-mono text-[10px] text-faint">
+                      {source.endpoint ?? source.kind}
+                    </p>
+                    {health && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9.5px] text-faint">
+                        <span className="inline-flex items-center gap-1 text-ok">
+                          <CheckCircle2 size={10} aria-hidden="true" />
+                          {t('plugins.sources.conformant')}
+                        </span>
+                        <span>{health.contract}</span>
+                        <span>
+                          {health.installable}/{health.items} {t('plugins.sources.installable')}
+                        </span>
+                        <span>{health.latencyMs} ms</span>
+                        {health.warnings.map((warning) => (
+                          <span key={warning} className="w-full text-warn">
+                            {warning}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <p className="mt-1 truncate font-mono text-[10px] text-faint">
-                    {source.endpoint ?? source.kind}
-                  </p>
-                  {health && (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9.5px] text-faint">
-                      <span className="inline-flex items-center gap-1 text-ok">
-                        <CheckCircle2 size={10} aria-hidden="true" />
-                        {t('plugins.sources.conformant')}
-                      </span>
-                      <span>{health.contract}</span>
-                      <span>
-                        {health.installable}/{health.items}{' '}
-                        {t('plugins.sources.installable')}
-                      </span>
-                      <span>{health.latencyMs} ms</span>
-                      {health.warnings.map((warning) => (
-                        <span key={warning} className="w-full text-warn">
-                          {warning}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void checkSource(source.id)}
-                  disabled={sourceWorking || checkingSource !== null}
-                  aria-label={t('plugins.sources.check')}
-                  className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-brand/10 hover:text-brand disabled:opacity-50"
-                >
-                  {checkingSource === source.id ? (
-                    <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-                  ) : (
-                    <RefreshCw size={13} aria-hidden="true" />
-                  )}
-                </button>
-                {!source.builtIn && (
                   <button
                     type="button"
-                    onClick={() => void removeSource(source.id)}
-                    disabled={sourceWorking}
-                    aria-label={t('plugins.sources.remove')}
-                    className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-danger/10 hover:text-danger"
+                    onClick={() => void checkSource(source.id)}
+                    disabled={sourceWorking || checkingSource !== null}
+                    aria-label={t('plugins.sources.check')}
+                    className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-brand/10 hover:text-brand disabled:opacity-50"
                   >
-                    <Trash2 size={13} aria-hidden="true" />
+                    {checkingSource === source.id ? (
+                      <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                    ) : (
+                      <RefreshCw size={13} aria-hidden="true" />
+                    )}
                   </button>
-                )}
+                  {!source.builtIn && (
+                    <button
+                      type="button"
+                      onClick={() => void removeSource(source.id)}
+                      disabled={sourceWorking}
+                      aria-label={t('plugins.sources.remove')}
+                      className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-danger/10 hover:text-danger"
+                    >
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  )}
                 </li>
               )
             })}
@@ -180,9 +179,7 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
               <Button
                 type="submit"
                 variant="primary"
-                disabled={
-                  adding || sourceWorking || label.trim() === '' || endpoint.trim() === ''
-                }
+                disabled={adding || sourceWorking || label.trim() === '' || endpoint.trim() === ''}
               >
                 {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
                 {adding ? t('plugins.sources.validating') : t('plugins.sources.addAction')}

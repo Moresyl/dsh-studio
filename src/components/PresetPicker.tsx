@@ -107,7 +107,11 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
             disabled={!chosen || chosenPreset?.shipped !== false || transferring !== null}
             onClick={() => void exportPreset()}
           >
-            {transferring === 'export' ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+            {transferring === 'export' ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Download size={12} />
+            )}
             {t('preset.export')}
           </button>
           <button
@@ -116,7 +120,11 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
             disabled={transferring !== null}
             onClick={() => void importPreset()}
           >
-            {transferring === 'import' ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+            {transferring === 'import' ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Upload size={12} />
+            )}
             {t('preset.import')}
           </button>
           <span className="inline-flex items-center gap-1 text-[10.5px] text-faint">

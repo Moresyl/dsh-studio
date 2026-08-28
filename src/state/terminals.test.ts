@@ -220,9 +220,9 @@ describe('opening a shell', () => {
     finish(shell('early-failed'))
     await opening
 
-    expect(
-      useTerminals.getState().tabs.find((tab) => tab.id === 'early-failed')?.exit,
-    ).toEqual({ code: 7 })
+    expect(useTerminals.getState().tabs.find((tab) => tab.id === 'early-failed')?.exit).toEqual({
+      code: 7,
+    })
     expect(screens.retire).toHaveBeenCalledWith('early-failed', 7)
   })
 })

@@ -313,7 +313,8 @@ const en = {
   'remote.state.open': 'Open',
   'remote.state.reconnecting': 'Reconnecting',
   'remote.reconnect': 'Reconnect',
-  'remote.reconnectingHint': 'Harness is restarting. The LAN listener is paused and will resume automatically; paired devices remain authorized in memory.',
+  'remote.reconnectingHint':
+    'Harness is restarting. The LAN listener is paused and will resume automatically; paired devices remain authorized in memory.',
   'remote.state.closed': 'Closed',
   'remote.needsHarness': 'Start the harness first — there is nothing to reach yet.',
   'remote.scan': 'Scan to pair',
@@ -405,11 +406,13 @@ const en = {
   'sessions.jump': 'Open the session here',
   'sessions.tab.list': 'Sessions',
   'sessions.tab.archived': 'Archived',
-  'sessions.archiveSubtitle': 'Sessions hidden from the active shelf; Harness logs remain untouched.',
+  'sessions.archiveSubtitle':
+    'Sessions hidden from the active shelf; Harness logs remain untouched.',
   'sessions.archive': 'Archive',
   'sessions.restore': 'Restore',
   'sessions.archiveEmpty': 'No archived sessions',
-  'sessions.archiveEmptyHint': 'Archive a session to hide it from the active shelf without deleting its Harness log.',
+  'sessions.archiveEmptyHint':
+    'Archive a session to hide it from the active shelf without deleting its Harness log.',
   'sessions.tab.usage': 'Usage',
   'sessions.export': 'Export',
   'sessions.exportHint': 'Copy this conversation, or save it as a file',
@@ -1001,7 +1004,8 @@ const zh: Record<MessageKey, string> = {
   'remote.state.open': '已开启',
   'remote.state.reconnecting': '正在重连',
   'remote.reconnect': '重新连接',
-  'remote.reconnectingHint': 'Harness 正在重启，局域网连接暂时暂停，恢复后会自动重连；已配对设备仍保留在内存中。',
+  'remote.reconnectingHint':
+    'Harness 正在重启，局域网连接暂时暂停，恢复后会自动重连；已配对设备仍保留在内存中。',
   'remote.state.closed': '已关闭',
   'remote.needsHarness': '请先启动 Harness，否则没有可访问的服务。',
   'remote.scan': '扫码配对',
@@ -1175,7 +1179,8 @@ const zh: Record<MessageKey, string> = {
   'worktrees.branchPlaceholder': 'agent/task-name',
   'worktrees.create': '创建工作树',
   'worktrees.creating': '正在创建…',
-  'worktrees.guard': '工作树从当前 HEAD 创建；DSH Studio 不会强制删除，审查与合并仍使用正常 Git 流程。',
+  'worktrees.guard':
+    '工作树从当前 HEAD 创建；DSH Studio 不会强制删除，审查与合并仍使用正常 Git 流程。',
   'worktrees.primary': '主工作树',
   'worktrees.dirty': '有未提交修改',
   'worktrees.use': '切换工作区',

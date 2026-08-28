@@ -327,9 +327,7 @@ export function RecoveryCenter() {
                 ) : (
                   <LifeBuoy size={13} aria-hidden="true" />
                 )}
-                {working === 'safe-mode'
-                  ? t('recovery.safeModeStarting')
-                  : t('recovery.safeMode')}
+                {working === 'safe-mode' ? t('recovery.safeModeStarting') : t('recovery.safeMode')}
               </Button>
               <Button variant="ghost" disabled={working !== null} onClick={() => void dismiss()}>
                 {t('recovery.continue')}

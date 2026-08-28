@@ -69,9 +69,7 @@ export function WorktreeManager() {
         <GitBranch size={15} className="mt-0.5 shrink-0 text-brand" aria-hidden="true" />
         <div className="min-w-0 flex-1">
           <h3 className="text-[12.5px] font-medium text-text">{t('worktrees.title')}</h3>
-          <p className="mt-1 text-[11.5px] leading-relaxed text-faint">
-            {t('worktrees.subtitle')}
-          </p>
+          <p className="mt-1 text-[11.5px] leading-relaxed text-faint">{t('worktrees.subtitle')}</p>
         </div>
         <Button variant="ghost" disabled={loading || creating} onClick={() => void refresh()}>
           {loading ? <Loader2 size={12} className="animate-spin" /> : t('action.recheck')}

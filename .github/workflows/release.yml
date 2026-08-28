@@ -16,8 +16,79 @@ permissions:
   contents: write
 
 jobs:
+  quality:
+    name: Release quality and supply-chain gate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-audit
+      - name: Enforce release identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          expected="v$version"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error title=Version mismatch::Tag $GITHUB_REF_NAME does not match $expected."
+            exit 1
+          fi
+          existing_target="$(gh release view "$expected" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
+          if [ -n "$existing_target" ] && [ "$existing_target" != "$GITHUB_SHA" ]; then
+            existing_commit="$(git rev-parse "$existing_target^{commit}" 2>/dev/null || true)"
+            if [ "$existing_commit" != "$GITHUB_SHA" ]; then
+              echo "::error title=Release already exists::$expected already targets $existing_target; refusing to overwrite it from $GITHUB_SHA. Bump the application version before publishing."
+              exit 1
+            fi
+          fi
+          test -s ".github/release-notes/$version.zh-CN.md" || { echo "::error::Missing detailed Chinese release notes for $version"; exit 1; }
+          test -s ".github/release-notes/$version.en.md" || { echo "::error::Missing English release notes for $version"; exit 1; }
+          node .github/scripts/release-notes.mjs >/dev/null
+          if [ -z "$UPDATER_KEY" ]; then
+            echo "::error title=Updater signing required::TAURI_SIGNING_PRIVATE_KEY must be configured before a formal release."
+            exit 1
+          fi
+      - name: Install Linux dependencies
+        run: |
+          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
+          sudo apt-get update -o Acquire::Retries=3
+          sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:release
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
+      - name: Audit production JavaScript dependencies
+        run: pnpm audit --prod --audit-level high --registry=https://registry.npmjs.org/
+      - name: Audit Rust dependencies
+        run: cargo audit --file src-tauri/Cargo.lock
+
+  runtime-contract:
+    name: Release runtime boot (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-2025, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.19.0
+      - run: node .github/scripts/verify-runtime-install.mjs
+
   publish:
     name: Build (${{ matrix.name }})
+    needs: [quality, runtime-contract]
     strategy:
       fail-fast: false
       matrix:
@@ -51,25 +122,6 @@ jobs:
           sudo apt-get install -y libarchive-tools libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
 
       - run: pnpm install --frozen-lockfile
-
-      - name: Enforce release contract
-        shell: bash
-        env:
-          UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-        run: |
-          version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
-          expected="v$version"
-          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$expected" ]; then
-            echo "::error title=Version mismatch::Tag $GITHUB_REF_NAME does not match $expected."
-            exit 1
-          fi
-          test -s ".github/release-notes/$version.zh-CN.md" || { echo "::error::Missing detailed Chinese release notes for $version"; exit 1; }
-          test -s ".github/release-notes/$version.en.md" || { echo "::error::Missing English release notes for $version"; exit 1; }
-          node .github/scripts/release-notes.mjs >/dev/null
-          if [ -z "$UPDATER_KEY" ]; then
-            echo "::error title=Updater signing required::TAURI_SIGNING_PRIVATE_KEY must be configured before a formal release."
-            exit 1
-          fi
 
       # This step exists rather than an `env:` block on
       # the build step. An unset secret interpolates to an empty string, and the

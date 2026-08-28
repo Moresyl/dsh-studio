@@ -9,6 +9,8 @@
 
 ## [未发布]
 
+## [0.9.0] —— 2026-08-28
+
 ### 新增
 
 - 新增 Studio 自有的隔离安全模式 Profile：只重建官方 base/web 层，不会接管没有
@@ -639,7 +641,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...v0.8.0
 [0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/Moresyl/dsh-studio/compare/v0.7.6...v0.7.7

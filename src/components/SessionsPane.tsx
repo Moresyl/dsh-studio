@@ -203,7 +203,13 @@ export function SessionsPane() {
     <section className="flex min-h-0 flex-1 animate-rise flex-col bg-canvas">
       <PaneHeader
         title={t('sessions.title')}
-        subtitle={tab === 'usage' ? t('usage.subtitle') : tab === 'archived' ? t('sessions.archiveSubtitle') : t('sessions.subtitle')}
+        subtitle={
+          tab === 'usage'
+            ? t('usage.subtitle')
+            : tab === 'archived'
+              ? t('sessions.archiveSubtitle')
+              : t('sessions.subtitle')
+        }
       >
         <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
           <TabButton
@@ -320,8 +326,20 @@ export function SessionsPane() {
               <Empty
                 icon={scanning ? Loader2 : tab === 'archived' ? Archive : MessagesSquare}
                 spin={scanning}
-                message={scanning ? t('sessions.scanning') : tab === 'archived' ? t('sessions.archiveEmpty') : t('sessions.empty')}
-                hint={scanning ? undefined : tab === 'archived' ? t('sessions.archiveEmptyHint') : t('sessions.emptyHint')}
+                message={
+                  scanning
+                    ? t('sessions.scanning')
+                    : tab === 'archived'
+                      ? t('sessions.archiveEmpty')
+                      : t('sessions.empty')
+                }
+                hint={
+                  scanning
+                    ? undefined
+                    : tab === 'archived'
+                      ? t('sessions.archiveEmptyHint')
+                      : t('sessions.emptyHint')
+                }
               />
             ) : (
               <ul>
@@ -521,7 +539,9 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
         {card && (
           <Button
             variant="secondary"
-            onClick={() => void archive(card.id, !archived.includes(card.id)).then((done) => done && onBack())}
+            onClick={() =>
+              void archive(card.id, !archived.includes(card.id)).then((done) => done && onBack())
+            }
           >
             {archived.includes(card.id) ? <ArchiveRestore size={13} /> : <Archive size={13} />}
             {archived.includes(card.id) ? t('sessions.restore') : t('sessions.archive')}
