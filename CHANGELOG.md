@@ -17,10 +17,11 @@ pre-1.0 caveat that anything may still move.
   release rehearsals verify the MSI-extracted executable without registering a
   temporary NSIS install; stateful NSIS and in-place upgrade checks remain enabled
   on ephemeral GitHub Actions runners.
-- The release workflow now deploys the freshly generated signed updater manifest
-  directly to GitHub Pages after all artifacts and checksums are complete, so the
-  secondary update endpoint cannot remain pinned to an older release when a release
-  created by `GITHUB_TOKEN` does not emit another workflow event.
+- The release workflow now persists the freshly generated signed updater manifest
+  on protected `main`, then explicitly dispatches and waits for the Website workflow
+  to deploy GitHub Pages after all artifacts and checksums are complete. The secondary
+  endpoint cannot remain pinned to an older release when a `GITHUB_TOKEN` release
+  does not emit another workflow event.
 
 ### Fixed
 

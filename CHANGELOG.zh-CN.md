@@ -16,9 +16,9 @@
 - Windows 安装包烟雾测试现在会隔离 Studio、Harness 和 Profile 状态。本地发布演练只验证
   MSI 管理提取后的可执行文件，不再把临时 NSIS 安装注册到真实系统；GitHub Actions 临时
   Runner 上仍会执行完整 NSIS 安装和原位升级测试。
-- 发布流水线会在所有资产与校验和完成后，把本次生成且带签名的更新清单直接部署到
-  GitHub Pages；即使使用 `GITHUB_TOKEN` 创建 Release 时不会再次触发其他工作流，备用
-  更新源也不会继续停留在旧版本。
+- 发布流水线会在所有资产与校验和完成后，把本次生成且带签名的更新清单写入受保护的
+  `main`，再显式触发并等待 Website 工作流从允许的分支部署 GitHub Pages；即使使用
+  `GITHUB_TOKEN` 创建 Release 时不会再次触发其他工作流，备用更新源也不会停留在旧版本。
 
 ### 修复
 

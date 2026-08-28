@@ -453,11 +453,7 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: write
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      actions: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -473,21 +469,7 @@ jobs:
             tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
           fi
           node packaging/generate.mjs "$tag"
-      - name: Assemble the website with the fresh signed manifest
-        run: |
-          mkdir -p site/assets/brand
-          cp website/*.html website/*.css website/*.js website/latest.json site/
-          cp assets/brand/icon.svg site/assets/brand/
-          touch site/.nojekyll
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deploy
-        uses: actions/deploy-pages@v4
-      - name: Persist the deployed fallback on main
+      - name: Persist the fallback on main
         run: |
           manifest="$(mktemp)"
           cp website/latest.json "$manifest"
@@ -503,3 +485,25 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git commit -m "chore: publish updater fallback for v$(node -p 'require(\"./src-tauri/tauri.conf.json\").version')"
           git push origin HEAD:main
+      - name: Dispatch the protected-branch Website deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          previous_run="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow website.yml --event workflow_dispatch --branch main --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+          gh workflow run website.yml --repo "$GITHUB_REPOSITORY" --ref main
+
+          run_id=""
+          for attempt in $(seq 1 30); do
+            candidate="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow website.yml --event workflow_dispatch --branch main --limit 1 --json databaseId --jq '.[0].databaseId // empty')"
+            if [ -n "$candidate" ] && [ "$candidate" != "$previous_run" ]; then
+              run_id="$candidate"
+              break
+            fi
+            sleep 2
+          done
+
+          if [ -z "$run_id" ]; then
+            echo "::error::The protected-branch Website deployment did not start."
+            exit 1
+          fi
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
