@@ -114,7 +114,11 @@ pub fn workspace_inspect(path: PathBuf) -> Admission {
 /// List Git's durable worktree registry for the selected workspace repository.
 #[tauri::command]
 pub async fn workspace_worktrees() -> Result<Vec<Worktree>> {
-    let repository = repository_root(&selected()).await?;
+    let repository = match repository_root(&selected()).await {
+        Ok(repository) => repository,
+        Err(failure) if is_not_git_repository(&failure) => return Ok(Vec::new()),
+        Err(failure) => return Err(failure),
+    };
     worktrees_in(&repository).await
 }
 
@@ -179,6 +183,10 @@ async fn repository_root(path: &Path) -> Result<PathBuf> {
         ));
     }
     Ok(node_runtime::plain_path(canonical))
+}
+
+fn is_not_git_repository(failure: &Error) -> bool {
+    matches!(failure, Error::Workspace(detail) if detail.to_ascii_lowercase().contains("not a git repository"))
 }
 
 async fn worktrees_in(repository: &Path) -> Result<Vec<Worktree>> {
@@ -466,7 +474,10 @@ fn classify(filesystem: &str) -> Admission {
 
 #[cfg(test)]
 mod tests {
-    use super::{inspect, parse_worktrees, valid_branch, workspace_inspect, Store};
+    use super::{
+        inspect, is_not_git_repository, parse_worktrees, valid_branch, workspace_inspect, Store,
+    };
+    use crate::error::Error;
 
     #[test]
     fn a_missing_workspace_is_blocked() {
@@ -524,6 +535,16 @@ mod tests {
         ] {
             assert!(!valid_branch(branch), "{branch} must be rejected");
         }
+    }
+
+    #[test]
+    fn an_ordinary_non_git_workspace_is_an_empty_worktree_state() {
+        assert!(is_not_git_repository(&Error::Workspace(
+            "fatal: not a git repository (or any of the parent directories): .git".into(),
+        )));
+        assert!(!is_not_git_repository(&Error::Workspace(
+            "Git could not start: executable missing".into(),
+        )));
     }
 
     #[cfg(windows)]

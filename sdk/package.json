@@ -1,6 +1,6 @@
 {
   "name": "@moresyl/dsh-studio-sdk",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Typed feature detection and Protocol 3 contracts for DSH Studio plugins",
   "type": "module",
   "main": "./index.js",

@@ -42,10 +42,11 @@ test('website fallback rejects unsigned or insecure updater artifacts', () => {
 })
 
 test('desktop and publishing workflows agree on the website fallback', async () => {
-  const [configText, packageWorkflow, websiteWorkflow] = await Promise.all([
+  const [configText, packageWorkflow, websiteWorkflow, releaseWorkflow] = await Promise.all([
     readFile('src-tauri/tauri.conf.json', 'utf8'),
     readFile('.github/workflows/packaging.yml', 'utf8'),
     readFile('.github/workflows/website.yml', 'utf8'),
+    readFile('.github/workflows/release.yml', 'utf8'),
   ])
   const config = JSON.parse(configText)
 
@@ -55,4 +56,7 @@ test('desktop and publishing workflows agree on the website fallback', async () 
   ])
   assert.match(packageWorkflow, /website\/latest\.json/)
   assert.match(websiteWorkflow, /cp website\/latest\.json site\//)
+  assert.match(releaseWorkflow, /node packaging\/generate\.mjs "\$tag"/)
+  assert.match(releaseWorkflow, /uses: actions\/deploy-pages@v4/)
+  assert.match(releaseWorkflow, /git add -- website\/latest\.json/)
 })

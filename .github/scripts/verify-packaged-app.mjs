@@ -27,6 +27,13 @@ export function resolveBundleRoot(root) {
   return resolve(root)
 }
 
+export function shouldExerciseWindowsInstaller(environment = process.env) {
+  return (
+    environment.GITHUB_ACTIONS === 'true' ||
+    environment.DSH_ALLOW_LOCAL_INSTALLER_SMOKE === '1'
+  )
+}
+
 async function verifyWindows(files) {
   const msi = requireOne(files, (file) => file.toLowerCase().endsWith('.msi'), 'MSI')
   const nsis = requireOne(
@@ -40,10 +47,19 @@ async function verifyWindows(files) {
   await verifyOffline(msiRoot)
   await smoke(await installedExecutable(msiRoot))
 
+  // NSIS writes per-user installation and uninstall registration even when /D
+  // points at a temporary directory. That is acceptable on an ephemeral CI
+  // runner, but a local release rehearsal must never take over the developer's
+  // real updater registration or leave a temp build as the primary app.
+  if (!shouldExerciseWindowsInstaller()) {
+    console.log('verified MSI extraction and packaged binary; skipped stateful NSIS install outside GitHub Actions')
+    return
+  }
+
   const nsisRoot = join(scratch, 'nsis')
   // NSIS requires /D to be the final argument. spawn() passes it as one value,
   // so spaces in the temporary path are never interpreted by a shell.
-  await run(nsis, ['/S', `/D=${nsisRoot}`])
+  await run(nsis, ['/S', `/D=${nsisRoot}`], { env: isolatedEnvironment('nsis') })
   await verifyOffline(nsisRoot)
   await smoke(await installedExecutable(nsisRoot))
   const uninstaller = (await walk(nsisRoot)).find(
@@ -60,9 +76,9 @@ async function verifyWindows(files) {
 
 async function verifyWindowsUpgrade(previous, current) {
   const root = join(scratch, 'upgrade')
-  await run(previous, ['/S', `/D=${root}`])
+  await run(previous, ['/S', `/D=${root}`], { env: isolatedEnvironment('upgrade') })
   await installedExecutable(root)
-  await run(current, ['/S', `/D=${root}`])
+  await run(current, ['/S', `/D=${root}`], { env: isolatedEnvironment('upgrade') })
   await smoke(await installedExecutable(root))
   const uninstaller = (await walk(root)).find(
     (file) => basename(file).toLowerCase() === 'uninstall.exe',
@@ -153,7 +169,21 @@ async function installedExecutable(directory) {
 }
 
 async function smoke(executable) {
-  await run(executable, ['--smoke-test'], { timeout: 30_000 })
+  await run(executable, ['--smoke-test'], {
+    timeout: 30_000,
+    env: isolatedEnvironment(`smoke-${basename(dirname(executable))}`),
+  })
+}
+
+function isolatedEnvironment(name) {
+  const root = join(scratch, 'isolated', name)
+  return {
+    DSH_HOME: join(root, 'dsh-home'),
+    LOCALAPPDATA: join(root, 'local-app-data'),
+    APPDATA: join(root, 'roaming-app-data'),
+    XDG_DATA_HOME: join(root, 'xdg-data'),
+    XDG_CONFIG_HOME: join(root, 'xdg-config'),
+  }
 }
 
 async function verifyOffline(directory) {
@@ -220,10 +250,15 @@ async function walk(directory) {
   return nested.flat()
 }
 
-async function run(command, args, { timeout = 120_000, cwd, createCwd = false } = {}) {
+async function run(command, args, { timeout = 120_000, cwd, createCwd = false, env } = {}) {
   if (createCwd) await mkdir(cwd, { recursive: true })
+  if (env) await Promise.all(Object.values(env).map((directory) => mkdir(directory, { recursive: true })))
   await new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, stdio: 'inherit' })
+    const child = spawn(command, args, {
+      cwd,
+      env: env ? { ...process.env, ...env } : process.env,
+      stdio: 'inherit',
+    })
     const timer = setTimeout(() => {
       child.kill('SIGTERM')
       reject(new Error(`${command} exceeded ${Math.round(timeout / 1000)} seconds`))

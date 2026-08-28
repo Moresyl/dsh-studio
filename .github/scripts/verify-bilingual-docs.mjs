@@ -42,8 +42,8 @@ const CONTRACTS = Object.freeze([
   },
   {
     pair: 'docs/ROADMAP.md|docs/ROADMAP.zh-CN.md',
-    english: ['dataelement/dsh-desktop', BENCHMARK_HEAD, 'v0.9.0 release candidate'],
-    chinese: ['dataelement/dsh-desktop', BENCHMARK_HEAD, 'v0.9.0 发布候选'],
+    english: ['dataelement/dsh-desktop', BENCHMARK_HEAD, 'v0.9.0 formal release'],
+    chinese: ['dataelement/dsh-desktop', BENCHMARK_HEAD, 'v0.9.0 正式版本'],
   },
 ])
 

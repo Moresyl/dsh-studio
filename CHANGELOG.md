@@ -9,6 +9,36 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-08-28
+
+### Changed
+
+- Windows package smoke tests now isolate Studio, Harness and Profile state. Local
+  release rehearsals verify the MSI-extracted executable without registering a
+  temporary NSIS install; stateful NSIS and in-place upgrade checks remain enabled
+  on ephemeral GitHub Actions runners.
+- The release workflow now deploys the freshly generated signed updater manifest
+  directly to GitHub Pages after all artifacts and checksums are complete, so the
+  secondary update endpoint cannot remain pinned to an older release when a release
+  created by `GITHUB_TOKEN` does not emit another workflow event.
+
+### Fixed
+
+- Fixed Harness startup occasionally failing after an install or upgrade because
+  the Profile-level fallback briefly resolved official `@deepseek-ai/*` modules
+  while the managed runtime junction was being promoted. Studio now gives only this
+  installation-owned race a longer bounded recovery window and reports a short,
+  actionable error if the modules remain unavailable; user plugins are preserved.
+- Fixed a manual **Check for updates** click being silently discarded while the
+  quiet launch-time check was still running. Manual checks now join the active
+  request and display its success or failure.
+- Fixed the Worktree Manager surfacing Git's fatal “not a git repository” message
+  for an ordinary non-Git workspace. It now shows an empty state and keeps creation
+  controls disabled until a Git repository is selected.
+- Fixed local package verification leaving a temporary installer path registered as
+  the primary Windows application, which could make shortcuts and later upgrades
+  launch a deleted smoke-test copy.
+
 ## [0.9.0] — 2026-08-28
 
 ### Added
@@ -770,7 +800,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...v0.8.0
 [0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8

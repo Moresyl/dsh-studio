@@ -23,6 +23,11 @@ const FIRST_CHECK_MS = 4_000
 /** And again at this interval, for the window that stays open for days. */
 const RECHECK_MS = 6 * 60 * 60 * 1000
 
+/** One native updater request per window. A manual check that arrives while the
+ * launch-time check is running joins this promise, so its result or failure is
+ * still visible instead of the click being silently discarded. */
+let activeCheck: Promise<void> | null = null
+
 interface UpdateState {
   release: Release | null
   /** A successful check has completed, including the up-to-date result. */
@@ -53,14 +58,22 @@ export const useUpdate = create<UpdateState>((set, get) => ({
    * a situation to report — it is Tuesday.
    */
   check: async (quiet = false) => {
-    if (get().checking || get().installing) return
-    set({ checking: true, error: null })
+    if (get().installing) return
+    let operation = activeCheck
+    if (operation === null) {
+      set({ checking: true, error: null })
+      operation = (async () => {
+        set({ release: await checkForUpdate(), checked: true })
+      })().finally(() => {
+        activeCheck = null
+        set({ checking: false })
+      })
+      activeCheck = operation
+    }
     try {
-      set({ release: await checkForUpdate(), checked: true })
+      await operation
     } catch (cause) {
       if (!quiet) set({ error: reportFailure(cause) })
-    } finally {
-      set({ checking: false })
     }
   },
 

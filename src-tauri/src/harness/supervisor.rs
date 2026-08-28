@@ -34,7 +34,11 @@ const RESTART_DELAYS_MS: [u64; 5] = [500, 1_000, 2_000, 5_000, 10_000];
 /// A profile import can briefly lose the shared fallback while a previously
 /// started runtime transaction is settling. Retry only that exact failure;
 /// configuration and plugin errors still fail on their first attempt.
-const INITIAL_MODULE_RETRY_DELAYS_MS: [u64; 2] = [250, 750];
+// Runtime promotion is a same-volume rename, but Windows Defender and indexers
+// can keep a just-replaced junction target unavailable for several seconds.
+// Only the installation-owned profile fallback receives these retries; a
+// missing third-party plugin still fails immediately with its real name.
+const INITIAL_MODULE_RETRY_DELAYS_MS: [u64; 4] = [250, 750, 1_500, 3_000];
 
 /// Enough startup stderr to identify a loader failure without retaining an
 /// unbounded process log in a detached pump task.
@@ -322,7 +326,7 @@ impl Supervisor {
                         .then_some(retry_delay_ms)
                         .flatten();
                     let Some(delay_ms) = retry else {
-                        return Err(failure);
+                        return Err(actionable_module_failure(failure));
                     };
                     self.record(
                         Stream::Stderr,
@@ -613,6 +617,16 @@ fn transient_profile_module_resolution_failure(detail: &str) -> bool {
         && (detail.contains("\\profiles\\") || detail.contains("/profiles/"))
 }
 
+fn actionable_module_failure(failure: Error) -> Error {
+    if !transient_profile_module_resolution_failure(&failure.to_string()) {
+        return failure;
+    }
+    Error::Readiness(
+        "the managed Harness modules remained unavailable after automatic recovery; restart DSH Studio, or use Repair in Environment if it repeats. The selected Profile and its plugins were not deleted"
+            .into(),
+    )
+}
+
 fn fixed_port_available(host: &str, port: u16) -> Result<()> {
     if port == 0 {
         return Ok(());
@@ -758,6 +772,17 @@ mod tests {
         assert!(!transient_profile_module_resolution_failure(
             "Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-client-ui-renderer' imported from C:\\runtime\\node_modules\\"
         ));
+    }
+
+    #[test]
+    fn exhausted_managed_module_recovery_has_a_bounded_actionable_error() {
+        let raw = Error::Readiness(
+            "Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@deepseek-ai/dsh-client-ui-renderer' imported from C:\\Users\\person\\.dsh\\profiles\\web\\".into(),
+        );
+        let friendly = actionable_module_failure(raw).to_string();
+        assert!(friendly.contains("automatic recovery"));
+        assert!(friendly.contains("Profile and its plugins were not deleted"));
+        assert!(!friendly.contains("ERR_MODULE_NOT_FOUND"));
     }
 
     #[test]

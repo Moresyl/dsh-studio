@@ -9,6 +9,29 @@
 
 ## [未发布]
 
+## [0.9.1] —— 2026-08-28
+
+### 变更
+
+- Windows 安装包烟雾测试现在会隔离 Studio、Harness 和 Profile 状态。本地发布演练只验证
+  MSI 管理提取后的可执行文件，不再把临时 NSIS 安装注册到真实系统；GitHub Actions 临时
+  Runner 上仍会执行完整 NSIS 安装和原位升级测试。
+- 发布流水线会在所有资产与校验和完成后，把本次生成且带签名的更新清单直接部署到
+  GitHub Pages；即使使用 `GITHUB_TOKEN` 创建 Release 时不会再次触发其他工作流，备用
+  更新源也不会继续停留在旧版本。
+
+### 修复
+
+- 修复安装或升级后 Harness 偶发启动失败：托管运行时目录链接正在切换时，Profile 级回退
+  可能短暂无法解析官方 `@deepseek-ai/*` 模块。现在只对这一安装器所有的竞态增加更长但有界
+  的恢复窗口；若模块仍不可用，会显示简短可操作的错误，同时保留用户插件。
+- 修复启动时静默更新检查尚未结束时，用户点击“检查更新”会被直接丢弃、界面没有反馈的问题；
+  手动检查现在会加入正在进行的请求，并显示成功或失败结果。
+- 修复普通非 Git 工作区打开 Worktree 管理器时直接显示 Git 的“not a git repository”致命错误；
+  现在显示空状态，并在选择 Git 仓库前禁用创建控件。
+- 修复本地安装包验证把临时测试路径注册成 Windows 主安装目录，导致开始菜单或后续升级可能启动
+  已删除的测试副本的问题。
+
 ## [0.9.0] —— 2026-08-28
 
 ### 新增
@@ -641,7 +664,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...v0.8.0
 [0.7.8]: https://github.com/Moresyl/dsh-studio/compare/v0.7.7...v0.7.8

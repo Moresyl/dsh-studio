@@ -80,6 +80,27 @@ describe('checking', () => {
     expect(updater.checkForUpdate).toHaveBeenCalledOnce()
   })
 
+  it('makes a manual check observe an already-running quiet failure', async () => {
+    let fail!: (cause: Error) => void
+    updater.checkForUpdate.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        fail = reject
+      }),
+    )
+
+    const quiet = useUpdate.getState().check(true)
+    const manual = useUpdate.getState().check(false)
+    fail(new Error('feed unavailable'))
+    await Promise.all([quiet, manual])
+
+    expect(updater.checkForUpdate).toHaveBeenCalledOnce()
+    expect(useUpdate.getState()).toMatchObject({ checking: false, error: 'feed unavailable' })
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'feed unavailable',
+    })
+  })
+
   it('does not start a check while an update is installing', async () => {
     useUpdate.setState({ installing: true })
 

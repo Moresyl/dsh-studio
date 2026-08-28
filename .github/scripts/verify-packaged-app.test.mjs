@@ -2,7 +2,11 @@ import assert from 'node:assert/strict'
 import { isAbsolute, resolve } from 'node:path'
 import test from 'node:test'
 
-import { resolveBundleRoot, rpmExtractArgs } from './verify-packaged-app.mjs'
+import {
+  resolveBundleRoot,
+  rpmExtractArgs,
+  shouldExerciseWindowsInstaller,
+} from './verify-packaged-app.mjs'
 
 test('resolves the bundle root before smoke tests change their working directory', () => {
   const root = resolveBundleRoot('src-tauri/target/release/bundle')
@@ -26,4 +30,14 @@ test('passes RPM paths with spaces directly to libarchive', () => {
 test('rejects incomplete RPM extraction arguments', () => {
   assert.throws(() => rpmExtractArgs('', '/tmp/rpm'), /required/)
   assert.throws(() => rpmExtractArgs('/tmp/app.rpm', ''), /required/)
+})
+
+test('keeps stateful Windows installer smoke tests on ephemeral CI by default', () => {
+  assert.equal(shouldExerciseWindowsInstaller({}), false)
+  assert.equal(shouldExerciseWindowsInstaller({ GITHUB_ACTIONS: 'true' }), true)
+})
+
+test('requires an explicit opt-in for a local stateful Windows installer smoke test', () => {
+  assert.equal(shouldExerciseWindowsInstaller({ DSH_ALLOW_LOCAL_INSTALLER_SMOKE: '1' }), true)
+  assert.equal(shouldExerciseWindowsInstaller({ DSH_ALLOW_LOCAL_INSTALLER_SMOKE: '0' }), false)
 })

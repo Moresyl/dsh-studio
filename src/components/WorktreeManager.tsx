@@ -16,6 +16,7 @@ export function WorktreeManager() {
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const notRepository = !loading && items.length === 0 && error === null
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -80,7 +81,7 @@ export function WorktreeManager() {
         <div className="flex gap-2">
           <input
             value={branch}
-            disabled={creating}
+            disabled={creating || loading || notRepository}
             placeholder={t('worktrees.branchPlaceholder')}
             aria-label={t('worktrees.branch')}
             onChange={(event) => setBranch(event.target.value)}
@@ -89,7 +90,10 @@ export function WorktreeManager() {
             }}
             className="h-[30px] min-w-0 flex-1 rounded-control border border-line-strong bg-surface-2 px-2.5 font-mono text-[11.5px] text-text outline-none placeholder:font-sans placeholder:text-faint focus:border-brand disabled:opacity-40"
           />
-          <Button disabled={!branch.trim() || creating} onClick={() => void create()}>
+          <Button
+            disabled={!branch.trim() || creating || loading || notRepository}
+            onClick={() => void create()}
+          >
             {creating ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
             {creating ? t('worktrees.creating') : t('worktrees.create')}
           </Button>
