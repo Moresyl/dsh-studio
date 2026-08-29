@@ -9,6 +9,8 @@
 
 ## [未发布]
 
+## [0.9.2] —— 2026-08-29
+
 ### 修复
 
 - 把 Windows Profile Junction 偶发不可遍历时仅靠等待重试的处理，替换为 Studio 自有的
@@ -673,7 +675,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.1...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/Moresyl/dsh-studio/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Moresyl/dsh-studio/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Moresyl/dsh-studio/compare/v0.7.8...v0.8.0
