@@ -116,6 +116,7 @@ fn launch_plan_for_profile(
                 .unwrap_or_else(|| "the workspace is not safe to use".into()),
         ));
     }
+    let resolver = install::ensure_runtime_resolver(&paths::harness_dir())?;
     let serves_studio = crate::profiles::prepare_for_studio(&profile)?;
     if check_plugin_recovery {
         if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {
@@ -126,6 +127,7 @@ fn launch_plan_for_profile(
     Ok(LaunchPlan {
         node: node.path,
         entry: environment.harness_entry,
+        resolver,
         profile,
         patches: serves_studio
             .then(|| {

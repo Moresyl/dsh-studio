@@ -110,7 +110,13 @@ export async function prepareSmokeProfile(runtimeRoot, dshHome) {
       join(profile, 'pnpm-workspace.yaml'),
       'packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n',
     ),
-    ...['package.json', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js'].map((relative) =>
+    ...[
+      'package.json',
+      'cordis.patch.yml',
+      'lib/index.js',
+      'lib/client.js',
+      'lib/runtime-resolver.cjs',
+    ].map((relative) =>
       copyFile(join(integrationSource, relative), join(integrationTarget, relative)),
     ),
   ])
@@ -138,6 +144,15 @@ export async function verifyProfileBoot({
   const child = spawn(
     process.execPath,
     [
+      '--require',
+      join(
+        runtimeRoot,
+        'node_modules',
+        '@moresyl',
+        'dsh-studio-integration',
+        'lib',
+        'runtime-resolver.cjs',
+      ),
       entry,
       '--profile',
       'web',

@@ -72,11 +72,12 @@ const WEB_APP_BUNDLE: &str = "@deepseek-ai/dsh-web-app";
 const WEB_PROFILE_BUNDLES: [&str; 2] = ["@deepseek-ai/dsh-base", WEB_APP_BUNDLE];
 const PROFILE_WORKSPACE: &str =
     "packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n";
-const STUDIO_MODULE_FILES: [&str; 4] = [
+const STUDIO_MODULE_FILES: [&str; 5] = [
     "package.json",
     "cordis.patch.yml",
     "lib/index.js",
     "lib/client.js",
+    "lib/runtime-resolver.cjs",
 ];
 
 /// What an exported profile is, so a file picked by mistake is caught before

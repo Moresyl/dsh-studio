@@ -9,6 +9,18 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Fixed
+
+- Replaced retry-only recovery for intermittent Windows profile junction failures
+  with a Studio-owned Node resolver. Normal Profile resolution remains first; only
+  missing official `@deepseek-ai/*` imports fall back to the qualified managed
+  Harness. Existing 0.9.1 runtimes gain the resolver atomically at launch without
+  deleting or rewriting the selected Profile or its plugins.
+- Added launch-contract, resolver isolation and real-Profile fault-injection tests.
+  The Windows acceptance test continuously removed the four links from the reported
+  failure while the real user Profile completed ten consecutive boots and HTTP
+  health checks.
+
 ## [0.9.1] — 2026-08-28
 
 ### Changed

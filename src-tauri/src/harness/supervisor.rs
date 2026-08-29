@@ -31,13 +31,10 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(120);
 /// Backoff schedule for unexpected exits. Running out means giving up.
 const RESTART_DELAYS_MS: [u64; 5] = [500, 1_000, 2_000, 5_000, 10_000];
 
-/// A profile import can briefly lose the shared fallback while a previously
-/// started runtime transaction is settling. Retry only that exact failure;
-/// configuration and plugin errors still fail on their first attempt.
-// Runtime promotion is a same-volume rename, but Windows Defender and indexers
-// can keep a just-replaced junction target unavailable for several seconds.
-// Only the installation-owned profile fallback receives these retries; a
-// missing third-party plugin still fails immediately with its real name.
+/// The Studio resolver bypasses the profile junction farm for missing managed
+/// packages. Keep a bounded retry as a last defence for an external scanner or
+/// runtime replacement briefly withholding the real managed package itself;
+/// configuration and third-party plugin errors still fail immediately.
 const INITIAL_MODULE_RETRY_DELAYS_MS: [u64; 4] = [250, 750, 1_500, 3_000];
 
 /// Enough startup stderr to identify a loader failure without retaining an
@@ -98,6 +95,9 @@ pub struct LaunchPlan {
     pub node: PathBuf,
     /// Path to the harness CLI entry point.
     pub entry: PathBuf,
+    /// Studio-owned Node resolver that safely falls back to the qualified
+    /// runtime when Windows cannot traverse upstream's profile junctions.
+    pub resolver: PathBuf,
     /// Profile to boot: which layer stack the harness composes, and therefore
     /// which plugins the session has.
     pub profile: String,
@@ -118,6 +118,11 @@ impl LaunchPlan {
     fn launcher_command(&self) -> Command {
         let mut command = Command::new(&self.node);
         command
+            // Node options must precede the script entry. The resolver keeps
+            // normal Profile resolution first and handles only missing
+            // installation-owned `@deepseek-ai/*` packages.
+            .arg("--require")
+            .arg(&self.resolver)
             .arg(&self.entry)
             // Named rather than using the `web` alias, and before the arguments
             // meant for the profile's own application: the launcher stops reading
@@ -609,8 +614,8 @@ fn with_startup_stderr(failure: Error, stderr: &[String]) -> Error {
 
 /// This is deliberately narrower than a general `ERR_MODULE_NOT_FOUND` retry.
 /// A missing user plugin or a broken package must remain actionable; only an
-/// installation-owned package imported through the profile parent fallback is
-/// known to recover once the stable managed-runtime target is visible again.
+/// installation-owned package imported from a Profile can be recovered from
+/// the qualified managed runtime by the Studio resolver.
 fn transient_profile_module_resolution_failure(detail: &str) -> bool {
     detail.contains("ERR_MODULE_NOT_FOUND")
         && detail.contains("Cannot find package '@deepseek-ai/")
@@ -689,6 +694,7 @@ mod tests {
         let plan = LaunchPlan {
             node: PathBuf::from("node"),
             entry: PathBuf::from("dsh/bin.js"),
+            resolver: PathBuf::from("studio/runtime-resolver.cjs"),
             profile: "web".into(),
             patches: vec![PathBuf::from("studio.patch.yml")],
             workspace: PathBuf::from("workspace"),
@@ -709,6 +715,8 @@ mod tests {
         assert_eq!(
             args,
             [
+                "--require",
+                "studio/runtime-resolver.cjs",
                 "dsh/bin.js",
                 "--profile",
                 "web",

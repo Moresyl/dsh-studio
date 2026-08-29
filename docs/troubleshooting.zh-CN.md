@@ -4,7 +4,7 @@
 
 ## 安装插件出现 404 / No authorization header
 
-如果日志指向 `@deepseek-ai/dsh@0.0.1-rc.1`，并提示 `@deepseek-ai/dsh-code-runtime-worker` 在镜像中不存在，问题来自旧版上游依赖图，不是你的登录状态。当前 Studio 固定使用已验证的 `0.1.0-rc.8` 家族；在环境页点击「修复」即可原子替换旧运行时。若仍报错：
+如果日志指向 `@deepseek-ai/dsh@0.0.1-rc.1`，并提示 `@deepseek-ai/dsh-code-runtime-worker` 在镜像中不存在，问题来自旧版上游依赖图，不是你的登录状态。当前 Studio 固定使用已验证的 `0.1.1-rc.2` 家族；在环境页点击「修复」即可原子替换旧运行时。若仍报错：
 
 1. 检查 npm registry 是否被设为不完整的镜像；作用域私有包才需要认证，公开包不应依赖 Authorization 头。
 2. 切回 `https://registry.npmjs.org/` 后重试。
@@ -19,6 +19,12 @@ Harness 安装发生在 staging 目录，校验成功后才替换当前运行时
 Studio 会从官方 npm registry 安装经过验证的运行时，并在控制台显示原生生命周期脚本阶段。连续 120 秒没有任何输出，或安装总时长超过 20 分钟时，任务会被终止并给出错误，不再永久转圈。请根据错误检查网络后重试，或改用完整离线版；窗口无法打开时，可给可执行文件传入 `--export-diagnostics`，并附上生成的 ZIP。
 
 如果 npm 已完成安装但 Contract 2 仍拒绝运行时，请升级到 Studio v0.7.2 或更高版本并点击「修复」。这些版本会把随附 Studio integration 物化为普通目录，不再保留指向临时安装源码的 Windows Junction；如果校验仍失败，错误会列出具体缺失的合同条件。
+
+## 托管 Harness 模块不可用
+
+旧版 Studio 完全依赖上游在 `$DSH_HOME/profiles/node_modules` 中建立的逐包链接。Windows 偶尔会拒绝遍历这些 Junction，于是同一个托管包明明存在，仍会出现 `ERR_MODULE_NOT_FOUND`。当前版本会先保持 Profile 的正常解析；仅当 `@deepseek-ai/*` 确实缺失时，才回退到已验证的托管 Harness。所选 Profile、其中安装的包版本和第三方插件仍然优先，不会被删除。
+
+升级后重启一次，Studio 会自动物化自己的解析器。若当前版本仍出现此提示，请在环境页点击「修复」并导出诊断；不要手工删除 Profile。
 
 ## 工作区被拒绝
 

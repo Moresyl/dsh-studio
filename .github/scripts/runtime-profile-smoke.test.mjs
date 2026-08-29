@@ -33,13 +33,17 @@ test('smoke profile mirrors the product bootstrap and materializes integration',
     const integration = join(runtime, 'node_modules', '@moresyl', 'dsh-studio-integration')
     await mkdir(join(integration, 'lib'), { recursive: true })
     await Promise.all(
-      ['package.json', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js'].map(
-        async (relative) => {
-          const target = join(integration, relative)
-          await mkdir(join(target, '..'), { recursive: true })
-          await writeFile(target, relative)
-        },
-      ),
+      [
+        'package.json',
+        'cordis.patch.yml',
+        'lib/index.js',
+        'lib/client.js',
+        'lib/runtime-resolver.cjs',
+      ].map(async (relative) => {
+        const target = join(integration, relative)
+        await mkdir(join(target, '..'), { recursive: true })
+        await writeFile(target, relative)
+      }),
     )
     const home = join(root, 'home')
     const made = await prepareSmokeProfile(runtime, home)

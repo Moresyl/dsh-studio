@@ -95,6 +95,8 @@ const INTEGRATION_NODE: &[u8] =
     include_bytes!("../../runtime-contract/dsh-studio-integration/lib/index.js");
 const INTEGRATION_CLIENT: &[u8] =
     include_bytes!("../../runtime-contract/dsh-studio-integration/lib/client.js");
+const INTEGRATION_RESOLVER: &[u8] =
+    include_bytes!("../../runtime-contract/dsh-studio-integration/lib/runtime-resolver.cjs");
 
 #[derive(Debug, Deserialize, Serialize)]
 struct InstallJournal {
@@ -416,7 +418,61 @@ fn stage_integration(target: &Path) -> Result<()> {
         .and_then(|_| std::fs::write(root.join("cordis.patch.yml"), INTEGRATION_PATCH))
         .and_then(|_| std::fs::write(root.join("lib/index.js"), INTEGRATION_NODE))
         .and_then(|_| std::fs::write(root.join("lib/client.js"), INTEGRATION_CLIENT))
+        .and_then(|_| std::fs::write(root.join("lib/runtime-resolver.cjs"), INTEGRATION_RESOLVER))
         .map_err(|cause| Error::Install(format!("could not stage the Studio integration: {cause}")))
+}
+
+/// Materialize launch support added by a Studio upgrade into an otherwise
+/// compatible managed runtime. The integration is Studio-owned, so this does
+/// not mutate the upstream Harness or any user Profile.
+pub fn ensure_runtime_resolver(target: &Path) -> Result<PathBuf> {
+    let integration = target.join("node_modules/@moresyl/dsh-studio-integration");
+    for directory in [&integration, &integration.join("lib")] {
+        let metadata = std::fs::symlink_metadata(directory).map_err(|cause| {
+            Error::Install(format!(
+                "the managed Studio integration is incomplete at {}: {cause}; use Repair in Environment",
+                directory.display()
+            ))
+        })?;
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
+            return Err(Error::Install(format!(
+                "the managed Studio integration has an unsafe directory at {}; use Repair in Environment",
+                directory.display()
+            )));
+        }
+    }
+    let entry = integration.join("lib/index.js");
+    let entry_metadata = std::fs::symlink_metadata(&entry).map_err(|_| {
+        Error::Install(
+            "the managed Studio integration is missing; use Repair in Environment".into(),
+        )
+    })?;
+    if entry_metadata.file_type().is_symlink() || !entry_metadata.is_file() {
+        return Err(Error::Install(
+            "the managed Studio integration entry is unsafe; use Repair in Environment".into(),
+        ));
+    }
+    let resolver = integration.join("lib/runtime-resolver.cjs");
+    if let Ok(metadata) = std::fs::symlink_metadata(&resolver) {
+        if metadata.file_type().is_symlink() || !metadata.is_file() {
+            return Err(Error::Install(format!(
+                "the managed runtime resolver has an unsafe file at {}",
+                resolver.display()
+            )));
+        }
+        if crate::bounded_file::read(&resolver, crate::bounded_file::CONTROL_BYTES)
+            .is_ok_and(|body| body == INTEGRATION_RESOLVER)
+        {
+            return Ok(resolver);
+        }
+    }
+    crate::atomic::write(&resolver, INTEGRATION_RESOLVER).map_err(|cause| {
+        Error::Install(format!(
+            "the managed runtime resolver could not be updated at {}: {cause}",
+            resolver.display()
+        ))
+    })?;
+    Ok(resolver)
 }
 
 fn qualify_runtime(target: &Path) -> Result<()> {
@@ -925,10 +981,11 @@ mod tests {
     use tokio::process::Command;
 
     use super::{
-        npm_cli_candidates, qualify_runtime, remove_dir_if_exists, replace_once,
-        require_expected_runtime, run_command_with_limits, runtime_compatible, runtime_version,
-        InstallPlan, INTEGRATION_PACKAGE, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC, PNPM_VERSION,
-        RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
+        ensure_runtime_resolver, npm_cli_candidates, qualify_runtime, remove_dir_if_exists,
+        replace_once, require_expected_runtime, run_command_with_limits, runtime_compatible,
+        runtime_version, InstallPlan, INTEGRATION_PACKAGE, INTEGRATION_RESOLVER, OFFICIAL_REGISTRY,
+        PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC,
+        VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -952,6 +1009,7 @@ mod tests {
         fs::write(pnpm.join("bin/pnpm.cjs"), "").expect("pnpm entry");
         let integration = root.join("node_modules/@moresyl/dsh-studio-integration/lib");
         fs::create_dir_all(&integration).expect("integration directory");
+        fs::write(integration.join("index.js"), "").expect("integration entry");
         fs::write(integration.join("client.js"), "").expect("integration client");
         let picker = root
             .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
@@ -1123,6 +1181,52 @@ mod tests {
         write_runtime(&root, VERSION, false);
         let _ = fs::remove_file(root.join("node_modules/@deepseek-ai/dsh/lib/bin.js"));
         assert!(!runtime_compatible(&root));
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn launch_support_materializes_and_repairs_the_runtime_resolver() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-runtime-resolver-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        write_runtime(&root, VERSION, true);
+
+        let resolver = ensure_runtime_resolver(&root).expect("materialize resolver");
+        assert_eq!(
+            fs::read(&resolver).expect("resolver body"),
+            INTEGRATION_RESOLVER
+        );
+        fs::write(&resolver, "stale resolver").expect("stale resolver fixture");
+        assert_eq!(
+            ensure_runtime_resolver(&root).expect("repair resolver"),
+            resolver
+        );
+        assert_eq!(
+            fs::read(&resolver).expect("repaired body"),
+            INTEGRATION_RESOLVER
+        );
+
+        fs::remove_dir_all(root).expect("cleanup");
+    }
+
+    #[test]
+    fn launch_support_refuses_an_unsafe_runtime_resolver() {
+        let root = std::env::temp_dir().join(format!(
+            "dsh-studio-runtime-resolver-kind-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        write_runtime(&root, VERSION, true);
+        let resolver =
+            root.join("node_modules/@moresyl/dsh-studio-integration/lib/runtime-resolver.cjs");
+        fs::create_dir(&resolver).expect("unsafe resolver directory");
+
+        let failure = ensure_runtime_resolver(&root).expect_err("directory must be refused");
+        assert!(failure.to_string().contains("unsafe file"));
+        assert!(resolver.is_dir());
+
         fs::remove_dir_all(root).expect("cleanup");
     }
 
