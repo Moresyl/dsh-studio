@@ -83,8 +83,9 @@ The remaining gaps are concentrated in:
 - `39bc348`: atomic export, settings, Profile and plugin-recovery writes.
 - `ff21525`: terminal-emulator code split and a release bundle-size budget.
 
-These commits shipped in the v0.9.2 formal release after its pipeline, public
-assets, updater signatures and checksums were verified.
+These commits first shipped in the v0.9.2 formal release and remain carried
+forward through v0.9.4 after each pipeline, public-asset, updater-signature and
+checksum verification.
 
 ## Next phase
 
