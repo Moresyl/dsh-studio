@@ -2,7 +2,7 @@
 
 [English](plugin-interoperability.md)
 
-状态：**支持 DSH Studio 0.7.x**。线协议为 Protocol 3，目录 Schema 为 1.0.0，SDK
+状态：**支持 DSH Studio 0.9.x**。线协议为 Protocol 3，目录 Schema 为 1.0.0，SDK
 包版本跟随应用版本。文中的“必须”“不得”“应该”是有意设定的规范要求。
 
 本合同明确分开三类扩展面：

@@ -38,8 +38,8 @@ const CONTRACTS = Object.freeze([
   },
   {
     pair: 'docs/plugin-interoperability.md|docs/plugin-interoperability.zh-CN.md',
-    english: ['Read-only Host Protocol 1', 'unreadable-manifest'],
-    chinese: ['只读 Host Protocol 1', 'unreadable-manifest'],
+    english: ['Read-only Host Protocol 1', 'unreadable-manifest', 'DSH Studio 0.9.x'],
+    chinese: ['只读 Host Protocol 1', 'unreadable-manifest', 'DSH Studio 0.9.x'],
   },
   {
     pair: 'docs/ROADMAP.md|docs/ROADMAP.zh-CN.md',
