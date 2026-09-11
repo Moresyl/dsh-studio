@@ -15,6 +15,12 @@ on:
 permissions:
   contents: write
 
+env:
+  # Cargo's sparse index is smaller and substantially less sensitive to
+  # transient crates.io DNS failures on macOS runners.
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  CARGO_NET_RETRY: 10
+
 jobs:
   quality:
     name: Release quality and supply-chain gate
