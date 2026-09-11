@@ -73,7 +73,12 @@ export const useUpdate = create<UpdateState>((set, get) => ({
     try {
       await operation
     } catch (cause) {
-      if (!quiet) set({ error: reportFailure(cause) })
+      if (!quiet) {
+        // An earlier successful result is stale once a manual refresh fails.
+        // Keeping it visible makes the user think the feed was checked now and
+        // can offer an installer that may no longer exist.
+        set({ release: null, checked: false, error: reportFailure(cause) })
+      }
     }
   },
 

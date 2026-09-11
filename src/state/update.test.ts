@@ -120,6 +120,15 @@ describe('checking', () => {
     expect(useUpdate.getState().error).toBe('offline')
     expect(useDialog.getState().pending).toMatchObject({ kind: 'error', details: 'offline' })
   })
+
+  it('clears an older release after a manual refresh fails', async () => {
+    updater.checkForUpdate.mockResolvedValueOnce(release).mockRejectedValueOnce(new Error('offline'))
+
+    await useUpdate.getState().check()
+    await useUpdate.getState().check()
+
+    expect(useUpdate.getState()).toMatchObject({ release: null, checked: false, error: 'offline' })
+  })
 })
 
 describe('dismissal', () => {
