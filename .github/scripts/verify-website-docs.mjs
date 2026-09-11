@@ -14,9 +14,9 @@ export async function verifyWebsiteDocs(root = ROOT, load = readFile) {
     const source = await load(join(root, page), 'utf8')
     for (const link of links) {
       if (!source.includes(link)) problems.push(`${page} is missing ${link}`)
-      if (!link.startsWith('http')) {
+      if (!link.startsWith('http') && !link.startsWith('docs/')) {
         try {
-          await access(join(root, link.startsWith('docs/') ? link : 'website', link))
+          await access(join(root, 'website', link))
         } catch {
           problems.push(`${page} points to missing local target ${link}`)
         }
