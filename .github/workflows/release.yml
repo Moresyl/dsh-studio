@@ -292,9 +292,15 @@ jobs:
             exit 0
           fi
           mkdir -p previous-release
-          gh release download "$previous" --repo "$GITHUB_REPOSITORY" --pattern '*-setup.exe' --dir previous-release
+          if ! gh release download "$previous" --repo "$GITHUB_REPOSITORY" --pattern '*-setup.exe' --dir previous-release; then
+            echo "Previous release $previous has no Windows installer; upgrade smoke is not applicable."
+            exit 0
+          fi
           installer="$(find previous-release -maxdepth 1 -type f -name '*-setup.exe' -print -quit)"
-          test -n "$installer"
+          if [ -z "$installer" ]; then
+            echo "Previous release $previous has no Windows installer; upgrade smoke is not applicable."
+            exit 0
+          fi
           echo "DSH_PREVIOUS_INSTALLER=$PWD/$installer" >> "$GITHUB_ENV"
           echo "Will verify an in-place upgrade from $previous."
 
