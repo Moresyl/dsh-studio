@@ -22,7 +22,7 @@ Studio 市场中的包必须具有合法 npm 身份和已发布精确版本。Ha
 ```json
 {
   "peerDependencies": {
-    "@deepseek-ai/dsh": "^0.1.0-rc.8"
+    "@deepseek-ai/dsh": "^0.1.1-rc.2"
   },
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" }
