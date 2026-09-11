@@ -9,6 +9,22 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.4] — 2026-09-12
+
+### Added
+
+- Added a bilingual documentation hub with user, troubleshooting, release and roadmap entry points.
+- Added automated checks for website navigation and bilingual documentation pairs.
+
+### Changed
+
+- Improved static-site navigation, 404 handling, sitemap, robots and canonical metadata.
+
+### Fixed
+
+- Cleared stale release results after a failed manual update check so the UI cannot present an old version as current.
+- Aligned application, Tauri and Rust package version metadata to the published release.
+
 ## [0.9.2] — 2026-08-29
 
 ### Fixed
