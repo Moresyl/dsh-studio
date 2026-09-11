@@ -20,7 +20,7 @@ test('bilingual pair validation reports every missing shared fact', () => {
 })
 
 test('repository bilingual capability documents stay synchronized', async () => {
-  assert.deepEqual(await verifyBilingualDocs(), { pairs: 8 })
+  assert.deepEqual(await verifyBilingualDocs(), { pairs: 9 })
 })
 
 test('shared facts spanning lines accept Windows checkouts', () => {

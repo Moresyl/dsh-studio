@@ -77,6 +77,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test:packaging
       - run: pnpm verify:docs
+      - run: node .github/scripts/verify-website-docs.mjs
       - name: Frontend logic coverage (80% minimum)
         run: pnpm test:coverage
       - name: Rust and LAN remote regression

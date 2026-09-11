@@ -79,6 +79,9 @@ jobs:
           done
           exit $status
 
+      - name: Verify documentation hub
+        run: node .github/scripts/verify-website-docs.mjs
+
       - uses: actions/configure-pages@v5
         with:
           enablement: true
