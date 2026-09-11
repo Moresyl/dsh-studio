@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises'
+import { access, readFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -14,6 +14,13 @@ export async function verifyWebsiteDocs(root = ROOT, load = readFile) {
     const source = await load(join(root, page), 'utf8')
     for (const link of links) {
       if (!source.includes(link)) problems.push(`${page} is missing ${link}`)
+      if (!link.startsWith('http')) {
+        try {
+          await access(join(root, link))
+        } catch {
+          problems.push(`${page} points to missing local target ${link}`)
+        }
+      }
     }
   }
   const css = await load(join(root, 'website/style.css'), 'utf8')
