@@ -519,8 +519,7 @@ scoop install dsh-studio</pre>
                 >， 覆盖该版本的所有文件，由构建它们的同一条流水线写出。
               </p>
               <pre>sha256sum -c SHA256SUMS.txt --ignore-missing</pre>
-              <!-- 版本号那一段用通配符：真实文件名是 DSH.Studio_0.4.0_x64-setup.exe。
-                   Get-FileHash 支持通配，所以这条命令是能直接跑通的，而不只是好看。 -->
+              <!-- 版本号使用通配符，因此这条命令适用于每个正式发布版本。 -->
               <pre>Get-FileHash .\DSH.Studio_*_x64-setup.exe</pre>
             </article>
 

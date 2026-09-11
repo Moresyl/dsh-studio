@@ -543,9 +543,8 @@ scoop install dsh-studio</pre>
                 covering every file on it, written by the same workflow that built them.
               </p>
               <pre>sha256sum -c SHA256SUMS.txt --ignore-missing</pre>
-              <!-- Wildcarded on the version segment, which the real filenames
-                   carry: DSH.Studio_0.4.0_x64-setup.exe. Get-FileHash globs, so
-                   this is a command that works rather than one that reads well. -->
+              <!-- The version segment is intentionally wildcarded so this remains
+                   valid for every published release. -->
               <pre>Get-FileHash .\DSH.Studio_*_x64-setup.exe</pre>
             </article>
 
