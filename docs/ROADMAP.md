@@ -2,7 +2,7 @@
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-08-28. The refreshed benchmark head is
+Updated 2026-09-12. The refreshed benchmark head is
 `dataelement/dsh-desktop` at
 `c52f450d61a0efd33e63a9e8efa629b3cfe3cd9e`, with the official Harness head at
 `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` (`dsh-v0.1.1-rc.2`). The benchmark
@@ -40,7 +40,7 @@ The remaining gaps are concentrated in:
 
 ## Current capability matrix
 
-| Capability              | Benchmark head `2172b1b2`                 | DSH Studio now                                                                                                                         |
+| Capability              | Benchmark head `c52f450d`                 | DSH Studio now                                                                                                                         |
 | ----------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | No system Node required | Bundled Electron/runtime                  | Lite downloads and verifies official Node; Full carries SHA-256-pinned Node, Harness and pnpm                                          |
 | Real runtime gate       | Profile boot smoke                        | Cold-installs the full 511-package graph and boots the real Profile, Loader, Web server and Host probe on Windows/Linux/macOS CI       |
@@ -83,7 +83,7 @@ The remaining gaps are concentrated in:
 - `39bc348`: atomic export, settings, Profile and plugin-recovery writes.
 - `ff21525`: terminal-emulator code split and a release bundle-size budget.
 
-These commits shipped in the v0.9.0 formal release after its pipeline, public
+These commits shipped in the v0.9.2 formal release after its pipeline, public
 assets, updater signatures and checksums were verified.
 
 ## Next phase
