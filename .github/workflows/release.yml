@@ -44,7 +44,11 @@ jobs:
             exit 1
           fi
           existing_target="$(gh release view "$expected" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
-          if [ -n "$existing_target" ] && [ "$existing_target" != "$GITHUB_SHA" ]; then
+          # A manually-created draft/release may retain `main` as targetCommitish
+          # even when the tag is already pinned to this exact commit. For tag
+          # builds, the immutable tag is the source of truth; keep the guard for
+          # genuinely conflicting commit targets.
+          if [ -n "$existing_target" ] && [ "$existing_target" != "$GITHUB_SHA" ] && [ "$existing_target" != "main" ]; then
             existing_commit="$(git rev-parse "$existing_target^{commit}" 2>/dev/null || true)"
             if [ "$existing_commit" != "$GITHUB_SHA" ]; then
               echo "::error title=Release already exists::$expected already targets $existing_target; refusing to overwrite it from $GITHUB_SHA. Bump the application version before publishing."
