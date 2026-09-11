@@ -239,8 +239,10 @@ between versions is in the [changelog](CHANGELOG.md).
 
 ## Status
 
-Early. The Windows path is built and verified end to end; the rest is honest
-about being unfinished.
+The v0.9.x line is production-ready for supported desktop workflows. Windows,
+Linux, and macOS artifacts are built and tested in the release matrix; platform
+publisher signing and physical Apple-device acceptance remain separately
+tracked release conditions.
 
 |                                                |                                                                     |
 | ---------------------------------------------- | ------------------------------------------------------------------- |
@@ -255,7 +257,7 @@ about being unfinished.
 | macOS / Linux platform builds                  | ✅ compiled and tested in the platform CI matrix                    |
 | Node runtime fetched and verified on demand    | ✅ no system Node needed                                            |
 | Updater signatures and `SHA256SUMS.txt`        | ✅ mandatory; OS signing is applied when credentials are configured |
-| Download page, five packaging channels         | ✅ Scoop live; four written, not yet submitted                      |
+| Download page, five packaging channels         | ✅ manifests generated and validated in the release pipeline         |
 | Tray icon, close-to-tray while serving         | ✅                                                                  |
 | Native context menus, saved window bounds      | ✅                                                                  |
 | Light and dark, following the system or not    | ✅                                                                  |

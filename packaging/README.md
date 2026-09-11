@@ -18,18 +18,18 @@ one is how a bucket ends up installing last month's build.
 | Channel       | Manifest                                              | State                                       |
 | ------------- | ----------------------------------------------------- | ------------------------------------------- |
 | Scoop         | [`bucket/dsh-studio.json`](../bucket/dsh-studio.json) | live from this repository                   |
-| winget        | [`winget/`](winget)                                   | validated, needs a pull request             |
-| Homebrew Cask | [`homebrew/dsh-studio.rb`](homebrew/dsh-studio.rb)    | needs its own tap repository                |
-| AUR           | [`aur/`](aur)                                         | needs an upload to aur.archlinux.org        |
-| Flathub       | [`flathub/`](flathub)                                 | locally buildable; sandbox limits CLI tools |
+| winget        | [`winget/`](winget)                                   | generated and CI-validated                  |
+| Homebrew Cask | [`homebrew/dsh-studio.rb`](homebrew/dsh-studio.rb)    | generated and CI-validated                  |
+| AUR           | [`aur/`](aur)                                         | generated and CI-validated                  |
+| Flathub       | [`flathub/`](flathub)                                 | generated and CI-built                      |
 
 ## Publishing
 
-Only Scoop is served from here until the external registries receive their
-one-time submissions. Every published release runs the generator, validates all
-five manifests on their native toolchains and commits the validated files back
-to `main`. After a channel has been registered, its maintainer can consume those
-committed files without recalculating release URLs or digests by hand.
+Scoop is directly served from this repository. The other manifests are generated
+from the published release, validated on their native toolchains, and committed
+back to `main`; external registry submission remains an account-maintainer step.
+Their maintainers can consume these files without recalculating release URLs or
+digests by hand.
 
 **Scoop** needs nothing. A bucket is a repository with a `bucket/` directory, so
 this one already is:
