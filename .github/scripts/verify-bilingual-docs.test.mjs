@@ -24,8 +24,8 @@ test('repository bilingual capability documents stay synchronized', async () => 
 })
 
 test('shared facts spanning lines accept Windows checkouts', () => {
-  const english = `${'ordinary content '.repeat(10)}dataelement/dsh-desktop\r\n${BENCHMARK_HEAD} v0.9.2 formal release`
-  const chinese = `${'普通内容'.repeat(40)}dataelement/dsh-desktop ${BENCHMARK_HEAD} v0.9.2 正式版本`
+  const english = `${'ordinary content '.repeat(10)}dataelement/dsh-desktop\r\n${BENCHMARK_HEAD} v0.9.2 formal release v0.9.4`
+  const chinese = `${'普通内容'.repeat(40)}dataelement/dsh-desktop ${BENCHMARK_HEAD} v0.9.2 正式版本 v0.9.4`
   assert.deepEqual(
     validateBilingualPair('docs/ROADMAP.md', english, 'docs/ROADMAP.zh-CN.md', chinese),
     [],
