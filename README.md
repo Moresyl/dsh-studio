@@ -350,7 +350,7 @@ desktop app wrapping a Node service has to answer.
 
 ## FAQ
 
-Detailed guides: [User guide](docs/user-guide.md) · [Troubleshooting](docs/troubleshooting.md) ·
+Documentation hub: [Docs](docs/index.md) · [User guide](docs/user-guide.md) · [Troubleshooting](docs/troubleshooting.md) ·
 [Architecture](docs/architecture.md) · [Plugin and catalog development](docs/plugin-development.md) ·
 [Plugin interoperability contract](docs/plugin-interoperability.md) ·
 [Protocol 3 SDK](sdk/README.md) · [Current roadmap](docs/ROADMAP.md).

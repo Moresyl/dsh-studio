@@ -10,6 +10,7 @@ export const BENCHMARK_HEAD = 'c52f450d'
 
 export const BILINGUAL_PAIRS = Object.freeze([
   ['README.md', 'README.zh-CN.md'],
+  ['docs/index.md', 'docs/index.zh-CN.md'],
   ['docs/architecture.md', 'docs/architecture.zh-CN.md'],
   ['docs/accessibility-acceptance.md', 'docs/accessibility-acceptance.zh-CN.md'],
   ['docs/plugin-development.md', 'docs/plugin-development.zh-CN.md'],

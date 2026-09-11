@@ -316,7 +316,7 @@ src-tauri/crates/
 
 ## 常见问题
 
-详细文档：[使用指南](docs/user-guide.zh-CN.md) · [故障排查](docs/troubleshooting.zh-CN.md) ·
+文档中心：[文档](docs/index.zh-CN.md) · [使用指南](docs/user-guide.zh-CN.md) · [故障排查](docs/troubleshooting.zh-CN.md) ·
 [架构](docs/architecture.zh-CN.md) · [插件与目录开发](docs/plugin-development.zh-CN.md) ·
 [插件互操作合同](docs/plugin-interoperability.zh-CN.md) · [Protocol 3 SDK](sdk/README.md) ·
 [当前路线图](docs/ROADMAP.zh-CN.md)。
