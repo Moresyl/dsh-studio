@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://moresyl.github.io/dsh-studio/sitemap.xml

@@ -41,7 +41,7 @@ jobs:
       - name: Assemble the site
         run: |
           mkdir -p site
-          cp website/*.html website/*.css website/*.js site/
+          cp website/*.html website/*.css website/*.js website/*.xml website/*.txt site/
           cp website/latest.json site/
 
           # The brand mark has one source of truth at the repository root, and

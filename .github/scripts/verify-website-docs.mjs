@@ -20,6 +20,9 @@ export async function verifyWebsiteDocs(root = ROOT, load = readFile) {
   for (const selector of ['.docs-home', '.doc-grid', '.doc-card', '.doc-callout']) {
     if (!css.includes(selector)) problems.push(`website/style.css is missing ${selector}`)
   }
+  for (const file of ['website/404.html', 'website/sitemap.xml', 'website/robots.txt']) {
+    await load(join(root, file), 'utf8')
+  }
   if (problems.length) throw new Error(`website documentation verification failed:\n- ${problems.join('\n- ')}`)
   return { pages: PAGES.length }
 }
