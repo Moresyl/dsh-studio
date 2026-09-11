@@ -176,8 +176,7 @@ kbd,
   padding: 64px 0 68px;
 }
 
-/* No text-transform here, unlike the other small labels on the page: the only
-   thing in it is a version string, and `v0.4.0` is not spelled `V0.4.0`. */
+/* Keep the release label's original casing; it contains a version string. */
 .eyebrow {
   display: inline-flex;
   align-items: center;
