@@ -18,7 +18,7 @@ Harness 安装发生在 staging 目录，校验成功后才替换当前运行时
 
 Studio 会从官方 npm registry 安装经过验证的运行时，并在控制台显示原生生命周期脚本阶段。连续 120 秒没有任何输出，或安装总时长超过 20 分钟时，任务会被终止并给出错误，不再永久转圈。请根据错误检查网络后重试，或改用完整离线版；窗口无法打开时，可给可执行文件传入 `--export-diagnostics`，并附上生成的 ZIP。
 
-如果 npm 已完成安装但 Contract 2 仍拒绝运行时，请升级到 Studio v0.7.2 或更高版本并点击「修复」。这些版本会把随附 Studio integration 物化为普通目录，不再保留指向临时安装源码的 Windows Junction；如果校验仍失败，错误会列出具体缺失的合同条件。
+如果 npm 已完成安装但 Contract 2 仍拒绝运行时，请升级到 Studio v0.9.4 或更高版本并点击「修复」。这些版本会把随附 Studio integration 物化为普通目录，不再保留指向临时安装源码的 Windows Junction；如果校验仍失败，错误会列出具体缺失的合同条件。
 
 ## 托管 Harness 模块不可用
 
