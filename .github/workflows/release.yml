@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
 env:
   # Cargo's sparse index is smaller and substantially less sensitive to
   # transient crates.io DNS failures on macOS runners.

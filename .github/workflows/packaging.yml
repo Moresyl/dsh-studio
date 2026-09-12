@@ -12,7 +12,9 @@ permissions:
   contents: write
 
 concurrency:
-  group: package-channels-${{ github.event.release.tag_name || github.run_id }}
+  # Release, workflow_run, and manual backfills must share one queue. Using
+  # run_id here allowed overlapping writers to race on website/latest.json.
+  group: package-channels
   cancel-in-progress: false
 
 jobs:
