@@ -9,6 +9,21 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.7] — 2026-09-13
+
+### Fixed
+
+- Fixed the cross-platform runtime-contract CI job so pnpm is installed before cold profile boot.
+
+### Changed
+
+- Upgraded checkout and Node setup actions to their Node.js 24-compatible releases.
+- Added branch-run concurrency cancellation to prevent stale CI jobs from racing newer commits.
+
+### Verification
+
+- Verified the release gate across Windows, macOS and Linux, including cold runtime installation, Rust tests, accessibility, contracts, packaging and coverage.
+
 ## [0.9.6] — 2026-09-13
 
 ### Fixed
