@@ -32,9 +32,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-        with:
-          run_install: false
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@11.7.0
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
@@ -113,9 +112,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-        with:
-          run_install: false
+      - name: Install pinned pnpm
+        run: npm install --global pnpm@11.7.0
 
       - uses: actions/setup-node@v5
         with:
