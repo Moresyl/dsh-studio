@@ -19,3 +19,4 @@ Profile, the first error line, and an exported redacted diagnostic bundle. Never
 include API keys, session tokens, or the contents of private workspaces.
 
 [简体中文文档](index.zh-CN.md)
+- [Support and verification matrix](support-matrix.md)

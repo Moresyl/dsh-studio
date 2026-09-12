@@ -18,3 +18,4 @@ DSH Studio 是 DeepSeek Harness 的原生桌面承载层。按下面的入口可
 脱敏诊断包。不要提交 API Key、会话令牌或私有工作区内容。
 
 [English documentation](index.md)
+- [支持与验证矩阵](support-matrix.zh-CN.md)
