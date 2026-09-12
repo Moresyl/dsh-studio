@@ -29,7 +29,7 @@ jobs:
         id: release
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = workflow_run ]; then
+          if [ "${{ github.event_name }}" = workflow_run ] || [ "${{ github.event_name }}" = workflow_dispatch ]; then
             tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
           else
             tag="${{ github.event.release.tag_name }}"
