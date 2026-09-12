@@ -108,27 +108,27 @@ async function release() {
       headers: { Accept: 'application/vnd.github+json' },
       signal: controller.signal,
     })
+    if (!response.ok) throw new Error(`GitHub API replied ${response.status}`)
+    const { tag_name, published_at, assets } = await response.json()
+
+    const files = {}
+    for (const [id, suffix] of Object.entries(SUFFIXES)) {
+      const asset = assets.find((a) => a.name.endsWith(suffix))
+      if (asset) files[id] = { url: asset.browser_download_url, size: asset.size, name: asset.name }
+    }
+    const checksums = assets.find((a) => a.name === 'SHA256SUMS.txt')
+
+    const data = {
+      tag: tag_name,
+      published: published_at,
+      files,
+      checksums: checksums?.browser_download_url,
+    }
+    try { sessionStorage.setItem('dsh:release', JSON.stringify(data)) } catch { /* optional cache */ }
+    return data
   } finally {
     clearTimeout(timeout)
   }
-  if (!response.ok) throw new Error(`GitHub API replied ${response.status}`)
-  const { tag_name, published_at, assets } = await response.json()
-
-  const files = {}
-  for (const [id, suffix] of Object.entries(SUFFIXES)) {
-    const asset = assets.find((a) => a.name.endsWith(suffix))
-    if (asset) files[id] = { url: asset.browser_download_url, size: asset.size, name: asset.name }
-  }
-  const checksums = assets.find((a) => a.name === 'SHA256SUMS.txt')
-
-  const data = {
-    tag: tag_name,
-    published: published_at,
-    files,
-    checksums: checksums?.browser_download_url,
-  }
-  try { sessionStorage.setItem('dsh:release', JSON.stringify(data)) } catch { /* optional cache */ }
-  return data
 }
 
 /* ---------- the page ---------- */
