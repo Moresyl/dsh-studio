@@ -84,7 +84,7 @@ The remaining gaps are concentrated in:
 - `ff21525`: terminal-emulator code split and a release bundle-size budget.
 
 These commits first shipped in the v0.9.2 formal release and remain carried
-forward through v0.9.4 after each pipeline, public-asset, updater-signature and
+forward through v0.9.7 after each pipeline, public-asset, updater-signature and
 checksum verification.
 
 ## Next phase
