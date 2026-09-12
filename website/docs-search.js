@@ -23,5 +23,9 @@
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
       event.preventDefault(); input.focus(); input.select()
     }
+    if (event.key === 'Escape' && document.activeElement === input && input.value) {
+      input.value = ''
+      update()
+    }
   })
 })()
