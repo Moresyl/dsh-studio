@@ -11,6 +11,7 @@
 
 const REPO = 'Moresyl/dsh-studio'
 const API = `https://api.github.com/repos/${REPO}/releases/latest`
+const API_TIMEOUT_MS = 8_000
 
 /* Assets are matched on the tail of the filename rather than parsed, because the
    version sits in the middle of every one of them and the tail is the part the
@@ -85,16 +86,31 @@ function appleSilicon() {
  * visitor who comes back tomorrow should see tomorrow's release.
  */
 async function release() {
-  const cached = sessionStorage.getItem('dsh:release')
+  let cached = null
+  try {
+    cached = sessionStorage.getItem('dsh:release')
+  } catch {
+    // Privacy modes may disable storage; the network path remains usable.
+  }
   if (cached) {
     try {
       return JSON.parse(cached)
     } catch {
-      sessionStorage.removeItem('dsh:release')
+      try { sessionStorage.removeItem('dsh:release') } catch { /* storage is optional */ }
     }
   }
 
-  const response = await fetch(API, { headers: { Accept: 'application/vnd.github+json' } })
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+  let response
+  try {
+    response = await fetch(API, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: controller.signal,
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
   if (!response.ok) throw new Error(`GitHub API replied ${response.status}`)
   const { tag_name, published_at, assets } = await response.json()
 
@@ -111,7 +127,7 @@ async function release() {
     files,
     checksums: checksums?.browser_download_url,
   }
-  sessionStorage.setItem('dsh:release', JSON.stringify(data))
+  try { sessionStorage.setItem('dsh:release', JSON.stringify(data)) } catch { /* optional cache */ }
   return data
 }
 
