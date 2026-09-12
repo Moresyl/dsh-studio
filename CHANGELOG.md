@@ -9,6 +9,15 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Changed
+
+- Improved documentation keyboard navigation with skip links and labelled landmarks.
+- Bounded the website's GitHub release metadata request and made its session cache optional.
+
+### Fixed
+
+- Preserved the original updater download or relaunch error when native resource cleanup also fails.
+
 ## [0.9.4] — 2026-09-12
 
 ### Added
