@@ -99,6 +99,7 @@ jobs:
   publish:
     name: Build (${{ matrix.name }})
     needs: [quality, runtime-contract]
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
