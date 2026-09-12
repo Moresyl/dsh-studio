@@ -2,7 +2,7 @@
 
 [English](ROADMAP.md)
 
-更新时间：2026-09-12。最新对标仓库为 `dataelement/dsh-desktop`，提交
+更新时间：2026-09-13。最新对标仓库为 `dataelement/dsh-desktop`，提交
 `c52f450d61a0efd33e63a9e8efa629b3cfe3cd9e`，官方 Harness 当前提交为
 `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e`（`dsh-v0.1.1-rc.2`）。对标项目
 package 自报 0.1.1；本次仍以提交 SHA 作为比较依据。我方比较起点为

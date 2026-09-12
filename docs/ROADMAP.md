@@ -2,7 +2,7 @@
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-09-12. The refreshed benchmark head is
+Updated 2026-09-13. The refreshed benchmark head is
 `dataelement/dsh-desktop` at
 `c52f450d61a0efd33e63a9e8efa629b3cfe3cd9e`, with the official Harness head at
 `b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` (`dsh-v0.1.1-rc.2`). The benchmark
