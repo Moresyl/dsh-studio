@@ -21,6 +21,16 @@ describe('checkForUpdate', () => {
     check.mockResolvedValue(null)
 
     await expect(checkForUpdate()).resolves.toBeNull()
+    expect(check).toHaveBeenCalledOnce()
+  })
+
+  it('recovers from a first feed failure without retrying a successful check', async () => {
+    check.mockRejectedValueOnce(new Error('connection reset')).mockResolvedValueOnce(null)
+
+    await expect(checkForUpdate()).resolves.toBeNull()
+    expect(check).toHaveBeenCalledTimes(2)
+    expect(check).toHaveBeenNthCalledWith(1, { timeout: 15_000 })
+    expect(check).toHaveBeenNthCalledWith(2, { timeout: 15_000 })
   })
 
   it('normalizes updater metadata and releases the native resource', async () => {
@@ -51,6 +61,7 @@ describe('checkForUpdate', () => {
     check.mockRejectedValue(new Error('error sending request for url'))
 
     await expect(checkForUpdate()).rejects.toThrow(/HTTPS_PROXY.*无法连接/s)
+    expect(check).toHaveBeenCalledTimes(2)
   })
 })
 
