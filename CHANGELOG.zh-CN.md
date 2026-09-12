@@ -745,7 +745,7 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.4...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.7...HEAD
 [0.9.4]: https://github.com/Moresyl/dsh-studio/compare/v0.9.2...v0.9.4
 [0.9.2]: https://github.com/Moresyl/dsh-studio/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...v0.9.1
