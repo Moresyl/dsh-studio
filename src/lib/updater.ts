@@ -45,7 +45,6 @@ export async function checkForUpdate(): Promise<Release | null> {
     await closeAfterFailure(update)
     throw cause
   }
-  await closeAfterSuccess(update)
 }
 
 /** Download, verify, install, and relaunch into the published build. */
