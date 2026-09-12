@@ -15,6 +15,14 @@ pre-1.0 caveat that anything may still move.
 
 - Preserved actionable updater errors when native cleanup also fails.
 - Bounded GitHub release metadata requests and explained timeouts on the download page.
+
+### Added
+
+- Added bilingual documentation search, shortcut guidance, and an empty state.
+- Added a platform support and verification matrix.
+
+### Changed
+
 - Improved documentation keyboard navigation and landmark semantics.
 
 ### Changed
