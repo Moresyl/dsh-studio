@@ -9,6 +9,14 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.5] — 2026-09-12
+
+### Fixed
+
+- Preserved actionable updater errors when native cleanup also fails.
+- Bounded GitHub release metadata requests and explained timeouts on the download page.
+- Improved documentation keyboard navigation and landmark semantics.
+
 ### Changed
 
 - Improved documentation keyboard navigation with skip links and labelled landmarks.
