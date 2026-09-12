@@ -26,10 +26,29 @@ const notes = async (language, changelog) => {
   }
 }
 
+const validate = (language, content) => {
+  if (!content || content.length < 80) {
+    throw new Error(`release notes for ${language} are empty or too short`)
+  }
+  const headings = language === 'zh-CN'
+    ? [/^## .*修复/m, /^## .*验证/m]
+    : [/^## .*Fix/m, /^## .*Verif/m]
+  if (!headings.every((pattern) => pattern.test(content))) {
+    throw new Error(`release notes for ${language} must include fix and verification sections`)
+  }
+  if ((content.match(/^[-*] /gm) ?? []).length < 2) {
+    throw new Error(`release notes for ${language} must include at least two concrete bullets`)
+  }
+  return content
+}
+
 const [zh, en] = await Promise.all([
   notes('zh-CN', 'CHANGELOG.zh-CN.md'),
   notes('en', 'CHANGELOG.md'),
 ])
+
+validate('zh-CN', zh)
+validate('en', en)
 
 process.stdout.write(`<!-- dsh-notes:zh -->
 ${zh}
