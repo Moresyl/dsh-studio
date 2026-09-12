@@ -1,5 +1,5 @@
 {
-  "version": "0.9.5",
+  "version": "0.9.6",
   "notes": "<!-- dsh-notes:zh -->\n# DSH Studio v0.9.5\n\n## 修复与打磨\n\n- 修复更新器清理原生资源失败时覆盖可操作错误的问题。\n- 为 GitHub 发布元数据请求增加超时，并在下载页解释超时原因。\n- 改进文档键盘导航和语义区域。\n- 文档中心新增中英文搜索、快捷键提示和无结果状态。\n- 新增平台支持与验证矩阵，明确自动化测试和真机验收边界。\n- 更新安装包与项目描述，准确列出运行时、Profile、插件恢复和诊断能力。\n\n## 验证\n\n- 发布质量、打包、Rust、前端、无障碍和文档门禁通过。\n\n<!-- dsh-notes:en -->\n# DSH Studio v0.9.5\n\n## Fixed and polished\n\n- Preserved actionable updater errors when native cleanup also fails.\n- Bounded GitHub release metadata requests and explained timeouts on the download page.\n- Improved documentation keyboard navigation and landmark semantics.\n- Added bilingual documentation search with shortcut guidance and an empty state.\n- Added a platform support and verification matrix that separates automation from device acceptance.\n- Clarified installer and project descriptions for runtime, profiles, plugin recovery and diagnostics.\n\n## Verification\n\n- Release quality, packaging, Rust, frontend, accessibility and documentation gates pass.\n\n<!-- dsh-notes:end -->",
   "pub_date": "2026-09-12T16:42:39.121Z",
   "platforms": {
