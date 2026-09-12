@@ -132,11 +132,16 @@ function exactVersion(value: unknown): string {
 async function checkSignedUpdate<T>(
   check: (options: { timeout: number }) => Promise<T>,
 ): Promise<T> {
-  try {
-    return await check({ timeout: CHECK_TIMEOUT_MS })
-  } catch (cause) {
-    throw updaterNetworkError(cause)
+  let last: unknown
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await check({ timeout: CHECK_TIMEOUT_MS })
+    } catch (cause) {
+      last = cause
+      if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 350))
+    }
   }
+  throw updaterNetworkError(last)
 }
 
 function updaterNetworkError(cause: unknown): Error {
