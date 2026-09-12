@@ -21,6 +21,9 @@ spawns, and never forks the upstream project to do it.
 
 Under 4 MB per installer · [all artifacts and checksums](#install) · [简体中文](README.zh-CN.md)
 
+For a precise platform and runtime boundary, see the [support matrix](docs/support-matrix.md).
+If startup or plugin installation fails, begin with the [troubleshooting guide](docs/troubleshooting.md).
+
 <br>
 
 <img src="assets/plugin-install.png" width="820" alt="Installing a plugin: the marketplace row, the manifest, the npm output, and the layer written to the harness profile">
