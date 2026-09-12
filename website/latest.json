@@ -1,6 +1,6 @@
 {
   "version": "0.9.7",
-  "notes": "<!-- dsh-notes:zh -->\n# DSH Studio v0.9.6\n\n## 修复与打磨\n\n- 修复下载页中英文版本标签的 HTML 闭合问题，避免浏览器解析异常。\n- 串行化发布与渠道清单写入，降低并发发布造成元数据竞争的风险。\n\n## 验证\n\n- CI 已验证 Windows、macOS、Linux 测试矩阵、冷安装、运行时契约、供应链审计和原生安全覆盖率。\n\n<!-- dsh-notes:en -->\n# DSH Studio v0.9.6\n\n## Fixed and polished\n\n- Fixed malformed version-label HTML on the bilingual download pages.\n- Serialized release and channel-manifest writers to reduce concurrent metadata races.\n\n## Verification\n\n- CI verifies Windows, macOS and Linux matrices, cold installs, runtime contracts, supply-chain audit and native safety coverage.\n\n<!-- dsh-notes:end -->",
+  "notes": "<!-- dsh-notes:zh -->\n# DSH Studio v0.9.7\n\n## 修复与打磨\n\n- 修复下载页中英文版本标签的 HTML 闭合问题，避免浏览器解析异常。\n- 串行化发布与渠道清单写入，降低并发发布造成元数据竞争的风险。\n\n## 验证\n\n- CI 已验证 Windows、macOS、Linux 测试矩阵、冷安装、运行时契约、供应链审计和原生安全覆盖率。\n\n<!-- dsh-notes:en -->\n# DSH Studio v0.9.7\n\n## Fixed and polished\n\n- Fixed malformed version-label HTML on the bilingual download pages.\n- Serialized release and channel-manifest writers to reduce concurrent metadata races.\n\n## Verification\n\n- CI verifies Windows, macOS and Linux matrices, cold installs, runtime contracts, supply-chain audit and native safety coverage.\n\n<!-- dsh-notes:end -->",
   "pub_date": "2026-09-12T18:49:40.378Z",
   "platforms": {
     "darwin-aarch64": {
