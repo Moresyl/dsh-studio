@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.9.5",
   "type": "module",
-  "description": "Native desktop studio for DeepSeek Harness — Linux/macOS/Windows, built with Rust + Tauri",
+  "description": "Cross-platform DeepSeek Harness desktop studio with supervised runtime, profiles, terminals, plugin recovery, sessions and signed updates",
   "keywords": [
     "deepseek",
     "deepseek-harness",

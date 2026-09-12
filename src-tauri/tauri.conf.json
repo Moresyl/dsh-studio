@@ -22,8 +22,8 @@
     "targets": "all",
     "createUpdaterArtifacts": true,
     "category": "DeveloperTool",
-    "shortDescription": "Native desktop studio for DeepSeek Harness",
-    "longDescription": "A native desktop shell for the DeepSeek Harness that supervises the local service, reclaims stray tool processes, and ships first-class builds for Windows, macOS and Linux.",
+    "shortDescription": "Cross-platform DeepSeek Harness desktop studio",
+    "longDescription": "A native Rust and Tauri studio for DeepSeek Harness with supervised local runtime, isolated profiles, terminals, session search and export, plugin catalog and recovery, remote access, diagnostics, and signed updates for Windows, macOS, and Linux.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
