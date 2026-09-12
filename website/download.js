@@ -300,9 +300,24 @@ async function main() {
     paint(data)
   } catch (error) {
     // Reported once, quietly. The static page is the fallback, and it works.
-    console.warn('Could not read the latest release; showing the shipped defaults.', error)
+    const timedOut = error?.name === 'AbortError'
+    console.warn(
+      timedOut
+        ? 'The release metadata request timed out; showing the shipped defaults.'
+        : 'Could not read the latest release; showing the shipped defaults.',
+      error,
+    )
     const notice = document.querySelector('[data-api-notice]')
-    if (notice) notice.hidden = false
+    if (notice) {
+      notice.hidden = false
+      if (timedOut) {
+        const timeoutMessage =
+          document.documentElement.lang.startsWith('zh')
+            ? 'GitHub 响应超时，因此下方链接指向 Releases 页面、体积为估算值。下载本身不受影响。'
+            : 'GitHub timed out, so the links below point to the Releases page and sizes are estimates. Downloads are unaffected.'
+        notice.textContent = timeoutMessage
+      }
+    }
   }
 
   if (platform) focus(platform, data)
