@@ -10,6 +10,7 @@ test('website documentation pages expose both languages and recovery links', asy
     ['website/404.html', '404'],
     ['website/sitemap.xml', '<urlset>'],
     ['website/robots.txt', 'Sitemap:'],
+    ['website/docs-search.js', 'data-doc-search data-doc-search-status metaKey ctrlKey'],
   ])
   await assert.doesNotReject(() => verifyWebsiteDocs('fixture', async (path) => {
     const name = path.replaceAll('\\', '/').split('/').slice(-2).join('/')
