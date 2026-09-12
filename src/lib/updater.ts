@@ -138,7 +138,7 @@ async function checkSignedUpdate<T>(
       return await check({ timeout: CHECK_TIMEOUT_MS })
     } catch (cause) {
       last = cause
-      if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 350))
+      if (attempt === 0) await new Promise((resolve) => globalThis.setTimeout(resolve, 350))
     }
   }
   throw updaterNetworkError(last)
