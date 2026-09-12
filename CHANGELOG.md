@@ -9,6 +9,10 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Documentation
+
+- Reworked the English and Chinese documentation landing pages into task-oriented paths, with a five-minute first-run guide, recovery guidance, and a more useful issue-reporting checklist.
+
 ## [0.9.7] — 2026-09-13
 
 ### Fixed
