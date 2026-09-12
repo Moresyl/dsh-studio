@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
 
 PackageIdentifier: Moresyl.DSHStudio
-PackageVersion: 0.9.5
+PackageVersion: 0.9.6
 InstallerLocale: en-US
 MinimumOSVersion: 10.0.17763.0
 InstallerType: nullsoft
@@ -11,7 +11,7 @@ UpgradeBehavior: install
 ReleaseDate: 2026-09-12
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/Moresyl/dsh-studio/releases/download/v0.9.5/DSH.Studio_0.9.5_x64-setup.exe
-    InstallerSha256: BEB66960AD013C16FDD3F134812C3141D79DBEA9D8485B5D7EA84FB0F19F8C87
+    InstallerUrl: https://github.com/Moresyl/dsh-studio/releases/download/v0.9.6/DSH.Studio_0.9.6_x64-setup.exe
+    InstallerSha256: A1CE8D591D9224EA84A7B61BBFED97E6E38629C7D14BBF5CF0E911CFF92F8E9A
 ManifestType: installer
 ManifestVersion: 1.6.0
