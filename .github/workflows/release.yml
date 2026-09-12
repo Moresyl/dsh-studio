@@ -37,7 +37,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
-          cache: pnpm
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-audit
       - name: Enforce release identity
@@ -118,7 +117,6 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
-          cache: pnpm
 
       - uses: dtolnay/rust-toolchain@stable
         with:
