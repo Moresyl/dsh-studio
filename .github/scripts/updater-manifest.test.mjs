@@ -42,13 +42,17 @@ test('website fallback rejects unsigned or insecure updater artifacts', () => {
 })
 
 test('desktop and publishing workflows agree on the website fallback', async () => {
-  const [configText, packageWorkflow, websiteWorkflow, releaseWorkflow] = await Promise.all([
+  const [configText, packageText, fallbackText, packageWorkflow, websiteWorkflow, releaseWorkflow] = await Promise.all([
     readFile('src-tauri/tauri.conf.json', 'utf8'),
+    readFile('package.json', 'utf8'),
+    readFile('website/latest.json', 'utf8'),
     readFile('.github/workflows/packaging.yml', 'utf8'),
     readFile('.github/workflows/website.yml', 'utf8'),
     readFile('.github/workflows/release.yml', 'utf8'),
   ])
   const config = JSON.parse(configText)
+  const packageVersion = JSON.parse(packageText).version
+  assert.equal(JSON.parse(fallbackText).version, packageVersion)
 
   assert.deepEqual(config.plugins.updater.endpoints, [
     'https://github.com/Moresyl/dsh-studio/releases/latest/download/latest.json',
