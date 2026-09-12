@@ -113,6 +113,8 @@ kbd,
 }
 
 .docs-home { max-width: 900px; margin: 0 auto; padding: 72px 0 48px; }
+.skip-link { position: absolute; left: 12px; top: 8px; z-index: 10; transform: translateY(-160%); padding: 8px 12px; border-radius: 8px; background: var(--accent); color: #071018; font-weight: 700; }
+.skip-link:focus { transform: translateY(0); }
 .doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 36px; }
 .doc-card { display: flex; flex-direction: column; gap: 10px; min-height: 156px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--panel) 76%, transparent); color: var(--ink); text-decoration: none; transition: border-color .16s ease, transform .16s ease; }
 .doc-card:hover { border-color: var(--accent); transform: translateY(-2px); }
