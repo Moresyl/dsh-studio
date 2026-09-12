@@ -9,6 +9,16 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.6] — 2026-09-13
+
+### Fixed
+
+- Fixed malformed closing markup in the bilingual download-page release labels.
+
+### Changed
+
+- Serialized release and channel metadata writers to reduce concurrent publication races.
+
 ## [0.9.5] — 2026-09-12
 
 ### Fixed
