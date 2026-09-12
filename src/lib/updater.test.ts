@@ -11,7 +11,7 @@ vi.mock('@tauri-apps/plugin-process', () => ({ relaunch }))
 import { checkForUpdate, installUpdate, notesForDisplay } from '@/lib/updater'
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   close.mockResolvedValue(undefined)
   relaunch.mockResolvedValue(undefined)
 })
@@ -81,11 +81,18 @@ describe('installUpdate', () => {
 
   it('closes the native resource and leaves relaunch alone after a download failure', async () => {
     downloadAndInstall.mockRejectedValue(new Error('network lost'))
+    close.mockRejectedValueOnce(new Error('cleanup lost'))
     check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
 
     await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/Full \/ Offline.*network lost/s)
     expect(relaunch).not.toHaveBeenCalled()
     expect(close).toHaveBeenCalledOnce()
+  })
+
+  it('reports cleanup failure after a successful update', async () => {
+    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
+    close.mockRejectedValueOnce(new Error('cleanup lost'))
+    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/更新器未能完成清理/)
   })
 
   it('requires a fresh review when latest changed after confirmation', async () => {

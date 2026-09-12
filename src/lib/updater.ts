@@ -8,6 +8,8 @@ const UPDATE_CHANGED =
   'The available release changed after you reviewed it. Review the new release notes before installing. / 可用版本在确认后发生了变化，请先查看新版本说明再安装。'
 const RELAUNCH_FAILED =
   'The update was installed, but DSH Studio could not relaunch. Close and start the app again to finish updating. / 更新已安装，但 DSH Studio 无法自动重启；请关闭并重新启动应用以完成更新。'
+const CLEANUP_FAILED =
+  'The updater could not finish cleanup. Restart DSH Studio and retry. / 更新器未能完成清理，请重启 DSH Studio 后重试。'
 
 export interface Release {
   /** The published version, without a leading `v`. */
@@ -31,15 +33,19 @@ export async function checkForUpdate(): Promise<Release | null> {
 
   try {
     const version = exactVersion(update.version)
-    return {
+    const release = {
       version,
       url: `${RELEASES}/tag/v${version}`,
       notes: update.body?.trim() ?? '',
       published: update.date ?? '',
     }
-  } finally {
-    await update.close()
+    await closeAfterSuccess(update)
+    return release
+  } catch (cause) {
+    await closeAfterFailure(update)
+    throw cause
   }
+  await closeAfterSuccess(update)
 }
 
 /** Download, verify, install, and relaunch into the published build. */
@@ -86,9 +92,27 @@ export async function installUpdate(
       const detail = cause instanceof Error ? cause.message.trim() : String(cause).trim()
       throw new Error(detail ? `${RELAUNCH_FAILED}\n${detail}` : RELAUNCH_FAILED, { cause })
     }
+    await closeAfterSuccess(update)
     return true
-  } finally {
+  } catch (cause) {
+    await closeAfterFailure(update)
+    throw cause
+  }
+}
+
+async function closeAfterFailure(update: { close: () => Promise<void> }): Promise<void> {
+  try {
     await update.close()
+  } catch {
+    // Preserve the actionable operation failure instead of masking it with cleanup noise.
+  }
+}
+
+async function closeAfterSuccess(update: { close: () => Promise<void> }): Promise<void> {
+  try {
+    await update.close()
+  } catch (cause) {
+    throw new Error(CLEANUP_FAILED, { cause })
   }
 }
 
