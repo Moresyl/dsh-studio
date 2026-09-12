@@ -113,6 +113,8 @@ kbd,
 }
 
 .docs-home { max-width: 900px; margin: 0 auto; padding: 72px 0 48px; }
+.docs-home > h1 { max-width: 18ch; font-size: clamp(2.3rem, 6vw, 4.2rem); line-height: 1.08; }
+.docs-home > .lede { max-width: 62ch; color: var(--muted); font-size: 1rem; }
 .doc-search { display: grid; gap: 8px; margin: 28px 0 8px; color: var(--muted); font-size: .82rem; font-weight: 650; letter-spacing: .02em; }
 .doc-search kbd { margin-left: 6px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; }
 .doc-search input { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 13px 15px; font: inherit; }
@@ -122,7 +124,7 @@ kbd,
 .doc-empty { margin: 22px 0; color: var(--muted); text-align: center; }
 .skip-link { position: absolute; left: 12px; top: 8px; z-index: 10; transform: translateY(-160%); padding: 8px 12px; border-radius: 8px; background: var(--accent); color: #071018; font-weight: 700; }
 .skip-link:focus { transform: translateY(0); }
-.doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 36px; }
+.doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 36px; }
 .doc-card { display: flex; flex-direction: column; gap: 10px; min-height: 156px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--panel) 76%, transparent); color: var(--ink); text-decoration: none; transition: border-color .16s ease, transform .16s ease; }
 .doc-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .doc-card:focus-visible, .masthead a:focus-visible, footer a:focus-visible, .button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
@@ -133,6 +135,7 @@ kbd,
 .doc-callout strong { color: var(--ink); white-space: nowrap; }
 .doc-callout a { margin-left: auto; color: var(--accent); white-space: nowrap; }
 @media (max-width: 760px) { .docs-home { padding: 48px 0 32px; } .doc-grid { grid-template-columns: 1fr; } .doc-callout { align-items: flex-start; flex-direction: column; } .doc-callout a { margin-left: 0; } }
+@media (min-width: 761px) and (max-width: 960px) { .doc-grid { grid-template-columns: repeat(2, 1fr); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
