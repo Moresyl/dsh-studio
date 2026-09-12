@@ -20,6 +20,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install pinned pnpm
         run: npm install --global pnpm@11.7.0
+      - name: Initialize pnpm store
+        run: pnpm store path
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
@@ -42,6 +44,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install pinned pnpm
         run: npm install --global pnpm@11.7.0
+      - name: Initialize pnpm store
+        run: pnpm store path
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
@@ -60,6 +64,8 @@ jobs:
 
       - name: Install pinned pnpm
         run: npm install --global pnpm@11.7.0
+      - name: Initialize pnpm store
+        run: pnpm store path
 
       - uses: actions/setup-node@v5
         with:
