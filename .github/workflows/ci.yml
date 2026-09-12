@@ -84,6 +84,10 @@ jobs:
       - run: pnpm lint
       - run: pnpm build
       - run: pnpm test:packaging
+      - name: Verify public contracts
+        run: pnpm verify:contracts
+      - name: Verify accessibility contracts
+        run: pnpm verify:a11y
       - run: pnpm verify:docs
       - run: node .github/scripts/verify-website-docs.mjs
       - name: Frontend logic coverage (80% minimum)
