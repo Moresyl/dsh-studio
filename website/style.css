@@ -114,10 +114,12 @@ kbd,
 
 .docs-home { max-width: 900px; margin: 0 auto; padding: 72px 0 48px; }
 .doc-search { display: grid; gap: 8px; margin: 28px 0 8px; color: var(--muted); font-size: .82rem; font-weight: 650; letter-spacing: .02em; }
+.doc-search kbd { margin-left: 6px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 6px; font-size: .72rem; font-weight: 600; }
 .doc-search input { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); padding: 13px 15px; font: inherit; }
 .doc-search input:focus { outline: 3px solid color-mix(in srgb, var(--accent) 30%, transparent); outline-offset: 2px; border-color: var(--accent); }
 .doc-search-status { min-height: 1.2em; margin: 0 0 12px; color: var(--muted); font-size: .85rem; }
 .doc-card[hidden] { display: none; }
+.doc-empty { margin: 22px 0; color: var(--muted); text-align: center; }
 .skip-link { position: absolute; left: 12px; top: 8px; z-index: 10; transform: translateY(-160%); padding: 8px 12px; border-radius: 8px; background: var(--accent); color: #071018; font-weight: 700; }
 .skip-link:focus { transform: translateY(0); }
 .doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 36px; }

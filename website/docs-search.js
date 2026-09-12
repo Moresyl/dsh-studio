@@ -2,6 +2,7 @@
   const input = document.querySelector('[data-doc-search]')
   const status = document.querySelector('[data-doc-search-status]')
   const cards = [...document.querySelectorAll('.doc-card')]
+  const empty = document.querySelector('[data-doc-empty]')
   if (!input || !status || !cards.length) return
   const chinese = document.documentElement.lang.startsWith('zh')
   const update = () => {
@@ -15,6 +16,7 @@
     status.textContent = query
       ? chinese ? `找到 ${visible} 篇文档` : `${visible} guide${visible === 1 ? '' : 's'} found`
       : ''
+    if (empty) empty.hidden = visible !== 0 || !query
   }
   input.addEventListener('input', update)
   document.addEventListener('keydown', (event) => {
