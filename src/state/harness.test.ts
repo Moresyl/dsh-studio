@@ -59,6 +59,10 @@ describe('supervisor actions', () => {
     await expect(useHarness.getState().inspect()).rejects.toBe('environment probe failed')
 
     expect(useHarness.getState().error).toBe('environment probe failed')
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'environment probe failed',
+    })
   })
 
   it('does not let an older environment probe overwrite a newer answer', async () => {
