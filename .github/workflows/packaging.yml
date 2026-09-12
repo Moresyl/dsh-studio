@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   release:
     types: [published]
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 permissions:
   contents: write
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   generate:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     name: Regenerate manifests
     runs-on: ubuntu-22.04
     steps:
@@ -21,7 +25,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22.19.0
-      - run: node packaging/generate.mjs "${{ github.event.release.tag_name }}"
+      - name: Resolve published release tag
+        id: release
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = workflow_run ]; then
+            tag="$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)"
+          else
+            tag="${{ github.event.release.tag_name }}"
+          fi
+          test -n "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: node packaging/generate.mjs "${{ steps.release.outputs.tag }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4
