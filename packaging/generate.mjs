@@ -100,7 +100,20 @@ async function sha256(url, attempt = 1) {
 }
 
 async function resolve(tag) {
-  const release = await github(tag ? `releases/tags/${tag}` : 'releases/latest')
+  const releasePath = tag ? `releases/tags/${tag}` : 'releases/latest'
+  // A published release triggers this workflow in parallel with the platform
+  // build. GitHub can therefore expose the Release before latest.json and the
+  // installers have finished uploading. Poll briefly instead of failing the
+  // channel job on that normal propagation window.
+  let release
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    release = await github(releasePath)
+    if (release.assets?.some((asset) => asset.name === 'latest.json')) break
+    if (attempt === 20) throw new Error(`Release ${release.tag_name} has no latest.json after waiting for build assets`)
+    const delay = Math.min(30_000, attempt * 3_000)
+    console.log(`  waiting for release assets (${attempt}/19)…`)
+    await new Promise((resume) => setTimeout(resume, delay))
+  }
   const version = release.tag_name.replace(/^v/, '')
 
   const updaterAsset = release.assets.find((asset) => asset.name === 'latest.json')
