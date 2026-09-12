@@ -45,8 +45,8 @@
   <content_rating type="oars-1.1" />
 
   <releases>
-    <release version="0.9.2" date="2026-08-29">
-      <url type="details">https://github.com/Moresyl/dsh-studio/releases/tag/v0.9.2</url>
+    <release version="0.9.5" date="2026-09-12">
+      <url type="details">https://github.com/Moresyl/dsh-studio/releases/tag/v0.9.5</url>
     </release>
   </releases>
 </component>
