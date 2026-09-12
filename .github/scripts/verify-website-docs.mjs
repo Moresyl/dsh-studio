@@ -27,6 +27,15 @@ export async function verifyWebsiteDocs(root = ROOT, load = readFile) {
   for (const selector of ['.docs-home', '.doc-grid', '.doc-card', '.doc-callout']) {
     if (!css.includes(selector)) problems.push(`website/style.css is missing ${selector}`)
   }
+  for (const page of PAGES.map(([page]) => page)) {
+    const source = await load(join(root, page), 'utf8')
+    if (!source.includes('docs-search.js')) problems.push(`${page} is missing the documentation search script`)
+    if (!source.includes('data-doc-search')) problems.push(`${page} is missing the documentation search control`)
+  }
+  const search = await load(join(root, 'website/docs-search.js'), 'utf8')
+  for (const marker of ['data-doc-search', 'data-doc-search-status', 'metaKey', 'ctrlKey']) {
+    if (!search.includes(marker)) problems.push(`website/docs-search.js is missing ${marker}`)
+  }
   for (const file of ['website/404.html', 'website/sitemap.xml', 'website/robots.txt']) {
     await load(join(root, file), 'utf8')
   }
