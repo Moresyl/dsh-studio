@@ -7,7 +7,6 @@
  */
 import { create } from 'zustand'
 
-import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import type { Environment, HarnessEvent, LogLine, NodeProgress, Status } from '@/lib/ipc'
 import { acquireTogether } from '@/lib/lifecycle'
