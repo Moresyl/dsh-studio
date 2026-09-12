@@ -4,8 +4,8 @@ import { verifyWebsiteDocs } from './verify-website-docs.mjs'
 
 test('website documentation pages expose both languages and recovery links', async () => {
   const files = new Map([
-    ['website/docs.html', '<a href="docs.zh.html"></a><a href="docs/user-guide.md"></a><a href="docs/troubleshooting.md"></a>'],
-    ['website/docs.zh.html', '<a href="docs.html"></a><a href="docs/user-guide.zh-CN.md"></a><a href="docs/troubleshooting.zh-CN.md"></a>'],
+    ['website/docs.html', '<a href="docs.zh.html"></a><a href="docs/user-guide.md"></a><a href="docs/troubleshooting.md"></a> docs-search.js data-doc-search'],
+    ['website/docs.zh.html', '<a href="docs.html"></a><a href="docs/user-guide.zh-CN.md"></a><a href="docs/troubleshooting.zh-CN.md"></a> docs-search.js data-doc-search'],
     ['website/style.css', '.docs-home .doc-grid .doc-card .doc-callout'],
     ['website/404.html', '404'],
     ['website/sitemap.xml', '<urlset>'],
