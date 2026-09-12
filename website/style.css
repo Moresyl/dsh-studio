@@ -116,6 +116,7 @@ kbd,
 .doc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 36px; }
 .doc-card { display: flex; flex-direction: column; gap: 10px; min-height: 156px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--panel) 76%, transparent); color: var(--ink); text-decoration: none; transition: border-color .16s ease, transform .16s ease; }
 .doc-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.doc-card:focus-visible, .masthead a:focus-visible, footer a:focus-visible, .button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
 .doc-card strong { font-size: 17px; }
 .doc-card > span:last-child { color: var(--muted); font-size: 13px; line-height: 1.55; }
 .doc-kicker { color: var(--accent); font: 11px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
@@ -123,6 +124,10 @@ kbd,
 .doc-callout strong { color: var(--ink); white-space: nowrap; }
 .doc-callout a { margin-left: auto; color: var(--accent); white-space: nowrap; }
 @media (max-width: 760px) { .docs-home { padding: 48px 0 32px; } .doc-grid { grid-template-columns: 1fr; } .doc-callout { align-items: flex-start; flex-direction: column; } .doc-callout a { margin-left: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
 
 /* ---------- masthead ---------- */
 
