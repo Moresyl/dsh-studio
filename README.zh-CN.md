@@ -21,6 +21,8 @@ Rust + Tauri 2 编写。它托管本地 `dsh` 服务、回收服务派生出的�
 
 每个安装包不到 4 MB · [全部产物与校验和](#安装) · [English](README.md)
 
+平台与运行时边界请参阅[支持矩阵](docs/support-matrix.zh-CN.md)；启动或插件安装失败时，请先查看[故障排除指南](docs/troubleshooting.zh-CN.md)。
+
 <br>
 
 <img src="assets/plugin-install.zh.png" width="820" alt="安装一个插件：市场列表、清单、npm 输出，以及写进 harness profile 的那一层">
