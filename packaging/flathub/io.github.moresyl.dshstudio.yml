@@ -47,8 +47,8 @@ modules:
       - install -Dm644 io.github.moresyl.dshstudio.metainfo.xml /app/share/metainfo/io.github.moresyl.dshstudio.metainfo.xml
     sources:
       - type: file
-        url: https://github.com/Moresyl/dsh-studio/releases/download/v0.9.6/DSH.Studio_0.9.6_amd64.deb
-        sha256: 9201b15399f63c3f6cc4525b847abd9d10e070d9cace5bff7a7f9a6d6587705f
+        url: https://github.com/Moresyl/dsh-studio/releases/download/v0.9.7/DSH.Studio_0.9.7_amd64.deb
+        sha256: b4125eeb16b86be03924351ddaf1bd2cf4289e2e81c5e9b4c1ba3674f9a72eea
         dest-filename: dsh-studio.deb
       - type: file
         path: io.github.moresyl.dshstudio.metainfo.xml
