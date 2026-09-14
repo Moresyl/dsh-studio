@@ -32,11 +32,14 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - name: Install pinned pnpm
-        run: npm install --global pnpm@11.7.0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-audit
       - name: Enforce release identity
@@ -93,11 +96,14 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
-      - name: Install pinned pnpm
-        run: npm install --global pnpm@11.7.0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - run: node .github/scripts/verify-runtime-install.mjs
 
   publish:
@@ -112,13 +118,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
-
-      - name: Install pinned pnpm
-        run: npm install --global pnpm@11.7.0
-
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - uses: dtolnay/rust-toolchain@stable
         with:
