@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Initialize pnpm store
         run: pnpm store path
       - uses: dtolnay/rust-toolchain@stable
@@ -49,6 +51,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
       - name: Initialize pnpm store
         run: pnpm store path
       - run: node .github/scripts/verify-runtime-install.mjs
@@ -69,6 +73,8 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Initialize pnpm store
         run: pnpm store path
