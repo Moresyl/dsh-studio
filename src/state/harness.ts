@@ -8,7 +8,14 @@
 import { create } from 'zustand'
 
 import * as ipc from '@/lib/ipc'
-import type { Environment, HarnessEvent, LogLine, NodeProgress, Status } from '@/lib/ipc'
+import type {
+  Environment,
+  HarnessEvent,
+  HarnessVersion,
+  LogLine,
+  NodeProgress,
+  Status,
+} from '@/lib/ipc'
 import { acquireTogether } from '@/lib/lifecycle'
 import { reportFailure } from '@/state/failure'
 
@@ -43,15 +50,18 @@ interface HarnessStore {
   nodeProgress: NodeProgress | null
   /** Last request failure, cleared when the next one begins. */
   error: string | null
+  harnessVersions: HarnessVersion[]
+  loadingHarnessVersions: boolean
 
   inspect: () => Promise<void>
   start: () => Promise<void>
   stop: () => Promise<void>
-  install: () => Promise<void>
+  install: (version?: string) => Promise<void>
   /** Fetch a Node runtime for a machine that has none. */
   provisionNode: () => Promise<void>
   /** Use one of the discovered supported Node runtimes for the next start. */
   selectNode: (path: string) => Promise<void>
+  refreshHarnessVersions: () => Promise<void>
   /** Empty the visible scrollback. The supervisor's own ring is untouched. */
   clear: () => void
   /** Apply one event from the Rust side. */
@@ -74,6 +84,8 @@ export const useHarness = create<HarnessStore>((set, get) => ({
   provisioningNode: false,
   nodeProgress: null,
   error: null,
+  harnessVersions: [],
+  loadingHarnessVersions: false,
 
   inspect: async () => {
     const generation = ++inspectionGeneration
@@ -119,11 +131,11 @@ export const useHarness = create<HarnessStore>((set, get) => ({
     }
   },
 
-  install: async () => {
+  install: async (version) => {
     if (occupied(get())) return
     set({ installing: true, installProgress: 0, error: null })
     try {
-      await ipc.install()
+      await ipc.install(version)
       // The check card is driven by what is on disk, so re-read it.
       await get().inspect()
     } catch (cause) {
@@ -157,6 +169,19 @@ export const useHarness = create<HarnessStore>((set, get) => ({
       set({ error: reportFailure(cause) })
     } finally {
       set({ busy: false })
+    }
+  },
+
+  refreshHarnessVersions: async () => {
+    if (get().loadingHarnessVersions) return
+    set({ loadingHarnessVersions: true, error: null })
+    try {
+      const harnessVersions = await ipc.harnessVersions()
+      set({ harnessVersions })
+    } catch (cause) {
+      set({ error: reportFailure(cause) })
+    } finally {
+      set({ loadingHarnessVersions: false })
     }
   },
 

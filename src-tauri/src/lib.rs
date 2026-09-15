@@ -118,6 +118,7 @@ pub fn run() {
             harness::commands::harness_safe_mode_start,
             harness::commands::harness_stop,
             harness::commands::harness_install,
+            harness::commands::harness_versions,
             harness::commands::harness_log,
             node::commands::node_provision,
             node::commands::node_select,

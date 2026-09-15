@@ -1,5 +1,6 @@
 //! The IPC surface the frontend drives.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -26,6 +27,14 @@ pub struct AppState {
     lifecycle: Mutex<()>,
 }
 
+struct InstallingGuard<'a>(&'a AtomicBool);
+
+impl Drop for InstallingGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
 impl AppState {
     pub fn new(supervisor: Arc<Supervisor>) -> Self {
         Self {
@@ -37,10 +46,77 @@ impl AppState {
 }
 
 /// One line of harness output, shaped for the log panel.
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct LogLine {
     pub stream: Stream,
     pub line: String,
+}
+
+/// A published Harness release, annotated with the Studio runtime contract.
+///
+/// The registry is an authority for what exists, not for what this desktop
+/// build can safely boot. Keeping that distinction in the response lets the
+/// UI distinguish the bundled baseline from versions requiring a local
+/// installation and startup check before promotion.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HarnessVersion {
+    pub version: String,
+    pub qualified: bool,
+    pub installed: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct NpmMetadata {
+    versions: HashMap<String, serde_json::Value>,
+}
+
+const HARNESSES_REGISTRY: &str = "https://registry.npmjs.org/@deepseek-ai%2Fdsh";
+const MAX_HARNESS_VERSIONS: usize = 50;
+
+fn parse_harness_versions(raw: &str, installed: Option<&str>) -> Result<Vec<HarnessVersion>> {
+    let metadata: NpmMetadata = serde_json::from_str(raw)
+        .map_err(|cause| Error::Network(format!("Harness version catalog is invalid: {cause}")))?;
+    let mut versions = metadata
+        .versions
+        .into_keys()
+        .filter_map(|version| {
+            semver::Version::parse(&version)
+                .ok()
+                .map(|parsed| (parsed, version))
+        })
+        .filter(|(parsed, _)| parsed.build.is_empty())
+        .collect::<Vec<_>>();
+    versions.sort_by(|left, right| {
+        let retained = |version: &str| version == install::VERSION || Some(version) == installed;
+        retained(&right.1)
+            .cmp(&retained(&left.1))
+            .then_with(|| right.0.cmp(&left.0))
+    });
+    versions.truncate(MAX_HARNESS_VERSIONS);
+    versions.sort_by(|left, right| right.0.cmp(&left.0));
+    Ok(versions
+        .into_iter()
+        .map(|(_, version)| HarnessVersion {
+            qualified: version == install::VERSION,
+            installed: installed.is_some_and(|current| current == version),
+            version,
+        })
+        .collect())
+}
+
+/// Return a bounded, exact-version view of the published Harness releases.
+///
+/// Metadata never certifies compatibility. Selected versions must pass the
+/// isolated install and startup checks before replacing the current runtime.
+#[tauri::command]
+pub async fn harness_versions() -> Result<Vec<HarnessVersion>> {
+    let client = crate::node::http::client()?;
+    let body = crate::node::http::text(&client, HARNESSES_REGISTRY).await?;
+    parse_harness_versions(
+        &body,
+        install::runtime_version(&crate::paths::harness_dir()).as_deref(),
+    )
 }
 
 /// What this machine can run, and what it is missing.
@@ -166,13 +242,20 @@ pub async fn harness_install(
     app: AppHandle,
     node_jobs: State<'_, Arc<NodeJobs>>,
     state: State<'_, AppState>,
+    version: Option<String>,
+    plugin_jobs: State<'_, Arc<crate::plugins::PluginJobs>>,
 ) -> Result<()> {
+    let version = version.unwrap_or_else(install::selected_version);
+    install::validate_version(&version)?;
+    // Profile commands resolve through the live runtime; do not replace it
+    // while another window is installing a plugin or switching profiles.
+    let _plugins = plugin_jobs.claim()?;
     if state.installing.swap(true, Ordering::SeqCst) {
         return Err(Error::AlreadyInstalling);
     }
+    let _installing = InstallingGuard(&state.installing);
     let _lifecycle = state.lifecycle.lock().await;
-    let outcome = perform_install(&app, &node_jobs, &state).await;
-    state.installing.store(false, Ordering::SeqCst);
+    let outcome = perform_install(&app, &node_jobs, &state, &version).await;
 
     match &outcome {
         Ok(()) => state
@@ -187,6 +270,7 @@ async fn perform_install(
     app: &AppHandle,
     node_jobs: &NodeJobs,
     state: &State<'_, AppState>,
+    version: &str,
 ) -> Result<()> {
     // Every shared fallback junction points into the live runtime. Leave no
     // supervised process resolving through those junctions while the verified
@@ -194,7 +278,7 @@ async fn perform_install(
     state.supervisor.stop().await;
     state.supervisor.wait_until_inactive().await?;
 
-    if let Some(payload) = crate::offline::payload(app)? {
+    if let Some(payload) = crate::offline::payload(app)?.filter(|_| version == install::VERSION) {
         state.supervisor.note(
             Stream::Stdout,
             format!(
@@ -212,7 +296,7 @@ async fn perform_install(
         })?;
     }
 
-    let plan = match super::install_plan() {
+    let mut plan = match super::install_plan() {
         Ok(plan) => plan,
         Err(Error::NpmMissing) => {
             state.supervisor.note(
@@ -224,6 +308,7 @@ async fn perform_install(
         }
         Err(failure) => return Err(failure),
     };
+    plan.spec = format!("{}@{version}", install::PACKAGE);
     let supervisor = Arc::clone(&state.supervisor);
     supervisor.note(
         Stream::Stdout,
@@ -253,4 +338,58 @@ pub fn harness_log(state: State<'_, AppState>) -> Vec<LogLine> {
         .into_iter()
         .map(|(stream, line)| LogLine { stream, line })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_harness_versions;
+    use crate::harness::install;
+
+    #[test]
+    fn catalog_is_bounded_sorted_and_marks_only_the_qualified_contract() {
+        let raw = serde_json::json!({
+            "versions": {
+                "0.1.0-rc.1": {},
+                "0.1.1-rc.2": {},
+                "0.1.5-rc.2": {},
+                "not-semver": {},
+                "1.0.0+build": {}
+            }
+        })
+        .to_string();
+        let versions = parse_harness_versions(&raw, Some(install::VERSION)).expect("catalog");
+        assert_eq!(versions[0].version, "0.1.5-rc.2");
+        assert!(versions
+            .iter()
+            .any(|version| version.version == install::VERSION
+                && version.qualified
+                && version.installed));
+        assert!(!versions
+            .iter()
+            .any(|version| version.version == "not-semver"));
+        assert!(!versions
+            .iter()
+            .any(|version| version.version == "1.0.0+build"));
+    }
+
+    #[test]
+    fn malformed_catalog_is_an_actionable_network_error() {
+        let error = parse_harness_versions("[]", None).expect_err("invalid catalog");
+        assert!(error.to_string().contains("version catalog is invalid"));
+    }
+
+    #[test]
+    fn truncated_catalog_keeps_the_bundled_and_installed_versions() {
+        let mut entries = serde_json::Map::new();
+        for minor in 0..100 {
+            entries.insert(format!("1.{minor}.0"), serde_json::json!({}));
+        }
+        entries.insert(install::VERSION.into(), serde_json::json!({}));
+        entries.insert("0.1.0-rc.8".into(), serde_json::json!({}));
+        let raw = serde_json::json!({"versions": entries}).to_string();
+        let result = parse_harness_versions(&raw, Some("0.1.0-rc.8")).expect("catalog");
+        assert_eq!(result.len(), 50);
+        assert!(result.iter().any(|version| version.qualified));
+        assert!(result.iter().any(|version| version.installed));
+    }
 }

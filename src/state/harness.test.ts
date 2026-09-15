@@ -15,6 +15,7 @@ vi.mock('@/lib/ipc', () => ({
   start: vi.fn(),
   stop: vi.fn(),
   install: vi.fn(),
+  harnessVersions: vi.fn(),
   nodeProvision: vi.fn(),
   nodeSelect: vi.fn(),
   onHarnessEvent: vi.fn(),
@@ -45,6 +46,8 @@ beforeEach(() => {
     provisioningNode: false,
     nodeProgress: null,
     error: null,
+    harnessVersions: [],
+    loadingHarnessVersions: false,
   })
   useDialog.setState({ pending: null })
   vi.mocked(ipc.environment).mockResolvedValue({} as never)
@@ -53,6 +56,40 @@ beforeEach(() => {
 })
 
 describe('supervisor actions', () => {
+  it('shows a catalog failure once, preserves the previous list and permits retry', async () => {
+    const releases = [{ version: '0.1.1-rc.2', qualified: true, installed: true }]
+    useHarness.setState({ harnessVersions: releases })
+    vi.mocked(ipc.harnessVersions).mockRejectedValueOnce(new Error('catalog unavailable'))
+    await expect(useHarness.getState().refreshHarnessVersions()).resolves.toBeUndefined()
+    expect(useHarness.getState()).toMatchObject({
+      harnessVersions: releases,
+      loadingHarnessVersions: false,
+      error: 'catalog unavailable',
+    })
+    expect(useDialog.getState().pending).toMatchObject({
+      kind: 'error',
+      details: 'catalog unavailable',
+    })
+    vi.mocked(ipc.harnessVersions).mockResolvedValueOnce([])
+    await useHarness.getState().refreshHarnessVersions()
+    expect(useHarness.getState()).toMatchObject({ harnessVersions: [], error: null })
+  })
+
+  it('deduplicates simultaneous catalog refreshes', async () => {
+    let resolve!: (value: ipc.HarnessVersion[]) => void
+    vi.mocked(ipc.harnessVersions).mockReturnValueOnce(
+      new Promise((done) => {
+        resolve = done
+      }),
+    )
+    const first = useHarness.getState().refreshHarnessVersions()
+    await useHarness.getState().refreshHarnessVersions()
+    expect(ipc.harnessVersions).toHaveBeenCalledTimes(1)
+    resolve([])
+    await first
+    expect(useHarness.getState().loadingHarnessVersions).toBe(false)
+  })
+
   it('reports a failed environment re-check to coordinated callers', async () => {
     vi.mocked(ipc.environment).mockRejectedValue('environment probe failed')
 

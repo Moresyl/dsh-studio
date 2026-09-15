@@ -43,7 +43,20 @@ pub fn parse(line: &str) -> Option<Ready> {
         )));
     }
 
-    Some(Ready::At(url.origin().ascii_serialization()))
+    // Recent Harness releases require the announced bootstrap token. Keep
+    // only this query parameter, never a child-selected path or redirect.
+    let origin = url.origin().ascii_serialization();
+    let token = url.query_pairs().find(|(name, _)| name == "token");
+    let address = match token {
+        Some((_, token)) if !token.is_empty() => {
+            let query = url::form_urlencoded::Serializer::new(String::new())
+                .append_pair("token", &token)
+                .finish();
+            format!("{origin}/?{query}")
+        }
+        _ => origin,
+    };
+    Some(Ready::At(address))
 }
 
 #[cfg(test)]
@@ -95,6 +108,14 @@ mod tests {
             parse("dsh web: http://127.0.0.1"),
             Some(Ready::Rejected(_))
         ));
+    }
+
+    #[test]
+    fn preserves_authentication_without_child_selected_navigation() {
+        assert_eq!(
+            parse("dsh web: http://127.0.0.1:3080/other?token=abc_def&redirect=https://example.com#fragment"),
+            Some(Ready::At("http://127.0.0.1:3080/?token=abc_def".into()))
+        );
     }
 
     #[test]

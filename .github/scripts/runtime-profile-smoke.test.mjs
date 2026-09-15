@@ -4,7 +4,22 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { parseReadyOrigin, prepareSmokeProfile } from './runtime-profile-smoke.mjs'
+import {
+  assertEmbeddedSessionCookies,
+  parseReadyOrigin,
+  prepareSmokeProfile,
+} from './runtime-profile-smoke.mjs'
+
+test('embedded windows reject cross-site-incompatible authentication before activation', () => {
+  for (const sameSite of ['Strict', 'Lax', 'strict']) {
+    assert.throws(
+      () => assertEmbeddedSessionCookies([`session=secret; HttpOnly; SameSite=${sameSite}`]),
+      /incompatible with the embedded Studio window/,
+    )
+  }
+  assert.doesNotThrow(() => assertEmbeddedSessionCookies([]))
+  assert.throws(() => assertEmbeddedSessionCookies(['session=secret; HttpOnly']), /incompatible/)
+})
 
 test('readiness accepts only an explicit loopback HTTP port', () => {
   assert.equal(parseReadyOrigin('ordinary output'), undefined)
@@ -13,6 +28,10 @@ test('readiness accepts only an explicit loopback HTTP port', () => {
     'http://127.0.0.1:52175',
   )
   assert.equal(parseReadyOrigin('dsh web: http://localhost:3080/'), 'http://localhost:3080')
+  assert.equal(
+    parseReadyOrigin('dsh web: http://127.0.0.1:3080/ignored?token=abc_def&redirect=elsewhere'),
+    'http://127.0.0.1:3080/?token=abc_def',
+  )
 })
 
 test('readiness rejects malformed, remote, secure, and implicit-port origins', () => {

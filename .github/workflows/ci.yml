@@ -102,6 +102,15 @@ jobs:
         run: pnpm test:coverage
       - name: Rust and LAN remote regression
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace
+      - name: Selected Harness downgrade and real profile boot
+        env:
+          DSH_TEST_VERSION: 0.1.1-rc.1
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib selected_runtime_cold_install_and_boot -- --ignored --nocapture
+      - name: Reject incompatible embedded authentication before activation
+        env:
+          DSH_TEST_VERSION: 0.1.5-rc.2
+          DSH_TEST_EXPECT_ERROR: incompatible with the embedded Studio window
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib selected_runtime_cold_install_and_boot -- --ignored --nocapture
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --workspace --all-targets -- -D warnings
 
   rust-coverage:

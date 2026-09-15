@@ -39,6 +39,10 @@ pub fn harness_install_journal() -> PathBuf {
 
 /// Entry point of the managed harness CLI.
 pub fn harness_entry() -> PathBuf {
+    let launcher = harness_dir().join("studio-cli.mjs");
+    if launcher.is_file() {
+        return launcher;
+    }
     harness_dir()
         .join("node_modules")
         .join("@deepseek-ai")

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import {
@@ -72,10 +73,11 @@ test('release and SDK versions stay aligned', () => {
 
 test('repository public contracts agree end to end', async () => {
   const result = await verifyPublicContracts()
+  const manifest = JSON.parse(await readFile('package.json', 'utf8'))
   assert.deepEqual(result, {
     protocol: 3,
     hostProtocol: 1,
     schema: '1.0.0',
-    version: '0.9.7',
+    version: manifest.version,
   })
 })

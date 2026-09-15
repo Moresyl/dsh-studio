@@ -305,7 +305,7 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
             className="flex items-center gap-1.5 font-mono text-[11.5px] text-text tabular-nums transition-colors duration-100 hover:text-brand"
           >
             <span className="truncate">
-              {copied ? t('statusbar.copied') : origin.replace(/^https?:\/\//, '')}
+              {copied ? t('statusbar.copied') : new URL(origin).host}
             </span>
             <ExternalLink size={11} strokeWidth={2.2} className="shrink-0 text-faint" />
           </button>

@@ -14,6 +14,28 @@ Choose **Lite** for the smallest download, or **Full / Offline** when first-run 
    65535 when a stable loopback origin is needed. Studio checks a fixed port
    before starting Node and reports an occupied port instead of silently moving.
 
+## Harness versions
+
+In Environment, check published Harness versions, choose an exact release, and
+select **Install and verify** to upgrade or downgrade. Switching stops the running
+Harness. Studio installs into a separate directory and checks its integration,
+loopback HTTP startup and Host protocol with a temporary official Profile before
+activation. Failed installation or verification preserves the previous runtime;
+start it again from the control panel. Existing Profiles and sessions are retained.
+
+The **Studio** label identifies the bundled tested release. Other upstream
+versions may fail verification when their internal interfaces change; being listed
+on npm does not guarantee compatibility with Studio or third-party plugins.
+Choose the Studio-labelled version to return to the bundled compatibility baseline.
+Full / Offline can install that baseline offline; selecting another version needs
+network access. Old runtime markers remain readable, and Repair targets the last
+successfully verified version. Do not manually replace packages inside the managed
+runtime directory.
+
+Known limitation: upstream `0.1.2-rc.1` and `0.1.5-rc.2` use a strict login cookie that cannot work
+inside the current embedded window. Studio rejects its activation even if the
+server starts, retaining the previous runtime instead of showing an unauthorized page.
+
 ## Plugins
 
 Discovery can use npm, DSH 1024Store, the rate-limited reviewed dshfind catalog, or a custom standard catalog. The Sources tab also opens [DSH Hub](https://dsh-hub.org/) for community discovery: copy a listed npm package name back into Studio search and the same native review applies. DSH Hub currently exposes a website directory rather than Studio's public catalog Schema 1.0.0 endpoint, so Studio does not scrape its HTML or treat the homepage as an install authority. Results are indexed for ten minutes and support category filters, sorting and 25-item pages. A catalog can only suggest an exact npm target. Before any mutation, Studio resolves that version again through npm and checks package syntax and the Harness peer range. A successful market install writes a receipt with the exact source, version and integrity; the managed badge is shown only while the installed version still matches that receipt. Plugin changes have a durable before-image; an interrupted operation is rolled back on the next launch and reported in the UI.

@@ -25,7 +25,7 @@ pub mod commands;
 
 pub(crate) mod archive;
 mod catalog;
-mod http;
+pub(crate) mod http;
 
 pub(crate) use http::ensure_crypto_provider;
 

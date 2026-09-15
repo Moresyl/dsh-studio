@@ -326,7 +326,7 @@ group('desktop frame lifetime', () => {
     })
     vi.mocked(ipc.desktopOffer).mockResolvedValue({ protocol: PROTOCOL } as never)
 
-    const stop = await serveDesktop(SERVING)
+    const stop = await serveDesktop(`${SERVING}/?token=bootstrap-secret`)
     const listener = tree.message()
     expect(listener).toBeTypeOf('function')
 

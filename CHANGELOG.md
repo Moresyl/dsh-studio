@@ -9,6 +9,25 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.8] — 2026-09-15
+
+### Added
+
+- Query official npm Harness releases and install an exact selection, including upgrades and downgrades, gated by an isolated install and real Profile startup.
+
+### Fixes and security
+
+- Pin Harness family members and required peers to the selected version to prevent mixed-release exports and missing services.
+- Preserve verified runtime selection and legacy markers; failed candidates retain the current runtime, and Repair targets the last verified selection.
+- Serialize runtime replacement against plugin mutations and surface retryable catalog errors through the shared error dialog.
+- Verify browser authentication and reject strict-cookie releases incompatible with the embedded window. `0.1.2-rc.1` and `0.1.5-rc.2` currently cannot activate; upstream authentication remains enabled.
+- Support exported CLI entry points on older Node versions without `import.meta.main`; preserve navigation tokens while redacting logs and tray labels.
+
+### Verification
+
+- Tested Windows cold installation of `0.1.1-rc.2`, real Profile boot after selecting `0.1.1-rc.1`, and the embedded strict-cookie failure in a browser.
+- Added selected-version startup and incompatible-version rejection to the three-platform CI matrix. No physical macOS device was available.
+
 ### Documentation
 
 - Reworked the English and Chinese documentation landing pages into task-oriented paths, with a five-minute first-run guide, recovery guidance, and a more useful issue-reporting checklist.

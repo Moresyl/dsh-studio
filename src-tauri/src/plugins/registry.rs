@@ -251,7 +251,7 @@ fn validate_preflight(detail: &Detail) -> Result<()> {
         return Err(Error::Plugin(format!(
             "{} is not compatible with Harness {}: {reason}",
             detail.name,
-            crate::harness::install::VERSION
+            crate::harness::install::selected_version()
         )));
     }
     if detail.deprecated.is_some() {
@@ -521,7 +521,7 @@ fn compatibility(manifest: &serde_json::Value) -> Compatibility {
             reason: "the package declares an unreadable peer dependency range".to_string(),
         };
     };
-    let current = semver::Version::parse(crate::harness::install::VERSION)
+    let current = semver::Version::parse(&crate::harness::install::selected_version())
         .expect("the pinned Harness version is valid semver");
     if requirement_parsed.matches(&current) {
         Compatibility::Compatible {

@@ -525,7 +525,7 @@ where
     if !environment.harness_compatible {
         return Err(Error::Plugin(format!(
             "plugins require the verified Harness runtime {}; repair it from the Environment panel first",
-            crate::harness::install::VERSION
+            crate::harness::install::selected_version()
         )));
     }
     let manager_node = environment

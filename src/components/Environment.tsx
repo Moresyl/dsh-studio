@@ -7,7 +7,8 @@
  * environment, and a second copy threaded through a component tree is a second
  * thing that can be stale.
  */
-import { Check, Download, Loader2 } from 'lucide-react'
+import { Check, Download, Loader2, RefreshCw } from 'lucide-react'
+import { useState } from 'react'
 
 import { CheckList, type CheckItem } from '@/components/CheckList'
 import { megabytes } from '@/lib/format'
@@ -17,11 +18,16 @@ import { useHarness } from '@/state/harness'
 
 /** The two things that can be missing, each carrying the fix for itself. */
 export function EnvironmentChecks() {
+  const [selectedVersion, setSelectedVersion] = useState('')
+  const busy = useHarness((state) => state.busy)
   const environment = useHarness((state) => state.environment)
   const installing = useHarness((state) => state.installing)
   const install = useHarness((state) => state.install)
   const provisioningNode = useHarness((state) => state.provisioningNode)
   const provisionNode = useHarness((state) => state.provisionNode)
+  const harnessVersions = useHarness((state) => state.harnessVersions)
+  const loadingHarnessVersions = useHarness((state) => state.loadingHarnessVersions)
+  const refreshHarnessVersions = useHarness((state) => state.refreshHarnessVersions)
 
   const node = environment?.node ?? null
   const minimum = environment ? formatVersion(environment.minimumNode) : ''
@@ -110,7 +116,65 @@ export function EnvironmentChecks() {
     },
   ]
 
-  return <CheckList items={items} />
+  return (
+    <div className="flex flex-col gap-2">
+      <CheckList items={items} />
+      <div className="rounded-panel border border-line bg-canvas-deep/40 px-2.5 py-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-medium text-text">{t('harness.versions')}</span>
+          <button
+            type="button"
+            onClick={() => void refreshHarnessVersions()}
+            disabled={loadingHarnessVersions}
+            className="ml-auto inline-flex h-[22px] items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 enabled:hover:brightness-[1.2] disabled:opacity-55"
+          >
+            <RefreshCw
+              size={11}
+              className={loadingHarnessVersions ? 'animate-spin' : ''}
+              aria-hidden="true"
+            />
+            {loadingHarnessVersions ? t('harness.versions.loading') : t('action.recheck')}
+          </button>
+        </div>
+        {harnessVersions.length > 0 ? (
+          <div className="mt-2 flex gap-2">
+            <select
+              aria-label={t('harness.versions')}
+              value={selectedVersion}
+              onChange={(event) => setSelectedVersion(event.target.value)}
+              disabled={busy || installing || provisioningNode}
+              className="min-w-0 flex-1 rounded border border-line-strong bg-surface-2 px-2 py-1 text-xs text-text"
+            >
+              <option value="">{t('harness.versions.choose')}</option>
+              {harnessVersions.map((release) => (
+                <option key={release.version} value={release.version}>
+                  {release.version}
+                  {release.qualified ? ' · Studio' : ''}
+                  {release.version === harnessVersion ? ` · ${t('runtime.active')}` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void install(selectedVersion)}
+              disabled={
+                !selectedVersion ||
+                !harnessVersions.some((release) => release.version === selectedVersion) ||
+                busy ||
+                installing ||
+                provisioningNode ||
+                !node
+              }
+              className="rounded border border-line-strong bg-surface-2 px-2 py-1 text-xs text-text disabled:opacity-55"
+            >
+              {installing ? t('action.installing') : t('harness.versions.install')}
+            </button>
+          </div>
+        ) : null}
+        <p className="mt-1.5 text-[11px] text-faint">{t('harness.versions.hint')}</p>
+      </div>
+    </div>
+  )
 }
 
 /**

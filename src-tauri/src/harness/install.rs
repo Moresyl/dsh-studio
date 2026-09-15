@@ -32,6 +32,40 @@ pub const PACKAGE: &str = "@deepseek-ai/dsh";
 /// release graph.
 pub const VERSION: &str = "0.1.1-rc.2";
 pub const SPEC: &str = "@deepseek-ai/dsh@0.1.1-rc.2";
+
+/// Accept immutable npm versions only; tags, ranges and paths are never commands.
+pub fn validate_version(version: &str) -> Result<()> {
+    if version.len() > 80
+        || !semver::Version::parse(version)
+            .is_ok_and(|parsed| parsed.build.is_empty() && parsed.to_string() == version)
+    {
+        return Err(Error::Install(
+            "select an exact Harness version such as 0.1.1-rc.2".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn expected_version(target: &Path) -> String {
+    crate::bounded_file::read_string(
+        &target.join("dsh-studio-runtime.json"),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .ok()
+    .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+    .and_then(|value| {
+        value
+            .get("version")
+            .and_then(|version| version.as_str())
+            .map(str::to_string)
+    })
+    .filter(|version| validate_version(version).is_ok())
+    .unwrap_or_else(|| VERSION.into())
+}
+
+pub fn selected_version() -> String {
+    expected_version(&crate::paths::harness_dir())
+}
 pub const PNPM_VERSION: &str = "11.7.0";
 pub const PNPM_SPEC: &str = "pnpm@11.7.0";
 const RUNTIME_SCHEMA: u8 = 2;
@@ -119,6 +153,19 @@ pub struct InstallPlan {
 }
 
 impl InstallPlan {
+    fn to_selected_command(&self) -> Command {
+        let mut command = self.to_command();
+        command.args([
+            "--legacy-peer-deps",
+            "--install-links",
+            "--save-exact",
+            "--registry=https://registry.npmjs.org/",
+            "--fetch-retries=2",
+            "--fetch-timeout=60000",
+        ]);
+        command
+    }
+
     fn to_command(&self) -> Command {
         let mut command = Command::new(&self.node);
         command
@@ -232,11 +279,13 @@ pub async fn run_transactional<R>(plan: &InstallPlan, report: R) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
-    if plan.spec != SPEC {
-        return Err(Error::Install(
-            "managed runtime install did not use the qualified Harness contract".into(),
-        ));
-    }
+    let version = plan
+        .spec
+        .strip_prefix(&format!("{PACKAGE}@"))
+        .ok_or_else(|| {
+            Error::Install("managed runtime must use the official Harness package".into())
+        })?;
+    validate_version(version)?;
     let _activity = ManagedInstallActivity::begin_install()?;
     recover_managed_install_inner()?;
 
@@ -253,7 +302,7 @@ where
         target: staging.clone(),
         ..plan.clone()
     };
-    if let Err(failure) = run_locked(&staged_plan, report).await {
+    if let Err(failure) = install_candidate(&staged_plan, version, report).await {
         let _ = remove_dir_if_exists(&staging);
         let _ = std::fs::remove_file(&journal);
         return Err(failure);
@@ -262,6 +311,182 @@ where
     require_expected_runtime(&staging)?;
 
     promote(live, &staging, &backup, &journal)
+}
+
+async fn install_candidate<R>(plan: &InstallPlan, version: &str, report: R) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    if version == VERSION {
+        run_locked(plan, report.clone()).await?;
+    } else {
+        std::fs::create_dir_all(&plan.target).map_err(|cause| Error::Install(cause.to_string()))?;
+        stage_integration(&plan.target)?;
+        // The desktop contract includes upstream peer packages which npm's
+        // legacy-peer mode cannot infer. Preserve those roots and align the
+        // official Harness family to the selected exact version.
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(RUNTIME_PACKAGE).map_err(|cause| {
+                Error::Install(format!("invalid bundled runtime manifest: {cause}"))
+            })?;
+        for (name, dependency) in manifest["dependencies"]
+            .as_object_mut()
+            .ok_or_else(|| Error::Install("bundled runtime has no dependencies".into()))?
+        {
+            if name == PACKAGE || name.starts_with("@deepseek-ai/dsh-") {
+                *dependency = serde_json::Value::String(version.into());
+            }
+        }
+        std::fs::write(plan.target.join("package.json"), manifest.to_string()).map_err(
+            |cause| Error::Install(format!("could not stage selected runtime: {cause}")),
+        )?;
+        run_command(
+            plan.to_selected_command(),
+            report.clone(),
+            "npm install selected Harness",
+        )
+        .await?;
+        // Official packages declare runtime services as peers. Read their
+        // manifests, pin those services explicitly, and resolve to a fixed
+        // point so newly added peers cannot leave the Web profile incomplete.
+        let mut complete = false;
+        for _ in 0..4 {
+            let mut peers = std::collections::BTreeSet::new();
+            let packages = std::fs::read_dir(plan.target.join("node_modules/@deepseek-ai"))
+                .map_err(|cause| {
+                    Error::Install(format!("cannot inspect Harness peers: {cause}"))
+                })?;
+            for package in packages {
+                let package = package.map_err(|cause| Error::Install(cause.to_string()))?;
+                if !package.file_name().to_string_lossy().starts_with("dsh-") {
+                    continue;
+                }
+                let raw = crate::bounded_file::read(
+                    &package.path().join("package.json"),
+                    crate::bounded_file::CONTROL_BYTES,
+                )
+                .map_err(|cause| {
+                    Error::Install(format!("cannot inspect Harness peer manifest: {cause}"))
+                })?;
+                let metadata: serde_json::Value =
+                    serde_json::from_slice(&raw).map_err(|cause| {
+                        Error::Install(format!("invalid Harness peer manifest: {cause}"))
+                    })?;
+                // Pin transitive family members too: upstream caret ranges
+                // otherwise turn a downgrade into a mixture of rc.1 and rc.2.
+                if let Some(name) = metadata["name"].as_str() {
+                    if name.starts_with("@deepseek-ai/dsh-") {
+                        peers.insert(name.to_string());
+                    }
+                }
+                if let Some(dependencies) = metadata["peerDependencies"].as_object() {
+                    peers.extend(
+                        dependencies
+                            .keys()
+                            .filter(|name| name.starts_with("@deepseek-ai/dsh-"))
+                            .cloned(),
+                    );
+                }
+            }
+            let dependencies = manifest["dependencies"]
+                .as_object_mut()
+                .expect("validated runtime dependencies");
+            let mut changed = false;
+            for peer in peers {
+                if !dependencies.contains_key(&peer) {
+                    dependencies.insert(peer, serde_json::Value::String(version.into()));
+                    changed = true;
+                }
+            }
+            if !changed {
+                complete = true;
+                break;
+            }
+            std::fs::write(plan.target.join("package.json"), manifest.to_string())
+                .map_err(|cause| Error::Install(format!("cannot stage Harness peers: {cause}")))?;
+            run_command(
+                plan.to_selected_command(),
+                report.clone(),
+                "npm install Harness peers",
+            )
+            .await?;
+        }
+        if !complete {
+            return Err(Error::Install(
+                "Harness peer dependency graph did not converge; previous runtime retained".into(),
+            ));
+        }
+        if runtime_version(&plan.target).as_deref() != Some(version) {
+            return Err(Error::Install(
+                "npm did not install the selected exact Harness version".into(),
+            ));
+        }
+        qualify_runtime(&plan.target)?;
+    }
+    // New upstream CLIs use import.meta.main, absent in Node 24.0. Importing
+    // their exported entry explicitly also works on supported older Nodes.
+    std::fs::write(plan.target.join("studio-cli.mjs"),
+        "const cli = await import('./node_modules/@deepseek-ai/dsh/lib/bin.js');\nif (typeof cli.runCli === 'function') await cli.runCli();\n")
+        .map_err(|cause| Error::Install(format!("could not stage Harness launcher: {cause}")))?;
+    verify_candidate_boot(plan, version, report).await?;
+    crate::atomic::write(
+        &plan.target.join("dsh-studio-runtime.json"),
+        serde_json::json!({"schema": RUNTIME_SCHEMA, "version": version}).to_string(),
+    )
+    .map_err(|cause| Error::Install(format!("could not record verified runtime: {cause}")))?;
+    require_expected_runtime(&plan.target)
+}
+
+async fn verify_candidate_boot<R>(plan: &InstallPlan, version: &str, report: R) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    // This uses a disposable official profile, never the user's profile or sessions.
+    let probe = plan.target.join("studio-runtime-probe.mjs");
+    let runner = plan.target.join("studio-runtime-check.mjs");
+    std::fs::write(&probe, include_bytes!("../../../.github/scripts/runtime-profile-smoke.mjs"))
+        .and_then(|_| std::fs::write(&runner,
+            "import { verifyProfileBoot } from './studio-runtime-probe.mjs';\nimport { join } from 'node:path';\nimport { writeFileSync } from 'node:fs';\nconst [root, version, studioVersion] = process.argv.slice(2);\ntry {\nawait verifyProfileBoot({runtimeRoot: root, entry: join(root, 'studio-cli.mjs'), dshHome: join(root, 'studio-probe-home'), harnessVersion: version, studioVersion});\nconsole.log('Studio runtime startup verified');\n} catch (error) {\nwriteFileSync(join(root, 'studio-runtime-error.txt'), String(error.message).slice(0, 8192));\nconsole.error(error);\nprocess.exitCode = 1;\n}\n"))
+        .map_err(|cause| Error::Install(format!("could not stage startup check: {cause}")))?;
+    report(
+        Stream::Stdout,
+        format!("verifying Harness {version} in an isolated profile"),
+    );
+    let mut command = Command::new(&plan.node);
+    command
+        .arg(&runner)
+        .arg(&plan.target)
+        .arg(version)
+        .arg(env!("CARGO_PKG_VERSION"))
+        .env("PATH", path_with_node(&plan.node))
+        .current_dir(&plan.target)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+    hide_console_window(&mut command);
+    let result = run_command_with_limits(
+        command,
+        report,
+        "Harness startup verification (see the preceding compatibility details; previous runtime retained)",
+        Duration::from_secs(180),
+        Duration::from_secs(240),
+        PIPE_DRAIN_TIMEOUT,
+    )
+    .await;
+    let error_file = plan.target.join("studio-runtime-error.txt");
+    let result = result.map_err(
+        |failure| match crate::bounded_file::read(&error_file, 8192) {
+            Ok(bytes) => Error::Install(crate::logging::redact_secrets(&String::from_utf8_lossy(
+                &bytes,
+            ))),
+            Err(_) => failure,
+        },
+    );
+    remove_dir_if_exists(&plan.target.join("studio-probe-home"))?;
+    let _ = std::fs::remove_file(error_file);
+    let _ = std::fs::remove_file(probe);
+    let _ = std::fs::remove_file(runner);
+    result
 }
 
 async fn run_locked<R>(plan: &InstallPlan, report: R) -> Result<()>
@@ -539,10 +764,17 @@ fn qualify_runtime(target: &Path) -> Result<()> {
         "\"browser.showHidden\": \"Show hidden files\",\n\t\t\t\t\t\"browser.nativePicker\": \"Choose with system dialog\"",
         "English directory picker copy",
     )?;
+    // Newer Harness moved the workspace client behind uiWorkspace. Keep the
+    // exact seam check for both known interfaces instead of a broad rewrite.
+    let workspace_service = if body.contains("ctx.uiWorkspace.createDirectory(path, name)") {
+        "uiWorkspace"
+    } else {
+        "workspaces"
+    };
     body = replace_once(
         body,
-        "\t\t\t\tcreateDirectory: (path, name) => ctx.workspaces.createDirectory(path, name),\n\t\t\t\tt: ctx.locale.bind(LOCALE_NS)",
-        "\t\t\t\tcreateDirectory: (path, name) => ctx.workspaces.createDirectory(path, name),\n\t\t\t\tpickNativeDirectory: typeof window.__DSH_DESKTOP_PICK_DIRECTORY__ === \"function\" ? () => window.__DSH_DESKTOP_PICK_DIRECTORY__() : void 0,\n\t\t\t\tvalidateDirectory: typeof window.__DSH_DESKTOP_VALIDATE_DIRECTORY__ === \"function\" ? (path) => window.__DSH_DESKTOP_VALIDATE_DIRECTORY__(path) : void 0,\n\t\t\t\tt: ctx.locale.bind(LOCALE_NS)",
+        &format!("\t\t\t\tcreateDirectory: (path, name) => ctx.{workspace_service}.createDirectory(path, name),\n\t\t\t\tt: ctx.locale.bind(LOCALE_NS)"),
+        &format!("\t\t\t\tcreateDirectory: (path, name) => ctx.{workspace_service}.createDirectory(path, name),\n\t\t\t\tpickNativeDirectory: typeof window.__DSH_DESKTOP_PICK_DIRECTORY__ === \"function\" ? () => window.__DSH_DESKTOP_PICK_DIRECTORY__() : void 0,\n\t\t\t\tvalidateDirectory: typeof window.__DSH_DESKTOP_VALIDATE_DIRECTORY__ === \"function\" ? (path) => window.__DSH_DESKTOP_VALIDATE_DIRECTORY__(path) : void 0,\n\t\t\t\tt: ctx.locale.bind(LOCALE_NS)"),
         "directory picker desktop injection",
     )?;
 
@@ -681,7 +913,7 @@ fn recover_managed_install_inner() -> Result<bool> {
             ))
         })?;
         remove_dir_if_exists(&staging)?;
-    } else if runtime_version(&staging).as_deref() == Some(VERSION) {
+    } else if runtime_compatible(&staging) {
         remove_dir_if_exists(&live)?;
         std::fs::rename(&staging, &live).map_err(|cause| {
             Error::Install(format!(
@@ -776,12 +1008,13 @@ fn qualified_picker(target: &Path) -> bool {
 }
 
 fn require_expected_runtime(target: &Path) -> Result<()> {
+    let expected = expected_version(target);
     let actual = runtime_version(target).unwrap_or_else(|| "missing".to_string());
     let actual_pnpm = pnpm_version(target).unwrap_or_else(|| "missing".to_string());
     let failures = runtime_contract_failures(target);
     if !failures.is_empty() {
         return Err(Error::Install(format!(
-            "npm finished but the verified runtime is not Studio contract {RUNTIME_SCHEMA} with {PACKAGE}@{VERSION}, {INTEGRATION_PACKAGE}, and pnpm {PNPM_VERSION} (found {actual} with pnpm {actual_pnpm}; failed: {})",
+            "npm finished but the verified runtime is not Studio contract {RUNTIME_SCHEMA} with {PACKAGE}@{expected}, {INTEGRATION_PACKAGE}, and pnpm {PNPM_VERSION} (found {actual} with pnpm {actual_pnpm}; failed: {})",
             failures.join(", ")
         )));
     }
@@ -790,11 +1023,14 @@ fn require_expected_runtime(target: &Path) -> Result<()> {
 
 fn runtime_contract_failures(target: &Path) -> Vec<&'static str> {
     let mut failures = Vec::new();
-    if runtime_version(target).as_deref() != Some(VERSION) {
+    if runtime_version(target).as_deref() != Some(expected_version(target).as_str()) {
         failures.push("Harness version");
     }
     if !entry(target).is_file() {
         failures.push("Harness entry point");
+    }
+    if expected_version(target) != VERSION && !target.join("studio-cli.mjs").is_file() {
+        failures.push("Studio CLI launcher");
     }
     if pnpm_version(target).as_deref() != Some(PNPM_VERSION) {
         failures.push("pnpm version");
@@ -979,6 +1215,110 @@ mod tests {
     use std::time::Duration;
 
     use tokio::process::Command;
+
+    #[tokio::test]
+    #[ignore = "downloads and boots an isolated npm runtime selected by DSH_TEST_VERSION"]
+    async fn selected_runtime_cold_install_and_boot() {
+        let version = std::env::var("DSH_TEST_VERSION").unwrap_or_else(|_| super::VERSION.into());
+        super::validate_version(&version).expect("exact version");
+        let node = node_runtime::discover_in(Some(&crate::paths::managed_node_dir()))
+            .into_iter()
+            .find(|node| super::npm_cli(&node.path).is_some())
+            .expect("Node with npm");
+        let root = std::env::temp_dir().join(format!(
+            "dsh-selected-runtime-{}-{}",
+            std::process::id(),
+            version
+        ));
+        assert!(!root.exists(), "test directory must be new");
+        let plan = super::plan(
+            &node.path,
+            root.clone(),
+            format!("{}@{version}", super::PACKAGE),
+        )
+        .expect("plan");
+        let result = super::install_candidate(&plan, &version, |_, line| eprintln!("{line}")).await;
+        if result.is_ok() {
+            assert!(super::runtime_compatible(&root));
+            assert_eq!(super::expected_version(&root), version);
+        }
+        super::remove_dir_if_exists(&root).expect("test cleanup");
+        if let Ok(expected) = std::env::var("DSH_TEST_EXPECT_ERROR") {
+            let failure = result.expect_err("incompatible runtime must not activate");
+            assert!(failure.to_string().contains(&expected), "{failure}");
+        } else {
+            result.expect("candidate install and real startup");
+        }
+    }
+
+    #[test]
+    fn version_input_rejects_tags_ranges_paths_and_command_arguments() {
+        for version in [
+            "latest",
+            "^0.1.1",
+            "../runtime",
+            "--help",
+            "1.0.0+build",
+            "v1.0.0",
+            "1.0.0\n",
+        ] {
+            assert!(super::validate_version(version).is_err(), "{version}");
+        }
+        assert!(super::validate_version("0.1.5-rc.2").is_ok());
+    }
+
+    #[test]
+    fn verified_version_marker_supports_old_installs_and_rejects_manual_replacement() {
+        let root = std::env::temp_dir().join(format!("dsh-version-marker-{}", std::process::id()));
+        assert!(!root.exists());
+        write_runtime(&root, VERSION, true);
+        assert!(
+            runtime_compatible(&root),
+            "legacy schema without version stays compatible"
+        );
+        write_runtime(&root, "0.1.5-rc.2", true);
+        assert!(
+            !runtime_compatible(&root),
+            "manual npm replacement is not a verified switch"
+        );
+        fs::write(
+            root.join("dsh-studio-runtime.json"),
+            r#"{"schema":2,"version":"0.1.5-rc.2"}"#,
+        )
+        .unwrap();
+        assert!(
+            !runtime_compatible(&root),
+            "selected runtime needs its verified launcher"
+        );
+        fs::write(root.join("studio-cli.mjs"), "// test launcher").unwrap();
+        assert!(runtime_compatible(&root));
+        fs::write(
+            root.join("dsh-studio-runtime.json"),
+            r#"{"schema":2,"version":"latest"}"#,
+        )
+        .unwrap();
+        assert!(!runtime_compatible(&root));
+        remove_dir_if_exists(&root).unwrap();
+    }
+
+    #[test]
+    fn failed_activation_restores_the_previous_runtime() {
+        let root =
+            std::env::temp_dir().join(format!("dsh-activation-rollback-{}", std::process::id()));
+        assert!(!root.exists());
+        let live = root.join("live");
+        let staging = root.join("staging");
+        let backup = root.join("backup");
+        let journal = root.join("journal.json");
+        write_runtime(&live, VERSION, true);
+        write_runtime(&staging, "0.1.5-rc.2", false);
+        fs::write(&journal, "{}").unwrap();
+        assert!(super::promote(&live, &staging, &backup, &journal).is_err());
+        assert!(runtime_compatible(&live));
+        assert_eq!(runtime_version(&live).as_deref(), Some(VERSION));
+        assert!(!backup.exists());
+        remove_dir_if_exists(&root).unwrap();
+    }
 
     use super::{
         ensure_runtime_resolver, npm_cli_candidates, qualify_runtime, remove_dir_if_exists,

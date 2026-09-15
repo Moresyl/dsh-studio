@@ -291,7 +291,12 @@ fn tooltip_for(status: &Status, count: u32) -> String {
         Status::Starting => pick("starting", "正在启动").to_string(),
         // The port is the one part worth carrying into a tooltip: it is what
         // someone needs to reach the service from anywhere else.
-        Status::Ready { origin, .. } => pick("running on ", "运行于 ").to_string() + origin,
+        Status::Ready { origin, .. } => {
+            let address = url::Url::parse(origin)
+                .map(|url| url.origin().ascii_serialization())
+                .unwrap_or_else(|_| "localhost".into());
+            pick("running on ", "运行于 ").to_string() + &address
+        }
         Status::Restarting { attempt, .. } => {
             format!(
                 "{}{attempt}",

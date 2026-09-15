@@ -186,6 +186,8 @@ export async function answer({ method, params }: Call): Promise<unknown> {
  * moved.
  */
 export async function serveDesktop(origin: string): Promise<() => void> {
+  // Bootstrap URLs can carry authentication; postMessage trusts the origin only.
+  origin = new URL(origin).origin
   const onMessage = (event: MessageEvent) => {
     const call = accepts(origin, event.origin, event.data)
     if (!call) return
@@ -225,6 +227,7 @@ export async function serveDesktop(origin: string): Promise<() => void> {
 export function pushWorkspaceDrop(path: string, origin: string): void {
   const selected = path.trim()
   if (!selected || !origin) return
+  origin = new URL(origin).origin
   tell({ dsh: PROTOCOL, event: 'workspace-drop', path: selected }, origin)
 }
 

@@ -92,7 +92,16 @@ export const startSafeMode = (): Promise<string> => invoke('harness_safe_mode_st
 export const stop = (): Promise<void> => invoke('harness_stop')
 
 /** Install the harness, or replace it with the latest release. */
-export const install = (): Promise<void> => invoke('harness_install')
+export const install = (version?: string): Promise<void> => invoke('harness_install', { version })
+
+export interface HarnessVersion {
+  version: string
+  qualified: boolean
+  installed: boolean
+}
+
+/** Published releases; only successful local verification authorizes activation. */
+export const harnessVersions = (): Promise<HarnessVersion[]> => invoke('harness_versions')
 
 export const log = (): Promise<LogLine[]> => invoke('harness_log')
 

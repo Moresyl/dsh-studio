@@ -65,7 +65,7 @@ pub fn environment() -> Environment {
         harness_installed,
         harness_compatible,
         harness_version,
-        expected_harness_version: install::VERSION.to_string(),
+        expected_harness_version: install::selected_version(),
         harness_problem,
         harness_entry,
         workspace,
@@ -105,7 +105,7 @@ fn launch_plan_for_profile(
                 .harness_version
                 .as_deref()
                 .unwrap_or("unknown"),
-            install::VERSION
+            install::selected_version()
         )));
     }
     if environment.workspace_admission.blocked() {
