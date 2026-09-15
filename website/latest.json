@@ -1,59 +1,59 @@
 {
-  "version": "0.9.7",
-  "notes": "<!-- dsh-notes:zh -->\n# DSH Studio v0.9.7\n\n## 修复与打磨\n- 修复运行时契约 CI 未初始化 pnpm 导致的跨平台校验失败。\n- 升级 GitHub Actions 运行时并启用并发取消，减少旧任务竞争和误报。\n\n## 验证\n- 通过 Windows、macOS、Linux 冷安装及运行时契约验证。\n- 通过前端、Rust、契约、无障碍、打包与覆盖率门禁。\n\n<!-- dsh-notes:en -->\n# DSH Studio v0.9.7\n\n## Fixed and polished\n- Fixed the runtime-contract CI job failing before pnpm was initialized on supported platforms.\n- Upgraded GitHub Actions runtimes and enabled concurrency cancellation to prevent stale-run races.\n\n## Verification\n- Verified Windows, macOS, and Linux cold-install and runtime-contract checks.\n- Passed frontend, Rust, contract, accessibility, packaging, and coverage gates.\n\n<!-- dsh-notes:end -->",
-  "pub_date": "2026-09-12T21:39:45.459Z",
+  "version": "0.9.8",
+  "notes": "<!-- dsh-notes:zh -->\n# DSH Studio v0.9.8\n\n## 新功能\n\n- 运行环境新增 Harness 版本列表，可查询官方 npm 发布记录，选择精确版本安装、升级或降级。\n- 安装时使用独立目录和临时官方 Profile 验证启动及 Host 协议，通过后才替换当前运行时。\n\n## 变更与安全\n\n- 将 Rustls 更新至 `0.23.45`，修复 TLS 握手边界校验漏洞 `RUSTSEC-2026-0285`。\n- 保留最近成功验证的版本，兼容旧版运行时标记；「修复」继续使用该版本。\n- 安装期间阻止插件修改，失败时保留原运行时、Profile 与会话，可重新启动原版本。\n- 新版登录 token 不再被启动解析丢弃，日志与托盘不展示凭证。\n\n## 修复与打磨\n\n- 修复选择旧版本时子包仍被解析为较新版本，导致缺少导出或 peer 服务的问题。\n- 增加新版 CLI 导出入口兼容，处理旧 Node 缺少 `import.meta.main` 时的静默退出。\n- 版本查询失败显示错误弹窗，可重试并保留已有列表；启动兼容性失败显示具体原因。\n\n## 安装与已知限制\n\n- 可覆盖安装或通过应用检查更新。需要离线安装时选择 Full，Lite 在首次运行时下载依赖。\n- 当前 Studio 基线仍为 `0.1.1-rc.2`。版本列表不等于全部兼容：`0.1.2-rc.1`、`0.1.5-rc.2` 的严格登录 Cookie 与内嵌界面不兼容，会被安全拒绝并保留原运行时。\n- 不手动修改托管运行时的 node_modules；第三方插件仍需满足所选版本的兼容要求。\n\n## 验证\n\n- Windows 完成基线冷安装、`0.1.1-rc.1` 选择安装与真实 Profile 启动；浏览器实测确认并拦截严格 Cookie 的内嵌登录问题。\n- 增加三平台 CI 启动与拒绝不兼容版本回归。没有苹果实体设备，macOS 以 CI 检查和后续用户反馈为依据。\n\n<!-- dsh-notes:en -->\n# DSH Studio v0.9.8\n\n## New features\n\n- Query official Harness releases and install an exact selected version with isolated installation and real Profile/Host startup verification.\n- Preserve the last verified selection, legacy runtime markers, and the previous runtime when a candidate fails.\n\n## Fixes and security\n\n- Update Rustls to `0.23.45`, fixing TLS handshake boundary validation advisory `RUSTSEC-2026-0285`.\n- Pin Harness family packages and required peers together, preventing mixed-version export failures during downgrades.\n- Serialize installation against plugin mutations, report catalog/compatibility errors, and support newer exported CLI entry points on older Node releases.\n- Preserve bootstrap tokens for navigation while redacting logs and tray labels. Authentication is never disabled.\n\n## Installation and limitations\n\n- Upgrade in place or use the in-app updater; Full includes offline dependencies, while Lite downloads them when needed.\n- The Studio baseline remains `0.1.1-rc.2`. Strict-cookie releases including `0.1.2-rc.1` and `0.1.5-rc.2` are rejected because the current embedded window cannot authenticate them. Existing runtime and user data are retained.\n\n## Verification\n\n- Windows cold baseline install and selected `0.1.1-rc.1` Profile startup were exercised; browser testing reproduced the strict-cookie embedding failure.\n- Three-platform CI now includes selected-version boot and incompatible-version rejection. No physical Apple device was available for validation.\n\n<!-- dsh-notes:end -->",
+  "pub_date": "2026-09-15T04:00:52.111Z",
   "platforms": {
     "darwin-aarch64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjJTSkh1cmRhUG9ETHhCejBiT0hGdW85WERoRkJPV0xzbzlFdjdHWlhNK0ZiM0pNT0FRdWdGV01Ddk84OVRTT0ZNeVpYYnhta0lvNVFQd3gzL1plMFE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4MDkzCWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CmNXN1FVeGhmOTNnUHQrekYrVmxMdjJKUUhtdEpZT0NJZFV5MDhCYm5LYUwxSjMrMVdLZHlDYjhETm83RXZGUFZpSTBTY05iL2piT3BiZUd2c2xaY0FnPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559979205"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNithdGE4R1BBQWJXUm95aFVzdE01Qk5wd1ByTlBKN1hWOUxMM3Z4ckEvT0xDTEFpVWNxdnRTeU81Yno1WldZekQxeWdTbkhWU0JaTWhLNXYvK3N5eEFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0MzIyCWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6ClloL1hPNitDbDlvOG5pZllVa2MydEZXZjBVbUxyMEV4aDRmN2tLTGRPOUJzUi9qT05vdFNoSHcyYkticUNKL3o1Wld4UEpsOWtJcjVVRS9acmlRZEF3PT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564825307"
     },
     "darwin-aarch64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjJTSkh1cmRhUG9ETHhCejBiT0hGdW85WERoRkJPV0xzbzlFdjdHWlhNK0ZiM0pNT0FRdWdGV01Ddk84OVRTT0ZNeVpYYnhta0lvNVFQd3gzL1plMFE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4MDkzCWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CmNXN1FVeGhmOTNnUHQrekYrVmxMdjJKUUhtdEpZT0NJZFV5MDhCYm5LYUwxSjMrMVdLZHlDYjhETm83RXZGUFZpSTBTY05iL2piT3BiZUd2c2xaY0FnPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559979205"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNithdGE4R1BBQWJXUm95aFVzdE01Qk5wd1ByTlBKN1hWOUxMM3Z4ckEvT0xDTEFpVWNxdnRTeU81Yno1WldZekQxeWdTbkhWU0JaTWhLNXYvK3N5eEFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0MzIyCWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6ClloL1hPNitDbDlvOG5pZllVa2MydEZXZjBVbUxyMEV4aDRmN2tLTGRPOUJzUi9qT05vdFNoSHcyYkticUNKL3o1Wld4UEpsOWtJcjVVRS9acmlRZEF3PT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564825307"
     },
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjNrTXoyeThudzcyT2U0ZkthNERuVzJNK2FoTnZoUGlTV096WGJFb1BEZ1RnVkFMTHlvL3N2NmI1SzRkYkdqZHlRdU5rc1VCNHdHQ1pkLzZXWmhueXdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4MTk5CWZpbGU6RFNIIFN0dWRpb18wLjkuN19hbWQ2NC5BcHBJbWFnZQpJb1kwT2t5blBWWDJyV1NIYnV3elMxcWhqT3M4UlpnTW9sTExYekZ6amhFY2VVR2xaOHltQUhtajgraU81OTh6N2cyZnFCdnRLVWxOWDc5cFA3anpDZz09Cg==",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559982264"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjlmL0pyRWdXdk1BTGYwS0xnZ1JYOGxuS0pyV1B2U24yTGMyZDFETTVHa2dpWkpZVFk4TEtvK21pOUNRRktFU1BoeVQ2MzlPUHF0b1N6OEdaSkw4NkFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0MzY2CWZpbGU6RFNIIFN0dWRpb18wLjkuOF9hbWQ2NC5BcHBJbWFnZQo1bERFU0lXZlFSdVhId29rY2hIYWdiSkVjRm5OZE5GQUdKTVppY04rUDNaazhVQVRtOU9pQkl1dU1NeW95T2JuQndHVnZ3WWMrK3lKblRteGNmaDdDdz09Cg==",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564826545"
     },
     "linux-x86_64-appimage": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjNrTXoyeThudzcyT2U0ZkthNERuVzJNK2FoTnZoUGlTV096WGJFb1BEZ1RnVkFMTHlvL3N2NmI1SzRkYkdqZHlRdU5rc1VCNHdHQ1pkLzZXWmhueXdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4MTk5CWZpbGU6RFNIIFN0dWRpb18wLjkuN19hbWQ2NC5BcHBJbWFnZQpJb1kwT2t5blBWWDJyV1NIYnV3elMxcWhqT3M4UlpnTW9sTExYekZ6amhFY2VVR2xaOHltQUhtajgraU81OTh6N2cyZnFCdnRLVWxOWDc5cFA3anpDZz09Cg==",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559982264"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjlmL0pyRWdXdk1BTGYwS0xnZ1JYOGxuS0pyV1B2U24yTGMyZDFETTVHa2dpWkpZVFk4TEtvK21pOUNRRktFU1BoeVQ2MzlPUHF0b1N6OEdaSkw4NkFjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0MzY2CWZpbGU6RFNIIFN0dWRpb18wLjkuOF9hbWQ2NC5BcHBJbWFnZQo1bERFU0lXZlFSdVhId29rY2hIYWdiSkVjRm5OZE5GQUdKTVppY04rUDNaazhVQVRtOU9pQkl1dU1NeW95T2JuQndHVnZ3WWMrK3lKblRteGNmaDdDdz09Cg==",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564826545"
     },
     "linux-x86_64-deb": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjd6RlJRa0RDTEFGbnNvOFF0ZU42YzR1SzU2am9HaWxNanl3WjE2MzhlRFdzQWQrZGk4R1RHd29GQlZ2M1VnVENGaVdxL21YazF5NDA0Yjl3cmlHcndNPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4MTk5CWZpbGU6RFNIIFN0dWRpb18wLjkuN19hbWQ2NC5kZWIKUXVUMnlZWTFkWjRhOUM0NnhrbUJ0UjRCM1FHVmVYTmFUR2NYNVFHNElYSXYxN3ZTdlpMbTdEcXIzTkdlV2kzeTE3MFR3K3lQSEdlU2NNSWRoUmRUQUE9PQo=",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559982186"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjFFbnpLRjhHNk5lT1I3cTlkN0xXcUdwdjNaY1lNVWpOcGxFTTFGN3hNTThTb21nRTNDSGhob051SVVldnVUL0MwbGlLZTRsOWNrL1hqcFlrMml1ZlF3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0MzY2CWZpbGU6RFNIIFN0dWRpb18wLjkuOF9hbWQ2NC5kZWIKLzU3WHZwdHJuU3lab29SVE9Lb2llY092a3ZNR0thM3BnVWdIVEpZTGhTYXBzbDBqRHJxbG9ZSGFaTFJxQUJ6dWxTa1NGMTVzT3lncCtjeWhRUmRVQ2c9PQo=",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564826479"
     },
     "linux-x86_64-rpm": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjQ5YWtSVWVJeWo0eTZTK1ZXZWxqVy9GZFVlcTJzMDNBUFpIRERySDA1TzdPZm5YY2FkM054YVdsVkxsdS9CM2xNQnl4Wmx0N2NSenNQRXFVVXpLbGdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4MTk5CWZpbGU6RFNIIFN0dWRpby0wLjkuNy0xLng4Nl82NC5ycG0KV2k2d0tobzhCNnI5SkF3ODRIay9TOUtXTzFKUjFaSjRmTjBENUxuMUlFYWVvWEhJeDArVHkwNy9WaDNJYTZEUXh0V1pjV2s5ejFtbkFzMXJkRmp2Qnc9PQo=",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559982229"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjdXUDZyTVBZUTBiOTB1LzN6ZnAzV2o0UUx0YWdnY0MzVVp6ZE5mYWVHZzVqMEkvUERMWEhuSGF3U0txMDVpWHp2ZE93Ti9KZDdEVmhqV3FRbm1vaEFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0MzY2CWZpbGU6RFNIIFN0dWRpby0wLjkuOC0xLng4Nl82NC5ycG0KOTRjNXlEN25Venp2TmMwQTJLd1hublNqSlV1WXNobCtzdzkrc2RjKytEeDV0Ykc2RGVYaFNBOW0zYnB1aU92L05zUjFHaEJ5UHduOHFITXRPdEhvQmc9PQo=",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564826513"
     },
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjJYUW1ES2JuNjJoVTUvN1dCb0lwWEdNSkI2cE9yZnN1c3BzbmE0NzlySGpNOEd3U1hVNkRtNmxlSFNLL3dMeXllL1hvejB1bzVBNGxvLzFwUkNIcUFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4NTUwCWZpbGU6RFNIIFN0dWRpb18wLjkuN194NjQtc2V0dXAuZXhlCjl3c0REbS9rRUlhTXNDQ3NqVDJpd0FNeHV6eUU1RXduYkk0YlpiYUoyUzIyZmVJYy91SHM1WmtxU3JudHNUVm5yNjBSOW5VcDRac2F4MEZlMDR2VkJnPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559990366"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNi9ENHBaTDlZa3ZiZVZXQ0FLRlp3cm9WR2hSYWd1SGFRczFnU29MSzZEL2k0T0lhKzRzNDNuQVkzZVRoak9wdVo1bHdZU1JMTWoxMkxvTHY0LzRmemdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0NDQzCWZpbGU6RFNIIFN0dWRpb18wLjkuOF94NjQtc2V0dXAuZXhlCjM3QkJ5RjRrRHIvODc2KzZvdTBQajBBQXlmTU5jRDZHMWxlQTFNWHFad0tmVC9lNGFuUXE2RjhsMXVhNkRXNlI5RmVHUytpZHEyVFVyTWVlYnlVdEFRPT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564828215"
     },
     "windows-x86_64-nsis": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjJYUW1ES2JuNjJoVTUvN1dCb0lwWEdNSkI2cE9yZnN1c3BzbmE0NzlySGpNOEd3U1hVNkRtNmxlSFNLL3dMeXllL1hvejB1bzVBNGxvLzFwUkNIcUFJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4NTUwCWZpbGU6RFNIIFN0dWRpb18wLjkuN194NjQtc2V0dXAuZXhlCjl3c0REbS9rRUlhTXNDQ3NqVDJpd0FNeHV6eUU1RXduYkk0YlpiYUoyUzIyZmVJYy91SHM1WmtxU3JudHNUVm5yNjBSOW5VcDRac2F4MEZlMDR2VkJnPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559990366"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNi9ENHBaTDlZa3ZiZVZXQ0FLRlp3cm9WR2hSYWd1SGFRczFnU29MSzZEL2k0T0lhKzRzNDNuQVkzZVRoak9wdVo1bHdZU1JMTWoxMkxvTHY0LzRmemdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0NDQzCWZpbGU6RFNIIFN0dWRpb18wLjkuOF94NjQtc2V0dXAuZXhlCjM3QkJ5RjRrRHIvODc2KzZvdTBQajBBQXlmTU5jRDZHMWxlQTFNWHFad0tmVC9lNGFuUXE2RjhsMXVhNkRXNlI5RmVHUytpZHEyVFVyTWVlYnlVdEFRPT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564828215"
     },
     "windows-x86_64-msi": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjBJVlZnUUltZm5vV0FxMWs0K0dNTFVGWlNkek13alZ5c2I4aXc0c05ZTWxnUGdyUGpxeFhmRzRrWkhSbm5GdjNDWUlKbk5zMUZVN0xTenRKb2FQb1FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4NTUwCWZpbGU6RFNIIFN0dWRpb18wLjkuN194NjRfZW4tVVMubXNpClZFTm13bzRJVFFZbXRDS1g1SnEvaFBpaHV5cTZYRnlNbEorK3Jyc3BLdXZMNzFMc3hTbEM0WUlrUXVTWjRvc1NER3orOElpRzBWLyszK1ZJMmpUYkR3PT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559990329"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjZkQ2pEeEhZWUdKdkR0R1htOUlZQlBLYWdmTFpHdG1HQjB0azllekFMb00xL2F6VExjVTRJS3E1OHlDc011bHY0OUwyLzBmNWc3bHBmZ3NKaTkwend3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0NDQzCWZpbGU6RFNIIFN0dWRpb18wLjkuOF94NjRfZW4tVVMubXNpCjhuZ0NJMU9BVVRPUUZsQmR1aXpGK0tsdmFEclRlZ3ZYWHN6TEV1RFVHRExLVVZYVG5NcWx0K2VwVU1nTEd5VVl1eXZ4dGZHMG5WS3J3Y1ZTa0wrbEFRPT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564828176"
     },
     "darwin-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjFEa2tsUGNRU0FCd3c4WjBJWHptbUU3REZtT01yM0VkR0NJTDkwYnVJRFZlakN5OUVHVDJ0Q3BjQ0xtdmNiTFpvaWhDR1crYjZkbTFKNmFhZHRvaWc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ5MTc5CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CnNzd3FYdithUUwvTkZ4VWJjUmtQT3dCbXIrQ2VFWXZDNG5OSzBPU0UyYW9GSWtXRkxZelJyY1FRaGxkamMyWnZPSGMvc3hTdjNTM2psWHNDMVJMeUFRPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/560003234"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjljRFpQckxTQ2k4K2h6anFrdWU5eWtqS0hCQjdsRCtNOFVadTZ0YnM3ekJQNEhuYVJBalNwclgyWm0xWmxYYkVHN3pKMmF6YXpFbFRQeVVScEdLUGdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0ODQ4CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CmErTUJVaUo2NWJPejNCUmE3cVlsN3JkVEFNeEdpcWhuZjF5S2FGUWpwRmxzQTlkL0JzR044cXo1dzBFQmFZRnpjL2hndGpsY2hTbStIK3ZHdkZ6OEJ3PT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564837701"
     },
     "darwin-universal": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjRjdEkzSHZRTmlMcldUZkxnYm01c0NPRmxZSGZJY2d4c1NUYzVBUEJOa2dWZXY2cG1SaEp1c0o4ZFdFYXd5N0FxYW5ZUm0xSzZDNXpFdHhQWDJGS2cwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4NTg0CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CitjWENZMnJxV09XTU9zUld3NnRsT25ENTVCR0ZkV1pWWmZXajBVeWo1dTFMWUtIRHNWOHduSHR0V0lwSW9xa2Y2bUxqbGxKRW1naG1UQlZ2QkFpSkRnPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559991152"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjRRUG9BakYxc1MyaXRkWVNWTFNwVUFLZXo5Y0pETkZlVW9hVVRDZUI3T2NqSDl6WjQ3TTBXc3B3QTVUMTk2QzN1azN2VlVFcmRnSEJrQ1FXODFSOHdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0ODM2CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CklPbnJ5c1RaQ0RiUlVaWnJsNnBxdHBIVVREc3c5cXN0OGhDZzhLMlBMWlFaSTVTL3VxR2dHWFY5YXhYUGdUUmZRMjdkWnF6bTk3MFNJRXpZYSs2dEJnPT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564837375"
     },
     "darwin-x86_64-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjFEa2tsUGNRU0FCd3c4WjBJWHptbUU3REZtT01yM0VkR0NJTDkwYnVJRFZlakN5OUVHVDJ0Q3BjQ0xtdmNiTFpvaWhDR1crYjZkbTFKNmFhZHRvaWc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ5MTc5CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CnNzd3FYdithUUwvTkZ4VWJjUmtQT3dCbXIrQ2VFWXZDNG5OSzBPU0UyYW9GSWtXRkxZelJyY1FRaGxkamMyWnZPSGMvc3hTdjNTM2psWHNDMVJMeUFRPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/560003234"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjljRFpQckxTQ2k4K2h6anFrdWU5eWtqS0hCQjdsRCtNOFVadTZ0YnM3ekJQNEhuYVJBalNwclgyWm0xWmxYYkVHN3pKMmF6YXpFbFRQeVVScEdLUGdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0ODQ4CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CmErTUJVaUo2NWJPejNCUmE3cVlsN3JkVEFNeEdpcWhuZjF5S2FGUWpwRmxzQTlkL0JzR044cXo1dzBFQmFZRnpjL2hndGpsY2hTbStIK3ZHdkZ6OEJ3PT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564837701"
     },
     "darwin-universal-app": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjRjdEkzSHZRTmlMcldUZkxnYm01c0NPRmxZSGZJY2d4c1NUYzVBUEJOa2dWZXY2cG1SaEp1c0o4ZFdFYXd5N0FxYW5ZUm0xSzZDNXpFdHhQWDJGS2cwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MjQ4NTg0CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CitjWENZMnJxV09XTU9zUld3NnRsT25ENTVCR0ZkV1pWWmZXajBVeWo1dTFMWUtIRHNWOHduSHR0V0lwSW9xa2Y2bUxqbGxKRW1naG1UQlZ2QkFpSkRnPT0K",
-      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/559991152"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSNmFIcmcySzNaNjRRUG9BakYxc1MyaXRkWVNWTFNwVUFLZXo5Y0pETkZlVW9hVVRDZUI3T2NqSDl6WjQ3TTBXc3B3QTVUMTk2QzN1azN2VlVFcmRnSEJrQ1FXODFSOHdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5NDQ0ODM2CWZpbGU6RFNIIFN0dWRpby5hcHAudGFyLmd6CklPbnJ5c1RaQ0RiUlVaWnJsNnBxdHBIVVREc3c5cXN0OGhDZzhLMlBMWlFaSTVTL3VxR2dHWFY5YXhYUGdUUmZRMjdkWnF6bTk3MFNJRXpZYSs2dEJnPT0K",
+      "url": "https://api.github.com/repos/Moresyl/dsh-studio/releases/assets/564837375"
     }
   }
 }
