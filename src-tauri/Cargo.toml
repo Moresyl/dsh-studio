@@ -97,7 +97,7 @@ reqwest = { version = "0.13", default-features = false, features = [
 # `rustls-no-provider` leaves the cipher suites to the application. The plugin
 # picks ring and installs it as the process default; this declares the same one
 # so both callers share a provider instead of racing to install two.
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring"] }
 sha2 = "0.10"
 # Pairing secrets come from the OS entropy source, never from a PRNG we seed.
 getrandom = "0.3"

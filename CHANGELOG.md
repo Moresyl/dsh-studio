@@ -17,6 +17,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and security
 
+- Upgrade Rustls to `0.23.45` to fix TLS handshake encryption-level boundary validation (`RUSTSEC-2026-0285`).
 - Pin Harness family members and required peers to the selected version to prevent mixed-release exports and missing services.
 - Preserve verified runtime selection and legacy markers; failed candidates retain the current runtime, and Repair targets the last verified selection.
 - Serialize runtime replacement against plugin mutations and surface retryable catalog errors through the shared error dialog.
