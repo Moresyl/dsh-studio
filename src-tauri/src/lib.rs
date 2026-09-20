@@ -22,6 +22,7 @@ mod profiles;
 mod recovery;
 mod remote;
 mod sessions;
+mod shell;
 mod startup;
 mod terminal;
 mod tray;
@@ -97,6 +98,24 @@ pub fn run() {
             app.manage(Arc::new(sessions::Library::default()));
             app.manage(recovery::RendererHealth::default());
             app.manage(terminal::Terminals::new()?);
+            // Serve the compiled shell from loopback so the harness iframe is
+            // same-site with it: dsh 0.1.2+ issues a SameSite=Strict session
+            // cookie that WKWebView only holds and sends inside a same-site
+            // frame. `origin()` hands every window the address to load.
+            // `frontendDist` is embedded in the binary for the tauri:// scheme,
+            // so it never lands on disk; the bundle's explicit `resources`
+            // mapping puts a second copy at Resources/dist/ for the loopback
+            // server to read.
+            let shell_root = app
+                .path()
+                .resource_dir()
+                .map_err(|cause| {
+                    crate::error::Error::Window(format!("resource dir unreadable: {cause}"))
+                })?
+                .join("dist");
+            let (shell_server, shell_origin) = shell::ShellServer::start(shell_root)?;
+            app.manage(shell_server);
+            app.manage(shell::ShellOrigin(shell_origin));
             // Before `desktop::wire`, which is where a link that started the app
             // is put down for whoever asks for it first.
             app.manage(desktop::Desk::default());
