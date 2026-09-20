@@ -5,7 +5,9 @@ window.__ModuleLoader__.load({
     const exports = module.exports
     Object.defineProperty(exports, Symbol.toStringTag, { value: 'Module' })
 
-    const inject = ['workspaces']
+    // uiWorkspace exists from Harness 0.1.2; inject stays tolerant so either
+    // generation loads (a missing service is skipped by the loader).
+    const inject = ['workspaces', 'uiWorkspace']
 
     function apply(ctx) {
       const desktop = window.dshStudio
@@ -15,8 +17,19 @@ window.__ModuleLoader__.load({
         void desktop.workspace.validate(path).then((review) => {
           if (!review.allowed) throw new Error(review.reason || 'DSH Studio rejected this workspace')
           return ctx.workspaces.create({ path })
-        }).then((workspace) => {
-          ctx.workspaces.startSession(workspace.workspaceId)
+        }).then((created) => {
+          // Harness 0.1.2 wraps service results in a Result object.
+          const workspace = created && typeof created.ok === 'boolean'
+            ? (created.ok ? created.value.workspace : null)
+            : created
+          if (!workspace) {
+            throw new Error((created && created.error && created.error.message) || 'Workspace could not be created')
+          }
+          if (typeof ctx.uiWorkspace?.startSession === 'function') {
+            ctx.uiWorkspace.startSession(workspace.workspaceId)
+          } else {
+            ctx.workspaces.startSession(workspace.workspaceId)
+          }
         }).catch((reason) => {
           const body = reason instanceof Error ? reason.message : String(reason)
           void desktop.notify({ title: 'Workspace could not be added', body }).catch(() => {})
