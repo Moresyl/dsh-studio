@@ -32,9 +32,10 @@ network access. Old runtime markers remain readable, and Repair targets the last
 successfully verified version. Do not manually replace packages inside the managed
 runtime directory.
 
-Known limitation: upstream `0.1.2-rc.1` and `0.1.5-rc.2` use a strict login cookie that cannot work
-inside the current embedded window. Studio rejects its activation even if the
-server starts, retaining the previous runtime instead of showing an unauthorized page.
+Harness 0.1.2 and later authenticate the web UI with a per-boot token exchanged
+for a `SameSite=Strict` session cookie. The Studio shell serves itself from the
+same loopback site (`http://127.0.0.1`), so the embedded window holds and sends
+that cookie exactly like a browser tab — no Harness patching is involved.
 
 ## Plugins
 

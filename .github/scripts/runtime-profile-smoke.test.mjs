@@ -4,22 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import {
-  assertEmbeddedSessionCookies,
-  parseReadyOrigin,
-  prepareSmokeProfile,
-} from './runtime-profile-smoke.mjs'
-
-test('embedded windows reject cross-site-incompatible authentication before activation', () => {
-  for (const sameSite of ['Strict', 'Lax', 'strict']) {
-    assert.throws(
-      () => assertEmbeddedSessionCookies([`session=secret; HttpOnly; SameSite=${sameSite}`]),
-      /incompatible with the embedded Studio window/,
-    )
-  }
-  assert.doesNotThrow(() => assertEmbeddedSessionCookies([]))
-  assert.throws(() => assertEmbeddedSessionCookies(['session=secret; HttpOnly']), /incompatible/)
-})
+import { parseReadyOrigin, prepareSmokeProfile } from './runtime-profile-smoke.mjs'
 
 test('readiness accepts only an explicit loopback HTTP port', () => {
   assert.equal(parseReadyOrigin('ordinary output'), undefined)
