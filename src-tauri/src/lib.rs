@@ -5,6 +5,7 @@ mod application_menu;
 mod atomic;
 mod bounded_file;
 mod child_output;
+mod cookies;
 mod desktop;
 mod diagnostics;
 mod error;
@@ -85,6 +86,14 @@ pub fn run() {
             // result is persisted and the first window explains it.
             let _ = plugins::recovery::recover_startup();
             let supervisor = Supervisor::new()?;
+            // Webview cookies for loopback hosts belong to no one session:
+            // dsh plants a fresh one every boot and never retires the last.
+            // Cleared before each harness process, which is the only moment
+            // nothing live is holding one. See `cookies`.
+            supervisor.set_pre_boot(Arc::new({
+                let app = app.handle().clone();
+                move || cookies::sweep_loopback(&app)
+            }));
             let remote = Arc::new(Remote::new());
 
             forward_events(app.handle(), &supervisor, &remote);

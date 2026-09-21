@@ -28,9 +28,11 @@ use std::time::Duration;
 
 use crate::error::{Error, Result};
 
-const ADDRESS: &str = "127.0.0.1";
-/// Bound the headers of a request the shell's own bundle can ask for.
-const REQUEST_BYTES: usize = 4096;
+pub(crate) const ADDRESS: &str = "127.0.0.1";
+/// Backstop for a head that never terminates. The head is drained and
+/// discarded, so this only bounds damage from a client that streams forever;
+/// it is nowhere near any realistic browser head, cookies included.
+const HEAD_BYTES: usize = 1024 * 1024;
 /// The frontend is compiled, minified and local; anything larger is not this
 /// server talking to itself.
 const BODY_BYTES: usize = crate::bounded_file::CONTROL_BYTES;
@@ -108,23 +110,60 @@ fn serve(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     stream.set_write_timeout(Some(Duration::from_secs(5)))?;
 
-    let mut head = Vec::new();
+    // The shell's static bundle never reads headers, so the head is a stream
+    // to drain, not a buffer to fill. Only the request line is kept (it is
+    // always the first line); everything else — Cookie included — is
+    // discarded. That matters: dsh sets a fresh, randomly-named, thirty-day
+    // cookie on 127.0.0.1 at every boot, and cookies ignore ports, so the
+    // webview's request head grows without bound across restarts. A
+    // fixed-size head buffer turns that into a hard failure once the cookies
+    // alone exceed it; draining does not care how large the head gets.
+    let mut request_line: Vec<u8> = Vec::new();
+    let mut on_first_line = true;
+    // The head ends with an empty line. Match the \r\n\r\n terminator as a
+    // rolling four-byte pattern so no head buffer is needed at all.
+    let mut terminator = 0usize;
+    let mut drained = 0usize;
     let mut byte = [0u8; 1];
-    while head.len() < REQUEST_BYTES {
+    const TERMINATOR: [u8; 4] = *b"\r\n\r\n";
+    loop {
         let read = stream.read(&mut byte)?;
         if read == 0 {
             return Ok(());
         }
-        head.push(byte[0]);
-        if head.ends_with(b"\r\n\r\n") {
+        drained += 1;
+        if drained > HEAD_BYTES {
+            reply(&mut stream, 431, "request head too large", "text/plain")?;
+            return Ok(());
+        }
+        let b = byte[0];
+        if on_first_line {
+            if b == b'\n' {
+                on_first_line = false;
+                if request_line.last() == Some(&b'\r') {
+                    request_line.pop();
+                }
+            } else {
+                request_line.push(b);
+            }
+        }
+        terminator = if b == TERMINATOR[terminator] {
+            terminator + 1
+        } else if b == b'\r' {
+            1
+        } else {
+            0
+        };
+        if terminator == TERMINATOR.len() {
             break;
         }
     }
 
-    let request = String::from_utf8_lossy(&head);
-    let Some(request_line) = request.lines().next() else {
+    let request = String::from_utf8_lossy(&request_line);
+    let request_line = request.trim_end();
+    if request_line.is_empty() {
         return Ok(());
-    };
+    }
     let mut parts = request_line.split_whitespace();
     if parts.next() != Some("GET") {
         reply(&mut stream, 405, "method not allowed", "text/plain")?;
@@ -140,9 +179,7 @@ fn serve(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
     // (hashed assets, source maps), and everything outside it is refused. Both
     // the root and the target are canonicalised because macOS temp paths pass
     // through a symlink and a plain lexical prefix check would refuse them.
-    let root = root
-        .canonicalize()
-        .unwrap_or_else(|_| root.to_path_buf());
+    let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
     let relative = path.trim_start_matches('/');
     let candidate = if relative.is_empty() {
         root.join("index.html")
@@ -231,10 +268,7 @@ mod tests {
 
     #[test]
     fn index_and_a_nested_asset_round_trip() {
-        let root = std::env::temp_dir().join(format!(
-            "shell-server-test-{}",
-            std::process::id()
-        ));
+        let root = std::env::temp_dir().join(format!("shell-server-test-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("assets")).unwrap();
         std::fs::write(root.join("index.html"), b"<html>shell</html>").unwrap();
@@ -275,14 +309,58 @@ mod tests {
         let mut stream = TcpStream::connect((host.as_str(), port)).unwrap();
         stream
             .write_all(
-                format!(
-                    "GET {path} HTTP/1.1\r\nhost: {host}\r\nconnection: close\r\n\r\n"
-                )
-                .as_bytes(),
+                format!("GET {path} HTTP/1.1\r\nhost: {host}\r\nconnection: close\r\n\r\n")
+                    .as_bytes(),
             )
             .unwrap();
         let mut out = Vec::new();
         stream.read_to_end(&mut out).unwrap();
         String::from_utf8_lossy(&out).to_string()
+    }
+
+    #[test]
+    fn a_request_head_full_of_cookies_is_still_served() {
+        // dsh plants a fresh, randomly-named, thirty-day cookie on 127.0.0.1
+        // at every boot, and cookies ignore ports — so over weeks the head a
+        // webview sends this server keeps growing. A regression here is an
+        // app that stops starting once the head outgrows the buffer.
+        let root =
+            std::env::temp_dir().join(format!("shell-server-cookies-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("index.html"), b"<html>shell</html>").unwrap();
+
+        let (server, origin) = ShellServer::start(root.clone()).unwrap();
+        let parsed = url::Url::parse(&origin).unwrap();
+        let host = parsed.host_str().unwrap().to_string();
+        let port = parsed.port().unwrap();
+
+        let cookies: String = (0..600)
+            .map(|i| format!("dsh-auth-{i:0>43}={i:0>173}"))
+            .collect::<Vec<_>>()
+            .join("; ");
+        assert!(
+            cookies.len() > 64 * 1024,
+            "the test head must dwarf any browser default"
+        );
+        let mut stream = TcpStream::connect((host.as_str(), port)).unwrap();
+        stream
+            .write_all(
+                format!("GET / HTTP/1.1\r\nhost: {host}\r\ncookie: {cookies}\r\nconnection: close\r\n\r\n")
+                    .as_bytes(),
+            )
+            .unwrap();
+        let mut out = Vec::new();
+        stream.read_to_end(&mut out).unwrap();
+        let text = String::from_utf8_lossy(&out);
+        assert!(
+            text.contains("200"),
+            "head of {} bytes: {text}",
+            cookies.len()
+        );
+        assert!(text.contains("<html>shell</html>"));
+
+        drop(server);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

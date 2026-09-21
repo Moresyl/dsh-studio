@@ -25,7 +25,7 @@ pub fn parse(line: &str) -> Option<Ready> {
     // The announcement is a bare URL; anything after whitespace is commentary.
     let candidate = announced.split_whitespace().next().unwrap_or_default();
 
-    let Ok(url) = url::Url::parse(candidate) else {
+    let Ok(mut url) = url::Url::parse(candidate) else {
         return Some(Ready::Rejected(format!(
             "harness announced an unparseable URL: {candidate}"
         )));
@@ -41,6 +41,17 @@ pub fn parse(line: &str) -> Option<Ready> {
         return Some(Ready::Rejected(format!(
             "harness announced a URL without an explicit port: {candidate}"
         )));
+    }
+
+    // A cookie's "site" is scheme plus registrable domain, and a name is not an
+    // address: `localhost` is a different site from `127.0.0.1`. The shell is
+    // served from `crate::shell::ADDRESS`, and the frame only keeps the
+    // harness's `SameSite=Strict` session cookie while it shares that site, so
+    // an announcement that spells the host out is rewritten to the address the
+    // launch actually binds (`--host`). Taking it as printed would quietly put
+    // the frame back in the third-party context this server exists to leave.
+    if url.host_str() == Some("localhost") {
+        let _ = url.set_host(Some(crate::shell::ADDRESS));
     }
 
     // Recent Harness releases require the announced bootstrap token. Keep
@@ -74,8 +85,24 @@ mod tests {
     #[test]
     fn tolerates_trailing_whitespace_and_carriage_returns() {
         assert_eq!(
-            parse("dsh web: http://localhost:3080/\r\n"),
-            Some(Ready::At("http://localhost:3080".into()))
+            parse("dsh web: http://127.0.0.1:3080/\r\n"),
+            Some(Ready::At("http://127.0.0.1:3080".into()))
+        );
+    }
+
+    #[test]
+    fn names_the_address_the_shell_is_same_site_with() {
+        // `localhost` and `127.0.0.1` are different sites to a cookie, so an
+        // announcement that names the host is rewritten to the address the
+        // frame has to share a site with.
+        assert_eq!(
+            parse("dsh web: http://localhost:3080/"),
+            Some(Ready::At("http://127.0.0.1:3080".into()))
+        );
+        // The token survives the rewrite; it is what the frame authenticates with.
+        assert_eq!(
+            parse("dsh web: http://localhost:3080/?token=abc"),
+            Some(Ready::At("http://127.0.0.1:3080/?token=abc".into()))
         );
     }
 
