@@ -9,6 +9,24 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.9] — 2026-09-22
+
+### Changed
+
+- Serve the Studio shell from the loopback origin so Harness `0.1.2-rc.1` can authenticate in the embedded window without weakening its cookie policy.
+- Align the main chrome, pane headings, buttons, and status text to consistent UI type roles; give actionable controls restrained press feedback and touch-friendly behavior.
+
+### Fixes and security
+
+- Preserve same-site navigation and bound the loopback cookie header; support both generations of the Studio integration client.
+- Keep Rust-only checks working from a clean checkout without a generated frontend bundle, and cover that path in CI.
+- Replace the obsolete incompatible-authentication CI assertion with a real isolated install and Profile boot of Harness `0.1.2-rc.1`.
+
+### Verification
+
+- Windows isolated installation and real Profile boot of Harness `0.1.2-rc.1` passed; frontend build, lint, 269 frontend tests, 51 packaging tests, and the Rust workspace tests passed locally.
+- CI tests the selected Harness on Linux, Windows, and macOS. No physical macOS device was available for validation.
+
 ## [0.9.8] — 2026-09-15
 
 ### Added
