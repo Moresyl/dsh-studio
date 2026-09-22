@@ -209,7 +209,16 @@ pub struct Supervisor {
     active: AtomicBool,
     /// Set by `stop`, so the supervision loop knows an exit was intentional.
     stopping: AtomicBool,
+    /// Run immediately before each harness process is spawned. See
+    /// [`PreBoot`].
+    pre_boot: Mutex<Option<PreBoot>>,
 }
+
+/// Work that belongs to the instant between harness processes: the previous
+/// session is gone, the next has not started. Per-boot webview hygiene lives
+/// here (see `crate::cookies`), because it must run for every spawn — launch,
+/// restart and version switch — and must not run while a session is live.
+pub type PreBoot = Arc<dyn Fn() + Send + Sync>;
 
 impl Supervisor {
     pub fn new() -> Result<Arc<Self>> {
@@ -221,7 +230,22 @@ impl Supervisor {
             persistent_log: Mutex::new(crate::logging::PersistentLog::managed()),
             active: AtomicBool::new(false),
             stopping: AtomicBool::new(false),
+            pre_boot: Mutex::new(None),
         }))
+    }
+
+    /// Install the pre-boot hook. Called once, at startup, before any boot.
+    pub fn set_pre_boot(&self, hook: PreBoot) {
+        if let Ok(mut slot) = self.pre_boot.lock() {
+            *slot = Some(hook);
+        }
+    }
+
+    fn run_pre_boot(&self) {
+        let hook = self.pre_boot.lock().ok().and_then(|slot| slot.clone());
+        if let Some(hook) = hook {
+            hook();
+        }
     }
 
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
@@ -351,6 +375,10 @@ impl Supervisor {
 
     /// Run one launch attempt to readiness.
     async fn launch_once(self: Arc<Self>, plan: &LaunchPlan) -> Result<(Child, String)> {
+        // Between processes: the previous session is gone and the next is not
+        // minted yet. Per-boot webview hygiene runs here so it covers launches,
+        // restarts and version switches alike. See `crate::cookies`.
+        self.run_pre_boot();
         let mut command = plan.to_command();
         let mut child = self.guard.spawn(&mut command).map_err(Error::Spawn)?;
         let pid = child.id();
@@ -664,6 +692,25 @@ mod tests {
     use std::panic::{self, AssertUnwindSafe};
 
     use super::*;
+
+    #[test]
+    fn the_pre_boot_hook_runs_for_every_process_attempt() {
+        let supervisor = Supervisor::new().expect("process guard");
+        let runs = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = Arc::clone(&runs);
+        supervisor.set_pre_boot(Arc::new(move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+        }));
+        supervisor.run_pre_boot();
+        supervisor.run_pre_boot();
+        assert_eq!(runs.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn a_supervisor_without_a_pre_boot_hook_is_not_a_special_case() {
+        let supervisor = Supervisor::new().expect("process guard");
+        supervisor.run_pre_boot();
+    }
 
     #[test]
     fn poisoned_status_bookkeeping_remains_readable() {

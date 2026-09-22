@@ -3,8 +3,10 @@
   "identifier": "default",
   "description": "What the shell UI running on the local asset protocol may do.",
   "windows": ["main", "work-*"],
+  "remote": { "urls": ["http://127.0.0.1:*", "http://localhost:*"] },
   "permissions": [
     "core:default",
+    "shell-commands",
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-start-dragging",

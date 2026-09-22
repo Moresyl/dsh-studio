@@ -195,7 +195,15 @@ fn shell<'a, R: Runtime, M: Manager<R>>(
     material: Option<Material>,
     standby: bool,
 ) -> WebviewWindowBuilder<'a, R, M> {
-    let builder = WebviewWindowBuilder::new(manager, label, WebviewUrl::default())
+    // Loading the shell from the loopback static server rather than the
+    // bundled tauri scheme makes it same-site with the harness iframe, which
+    // is what lets WKWebView hold and send the harness's SameSite=Strict
+    // session cookie. See `crate::shell`.
+    let load = manager
+        .try_state::<crate::shell::ShellOrigin>()
+        .map(|origin| WebviewUrl::External(origin.0.parse().expect("shell origin is a URL")))
+        .unwrap_or_default();
+    let builder = WebviewWindowBuilder::new(manager, label, load)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .transparent(material.is_some())
         .initialization_script(announce(material, standby))

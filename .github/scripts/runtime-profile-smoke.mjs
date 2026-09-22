@@ -6,15 +6,6 @@ import { setTimeout as delay } from 'node:timers/promises'
 
 export const READY_PREFIX = 'dsh web: '
 
-export function assertEmbeddedSessionCookies(cookies) {
-  // Omitted SameSite also defaults to Lax in modern browsers.
-  if (cookies.some((cookie) => !/;\s*SameSite\s*=\s*None\b/iu.test(cookie))) {
-    throw new Error(
-      'This Harness version requires a browser session cookie incompatible with the embedded Studio window. The previous runtime was retained; select the Studio baseline or another compatible version.',
-    )
-  }
-}
-
 /** Parse the exact loopback origin accepted by the native supervisor. */
 export function parseReadyOrigin(line) {
   if (!line.startsWith(READY_PREFIX)) return undefined
@@ -246,7 +237,10 @@ export async function verifyProfileBoot({
       if (exchange.status !== 303 || exchange.headers.get('location') !== '/' || !cookies.length) {
         throw bootFailure('Harness authentication handshake failed', output)
       }
-      assertEmbeddedSessionCookies(sessionCookies)
+      // No SameSite constraint is asserted here: the shell is served from the
+      // same loopback site as the Harness (see src-tauri/src/shell.rs), so the
+      // embedded window holds Strict and Lax session cookies exactly like a
+      // browser tab.
       headers.cookie = cookies.join('; ')
     }
     const response = await fetch(address.origin, {

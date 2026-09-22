@@ -5,6 +5,7 @@ mod application_menu;
 mod atomic;
 mod bounded_file;
 mod child_output;
+mod cookies;
 mod desktop;
 mod diagnostics;
 mod error;
@@ -22,6 +23,7 @@ mod profiles;
 mod recovery;
 mod remote;
 mod sessions;
+mod shell;
 mod startup;
 mod terminal;
 mod tray;
@@ -84,6 +86,14 @@ pub fn run() {
             // result is persisted and the first window explains it.
             let _ = plugins::recovery::recover_startup();
             let supervisor = Supervisor::new()?;
+            // Webview cookies for loopback hosts belong to no one session:
+            // dsh plants a fresh one every boot and never retires the last.
+            // Cleared before each harness process, which is the only moment
+            // nothing live is holding one. See `cookies`.
+            supervisor.set_pre_boot(Arc::new({
+                let app = app.handle().clone();
+                move || cookies::sweep_loopback(&app)
+            }));
             let remote = Arc::new(Remote::new());
 
             forward_events(app.handle(), &supervisor, &remote);
@@ -97,6 +107,24 @@ pub fn run() {
             app.manage(Arc::new(sessions::Library::default()));
             app.manage(recovery::RendererHealth::default());
             app.manage(terminal::Terminals::new()?);
+            // Serve the compiled shell from loopback so the harness iframe is
+            // same-site with it: dsh 0.1.2+ issues a SameSite=Strict session
+            // cookie that WKWebView only holds and sends inside a same-site
+            // frame. `origin()` hands every window the address to load.
+            // `frontendDist` is embedded in the binary for the tauri:// scheme,
+            // so it never lands on disk; the bundle's explicit `resources`
+            // mapping puts a second copy at Resources/dist/ for the loopback
+            // server to read.
+            let shell_root = app
+                .path()
+                .resource_dir()
+                .map_err(|cause| {
+                    crate::error::Error::Window(format!("resource dir unreadable: {cause}"))
+                })?
+                .join("dist");
+            let (shell_server, shell_origin) = shell::ShellServer::start(shell_root)?;
+            app.manage(shell_server);
+            app.manage(shell::ShellOrigin(shell_origin));
             // Before `desktop::wire`, which is where a link that started the app
             // is put down for whoever asks for it first.
             app.manage(desktop::Desk::default());

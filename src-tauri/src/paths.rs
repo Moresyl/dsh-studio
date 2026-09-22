@@ -8,7 +8,33 @@
 use std::path::PathBuf;
 
 /// Root of everything this application writes.
+///
+/// `DSH_STUDIO_DATA_DIR` relocates the whole tree, which integration checks
+/// use to rehearse against a throwaway machine. Unit tests always get an
+/// isolated empty root: the contract, channel and plugin suites assert against
+/// the built-in release, and a developer machine that has pinned another
+/// Harness release must not turn those assertions red.
 pub fn app_data_dir() -> PathBuf {
+    if let Some(relocated) = std::env::var_os("DSH_STUDIO_DATA_DIR") {
+        return PathBuf::from(relocated);
+    }
+    #[cfg(test)]
+    {
+        static TEST_ROOT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+        TEST_ROOT
+            .get_or_init(|| {
+                std::env::temp_dir().join(format!(
+                    "dsh-studio-test-{}-{}",
+                    std::process::id(),
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|elapsed| elapsed.as_nanos())
+                        .unwrap_or_default()
+                ))
+            })
+            .clone()
+    }
+    #[cfg(not(test))]
     dirs::data_local_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("dsh-studio")

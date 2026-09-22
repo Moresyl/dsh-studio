@@ -20,6 +20,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": {
+      "../dist": "dist/"
+    },
     "createUpdaterArtifacts": true,
     "category": "DeveloperTool",
     "shortDescription": "Cross-platform DeepSeek Harness desktop studio",
