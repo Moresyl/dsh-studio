@@ -24,6 +24,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          package-manager-cache: false
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@cargo-audit
       - name: Audit production JavaScript dependencies
@@ -47,6 +48,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          package-manager-cache: false
       - run: node .github/scripts/verify-runtime-install.mjs
 
   test:

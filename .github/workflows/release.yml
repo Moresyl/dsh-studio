@@ -102,6 +102,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          package-manager-cache: false
       - run: node .github/scripts/verify-runtime-install.mjs
 
   publish:
@@ -486,6 +487,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22.19.0
+          package-manager-cache: false
       - name: Generate the manifest from the completed formal release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
