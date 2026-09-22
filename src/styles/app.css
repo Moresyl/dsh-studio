@@ -50,6 +50,17 @@
   --font-mono:
     'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
+  /* Stable UI roles keep typography coherent as individual panes evolve. The
+     setting changes only these tokens, never the root rem scale, so geometry
+     stays stable while text remains comfortable for long sessions. */
+  --ui-font-size: 14px;
+  --text-ui-xl: calc(var(--ui-font-size) + 4px);
+  --text-ui-lg: calc(var(--ui-font-size) + 2px);
+  --text-ui-base: var(--ui-font-size);
+  --text-ui-caption: calc(var(--ui-font-size) - 1px);
+  --text-ui-sm: calc(var(--ui-font-size) - 2px);
+  --text-ui-xs: calc(var(--ui-font-size) - 4px);
+
   /* A window corner is 8px, so nothing framed by one has any business being
      rounder than that. Controls sit a step tighter again. */
   --radius-panel: 0.5rem;
@@ -342,6 +353,15 @@
     overscroll-behavior: none;
   }
 
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    text-wrap: balance;
+  }
+
   .selectable {
     user-select: text;
     -webkit-user-select: text;
@@ -373,6 +393,15 @@
   svg,
   button {
     -webkit-user-drag: none;
+  }
+
+  button,
+  [role='button'],
+  [role='switch'],
+  [role='tab'],
+  a[href] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   :focus-visible {

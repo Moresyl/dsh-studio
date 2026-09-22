@@ -80,10 +80,10 @@ function ConsoleRail() {
         <div className="flex items-center gap-3">
           <BrandMark size={38} className="rounded-[9px] shadow-lift" />
           <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-[15px] leading-none font-semibold tracking-[-0.01em] text-text">
+            <h1 className="text-ui-lg leading-none font-semibold tracking-[-0.01em] text-text">
               DSH Studio
             </h1>
-            <p className="flex items-center gap-1.5 text-[12px] leading-none text-muted">
+            <p className="flex items-center gap-1.5 text-ui-sm leading-none text-muted">
               <StatusDot tone={toneOf(status)} size={6} />
               {labelOf(status)}
             </p>

@@ -23,12 +23,12 @@ export function PaneHeader({ title, subtitle, subtitleHint, children }: PaneHead
   return (
     <header className="chrome flex h-14 shrink-0 items-center gap-4 border-b border-line px-5">
       <div className="min-w-0">
-        <h2 className="text-[13.5px] leading-none font-semibold tracking-[-0.01em] text-text">
+        <h2 className="text-ui-base leading-none font-semibold tracking-[-0.01em] text-text">
           {title}
         </h2>
         {subtitle && (
           <p
-            className="mt-1.5 truncate text-[11.5px] leading-none text-faint"
+            className="mt-1.5 truncate text-ui-sm leading-none text-faint"
             data-hint={subtitleHint}
           >
             {subtitle}

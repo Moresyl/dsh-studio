@@ -20,7 +20,7 @@ interface ButtonProps extends ComponentPropsWithRef<'button'> {
  * control from lighting up when it is hovered.
  */
 const BASE =
-  'inline-flex h-[30px] shrink-0 items-center justify-center gap-1.5 rounded-control px-3 text-[12.5px] font-medium transition duration-100 ease-[var(--ease-out-soft)] select-none disabled:opacity-40'
+  'inline-flex h-[30px] shrink-0 items-center justify-center gap-1.5 rounded-control px-3 text-ui-caption font-medium transition-[background-color,border-color,color,filter,opacity,transform] duration-100 ease-[var(--ease-out-soft)] select-none disabled:opacity-40 enabled:active:translate-y-px'
 
 const VARIANT: Record<Variant, string> = {
   // Flat accent, dark ink. The one saturated element on the surface, which is

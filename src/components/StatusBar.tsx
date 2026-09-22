@@ -41,7 +41,7 @@ export function StatusBar({
   const node = environment?.node ?? null
 
   return (
-    <footer className="chrome relative z-20 flex h-[26px] shrink-0 items-stretch border-t border-line text-[11px] text-muted select-none">
+    <footer className="chrome relative z-20 flex h-[26px] shrink-0 items-stretch border-t border-line text-ui-xs text-muted select-none">
       <Segment hint={labelOf(status)}>
         <StatusDot tone={toneOf(status)} size={7} />
         {labelOf(status)}

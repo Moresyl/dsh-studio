@@ -112,7 +112,7 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
     >
       <div data-tauri-drag-region className="flex flex-1 items-center gap-2 self-stretch pl-2.5">
         <BrandMark size={15} className="rounded-[4px]" />
-        <span className="text-[12px] font-medium text-muted">DSH Studio</span>
+        <span className="text-ui-sm font-medium text-muted">DSH Studio</span>
 
         {/* Windows opened for a task look alike, and the number is what makes
             them referable — the same one the system title carries, so the
@@ -120,7 +120,7 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
         {ordinal && (
           <span
             data-hint={t('window.ordinal', { name: ordinal })}
-            className="grid h-[15px] min-w-[15px] shrink-0 place-items-center rounded-[4px] border border-line px-1 text-[10px] text-faint tabular-nums"
+            className="grid h-[15px] min-w-[15px] shrink-0 place-items-center rounded-[4px] border border-line px-1 text-ui-xs text-faint tabular-nums"
           >
             {ordinal}
           </span>
@@ -221,7 +221,7 @@ function SwitchTab({ label, active, onClick }: SwitchTabProps) {
       aria-pressed={active}
       onClick={active ? undefined : onClick}
       className={[
-        'h-[20px] rounded-[3px] px-2 text-[11.5px] transition-colors duration-100',
+        'h-[20px] rounded-[3px] px-2 text-ui-sm transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px',
         // The raised half of the pair does nothing when pressed, so it does not
         // offer the hand that promises it would.
         active

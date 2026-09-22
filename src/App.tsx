@@ -354,7 +354,7 @@ function ExtendedToolbar({
       aria-label={t('extended.actions')}
       className="chrome flex h-10 shrink-0 items-center gap-1 border-b border-line px-3"
     >
-      <span className="mr-2 text-[11.5px] font-medium text-faint">{t('extended.label')}</span>
+      <span className="mr-2 text-ui-sm font-medium text-faint">{t('extended.label')}</span>
       <ToolbarButton onClick={() => onView('terminal')}>{t('nav.terminal')}</ToolbarButton>
       <ToolbarButton onClick={() => onView('sessions')}>{t('nav.sessions')}</ToolbarButton>
       <ToolbarButton onClick={() => onView('plugins')}>{t('nav.plugins')}</ToolbarButton>
@@ -369,7 +369,7 @@ function ToolbarButton({ children, onClick }: { children: string; onClick: () =>
     <button
       type="button"
       onClick={onClick}
-      className="h-7 rounded-control px-2.5 text-[11.5px] text-muted transition-colors hover:bg-surface-2 hover:text-text"
+      className="h-7 rounded-control px-2.5 text-ui-sm text-muted transition-[background-color,color,transform] duration-100 hover:bg-surface-2 hover:text-text active:translate-y-px"
     >
       {children}
     </button>
@@ -381,7 +381,7 @@ function LoadingSurface({ overlay = false }: { overlay?: boolean }) {
     <div
       role="status"
       className={[
-        'grid place-items-center bg-canvas text-[12px] text-faint',
+        'grid place-items-center bg-canvas text-ui-sm text-faint',
         overlay ? 'absolute inset-0 z-50' : 'min-h-0 flex-1',
       ].join(' ')}
     >
