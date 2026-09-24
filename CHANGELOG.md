@@ -9,6 +9,19 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.12] — 2026-09-24
+
+### Fixes and polish
+
+- Run Windows NSIS uninstall smoke tests synchronously with the documented `_?=<install directory>` argument, then remove only the uninstaller and empty directory tree. Genuine packaged-file residue now fails with the remaining paths instead of timing out on an asynchronous launcher.
+- Supersede the incomplete `v0.9.11` release run while preserving its unified input, select, switch, focus, and compact-dialog treatment.
+
+### Verification
+
+- Local frontend build, lint, 274 frontend tests at 95.1% statement coverage, 57 packaging script tests, Rust workspace tests, accessibility checks, and public-contract checks passed.
+- Browser checks covered both themes, 1102px and 884px desktop layouts, and the 744px full-window dialog layout without horizontal overflow or clipped control text.
+- The release pipeline validates Lite and Full packages on Linux, Windows, and macOS, then publishes checksums and the signed updater manifest only after all package smoke tests pass.
+
 ## [0.9.11] — 2026-09-24
 
 ### Changed
