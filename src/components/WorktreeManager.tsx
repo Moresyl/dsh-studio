@@ -88,7 +88,7 @@ export function WorktreeManager() {
             onKeyDown={(event) => {
               if (event.key === 'Enter') void create()
             }}
-            className="h-[30px] min-w-0 flex-1 rounded-control border border-line-strong bg-surface-2 px-2.5 font-mono text-[11.5px] text-text outline-none placeholder:font-sans placeholder:text-faint focus:border-brand disabled:opacity-40"
+            className="field-control field-control--large min-w-0 flex-1 font-mono text-[11.5px] placeholder:font-sans"
           />
           <Button
             disabled={!branch.trim() || creating || loading || notRepository}

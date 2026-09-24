@@ -47,14 +47,14 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-40 grid place-items-center bg-canvas-deep/75 p-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid place-items-center bg-canvas-deep/75 p-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
         role="dialog"
         aria-modal="true"
         aria-label={t('plugins.sources.title')}
-        className="flex max-h-full w-full max-w-[560px] flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-full w-full max-w-[560px] flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
       >
         <header className="flex items-center gap-3 border-b border-line px-4 py-3.5">
           <Database size={17} className="text-brand" aria-hidden="true" />
@@ -163,7 +163,7 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
                 onChange={(event) => setLabel(event.target.value)}
                 placeholder={t('plugins.sources.name')}
                 maxLength={64}
-                className="h-8 rounded-control border border-line bg-surface px-2.5 text-[11.5px] text-text outline-none focus:border-brand"
+                className="field-control w-full"
               />
               <input
                 value={endpoint}
@@ -172,7 +172,7 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
                 placeholder="https://catalog.example/plugins.json"
                 inputMode="url"
                 spellCheck={false}
-                className="h-8 rounded-control border border-line bg-surface px-2.5 font-mono text-[10.5px] text-text outline-none focus:border-brand"
+                className="field-control w-full font-mono text-[10.5px]"
               />
             </div>
             <div className="mt-3 flex justify-end">

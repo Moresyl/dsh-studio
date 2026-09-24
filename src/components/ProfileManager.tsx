@@ -259,7 +259,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-30 grid animate-fade place-items-center bg-canvas-deep/70 p-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-30 grid animate-fade place-items-center bg-canvas-deep/70 p-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
@@ -267,7 +267,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
         aria-modal="true"
         aria-label={t('profile.title')}
         tabIndex={-1}
-        className="flex max-h-full w-full max-w-[620px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift outline-none"
+        className="dialog-panel flex max-h-full w-full max-w-[620px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift outline-none"
       >
         <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3.5">
           <span
@@ -711,7 +711,7 @@ function SidePicker({ label, value, options, onPick }: SidePickerProps) {
       aria-haspopup="menu"
       aria-label={label}
       onClick={open}
-      className="flex h-[28px] min-w-0 flex-1 items-center gap-1.5 rounded-control border border-line-strong bg-surface-2 px-2 text-[12px] transition duration-100 hover:brightness-[1.15] active:brightness-95"
+      className="select-trigger select-trigger--compact flex-1"
     >
       <span className="shrink-0 text-[11px] text-faint">{label}</span>
       <span className="truncate font-medium text-text">{value}</span>
@@ -833,7 +833,7 @@ function NameForm({ form, busy, onCancel, onSubmit }: NameFormProps) {
           placeholder={t('profile.namePlaceholder')}
           spellCheck={false}
           autoComplete="off"
-          className="selectable h-[30px] min-w-0 flex-1 rounded-control border border-line-strong bg-surface px-2.5 font-mono text-[12px] text-text outline-none placeholder:font-sans placeholder:text-faint focus-visible:border-brand/60"
+          className="field-control field-control--large selectable min-w-0 flex-1 font-mono placeholder:font-sans"
         />
 
         <Button variant="ghost" onClick={onCancel}>

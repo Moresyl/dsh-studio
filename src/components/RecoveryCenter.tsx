@@ -187,14 +187,14 @@ export function RecoveryCenter() {
     <div
       role="presentation"
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-50 grid place-items-center bg-canvas-deep/80 p-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-50 grid place-items-center bg-canvas-deep/80 p-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
         role="alertdialog"
         aria-modal="true"
         aria-label={t('recovery.centerTitle')}
-        className="w-full max-w-[560px] rounded-panel border border-line-strong bg-surface p-5 shadow-lift"
+        className="dialog-panel w-full max-w-[560px] rounded-panel border border-line-strong bg-surface p-5 shadow-lift"
       >
         <div className="flex items-start gap-3">
           {current.kind === 'plugin' && current.notice.restored ? (

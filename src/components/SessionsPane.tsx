@@ -780,7 +780,7 @@ function Filter({
       data-hint={project ?? t('sessions.filter')}
       aria-label={t('sessions.filter')}
       onClick={open}
-      className="inline-flex h-[22px] max-w-[168px] shrink-0 items-center gap-1.5 rounded-control border border-line px-1.5 text-[11.5px] text-muted transition-colors duration-100 hover:border-line-strong hover:bg-surface-2 hover:text-text"
+      className="select-trigger max-w-[168px] shrink-0"
     >
       <span className="truncate">{project ? leaf(project) : t('sessions.allProjects')}</span>
       <ChevronDown size={10} strokeWidth={2.4} className="shrink-0 opacity-55" aria-hidden="true" />

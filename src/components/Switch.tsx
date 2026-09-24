@@ -18,9 +18,8 @@ interface SwitchProps {
  * switch acts the moment it is thrown. Everything this one is used for writes
  * immediately, so it has to be the second one.
  *
- * The knob is the only part that changes colour, and it changes to keep contrast
- * against both track colours in both palettes — a switch nobody can see the
- * state of is a switch that gets thrown twice.
+ * The white thumb stays constant while the track carries state, matching the
+ * desktop chat control and remaining obvious in both palettes.
  */
 export function Switch({ on, busy = false, disabled = false, label, onChange }: SwitchProps) {
   return (
@@ -35,26 +34,28 @@ export function Switch({ on, busy = false, disabled = false, label, onChange }: 
       className={[
         // `transition` rather than `transition-colors`: the hover lift is a
         // filter, and a switch that brightens without easing reads as a flicker.
-        'relative h-[18px] w-[32px] shrink-0 rounded-full transition duration-150 ease-[var(--ease-out-soft)]',
+        'relative h-[19px] w-[32px] shrink-0 rounded-full transition duration-150 ease-[var(--ease-out-soft)]',
         // A switch is the one control here with no label of its own to change,
         // so the track has to answer the pointer or there is nothing to confirm
         // the hit is landing.
-        'enabled:hover:brightness-[1.14] enabled:active:brightness-95 disabled:opacity-45',
-        on ? 'bg-ok' : 'bg-surface-2 hairline',
+        'enabled:active:brightness-95',
+        on
+          ? 'bg-switch-on enabled:hover:brightness-[1.08]'
+          : 'bg-switch-off enabled:hover:bg-switch-off-hover disabled:bg-switch-off-disabled',
       ].join(' ')}
     >
       {busy ? (
         <Loader2
           size={11}
-          className={`absolute top-[3.5px] animate-spin ${on ? 'left-[17px] text-canvas' : 'left-[4px] text-faint'}`}
+          className={`absolute top-[4px] animate-spin ${on ? 'left-[17px] text-white' : 'left-[4px] text-text'}`}
           aria-hidden="true"
         />
       ) : (
         <span
           aria-hidden="true"
           className={[
-            'absolute top-[2px] size-[14px] rounded-full shadow-panel transition-all duration-150 ease-[var(--ease-out-soft)]',
-            on ? 'left-[16px] bg-canvas' : 'left-[2px] bg-faint',
+            'absolute top-[3px] size-[13px] rounded-full bg-white shadow-[0_1px_2px_#0003] transition-all duration-150 ease-[var(--ease-out-soft)]',
+            on ? 'left-[16px]' : 'left-[3px]',
           ].join(' ')}
         />
       )}

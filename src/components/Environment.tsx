@@ -11,6 +11,7 @@ import { Check, Download, Loader2, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 
 import { CheckList, type CheckItem } from '@/components/CheckList'
+import { SelectControl } from '@/components/SelectControl'
 import { megabytes } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { formatVersion, type NodeProgress } from '@/lib/ipc'
@@ -138,12 +139,13 @@ export function EnvironmentChecks() {
         </div>
         {harnessVersions.length > 0 ? (
           <div className="mt-2 flex gap-2">
-            <select
+            <SelectControl
               aria-label={t('harness.versions')}
               value={selectedVersion}
               onChange={(event) => setSelectedVersion(event.target.value)}
               disabled={busy || installing || provisioningNode}
-              className="min-w-0 flex-1 rounded border border-line-strong bg-surface-2 px-2 py-1 text-xs text-text"
+              density="compact"
+              containerClassName="min-w-0 flex-1"
             >
               <option value="">{t('harness.versions.choose')}</option>
               {harnessVersions.map((release) => (
@@ -153,7 +155,7 @@ export function EnvironmentChecks() {
                   {release.version === harnessVersion ? ` · ${t('runtime.active')}` : ''}
                 </option>
               ))}
-            </select>
+            </SelectControl>
             <button
               type="button"
               onClick={() => void install(selectedVersion)}

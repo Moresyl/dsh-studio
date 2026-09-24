@@ -67,7 +67,7 @@ export function ProfileSwitch({ onManage }: ProfileSwitchProps) {
       aria-label={t('profile.switch')}
       data-hint={t('profile.switch')}
       onClick={open}
-      className="ml-1 inline-flex h-[22px] max-w-[164px] shrink-0 items-center gap-1.5 rounded-control border border-line px-1.5 text-[11.5px] text-muted transition-colors duration-100 hover:border-line-strong hover:bg-surface-2 hover:text-text"
+      className="select-trigger ml-1 max-w-[164px] shrink-0"
     >
       <Layers size={11} strokeWidth={2.1} className="shrink-0 text-brand" aria-hidden="true" />
       <span className="truncate">{selected}</span>

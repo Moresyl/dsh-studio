@@ -431,7 +431,7 @@ function Palette({
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-30 flex animate-fade justify-center bg-canvas-deep/65 px-8 pt-[11vh] backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-30 flex animate-fade justify-center bg-canvas-deep/65 px-8 pt-[11vh] backdrop-blur-[2px]"
     >
       {/* No focus ring to hold: the box is the only thing in here the caret can
           reach, and Tab is spent moving the selection instead of leaving. */}
@@ -439,7 +439,7 @@ function Palette({
         role="dialog"
         aria-modal="true"
         aria-label={t('palette.title')}
-        className="flex h-fit max-h-[68vh] w-full max-w-[588px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex h-fit max-h-[68vh] w-full max-w-[588px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
       >
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line px-3.5">
           <Search size={15} strokeWidth={2.1} className="shrink-0 text-faint" aria-hidden="true" />

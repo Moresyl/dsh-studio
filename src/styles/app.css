@@ -25,6 +25,15 @@
   --color-surface-2: #303030;
   --color-line: #ffffff1a;
   --color-line-strong: #ffffff1f;
+  --color-control-border: #ffffff40;
+  --color-control-border-hover: #ffffff4d;
+  --color-control-fill: #ffffff1f;
+  --color-control-fill-hover: #ffffff29;
+  --color-focus: #0285ff;
+  --color-switch-off: #414141;
+  --color-switch-off-hover: #4f4f4f;
+  --color-switch-off-disabled: #303030;
+  --color-switch-on: #0285ff;
 
   --color-text: #ededed;
   --color-muted: #afafaf;
@@ -191,6 +200,15 @@
     --color-surface-2: #ededed;
     --color-line: #00000014;
     --color-line-strong: #0000001f;
+    --color-control-border: #00000029;
+    --color-control-border-hover: #00000040;
+    --color-control-fill: #00000014;
+    --color-control-fill-hover: #0000001f;
+    --color-focus: #0169cc;
+    --color-switch-off: #dfdfdf;
+    --color-switch-off-hover: #cdcdcd;
+    --color-switch-off-disabled: #ededed;
+    --color-switch-on: #0285ff;
 
     --color-text: #282828;
     --color-muted: #5d5d5d;
@@ -236,6 +254,15 @@
   --color-surface-2: #ededed;
   --color-line: #00000014;
   --color-line-strong: #0000001f;
+  --color-control-border: #00000029;
+  --color-control-border-hover: #00000040;
+  --color-control-fill: #00000014;
+  --color-control-fill-hover: #0000001f;
+  --color-focus: #0169cc;
+  --color-switch-off: #dfdfdf;
+  --color-switch-off-hover: #cdcdcd;
+  --color-switch-off-disabled: #ededed;
+  --color-switch-on: #0285ff;
 
   --color-text: #282828;
   --color-muted: #5d5d5d;
@@ -407,7 +434,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-brand);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -501,6 +528,181 @@
     letter-spacing: 0;
     color: var(--color-faint);
   }
+
+  /* ChatGPT desktop treats ordinary fields as quiet pieces of chrome: a
+     translucent neutral fill, a precise outline and blue only while focused. */
+  .field-control {
+    height: 22px;
+    min-width: 0;
+    border: 1px solid var(--color-control-border);
+    border-radius: 6px;
+    background: var(--color-control-fill);
+    color: var(--color-text);
+    padding-inline: 8px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    outline: none;
+    box-shadow: 0 1px 2px -1px #00000014;
+    transition:
+      background-color 150ms var(--ease-out-soft),
+      border-color 150ms var(--ease-out-soft),
+      box-shadow 150ms var(--ease-out-soft),
+      color 150ms var(--ease-out-soft);
+  }
+
+  .field-control::placeholder {
+    color: var(--color-faint);
+    font-family: var(--font-sans);
+    opacity: 1;
+  }
+
+  .field-control:hover:not(:disabled) {
+    border-color: var(--color-control-border-hover);
+    background: var(--color-control-fill-hover);
+  }
+
+  .field-control:focus,
+  .field-control:focus-visible {
+    border-color: color-mix(in oklab, var(--color-focus) 72%, var(--color-control-border));
+    outline: none;
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--color-focus) 20%, transparent),
+      0 1px 2px -1px #00000014;
+  }
+
+  .field-control:disabled {
+    opacity: 0.45;
+  }
+
+  .field-control--compact {
+    height: 28px;
+    padding-inline: 8px;
+    font-size: 11.5px;
+  }
+
+  .field-control--small {
+    height: 26px;
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+
+  .field-control--large {
+    height: 30px;
+    padding-inline: 9px;
+  }
+
+  .field-shell {
+    border: 1px solid var(--color-control-border);
+    border-radius: 6px;
+    background: var(--color-control-fill);
+    box-shadow: 0 1px 2px -1px #00000014;
+    transition:
+      background-color 150ms var(--ease-out-soft),
+      border-color 150ms var(--ease-out-soft),
+      box-shadow 150ms var(--ease-out-soft);
+  }
+
+  .field-shell:hover {
+    border-color: var(--color-control-border-hover);
+    background: var(--color-control-fill-hover);
+  }
+
+  .field-shell:focus-within {
+    border-color: color-mix(in oklab, var(--color-focus) 72%, var(--color-control-border));
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--color-focus) 20%, transparent),
+      0 1px 2px -1px #00000014;
+  }
+
+  .select-control {
+    position: relative;
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+  }
+
+  .select-control__input {
+    width: 100%;
+    appearance: none;
+    cursor: pointer;
+    padding-right: 28px;
+    font-weight: 510;
+  }
+
+  .select-control__input:disabled {
+    cursor: not-allowed;
+  }
+
+  .select-control__chevron {
+    position: absolute;
+    right: 8px;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    color: var(--color-faint);
+    transition: color 150ms var(--ease-out-soft);
+  }
+
+  .select-control:focus-within .select-control__chevron,
+  .select-control:hover .select-control__chevron {
+    color: var(--color-text);
+  }
+
+  .select-control:has(.select-control__input:disabled) .select-control__chevron {
+    opacity: 0.45;
+  }
+
+  /* Menu-backed pickers use the same visual contract as native selects. The
+     popup is custom, but the closed control should not reveal that detail. */
+  .select-trigger {
+    display: inline-flex;
+    height: 22px;
+    min-width: 0;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid var(--color-control-border);
+    border-radius: 6px;
+    background: var(--color-control-fill);
+    padding-inline: 6px;
+    color: var(--color-muted);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 510;
+    line-height: 1;
+    box-shadow: 0 1px 2px -1px #00000014;
+    transition:
+      background-color 150ms var(--ease-out-soft),
+      border-color 150ms var(--ease-out-soft),
+      box-shadow 150ms var(--ease-out-soft),
+      color 150ms var(--ease-out-soft);
+  }
+
+  .select-trigger:hover:not(:disabled) {
+    border-color: var(--color-control-border-hover);
+    background: var(--color-control-fill-hover);
+    color: var(--color-text);
+  }
+
+  .select-trigger:focus-visible {
+    border-color: color-mix(in oklab, var(--color-focus) 72%, var(--color-control-border));
+    outline: none;
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--color-focus) 20%, transparent),
+      0 1px 2px -1px #00000014;
+  }
+
+  .select-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .select-trigger--compact {
+    height: 28px;
+    gap: 6px;
+    padding-inline: 8px;
+  }
 }
 
 /* The terminal, fitted to this window.
@@ -542,6 +744,26 @@
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* The desktop dialogs float at their task-specific widths. Below the desktop
+   breakpoint they become the window, matching the compact ChatGPT shell and
+   leaving the full viewport available for scrollable content. */
+@media (max-width: 47.999rem) {
+  .dialog-backdrop {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0 !important;
+  }
+
+  .dialog-panel {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    max-height: none !important;
+    border: 0;
+    border-radius: 0;
   }
 }
 

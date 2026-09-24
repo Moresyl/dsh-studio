@@ -24,6 +24,7 @@ import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PluginDialog } from '@/components/PluginDialog'
 import { CatalogSourcesDialog } from '@/components/CatalogSourcesDialog'
+import { SelectControl } from '@/components/SelectControl'
 import { Switch } from '@/components/Switch'
 import { TabButton } from '@/components/TabButton'
 import { count, day, filesize } from '@/lib/format'
@@ -227,7 +228,7 @@ export function PluginMarket() {
         {(tab === 'discover' || tab === 'installable') && (
           <div className="shrink-0 border-b border-line">
             <div className="flex h-11 items-center gap-2 px-4">
-              <select
+              <SelectControl
                 value={activeSource?.id ?? 'npm'}
                 disabled={working !== null || sourceWorking}
                 onChange={(event) => {
@@ -236,14 +237,16 @@ export function PluginMarket() {
                   void selectSource(event.target.value)
                 }}
                 aria-label={t('plugins.source')}
-                className="h-7 max-w-[150px] rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
+                density="small"
+                containerClassName="max-w-[150px]"
+                className="text-muted"
               >
                 {sources.map((source) => (
                   <option key={source.id} value={source.id}>
                     {source.label}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
               <button
                 type="button"
                 onClick={() => setManagingSources(true)}
@@ -310,14 +313,16 @@ export function PluginMarket() {
             </div>
 
             <div className="flex h-9 items-center gap-2 border-t border-line/70 px-4">
-              <select
+              <SelectControl
                 value={category ?? ''}
                 onChange={(event) => {
                   setCategory(event.target.value || null)
                   setPage(0)
                 }}
                 aria-label={t('plugins.category.all')}
-                className="h-7 max-w-[170px] rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
+                density="small"
+                containerClassName="max-w-[170px]"
+                className="text-muted"
               >
                 <option value="">{t('plugins.category.all')}</option>
                 {categories.map((value) => (
@@ -325,22 +330,23 @@ export function PluginMarket() {
                     {value}
                   </option>
                 ))}
-              </select>
-              <select
+              </SelectControl>
+              <SelectControl
                 value={sort}
                 aria-label={t('plugins.sort.label')}
                 onChange={(event) => {
                   setSort(event.target.value as PluginSort)
                   setPage(0)
                 }}
-                className="h-7 rounded-control border border-line bg-surface-2 px-2 text-[11px] text-muted outline-none focus:border-brand"
+                density="small"
+                className="text-muted"
               >
                 {(['relevance', 'updated', 'name', 'downloads'] as const).map((value) => (
                   <option key={value} value={value}>
                     {t(`plugins.sort.${value}`)}
                   </option>
                 ))}
-              </select>
+              </SelectControl>
               <button
                 type="button"
                 onClick={() => {

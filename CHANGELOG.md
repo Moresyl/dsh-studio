@@ -11,14 +11,20 @@ pre-1.0 caveat that anything may still move.
 
 ## [0.9.11] — 2026-09-24
 
+### Changed
+
+- Align native selects, text and number fields, menu-backed pickers, focus rings, and switches with the measured desktop chat control tokens while preserving native keyboard semantics and required accessible labels.
+
 ### Fixes and polish
 
+- Make all six modal surfaces fill compact windows below 48rem without borders or rounded corners, while retaining their task-specific desktop widths.
 - Allow the asynchronous Windows NSIS uninstaller up to 60 seconds to remove an upgraded test installation, avoiding false release failures on slower hosted runners.
 - Supersede the incomplete `v0.9.10` release run with a clean patch release while preserving the desktop UI, selected-runtime compatibility, and application behavior introduced there.
 
 ### Verification
 
-- Local frontend build, lint, 269 frontend tests, 55 packaging script tests, Rust workspace tests, and public-contract checks passed.
+- Local frontend build, lint, 274 frontend tests at 95.1% statement coverage, 55 packaging script tests, Rust workspace tests, accessibility checks, and public-contract checks passed.
+- Browser checks covered both themes, 1102px and 884px desktop layouts, and the 744px full-window dialog layout without horizontal overflow or clipped control text.
 - The release pipeline validates Lite and Full packages on Linux, Windows, and macOS, then publishes checksums and the signed updater manifest only after all package smoke tests pass.
 
 ## [0.9.10] — 2026-09-24

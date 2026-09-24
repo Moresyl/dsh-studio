@@ -16,6 +16,7 @@ import {
 
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
+import { SelectControl } from '@/components/SelectControl'
 import { Switch } from '@/components/Switch'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { WorktreeManager } from '@/components/WorktreeManager'
@@ -126,7 +127,7 @@ export function SettingsPane() {
               label={t('settings.presentation')}
               hint={t('settings.presentationHint')}
             >
-              <select
+              <SelectControl
                 value={presentation}
                 aria-label={t('settings.presentation')}
                 onChange={(event) =>
@@ -134,29 +135,29 @@ export function SettingsPane() {
                     event.target.value as 'compatibility' | 'extended' | 'advanced',
                   )
                 }
-                className="h-[30px] rounded-control border border-line-strong bg-surface-2 px-2.5 text-[11.5px] text-text outline-none focus:border-brand"
+                density="compact"
               >
                 <option value="compatibility">{t('settings.presentation.compatibility')}</option>
                 <option value="extended">{t('settings.presentation.extended')}</option>
                 <option value="advanced">{t('settings.presentation.advanced')}</option>
-              </select>
+              </SelectControl>
             </Row>
 
             <Row icon={ScrollText} label={t('settings.logLevel')} hint={t('settings.logLevelHint')}>
-              <select
+              <SelectControl
                 value={state?.logLevel ?? 'info'}
                 aria-label={t('settings.logLevel')}
                 disabled={!ready || busy}
                 onChange={(event) =>
                   void setLogLevel(event.target.value as 'debug' | 'info' | 'warn' | 'error')
                 }
-                className="h-[30px] rounded-control border border-line-strong bg-surface-2 px-2.5 text-[11.5px] text-text outline-none focus:border-brand disabled:opacity-40"
+                density="compact"
               >
                 <option value="debug">{t('settings.logLevel.debug')}</option>
                 <option value="info">{t('settings.logLevel.info')}</option>
                 <option value="warn">{t('settings.logLevel.warn')}</option>
                 <option value="error">{t('settings.logLevel.error')}</option>
-              </select>
+              </SelectControl>
             </Row>
 
             <Row
@@ -408,7 +409,7 @@ function PortField({ value, disabled, onSave }: PortFieldProps) {
           event.currentTarget.blur()
         }
       }}
-      className="h-[30px] w-[112px] rounded-control border border-line-strong bg-surface-2 px-2.5 text-right text-[11.5px] text-text outline-none placeholder:text-faint focus:border-brand disabled:opacity-40"
+      className="field-control field-control--compact w-[112px] text-right tabular-nums"
     />
   )
 }

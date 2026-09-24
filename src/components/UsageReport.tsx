@@ -172,7 +172,7 @@ export function UsageReport({
           ))}
         </div>
 
-        <label className="ml-auto flex h-7 items-center gap-1.5 rounded-control border border-line bg-surface px-2 text-[10.5px] text-faint">
+        <label className="field-shell ml-auto flex h-7 items-center gap-1.5 px-2 text-[10.5px] text-faint">
           {t('usage.monthlyBudget')}
           <span>{symbol}</span>
           <input
@@ -653,7 +653,7 @@ function Editor({ model, symbol, onDone }: { model: string; symbol: string; onDo
         {FIELDS.map(({ key, label }) => (
           <label key={key} className="flex flex-col gap-1">
             <span className="text-[10.5px] text-faint">{t(label)}</span>
-            <span className="flex h-[26px] items-center rounded-control border border-line bg-canvas px-1.5 focus-within:border-brand">
+            <span className="field-shell flex h-[26px] items-center px-1.5">
               <span className="mr-1 text-[11px] text-faint">{symbol}</span>
               <input
                 type="number"

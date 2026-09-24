@@ -76,7 +76,7 @@ export function Dialog() {
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
@@ -84,7 +84,7 @@ export function Dialog() {
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby="dialog-body"
-        className="w-full max-w-[404px] animate-pop rounded-panel border border-line-strong bg-surface p-5 shadow-lift"
+        className="dialog-panel w-full max-w-[404px] animate-pop rounded-panel border border-line-strong bg-surface p-5 shadow-lift"
       >
         <div className="flex gap-3.5">
           <span

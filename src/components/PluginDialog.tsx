@@ -121,14 +121,14 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="fixed inset-0 z-30 grid animate-fade place-items-center bg-canvas-deep/70 p-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-30 grid animate-fade place-items-center bg-canvas-deep/70 p-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
         role="dialog"
         aria-modal="true"
         aria-label={t('plugins.details')}
-        className="flex max-h-full w-full max-w-[540px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-full w-full max-w-[540px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
       >
         <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3.5">
           <span
