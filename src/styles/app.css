@@ -19,16 +19,16 @@
    * Near-neutral on purpose. Saturated chrome is most of what makes a desktop
    * app read as a web page wearing a title bar; the colour budget is spent on
    * the one accent and on status, where it carries meaning. */
-  --color-canvas: #171717;
-  --color-canvas-deep: #111111;
-  --color-surface: #242424;
-  --color-surface-2: #343434;
-  --color-line: #ffffff12;
-  --color-line-strong: #ffffff2a;
+  --color-canvas: #212121;
+  --color-canvas-deep: #0d0d0d;
+  --color-surface: #181818;
+  --color-surface-2: #303030;
+  --color-line: #ffffff1a;
+  --color-line-strong: #ffffff1f;
 
   --color-text: #ededed;
-  --color-muted: #b8b8b8;
-  --color-faint: #858585;
+  --color-muted: #afafaf;
+  --color-faint: #8f8f8f;
 
   --color-brand: #ededed;
   --color-brand-cyan: #86c8d0;
@@ -41,12 +41,12 @@
      with the palette: an accent light enough to read against a dark window
      needs dark ink, and the darker accent the light window needs takes light
      ink — so a hard-coded value is legible in exactly one of the two. */
-  --color-on-brand: #171717;
+  --color-on-brand: #0d0d0d;
   --color-on-danger: #2b0a11;
 
   --font-sans:
-    -apple-system-body, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica,
-    'PingFang SC', 'Microsoft YaHei UI', Arial, sans-serif;
+    'OpenAI Sans', -apple-system-body, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Helvetica, 'PingFang SC', 'Microsoft YaHei UI', Arial, sans-serif;
   --font-mono:
     'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -60,6 +60,8 @@
   --text-ui-caption: calc(var(--ui-font-size) - 1px);
   --text-ui-sm: calc(var(--ui-font-size) - 2px);
   --text-ui-xs: calc(var(--ui-font-size) - 4px);
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
 
   /* A window corner is 8px, so nothing framed by one has any business being
      rounder than that. Controls sit a step tighter again. */
@@ -184,17 +186,17 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme='dark']) {
     --color-canvas: #ffffff;
-    --color-canvas-deep: #f4f4f4;
-    --color-surface: #f7f7f5;
-    --color-surface-2: #eaeae8;
-    --color-line: #17171712;
-    --color-line-strong: #1717172a;
+    --color-canvas-deep: #f3f3f3;
+    --color-surface: #f9f9f9;
+    --color-surface-2: #ededed;
+    --color-line: #00000014;
+    --color-line-strong: #0000001f;
 
-    --color-text: #171717;
-    --color-muted: #5b5b5b;
-    --color-faint: #858585;
+    --color-text: #282828;
+    --color-muted: #5d5d5d;
+    --color-faint: #8f8f8f;
 
-    --color-brand: #171717;
+    --color-brand: #0d0d0d;
     --color-brand-cyan: #147f89;
     --color-brand-violet: #7962a4;
     --color-ok: #138663;
@@ -229,17 +231,17 @@
 
 :root[data-theme='light'] {
   --color-canvas: #ffffff;
-  --color-canvas-deep: #f4f4f4;
-  --color-surface: #f7f7f5;
-  --color-surface-2: #eaeae8;
-  --color-line: #17171712;
-  --color-line-strong: #1717172a;
+  --color-canvas-deep: #f3f3f3;
+  --color-surface: #f9f9f9;
+  --color-surface-2: #ededed;
+  --color-line: #00000014;
+  --color-line-strong: #0000001f;
 
-  --color-text: #171717;
-  --color-muted: #5b5b5b;
-  --color-faint: #858585;
+  --color-text: #282828;
+  --color-muted: #5d5d5d;
+  --color-faint: #8f8f8f;
 
-  --color-brand: #171717;
+  --color-brand: #0d0d0d;
   --color-brand-cyan: #147f89;
   --color-brand-violet: #7962a4;
   --color-ok: #138663;

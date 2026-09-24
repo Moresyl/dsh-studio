@@ -113,21 +113,21 @@ export function TitleBar({
     <header
       data-tauri-drag-region
       onContextMenu={drawsWindowControls ? windowMenu : undefined}
-      className="relative z-20 flex h-11 shrink-0 items-center border-b border-line bg-canvas select-none"
+      className="relative z-20 flex h-[46px] shrink-0 items-center border-b border-line bg-canvas select-none"
       style={isMac ? { paddingLeft: TRAFFIC_LIGHT_INSET } : undefined}
     >
       <div
         data-tauri-drag-region
         className={[
-          'chrome flex shrink-0 items-center gap-2 self-stretch border-r border-line px-3 transition-[width] duration-150',
-          sidebarCollapsed ? 'w-[58px] justify-center' : 'w-[238px]',
+          'chrome flex shrink-0 items-center gap-2 self-stretch border-r border-line bg-surface px-3 transition-[width] duration-150',
+          sidebarCollapsed ? 'w-[58px] justify-center' : 'w-[275px]',
         ].join(' ')}
       >
         {(!sidebarCollapsed || !onToggleSidebar) && (
-          <BrandMark size={23} className="shrink-0 rounded-control" />
+          <BrandMark size={21} className="shrink-0 rounded-control" />
         )}
         {!sidebarCollapsed && (
-          <span className="min-w-0 flex-1 truncate text-ui-caption font-semibold text-text">
+          <span className="min-w-0 flex-1 truncate text-ui-base font-medium text-text">
             DSH Studio
           </span>
         )}
@@ -157,7 +157,10 @@ export function TitleBar({
         )}
       </div>
 
-      <div data-tauri-drag-region className="flex min-w-0 flex-1 items-center self-stretch px-3">
+      <div
+        data-tauri-drag-region
+        className="flex min-w-0 flex-1 items-center justify-center self-stretch px-3"
+      >
         {serving && onPresentation && <ViewSwitch mode={mode} onChoose={onPresentation} />}
       </div>
 

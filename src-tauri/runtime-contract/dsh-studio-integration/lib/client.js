@@ -11,8 +11,9 @@ window.__ModuleLoader__.load({
 
     const themeStyle = `
       body[data-dsh-studio-theme] {
-        font-family: -apple-system-body, ui-sans-serif, -apple-system, BlinkMacSystemFont,
-          'Segoe UI', Helvetica, 'PingFang SC', 'Microsoft YaHei UI', Arial, sans-serif !important;
+        font-family: 'OpenAI Sans', -apple-system-body, ui-sans-serif, -apple-system,
+          BlinkMacSystemFont, 'Segoe UI', Helvetica, 'PingFang SC', 'Microsoft YaHei UI', Arial,
+          sans-serif !important;
         font-feature-settings: normal !important;
       }
       body[data-dsh-studio-theme] button,
@@ -21,42 +22,42 @@ window.__ModuleLoader__.load({
         font-family: inherit;
       }
       body[data-dsh-studio-theme='dark'] {
-        --dsw-alias-bg-base: #171717 !important;
-        --dsw-alias-bg-layer-1: #242424 !important;
-        --dsw-alias-bg-layer-2: #2f2f2f !important;
-        --dsw-alias-bg-layer-3: #3a3a3a !important;
-        --dsw-alias-bg-overlay: #242424 !important;
-        --dsw-alias-border-l1: #ffffff12 !important;
-        --dsw-alias-border-l2: #ffffff2a !important;
-        --dsw-alias-border-l3: #ffffff40 !important;
+        --dsw-alias-bg-base: #212121 !important;
+        --dsw-alias-bg-layer-1: #181818 !important;
+        --dsw-alias-bg-layer-2: #282828 !important;
+        --dsw-alias-bg-layer-3: #303030 !important;
+        --dsw-alias-bg-overlay: #212121 !important;
+        --dsw-alias-border-l1: #ffffff1a !important;
+        --dsw-alias-border-l2: #ffffff1f !important;
+        --dsw-alias-border-l3: #ffffff33 !important;
         --dsw-alias-label-primary: #ededed !important;
-        --dsw-alias-label-secondary: #b8b8b8 !important;
-        --dsw-alias-label-tertiary: #858585 !important;
+        --dsw-alias-label-secondary: #afafaf !important;
+        --dsw-alias-label-tertiary: #8f8f8f !important;
         --dsw-alias-brand-primary: #ededed !important;
         --dsw-alias-brand-text: #ededed !important;
         --dsw-alias-button-primary-fill: #ededed !important;
         --dsw-alias-button-primary-hover: #ffffff !important;
-        --dsw-alias-interactive-bg-hover: #343434 !important;
-        --dsw-alias-interactive-bg-active: #3a3a3a !important;
+        --dsw-alias-interactive-bg-hover: #303030 !important;
+        --dsw-alias-interactive-bg-active: #393939 !important;
       }
       body[data-dsh-studio-theme='light'] {
         --dsw-alias-bg-base: #ffffff !important;
-        --dsw-alias-bg-layer-1: #f7f7f5 !important;
-        --dsw-alias-bg-layer-2: #efefed !important;
-        --dsw-alias-bg-layer-3: #e7e7e5 !important;
+        --dsw-alias-bg-layer-1: #f9f9f9 !important;
+        --dsw-alias-bg-layer-2: #f3f3f3 !important;
+        --dsw-alias-bg-layer-3: #ededed !important;
         --dsw-alias-bg-overlay: #ffffff !important;
-        --dsw-alias-border-l1: #17171712 !important;
-        --dsw-alias-border-l2: #1717172a !important;
-        --dsw-alias-border-l3: #17171740 !important;
-        --dsw-alias-label-primary: #171717 !important;
-        --dsw-alias-label-secondary: #5b5b5b !important;
-        --dsw-alias-label-tertiary: #858585 !important;
-        --dsw-alias-brand-primary: #171717 !important;
-        --dsw-alias-brand-text: #171717 !important;
-        --dsw-alias-button-primary-fill: #171717 !important;
-        --dsw-alias-button-primary-hover: #343434 !important;
-        --dsw-alias-interactive-bg-hover: #eaeae8 !important;
-        --dsw-alias-interactive-bg-active: #e7e7e5 !important;
+        --dsw-alias-border-l1: #00000014 !important;
+        --dsw-alias-border-l2: #0000001f !important;
+        --dsw-alias-border-l3: #00000033 !important;
+        --dsw-alias-label-primary: #282828 !important;
+        --dsw-alias-label-secondary: #5d5d5d !important;
+        --dsw-alias-label-tertiary: #8f8f8f !important;
+        --dsw-alias-brand-primary: #0d0d0d !important;
+        --dsw-alias-brand-text: #0d0d0d !important;
+        --dsw-alias-button-primary-fill: #0d0d0d !important;
+        --dsw-alias-button-primary-hover: #303030 !important;
+        --dsw-alias-interactive-bg-hover: #ededed !important;
+        --dsw-alias-interactive-bg-active: #dfdfdf !important;
       }
     `
 

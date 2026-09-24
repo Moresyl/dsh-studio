@@ -17,18 +17,19 @@ pre-1.0 caveat that anything may still move.
 
 ### Changed
 
-- Adopt a neutral light/dark palette and a native system UI font stack. The managed Harness integration synchronizes semantic theme colors with the Studio window.
+- Match the desktop chat design tokens with a neutral light/dark ramp and an OpenAI Sans-first system UI font stack using the original 510/590 interface weights. Use a 46 px title bar, center the view selector, give the expanded sidebar a 275 px width, and use 40 px primary navigation rows. The managed Harness integration synchronizes semantic theme colors with the Studio window.
 - Keep Harness's own conversation sidebar in chat mode instead of stacking two navigation columns. Put runtime state above a full-width console log and switch to one column when the content area is narrow.
 
 ### Fixes and polish
 
 - Make the workbench search action open the session list and focus its search field, including when leaving a reader or another session tab.
 - Update capture fixtures for the current session, profile, and plugin catalog contracts and wait for lazy panes before taking preview frames.
+- Pin the Cordis core and plugin compatibility floors declared by each selected Harness release, preventing npm dependency drift from terminating older runtimes after readiness. Probe the real document and preserve Harness output when startup fails.
 
 ### Verification
 
 - Local frontend build, lint, 269 frontend tests, 53 packaging script tests, Rust workspace tests, and public-contract checks passed.
-- Browser checks covered both themes, minimum window width, collapsed navigation, recent-session opening, search focus, and Harness theme-token overrides. The release pipeline validates native packages.
+- Browser checks covered both themes, the 900×620 minimum window, expanded and collapsed navigation, title-bar overlap, recent-session opening, search focus, and Harness theme-token overrides. Isolated cold installs and real Profile boots passed for both `0.1.1-rc.1` and `0.1.2-rc.1`; the release pipeline validates native packages.
 
 ## [0.9.9] — 2026-09-22
 

@@ -243,15 +243,29 @@ export async function verifyProfileBoot({
       // browser tab.
       headers.cookie = cookies.join('; ')
     }
-    const response = await fetch(address.origin, {
-      method: 'HEAD',
-      redirect: 'error',
-      signal: AbortSignal.timeout(15_000),
-      headers,
-    })
+    let response
+    try {
+      // Fetch the document the embedded webview actually loads so readiness
+      // covers the authenticated application route rather than optional HEAD behavior.
+      response = await fetch(address.origin, {
+        method: 'GET',
+        redirect: 'error',
+        signal: AbortSignal.timeout(15_000),
+        headers,
+      })
+    } catch (cause) {
+      // Let stderr/stdout drain before building the failure so CI reports the
+      // Harness error rather than an unhelpful bare `fetch failed`.
+      await delay(50)
+      throw bootFailure(
+        `readiness document request failed: ${cause?.cause?.code ?? cause?.message ?? 'unknown error'}`,
+        output,
+      )
+    }
     if (!response.ok) {
       throw bootFailure(`readiness endpoint returned HTTP ${response.status}`, output)
     }
+    await response.body?.cancel()
     const contract = await waitForContract(marker, 5_000, output)
     if (
       contract.protocol !== 1 ||

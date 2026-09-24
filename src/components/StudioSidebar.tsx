@@ -70,7 +70,7 @@ export function StudioSidebar({
       aria-label={t('sidebar.navigation')}
       className={[
         'studio-sidebar chrome flex min-h-0 shrink-0 flex-col border-r border-line transition-[width] duration-150',
-        collapsed ? 'w-[58px]' : 'w-[238px]',
+        collapsed ? 'w-[58px]' : 'w-[275px]',
       ].join(' ')}
     >
       <nav
@@ -215,7 +215,7 @@ function SidebarItem({
       data-hint={collapsed ? hint : undefined}
       onClick={onClick}
       className={[
-        'flex h-9 w-full items-center gap-3 rounded-control px-2 text-left text-ui-caption transition-colors duration-100',
+        'flex h-10 w-full items-center gap-3 rounded-control px-2 text-left text-ui-caption transition-colors duration-100',
         active
           ? 'bg-surface-2 font-medium text-text'
           : 'text-muted hover:bg-surface-2/80 hover:text-text',

@@ -46,6 +46,19 @@ pub fn validate_version(version: &str) -> Result<()> {
     Ok(())
 }
 
+fn cordis_compatibility_floor(name: &str, requirement: &str) -> Option<semver::Version> {
+    if name != "@deepseek-ai/cordis" && !name.starts_with("@deepseek-ai/cordis-plugin-") {
+        return None;
+    }
+    let exact = requirement
+        .strip_prefix('^')
+        .or_else(|| requirement.strip_prefix('~'))
+        .unwrap_or(requirement);
+    semver::Version::parse(exact)
+        .ok()
+        .filter(|version| version.build.is_empty() && version.to_string() == exact)
+}
+
 fn expected_version(target: &Path) -> String {
     crate::bounded_file::read_string(
         &target.join("dsh-studio-runtime.json"),
@@ -352,6 +365,7 @@ where
         let mut complete = false;
         for _ in 0..4 {
             let mut peers = std::collections::BTreeSet::new();
+            let mut cordis_floors = std::collections::BTreeMap::new();
             let packages = std::fs::read_dir(plan.target.join("node_modules/@deepseek-ai"))
                 .map_err(|cause| {
                     Error::Install(format!("cannot inspect Harness peers: {cause}"))
@@ -387,6 +401,31 @@ where
                             .cloned(),
                     );
                 }
+                // Old Harness releases use caret ranges for their Cordis
+                // foundation. Resolving those ranges years later can combine
+                // an old launcher with a newer loader/HMR lifecycle. Pin the
+                // greatest declared compatibility floor for this release.
+                for section in ["dependencies", "peerDependencies"] {
+                    let Some(dependencies) = metadata[section].as_object() else {
+                        continue;
+                    };
+                    for (name, requirement) in dependencies {
+                        let Some(version) = requirement
+                            .as_str()
+                            .and_then(|requirement| cordis_compatibility_floor(name, requirement))
+                        else {
+                            continue;
+                        };
+                        cordis_floors
+                            .entry(name.clone())
+                            .and_modify(|current: &mut semver::Version| {
+                                if version > *current {
+                                    *current = version.clone();
+                                }
+                            })
+                            .or_insert(version);
+                    }
+                }
             }
             let dependencies = manifest["dependencies"]
                 .as_object_mut()
@@ -395,6 +434,15 @@ where
             for peer in peers {
                 if !dependencies.contains_key(&peer) {
                     dependencies.insert(peer, serde_json::Value::String(version.into()));
+                    changed = true;
+                }
+            }
+            for (name, version) in cordis_floors {
+                let version = version.to_string();
+                if dependencies.get(&name).and_then(serde_json::Value::as_str)
+                    != Some(version.as_str())
+                {
+                    dependencies.insert(name, serde_json::Value::String(version));
                     changed = true;
                 }
             }
@@ -1265,6 +1313,25 @@ mod tests {
             assert!(super::validate_version(version).is_err(), "{version}");
         }
         assert!(super::validate_version("0.1.5-rc.2").is_ok());
+    }
+
+    #[test]
+    fn cordis_compatibility_floor_accepts_only_supported_exact_caret_or_tilde_versions() {
+        assert_eq!(
+            super::cordis_compatibility_floor("@deepseek-ai/cordis", "^4.0.1")
+                .map(|version| version.to_string()),
+            Some("4.0.1".into())
+        );
+        assert_eq!(
+            super::cordis_compatibility_floor("@deepseek-ai/cordis-plugin-hmr", "~1.0.16")
+                .map(|version| version.to_string()),
+            Some("1.0.16".into())
+        );
+        assert!(super::cordis_compatibility_floor("@deepseek-ai/dsh-base", "^0.1.1").is_none());
+        assert!(
+            super::cordis_compatibility_floor("@deepseek-ai/cordis-plugin-hmr", ">=1.0.16")
+                .is_none()
+        );
     }
 
     #[test]
