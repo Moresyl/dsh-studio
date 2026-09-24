@@ -58,10 +58,10 @@ export function StudioSidebar({
   }, [refreshPlugins])
 
   useEffect(() => {
-    if (collapsed || cards !== null) return
+    if (collapsed) return
     const timer = window.setTimeout(() => void refreshSessions(), 250)
     return () => window.clearTimeout(timer)
-  }, [cards, collapsed, refreshSessions])
+  }, [collapsed, refreshSessions])
 
   const recent = cards?.filter((card) => !archived.includes(card.id)).slice(0, 8) ?? []
 
