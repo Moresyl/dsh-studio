@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict'
-import { isAbsolute, resolve } from 'node:path'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 
 import {
   resolveBundleRoot,
   rpmExtractArgs,
   shouldExerciseWindowsInstaller,
+  waitUntilRemoved,
 } from './verify-packaged-app.mjs'
 
 test('resolves the bundle root before smoke tests change their working directory', () => {
@@ -40,4 +43,25 @@ test('keeps stateful Windows installer smoke tests on ephemeral CI by default', 
 test('requires an explicit opt-in for a local stateful Windows installer smoke test', () => {
   assert.equal(shouldExerciseWindowsInstaller({ DSH_ALLOW_LOCAL_INSTALLER_SMOKE: '1' }), true)
   assert.equal(shouldExerciseWindowsInstaller({ DSH_ALLOW_LOCAL_INSTALLER_SMOKE: '0' }), false)
+})
+
+test('waits for an asynchronous Windows uninstaller to remove its directory', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-uninstall-wait-'))
+  const removal = new Promise((resolveRemoval) =>
+    setTimeout(() => resolveRemoval(rm(root, { recursive: true, force: true })), 20),
+  )
+  await waitUntilRemoved(root, { attempts: 20, intervalMs: 5 })
+  await removal
+})
+
+test('fails when a Windows uninstaller leaves its directory behind', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-uninstall-timeout-'))
+  try {
+    await assert.rejects(
+      waitUntilRemoved(root, { attempts: 2, intervalMs: 1 }),
+      /silent uninstall did not remove/,
+    )
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
 })

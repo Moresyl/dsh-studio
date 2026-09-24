@@ -25,10 +25,11 @@ pre-1.0 caveat that anything may still move.
 - Make the workbench search action open the session list and focus its search field, including when leaving a reader or another session tab.
 - Update capture fixtures for the current session, profile, and plugin catalog contracts and wait for lazy panes before taking preview frames.
 - Pin the Cordis core and plugin compatibility floors declared by each selected Harness release, preventing npm dependency drift from terminating older runtimes after readiness. Probe the real document and preserve Harness output when startup fails.
+- Allow the asynchronous Windows NSIS uninstaller up to 60 seconds to remove an upgraded test installation, avoiding false release failures on slower hosted runners.
 
 ### Verification
 
-- Local frontend build, lint, 269 frontend tests, 53 packaging script tests, Rust workspace tests, and public-contract checks passed.
+- Local frontend build, lint, 269 frontend tests, 55 packaging script tests, Rust workspace tests, and public-contract checks passed.
 - Browser checks covered both themes, the 900×620 minimum window, expanded and collapsed navigation, title-bar overlap, recent-session opening, search focus, and Harness theme-token overrides. Isolated cold installs and real Profile boots passed for both `0.1.1-rc.1` and `0.1.2-rc.1`; the release pipeline validates native packages.
 
 ## [0.9.9] — 2026-09-22

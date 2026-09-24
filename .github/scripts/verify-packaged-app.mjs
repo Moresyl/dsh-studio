@@ -89,14 +89,14 @@ async function verifyWindowsUpgrade(previous, current) {
   console.log(`upgraded ${basename(previous)} in place and executed the new application binary`)
 }
 
-async function waitUntilRemoved(path) {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
+export async function waitUntilRemoved(path, { attempts = 240, intervalMs = 250 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       await access(path)
     } catch {
       return
     }
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
   throw new Error(`silent uninstall did not remove ${path}`)
 }
