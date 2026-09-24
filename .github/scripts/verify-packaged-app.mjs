@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -66,8 +66,8 @@ async function verifyWindows(files) {
     (file) => basename(file).toLowerCase() === 'uninstall.exe',
   )
   if (!uninstaller) throw new Error('NSIS installation contains no uninstaller')
-  await run(uninstaller, ['/S'])
-  await waitUntilRemoved(nsisRoot)
+  await run(uninstaller, windowsUninstallerArgs(nsisRoot))
+  await finalizeWindowsUninstall(nsisRoot, uninstaller)
   if (process.env.DSH_PREVIOUS_INSTALLER) {
     await verifyWindowsUpgrade(process.env.DSH_PREVIOUS_INSTALLER, nsis)
   }
@@ -84,21 +84,35 @@ async function verifyWindowsUpgrade(previous, current) {
     (file) => basename(file).toLowerCase() === 'uninstall.exe',
   )
   if (!uninstaller) throw new Error('upgraded NSIS installation contains no uninstaller')
-  await run(uninstaller, ['/S'])
-  await waitUntilRemoved(root)
+  await run(uninstaller, windowsUninstallerArgs(root))
+  await finalizeWindowsUninstall(root, uninstaller)
   console.log(`upgraded ${basename(previous)} in place and executed the new application binary`)
 }
 
-export async function waitUntilRemoved(path, { attempts = 240, intervalMs = 250 } = {}) {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      await access(path)
-    } catch {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+export function windowsUninstallerArgs(root) {
+  if (!root) throw new Error('Windows uninstall root is required')
+  return ['/S', `_?=${resolve(root)}`]
+}
+
+export async function finalizeWindowsUninstall(root, uninstaller) {
+  // _?= keeps NSIS in the original uninstaller process so run() can wait for
+  // the real uninstall. The caller must then remove that executable itself.
+  await rm(uninstaller, { force: true })
+  let remaining
+  try {
+    remaining = await walk(root)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return
+    throw error
   }
-  throw new Error(`silent uninstall did not remove ${path}`)
+  if (remaining.length > 0) {
+    const names = remaining
+      .slice(0, 10)
+      .map((file) => relative(root, file))
+      .join(', ')
+    throw new Error(`silent uninstall left packaged files under ${root}: ${names}`)
+  }
+  await rm(root, { recursive: true, force: true })
 }
 
 async function verifyMac(files) {

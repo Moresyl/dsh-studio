@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import test from 'node:test'
 
 import {
+  finalizeWindowsUninstall,
   resolveBundleRoot,
   rpmExtractArgs,
   shouldExerciseWindowsInstaller,
-  waitUntilRemoved,
+  windowsUninstallerArgs,
 } from './verify-packaged-app.mjs'
 
 test('resolves the bundle root before smoke tests change their working directory', () => {
@@ -45,21 +46,33 @@ test('requires an explicit opt-in for a local stateful Windows installer smoke t
   assert.equal(shouldExerciseWindowsInstaller({ DSH_ALLOW_LOCAL_INSTALLER_SMOKE: '0' }), false)
 })
 
-test('waits for an asynchronous Windows uninstaller to remove its directory', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-uninstall-wait-'))
-  const removal = new Promise((resolveRemoval) =>
-    setTimeout(() => resolveRemoval(rm(root, { recursive: true, force: true })), 20),
-  )
-  await waitUntilRemoved(root, { attempts: 20, intervalMs: 5 })
-  await removal
+test('keeps the NSIS uninstall root as the final unquoted argument', () => {
+  const root = join(tmpdir(), 'DSH Studio package smoke')
+  assert.deepEqual(windowsUninstallerArgs(root), ['/S', `_?=${resolve(root)}`])
 })
 
-test('fails when a Windows uninstaller leaves its directory behind', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'dsh-uninstall-timeout-'))
+test('rejects a missing Windows uninstall root', () => {
+  assert.throws(() => windowsUninstallerArgs(), /root is required/)
+})
+
+test('removes the synchronous NSIS uninstaller and empty install tree', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-uninstall-complete-'))
+  const uninstaller = join(root, 'uninstall.exe')
+  await writeFile(uninstaller, 'fixture')
+  await mkdir(join(root, 'empty-directory'))
+  await finalizeWindowsUninstall(root, uninstaller)
+  await assert.rejects(access(root), { code: 'ENOENT' })
+})
+
+test('reports packaged files left by a Windows uninstaller', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-uninstall-residue-'))
+  const uninstaller = join(root, 'uninstall.exe')
+  await writeFile(uninstaller, 'fixture')
+  await writeFile(join(root, 'DSH Studio.exe'), 'fixture')
   try {
     await assert.rejects(
-      waitUntilRemoved(root, { attempts: 2, intervalMs: 1 }),
-      /silent uninstall did not remove/,
+      finalizeWindowsUninstall(root, uninstaller),
+      /silent uninstall left packaged files.*DSH Studio\.exe/,
     )
   } finally {
     await rm(root, { recursive: true, force: true })
