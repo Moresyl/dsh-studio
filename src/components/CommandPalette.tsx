@@ -439,7 +439,7 @@ function Palette({
         role="dialog"
         aria-modal="true"
         aria-label={t('palette.title')}
-        className="dialog-panel flex h-fit max-h-[68vh] w-full max-w-[588px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex h-fit max-h-[68vh] w-full max-w-[520px] animate-pop flex-col overflow-hidden rounded-[16px] border border-line-strong bg-surface shadow-lift"
       >
         <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line px-3.5">
           <Search size={15} strokeWidth={2.1} className="shrink-0 text-faint" aria-hidden="true" />

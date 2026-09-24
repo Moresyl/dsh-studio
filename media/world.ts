@@ -30,6 +30,7 @@ import type {
   About,
   CatalogSource,
   Environment,
+  GitWorktree,
   InstalledPlugin,
   LogLine,
   LogStream,
@@ -37,11 +38,13 @@ import type {
   PluginListing,
   PluginPage,
   PluginState,
+  PresetRoster,
   RemoteStatus,
   Roster,
   SessionCard,
   SessionTranscript,
   Status,
+  Startup,
 } from '@/lib/ipc'
 
 /* -------------------------------------------------------------------------- */
@@ -129,6 +132,56 @@ const about: About = {
   harnessDir: HARNESS_DIR,
   profileDir: `${HOME}\\.dsh\\profiles\\${PROFILE}`,
 }
+
+const startup: Startup = {
+  autostart: false,
+  shortcut: 'Ctrl+Shift+Space',
+  held: true,
+  suggested: 'Ctrl+Shift+Space',
+  notifications: {
+    turnCompleted: true,
+    turnFailed: true,
+    jobCompleted: true,
+    jobFailed: true,
+  },
+  logLevel: 'info',
+  harnessPort: null,
+}
+
+const worktrees: GitWorktree[] = [
+  {
+    path: `${HOME}\\projects\\atlas`,
+    branch: 'main',
+    head: 'c5e68e6',
+    primary: true,
+    dirty: false,
+  },
+]
+
+let selectedPreset = 'general'
+const presetRoster = (): PresetRoster => ({
+  presets: [
+    {
+      id: 'general',
+      name: '通用助手',
+      description: '适合日常编码、分析与项目维护。',
+      shipped: true,
+    },
+    {
+      id: 'reviewer',
+      name: '代码审查',
+      description: '优先检查行为回归、边界条件与缺失测试。',
+      shipped: true,
+    },
+    {
+      id: 'builder',
+      name: '功能实现',
+      description: '专注完成可验证的端到端实现。',
+      shipped: true,
+    },
+  ],
+  default: selectedPreset,
+})
 
 /* -------------------------------------------------------------------------- */
 /* Mutable world                                                              */
@@ -725,6 +778,26 @@ export function answerCommands(): void {
           return transcript(text(args, 'id'))
         case 'session_archive':
           return { cards: sampleSessions, loaded: sampleSessions.length, archived: [] }
+
+        /* Machine settings and workspace isolation */
+        case 'startup_state':
+        case 'startup_autostart':
+        case 'startup_shortcut':
+        case 'startup_notification':
+        case 'startup_notification_test':
+        case 'startup_log_level':
+        case 'startup_harness_port':
+          return startup
+        case 'workspace_worktrees':
+        case 'workspace_worktree_create':
+          return worktrees
+
+        /* Agent presets */
+        case 'preset_roster':
+          return presetRoster()
+        case 'preset_choose':
+          selectedPreset = text(args, 'id') || selectedPreset
+          return presetRoster()
 
         /* About */
         case 'app_about':

@@ -84,7 +84,7 @@ export function Dialog() {
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby="dialog-body"
-        className="dialog-panel w-full max-w-[404px] animate-pop rounded-panel border border-line-strong bg-surface p-5 shadow-lift"
+        className="dialog-panel w-full max-w-[450px] animate-pop rounded-[12px] border border-line-strong bg-surface p-5 shadow-lift"
       >
         <div className="flex gap-3.5">
           <span

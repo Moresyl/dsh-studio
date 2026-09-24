@@ -16,7 +16,7 @@
  * same way, and putting invented text on somebody else's preset would be worse
  * than showing theirs.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Archive, Download, Loader2, Upload } from 'lucide-react'
 import { open as pickFile, save as pickPath } from '@tauri-apps/plugin-dialog'
 
@@ -36,6 +36,27 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
   const chosenPreset = presets.find((preset) => preset.id === chosen)
   const [transferError, setTransferError] = useState<string | null>(null)
   const [transferring, setTransferring] = useState<'export' | 'import' | null>(null)
+
+  const moveSelection = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof HTMLButtonElement) || event.target.role !== 'radio') return
+
+    const choices = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role=radio]')]
+    const current = choices.indexOf(event.target)
+    if (current < 0 || choices.length === 0) return
+
+    let next = current
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight')
+      next = (current + 1) % choices.length
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      next = (current - 1 + choices.length) % choices.length
+    } else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = choices.length - 1
+    else return
+
+    event.preventDefault()
+    choices[next]?.focus()
+    choices[next]?.click()
+  }
 
   const exportPreset = async () => {
     if (!chosen || transferring !== null) return
@@ -133,12 +154,18 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
           </span>
         </div>
       )}
-      <div role="radiogroup" aria-label={t('section.agent')} className="flex flex-col gap-1.5">
+      <div
+        role="radiogroup"
+        aria-label={t('section.agent')}
+        onKeyDown={moveSelection}
+        className="flex flex-col gap-1.5"
+      >
         {presets.map((preset) => (
           <Choice
             key={preset.id}
             preset={preset}
             chosen={preset.id === chosen}
+            tabbable={preset.id === (chosen ?? presets[0]?.id)}
             detail={detail}
             onChoose={() => void choose(preset.id)}
           />
@@ -170,11 +197,13 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
 function Choice({
   preset,
   chosen,
+  tabbable,
   detail,
   onChoose,
 }: {
   preset: AgentPreset
   chosen: boolean
+  tabbable: boolean
   detail: boolean
   onChoose: () => void
 }) {
@@ -188,6 +217,7 @@ function Choice({
       type="button"
       role="radio"
       aria-checked={chosen}
+      tabIndex={tabbable ? 0 : -1}
       onClick={onChoose}
       // Only where the description is not already on the card. Two ways of
       // reading the same sentence is one more than anybody needs.
@@ -196,7 +226,7 @@ function Choice({
         'group flex w-full cursor-pointer flex-col gap-1 rounded-control border px-2.5 text-left transition duration-100 ease-[var(--ease-out-soft)]',
         detail ? 'py-2.5' : 'py-2',
         chosen
-          ? 'border-brand/55 bg-brand/8'
+          ? 'border-control-border bg-surface-2'
           : 'border-line bg-canvas-deep/40 hover:border-line-strong hover:bg-surface-2',
       ].join(' ')}
     >
@@ -209,7 +239,7 @@ function Choice({
         </span>
 
         {chosen && (
-          <span className="ml-auto shrink-0 rounded-[4px] bg-brand/15 px-1.5 py-0.5 text-[10.5px] font-medium text-brand">
+          <span className="ml-auto h-[18px] shrink-0 rounded-[4px] bg-brand/15 px-1.5 text-[10.5px] leading-[18px] font-medium text-brand">
             {t('preset.current')}
           </span>
         )}
@@ -235,11 +265,13 @@ function Dot({ chosen }: { chosen: boolean }) {
     <span
       aria-hidden="true"
       className={[
-        'grid size-[14px] shrink-0 place-items-center rounded-full border transition duration-100',
-        chosen ? 'border-brand' : 'border-line-strong group-hover:border-muted',
+        'grid size-4 shrink-0 place-items-center rounded-full transition duration-150',
+        chosen
+          ? 'bg-brand shadow-[inset_0_0_0_1px_var(--color-brand)]'
+          : 'shadow-[inset_0_0_0_1px_var(--color-control-border)] group-hover:shadow-[inset_0_0_0_1px_var(--color-control-border-hover)]',
       ].join(' ')}
     >
-      {chosen && <span className="size-[6px] rounded-full bg-brand" />}
+      {chosen && <span className="size-1.5 rounded-full bg-on-brand" />}
     </span>
   )
 }

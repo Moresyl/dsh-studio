@@ -8,6 +8,9 @@ import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import { switchWorkspace } from '@/state/workspace'
 
+const asWorktrees = (value: unknown): ipc.GitWorktree[] =>
+  Array.isArray(value) ? (value as ipc.GitWorktree[]) : []
+
 /** Git-native isolation for parallel agent tasks. No destructive remove action
  * is offered: dirty branches stay visible until reviewed in ordinary Git. */
 export function WorktreeManager() {
@@ -22,7 +25,7 @@ export function WorktreeManager() {
     setLoading(true)
     setError(null)
     try {
-      setItems(await ipc.workspaceWorktrees())
+      setItems(asWorktrees(await ipc.workspaceWorktrees()))
     } catch (cause) {
       setItems([])
       setError(describe(cause))
@@ -36,7 +39,7 @@ export function WorktreeManager() {
     void ipc
       .workspaceWorktrees()
       .then((worktrees) => {
-        if (active) setItems(worktrees)
+        if (active) setItems(asWorktrees(worktrees))
       })
       .catch((cause: unknown) => {
         if (active) setError(describe(cause))
@@ -55,7 +58,7 @@ export function WorktreeManager() {
     setCreating(true)
     setError(null)
     try {
-      setItems(await ipc.workspaceWorktreeCreate(name))
+      setItems(asWorktrees(await ipc.workspaceWorktreeCreate(name)))
       setBranch('')
     } catch (cause) {
       setError(describe(cause))

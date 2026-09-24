@@ -1,5 +1,29 @@
 @import 'tailwindcss';
 
+@font-face {
+  font-family: 'OpenAI Sans';
+  src: url('../assets/fonts/OpenAISans-Regular-c56711d328c4.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenAI Sans';
+  src: url('../assets/fonts/OpenAISans-Medium-7b9c963f9063.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500 510;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'OpenAI Sans';
+  src: url('../assets/fonts/OpenAISans-Semibold-e259229c5327.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 590 600;
+  font-display: swap;
+}
+
 /*
  * Design tokens.
  *
@@ -58,15 +82,15 @@
   --color-on-danger: #2b0a11;
 
   --font-sans:
-    'OpenAI Sans', -apple-system-body, ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    Helvetica, 'PingFang SC', 'Microsoft YaHei UI', Arial, sans-serif;
+    'OpenAI Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei UI', sans-serif;
   --font-mono:
     'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Stable UI roles keep typography coherent as individual panes evolve. The
      setting changes only these tokens, never the root rem scale, so geometry
      stays stable while text remains comfortable for long sessions. */
-  --ui-font-size: 14px;
+  --ui-font-size: 13px;
   --text-ui-xl: calc(var(--ui-font-size) + 4px);
   --text-ui-lg: calc(var(--ui-font-size) + 2px);
   --text-ui-base: var(--ui-font-size);
@@ -412,7 +436,7 @@
   /* The browser's own selection is a saturated blue that belongs to no palette
      here, and it is the one colour a user sees that the app did not choose. */
   ::selection {
-    background-color: color-mix(in oklab, var(--color-brand) 34%, transparent);
+    background-color: color-mix(in oklab, var(--color-focus) 24%, transparent);
     color: var(--color-text);
   }
 
@@ -588,20 +612,21 @@
   }
 
   .field-control--compact {
-    height: 28px;
+    height: 24px;
     padding-inline: 8px;
-    font-size: 11.5px;
+    font-size: 12px;
   }
 
   .field-control--small {
-    height: 26px;
-    padding-inline: 7px;
-    font-size: 11px;
+    height: 22px;
+    padding-inline: 6px;
+    font-size: 12px;
   }
 
   .field-control--large {
-    height: 30px;
-    padding-inline: 9px;
+    height: 28px;
+    padding-inline: 10px;
+    font-size: 14px;
   }
 
   .field-shell {
@@ -669,6 +694,7 @@
   .select-control__trigger:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: -1px;
+    box-shadow: inset 0 0 0 1px var(--color-control-border-focus);
   }
 
   .select-control__trigger:disabled {
@@ -679,15 +705,15 @@
   }
 
   .select-control__trigger.field-control--compact {
-    height: 28px;
+    height: 24px;
     padding-inline: 8px 24px;
-    font-size: 11.5px;
+    font-size: 12px;
   }
 
   .select-control__trigger.field-control--small {
-    height: 26px;
-    padding-inline: 7px 23px;
-    font-size: 11px;
+    height: 22px;
+    padding-inline: 6px 22px;
+    font-size: 12px;
   }
 
   .select-control__chevron {
@@ -697,6 +723,7 @@
     height: 5px;
     pointer-events: none;
     color: var(--color-faint);
+    opacity: 0.75;
     transition: color 150ms var(--ease-out-soft);
   }
 
@@ -704,6 +731,7 @@
   .select-control:focus-within .select-control__chevron,
   .select-control:hover .select-control__chevron {
     color: var(--color-text);
+    opacity: 1;
   }
 
   .select-control:has(.select-control__trigger:disabled) .select-control__chevron {

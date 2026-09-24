@@ -113,7 +113,7 @@ export function TitleBar({
     <header
       data-tauri-drag-region
       onContextMenu={drawsWindowControls ? windowMenu : undefined}
-      className="relative z-20 flex h-[46px] shrink-0 items-center border-b border-line bg-canvas select-none"
+      className="relative z-20 flex h-9 shrink-0 items-center border-b border-line bg-canvas select-none"
       style={isMac ? { paddingLeft: TRAFFIC_LIGHT_INSET } : undefined}
     >
       <div
@@ -124,7 +124,7 @@ export function TitleBar({
         ].join(' ')}
       >
         {(!sidebarCollapsed || !onToggleSidebar) && (
-          <BrandMark size={21} className="shrink-0 rounded-control" />
+          <BrandMark size={19} className="shrink-0 rounded-control" />
         )}
         {!sidebarCollapsed && (
           <span className="min-w-0 flex-1 truncate text-ui-base font-medium text-text">
@@ -150,9 +150,9 @@ export function TitleBar({
             aria-label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
             data-hint={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
             onClick={onToggleSidebar}
-            className="ml-auto grid size-7 shrink-0 place-items-center rounded-control text-muted transition-colors hover:bg-surface-2 hover:text-text"
+            className="ml-auto grid size-6 shrink-0 place-items-center rounded-[6px] text-muted transition-colors hover:bg-surface-2 hover:text-text"
           >
-            {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+            {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
           </button>
         )}
       </div>

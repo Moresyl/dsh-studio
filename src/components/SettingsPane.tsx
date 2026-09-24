@@ -234,7 +234,6 @@ export function SettingsPane() {
             >
               <Button
                 variant="secondary"
-                className="h-[30px] px-2.5 text-[11.5px]"
                 disabled={!ready || busy}
                 onClick={() => void testNotification()}
               >

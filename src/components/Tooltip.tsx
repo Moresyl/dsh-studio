@@ -156,7 +156,7 @@ export function Tooltip() {
       ref={surface}
       role="tooltip"
       style={{ left: position.x, top: position.y }}
-      className="pointer-events-none fixed z-60 max-w-[320px] animate-fade rounded-control border border-line-strong bg-surface px-2 py-1 text-[11.5px] leading-relaxed whitespace-pre-line text-text shadow-lift"
+      className="pointer-events-none fixed z-60 max-w-[320px] animate-fade rounded-[8px] bg-[#353535] px-2 py-0.5 text-[14px] leading-[1.45] tracking-[-0.15px] whitespace-pre-line text-white shadow-lift"
     >
       {tip.text}
     </div>
