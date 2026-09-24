@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 import { BrandMark } from '@/components/BrandMark'
-import { ProfileSwitch } from '@/components/ProfileSwitch'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
@@ -19,10 +19,10 @@ interface TitleBarProps {
   /** Whether the harness is serving, and so presentation choices are available. */
   serving: boolean
   mode: Presentation
+  sidebarCollapsed: boolean
+  onToggleSidebar?: () => void
   /** Switch presentations. Absent while there is only one surface to show. */
   onPresentation?: (mode: Presentation) => void
-  /** Open the profile manager. Absent while the first-run guide is up. */
-  onManageProfiles?: () => void
 }
 
 /**
@@ -36,10 +36,16 @@ interface TitleBarProps {
  * this is the only chrome left and starting the harness would otherwise be a
  * one-way door. A switch and not a badge: the available presentations belong
  * on screen together with the current one marked. The
- * profile chip is here for the same reason: which stack is running is a property
- * of the window, and this strip is what survives the harness taking the rest.
+ * The profile switch lives in the workbench sidebar; Harness has its own
+ * sidebar and should not get a second navigation column.
  */
-export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: TitleBarProps) {
+export function TitleBar({
+  serving,
+  mode,
+  sidebarCollapsed,
+  onToggleSidebar,
+  onPresentation,
+}: TitleBarProps) {
   const appWindow = getCurrentWindow()
   const [maximized, setMaximized] = useState(false)
 
@@ -107,17 +113,29 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
     <header
       data-tauri-drag-region
       onContextMenu={drawsWindowControls ? windowMenu : undefined}
-      className="chrome relative z-20 flex h-9 shrink-0 items-center border-b border-line select-none"
+      className="relative z-20 flex h-11 shrink-0 items-center border-b border-line bg-canvas select-none"
       style={isMac ? { paddingLeft: TRAFFIC_LIGHT_INSET } : undefined}
     >
-      <div data-tauri-drag-region className="flex flex-1 items-center gap-2 self-stretch pl-2.5">
-        <BrandMark size={15} className="rounded-[4px]" />
-        <span className="text-ui-sm font-medium text-muted">DSH Studio</span>
+      <div
+        data-tauri-drag-region
+        className={[
+          'chrome flex shrink-0 items-center gap-2 self-stretch border-r border-line px-3 transition-[width] duration-150',
+          sidebarCollapsed ? 'w-[58px] justify-center' : 'w-[238px]',
+        ].join(' ')}
+      >
+        {(!sidebarCollapsed || !onToggleSidebar) && (
+          <BrandMark size={23} className="shrink-0 rounded-control" />
+        )}
+        {!sidebarCollapsed && (
+          <span className="min-w-0 flex-1 truncate text-ui-caption font-semibold text-text">
+            DSH Studio
+          </span>
+        )}
 
         {/* Windows opened for a task look alike, and the number is what makes
             them referable — the same one the system title carries, so the
             taskbar and the strip agree about which window this is. */}
-        {ordinal && (
+        {ordinal && !sidebarCollapsed && (
           <span
             data-hint={t('window.ordinal', { name: ordinal })}
             className="grid h-[15px] min-w-[15px] shrink-0 place-items-center rounded-[4px] border border-line px-1 text-ui-xs text-faint tabular-nums"
@@ -126,9 +144,21 @@ export function TitleBar({ serving, mode, onPresentation, onManageProfiles }: Ti
           </span>
         )}
 
-        {serving && onPresentation && <ViewSwitch mode={mode} onChoose={onPresentation} />}
+        {onToggleSidebar && (
+          <button
+            type="button"
+            aria-label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+            data-hint={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+            onClick={onToggleSidebar}
+            className="ml-auto grid size-7 shrink-0 place-items-center rounded-control text-muted transition-colors hover:bg-surface-2 hover:text-text"
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
+        )}
+      </div>
 
-        {onManageProfiles && <ProfileSwitch onManage={onManageProfiles} />}
+      <div data-tauri-drag-region className="flex min-w-0 flex-1 items-center self-stretch px-3">
+        {serving && onPresentation && <ViewSwitch mode={mode} onChoose={onPresentation} />}
       </div>
 
       {/* Beside the window buttons rather than inside a pane, because the theme
@@ -186,7 +216,7 @@ function ViewSwitch({
   onChoose: (mode: Presentation) => void
 }) {
   return (
-    <div className="ml-2 flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
+    <div className="flex items-center gap-0.5 rounded-control bg-surface p-0.5">
       <SwitchTab
         label={t('view.harness')}
         active={mode === 'compatibility'}
@@ -221,7 +251,7 @@ function SwitchTab({ label, active, onClick }: SwitchTabProps) {
       aria-pressed={active}
       onClick={active ? undefined : onClick}
       className={[
-        'h-[20px] rounded-[3px] px-2 text-ui-sm transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px',
+        'h-7 rounded-control px-2.5 text-ui-caption transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px',
         // The raised half of the pair does nothing when pressed, so it does not
         // offer the hand that promises it would.
         active

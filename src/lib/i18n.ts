@@ -115,6 +115,11 @@ const en = {
   'nav.remote': 'Remote',
   'nav.about': 'About',
   'nav.settings': 'Settings',
+  'sidebar.navigation': 'Navigation',
+  'sidebar.search': 'Search conversations',
+  'sidebar.recent': 'Recent conversations',
+  'sidebar.expand': 'Expand sidebar',
+  'sidebar.collapse': 'Collapse sidebar',
 
   'plugins.title': 'Plugin marketplace',
   'plugins.subtitle': 'Packages that add a layer to the {profile} profile',
@@ -821,6 +826,11 @@ const zh: Record<MessageKey, string> = {
   'nav.remote': '远程',
   'nav.about': '关于',
   'nav.settings': '设置',
+  'sidebar.navigation': '导航',
+  'sidebar.search': '搜索会话',
+  'sidebar.recent': '最近会话',
+  'sidebar.expand': '展开侧栏',
+  'sidebar.collapse': '收起侧栏',
 
   'plugins.title': '插件市场',
   'plugins.subtitle': '为 {profile} 配置追加图层的扩展包',

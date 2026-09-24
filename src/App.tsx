@@ -26,6 +26,7 @@ import { usePalette } from '@/state/palette'
 import { usePresentation } from '@/state/presentation'
 import { subscribeToProfiles } from '@/state/profiles'
 import { subscribeToRemote, useRemote } from '@/state/remote'
+import { useSessions } from '@/state/sessions'
 import { useUpdate, watchForUpdates } from '@/state/update'
 import { switchWorkspace } from '@/state/workspace'
 
@@ -34,6 +35,9 @@ const ProfileManager = lazy(() =>
 )
 const Workbench = lazy(() =>
   import('@/components/Workbench').then((module) => ({ default: module.Workbench })),
+)
+const StudioSidebar = lazy(() =>
+  import('@/components/StudioSidebar').then((module) => ({ default: module.StudioSidebar })),
 )
 
 /**
@@ -66,6 +70,21 @@ export default function App() {
   // covers the window, and a modal inside a strip 36px tall would be positioned
   // against a strip 36px tall.
   const [managing, setManaging] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem('dsh-studio.sidebar') === 'collapsed'
+    } catch {
+      return false
+    }
+  })
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('dsh-studio.sidebar', sidebarCollapsed ? 'collapsed' : 'open')
+    } catch {
+      // The current window still honors the choice when storage is unavailable.
+    }
+  }, [sidebarCollapsed])
 
   // Stable, because the palette rebuilds its command list from its props and
   // this window re-renders on every line the harness prints.
@@ -99,6 +118,18 @@ export default function App() {
     },
     [choosePresentation],
   )
+  const openSession = useCallback(
+    (id: string) => {
+      show('sessions')
+      void useSessions.getState().open(id)
+    },
+    [show],
+  )
+  const searchSessions = useCallback(() => {
+    useSessions.getState().close()
+    show('sessions')
+    useSessions.getState().requestSearch()
+  }, [show])
 
   // The one look at the machine, owned here rather than by a pane, because two
   // things now depend on the answer: the console shows it, and the guide exists
@@ -270,10 +301,13 @@ export default function App() {
       <TitleBar
         serving={origin !== null}
         mode={presentation}
+        sidebarCollapsed={sidebarCollapsed || !showPanel}
+        onToggleSidebar={
+          stage === 'guiding' || !showPanel
+            ? undefined
+            : () => setSidebarCollapsed((value) => !value)
+        }
         onPresentation={origin ? present : undefined}
-        // Not while the guide is up: which profile to work in is a question for
-        // somebody who already has a harness to point at one.
-        onManageProfiles={stage === 'guiding' ? undefined : manage}
       />
 
       <Suspense fallback={<LoadingSurface />}>
@@ -285,26 +319,39 @@ export default function App() {
           <Onboarding />
         ) : (
           <div className="relative flex min-h-0 flex-1">
-            {origin && (
-              <div className="flex min-h-0 flex-1 flex-col" hidden={showPanel}>
-                {presentation === 'extended' && (
-                  <ExtendedToolbar
-                    onView={show}
-                    onProfiles={manage}
-                    onWorkspace={() => void chooseWorkspace()}
-                  />
-                )}
-                <div className="relative min-h-0 flex-1">
-                  <HarnessFrame origin={origin} hidden={false} />
+            {showPanel && (
+              <StudioSidebar
+                collapsed={sidebarCollapsed}
+                serving={origin !== null}
+                inHarness={false}
+                view={view}
+                onHarness={() => present('compatibility')}
+                onSelect={show}
+                onSearch={searchSessions}
+                onOpenSession={openSession}
+                onManageProfiles={manage}
+              />
+            )}
+            <div className="relative flex min-h-0 min-w-0 flex-1">
+              {origin && (
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col" hidden={showPanel}>
+                  {presentation === 'extended' && (
+                    <ExtendedToolbar
+                      onView={show}
+                      onProfiles={manage}
+                      onWorkspace={() => void chooseWorkspace()}
+                    />
+                  )}
+                  <div className="relative min-h-0 flex-1">
+                    <HarnessFrame origin={origin} hidden={false} />
+                  </div>
                 </div>
-              </div>
-            )}
-            {/* Hidden rather than unmounted, for the same reason the frame is: a
-                search someone typed and a pairing code on screen must survive a
-                glance at the harness. */}
-            {inspected && needsWorkbench(origin !== null, presentation, workbenchLoaded) && (
-              <Workbench hidden={!showPanel} view={view} onSelect={show} />
-            )}
+              )}
+              {/* Hidden rather than unmounted so pane state survives a visit to Harness. */}
+              {inspected && needsWorkbench(origin !== null, presentation, workbenchLoaded) && (
+                <Workbench hidden={!showPanel} view={view} />
+              )}
+            </div>
           </div>
         )}
         {inspected && <RendererReady />}

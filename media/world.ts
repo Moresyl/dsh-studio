@@ -28,14 +28,19 @@ import { mockIPC, mockWindows } from '@tauri-apps/api/mocks'
 
 import type {
   About,
+  CatalogSource,
   Environment,
   InstalledPlugin,
   LogLine,
   LogStream,
   PluginDetail,
   PluginListing,
+  PluginPage,
   PluginState,
   RemoteStatus,
+  Roster,
+  SessionCard,
+  SessionTranscript,
   Status,
 } from '@/lib/ipc'
 
@@ -48,6 +53,48 @@ const HOME = 'C:\\Users\\dev'
 const APP_DATA = `${HOME}\\AppData\\Local\\dsh-studio`
 const HARNESS_DIR = `${APP_DATA}\\harness`
 const PROFILE = 'web'
+
+const roster: Roster = {
+  profiles: [
+    {
+      name: PROFILE,
+      dir: `${APP_DATA}\\profiles\\web`,
+      initialized: true,
+      shipped: true,
+      servesWindow: true,
+      plugins: 2,
+      disabled: 0,
+    },
+  ],
+  selected: PROFILE,
+  root: `${APP_DATA}\\profiles`,
+}
+
+const sessionSummaries = [
+  ['梳理 Atlas 项目结构', 'atlas-structure', '2026-09-24T08:15:00Z'],
+  ['修复构建流水线', 'build-pipeline', '2026-09-23T11:20:00Z'],
+  ['优化终端交互', 'terminal-interaction', '2026-09-22T09:40:00Z'],
+] as const
+
+const sampleSessions: SessionCard[] = sessionSummaries.map(([title, id, time]) => ({
+  id,
+  project: `${HOME}\\projects\\atlas`,
+  started: Date.parse(time),
+  touched: Date.parse(time),
+  title,
+  turns: 4,
+  models: [],
+  tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  byModel: [],
+  delegated: false,
+  bytes: 0,
+}))
+
+const transcript = (id: string): SessionTranscript => {
+  const card = sampleSessions.find((entry) => entry.id === id) ?? sampleSessions[0]
+  if (!card) throw new Error('media session fixture is empty')
+  return { card, lines: [] }
+}
 
 const environment: Environment = {
   node: {
@@ -261,6 +308,30 @@ const DISCOVER: PluginListing[] = [
   },
 ]
 
+const SOURCES: CatalogSource[] = [
+  { id: 'npm', label: 'npm registry', kind: 'npm', endpoint: null, builtIn: true, active: true },
+]
+
+const discover = (query: string): PluginPage => {
+  const needle = query.trim().toLowerCase()
+  const items = needle
+    ? DISCOVER.filter(
+        (entry) =>
+          entry.name.toLowerCase().includes(needle) ||
+          entry.description.toLowerCase().includes(needle),
+      )
+    : DISCOVER
+  return {
+    items,
+    categories: ['dsh'],
+    total: items.length,
+    page: 0,
+    pageSize: 25,
+    hasMore: false,
+    indexedAt: Date.parse('2026-08-17T00:00:00Z') / 1000,
+  }
+}
+
 /** `plugin_detail dsh-visual-plugin`, as the registry published it. */
 const DETAILS: Record<string, PluginDetail> = {
   'dsh-visual-plugin': {
@@ -365,7 +436,13 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 /** Two painted frames, which is when a React state change is on screen. */
 export const settle = (): Promise<void> =>
   new Promise((resolve) => {
-    requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    const fallback = window.setTimeout(resolve, 100)
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        window.clearTimeout(fallback)
+        resolve()
+      }),
+    )
   })
 
 /* -------------------------------------------------------------------------- */
@@ -621,15 +698,11 @@ export function answerCommands(): void {
         /* Plugins */
         case 'plugin_state':
           return profile()
-        case 'plugin_search': {
-          const query = text(args, 'query').trim().toLowerCase()
-          if (query.length === 0) return DISCOVER
-          return DISCOVER.filter(
-            (entry) =>
-              entry.name.toLowerCase().includes(query) ||
-              entry.description.toLowerCase().includes(query),
-          )
-        }
+        case 'plugin_sources':
+        case 'plugin_source_select':
+          return SOURCES
+        case 'plugin_search':
+          return discover(text(args, 'query'))
         case 'plugin_detail':
           return beat(220).then(() => detailFor(text(args, 'name')))
         case 'plugin_add':
@@ -638,6 +711,20 @@ export function answerCommands(): void {
           return remove(text(args, 'name'))
         case 'plugin_switch':
           return switchPlugin(text(args, 'name'), flag(args, 'enabled'))
+
+        /* Profiles and conversations */
+        case 'profile_roster':
+          return roster
+        case 'profile_recovery_notice':
+          return null
+        case 'session_roster':
+          return { cards: sampleSessions, loaded: sampleSessions.length, archived: [] }
+        case 'session_search':
+          return []
+        case 'session_read':
+          return transcript(text(args, 'id'))
+        case 'session_archive':
+          return { cards: sampleSessions, loaded: sampleSessions.length, archived: [] }
 
         /* About */
         case 'app_about':

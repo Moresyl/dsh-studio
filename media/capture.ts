@@ -66,8 +66,26 @@ const pane = (title: string): HTMLElement => {
   return section
 }
 
-/** Rail order is `VIEWS`: console, plugins, remote, about. */
-const rail = (index: number) => need(document, 'nav[aria-label] > button', index)
+const waitPane = async (title: string): Promise<void> => {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (seek<HTMLElement>(document, 'h1,h2').some((heading) => heading.textContent === title))
+      return
+    await wait(25)
+  }
+  throw new Error(`capture: pane ${title} never mounted`)
+}
+
+/** Capture order is fixed even when the application's sidebar gains new actions. */
+const captureViews = ['nav.console', 'nav.plugins', 'nav.remote', 'nav.about'] as const
+const captureTitles = ['nav.console', 'plugins.title', 'remote.title', 'about.title'] as const
+const rail = (index: number): HTMLElement => {
+  const label = t(captureViews[index] ?? 'nav.console')
+  const found = seek<HTMLElement>(document, 'aside button').find((button) =>
+    (button.getAttribute('aria-label') ?? button.textContent?.trim())?.startsWith(label),
+  )
+  if (!found) throw new Error(`capture: no sidebar action called ${label}`)
+  return found
+}
 
 const market = () => pane(t('plugins.title'))
 const doorPane = () => pane(t('remote.title'))
@@ -258,6 +276,7 @@ const enter = async (view: number) => {
   await mounted()
   await serve()
   rail(view).click()
+  await waitPane(t(captureTitles[view] ?? 'nav.console'))
   await settle()
   hold()
 }
@@ -321,18 +340,21 @@ const POSES: Record<string, () => Promise<void>> = {
     // Asked for, not implied. A ready harness is what the window puts in front,
     // so reaching the console means clicking Console — exactly as a user does.
     rail(0).click()
+    await waitPane(t('nav.console'))
     await settle()
   },
   plugins: async () => {
     await mounted()
     await serve()
     rail(1).click()
+    await waitPane(t('plugins.title'))
     await settle()
   },
   remote: async () => {
     await mounted()
     await serve()
     rail(2).click()
+    await waitPane(t('remote.title'))
     await settle()
     doorButton().click()
     await wait(500)
@@ -343,6 +365,7 @@ const POSES: Record<string, () => Promise<void>> = {
     await mounted()
     await serve()
     rail(3).click()
+    await waitPane(t('about.title'))
     await settle()
   },
 }
@@ -362,6 +385,7 @@ interface Progress {
 interface Driver {
   /** True once the scene is built and the first frame is on screen. */
   ready: boolean
+  error: string | null
   /** Advance exactly one frame. */
   step: () => Promise<Progress>
   /** Every frame's hold, in order, for the encoder. */
@@ -374,6 +398,7 @@ let index = 0
 
 const driver: Driver = {
   ready: false,
+  error: null,
 
   step: async () => {
     const frame = reel[index]
@@ -421,4 +446,6 @@ void (async () => {
     await serve()
   }
   driver.ready = true
-})()
+})().catch((cause: unknown) => {
+  driver.error = cause instanceof Error ? (cause.stack ?? cause.message) : String(cause)
+})

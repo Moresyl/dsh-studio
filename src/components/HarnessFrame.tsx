@@ -8,15 +8,15 @@
  * minimised or closed. Framing it keeps the chrome ours no matter what the
  * harness page does.
  *
- * It also keeps this shell out of the harness's DOM. Reaching in to restyle
- * someone else's application is a maintenance debt that comes due on their
- * release schedule, not ours.
+ * The managed integration plugin owns the small, documented theme-token bridge
+ * inside Harness. This shell still never reaches into its DOM.
  */
-import { useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 
 import { serveDesktop } from '@/lib/bridge'
 import { ownAsync } from '@/lib/lifecycle'
 import { reportFailure } from '@/state/failure'
+import { useTheme } from '@/state/theme'
 
 /** Capabilities the harness UI needs that a frame does not grant by default. */
 const PERMISSIONS = 'clipboard-read; clipboard-write'
@@ -29,6 +29,37 @@ interface HarnessFrameProps {
 }
 
 export function HarnessFrame({ origin, hidden }: HarnessFrameProps) {
+  const frame = useRef<HTMLIFrameElement>(null)
+  const theme = useTheme((state) => state.theme)
+  const sendTheme = useCallback(() => {
+    const resolved =
+      theme === 'system'
+        ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
+          ? 'dark'
+          : 'light'
+        : theme
+    frame.current?.contentWindow?.postMessage(
+      { type: 'dsh-studio:theme', theme: resolved },
+      new URL(origin).origin,
+    )
+  }, [origin, theme])
+
+  useEffect(() => {
+    const onReady = (event: MessageEvent) => {
+      if (event.source !== frame.current?.contentWindow) return
+      if (event.origin !== new URL(origin).origin) return
+      if (event.data?.type === 'dsh-studio:theme-ready') sendTheme()
+    }
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
+    window.addEventListener('message', onReady)
+    if (theme === 'system') media?.addEventListener('change', sendTheme)
+    sendTheme()
+    return () => {
+      window.removeEventListener('message', onReady)
+      media?.removeEventListener('change', sendTheme)
+    }
+  }, [origin, sendTheme, theme])
+
   // The desktop is offered to this frame for exactly as long as the frame is
   // the thing serving on that origin — see `src/lib/bridge.ts`. Not tied to
   // `hidden`, because a session left running behind the control panel is still
@@ -40,6 +71,8 @@ export function HarnessFrame({ origin, hidden }: HarnessFrameProps) {
 
   return (
     <iframe
+      ref={frame}
+      onLoad={sendTheme}
       // Hidden rather than unmounted: an agent session is long-lived work, and
       // stepping into the control panel must not throw it away. `display: none`
       // leaves the document loaded and its state intact.

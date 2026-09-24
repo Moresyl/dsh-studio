@@ -140,6 +140,9 @@ export function SessionsPane() {
   const narrow = useSessions((state) => state.narrow)
   const open = useSessions((state) => state.open)
   const close = useSessions((state) => state.close)
+  const searchRequest = useSessions((state) => state.searchRequest)
+  const tab = useSessions((state) => state.tab)
+  const setTab = useSessions((state) => state.setTab)
 
   const field = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
@@ -148,11 +151,15 @@ export function SessionsPane() {
   // The statement is a second reading of the same shelf, not a seventh pane in
   // the rail: nobody goes looking for "usage" without a session in mind, and a
   // rail that grows an entry per question stops being a rail.
-  const [tab, setTab] = useState<'list' | 'archived' | 'usage'>('list')
 
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (searchRequest === 0) return
+    field.current?.focus()
+  }, [searchRequest])
 
   // Emptying the box is not a keystroke to wait out — it is the moment the list
   // underneath becomes the answer again.

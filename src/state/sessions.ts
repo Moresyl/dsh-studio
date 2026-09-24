@@ -31,10 +31,12 @@ interface SessionStore {
   query: string
   /** Narrow to one project directory, or null for all of them. */
   project: string | null
+  tab: 'list' | 'archived' | 'usage'
 
   /** The session being read, and its id while it is still being fetched. */
   opened: SessionTranscript | null
   opening: string | null
+  searchRequest: number
 
   scanning: boolean
   searching: boolean
@@ -48,6 +50,8 @@ interface SessionStore {
   narrow: (project: string | null) => Promise<void>
   open: (id: string) => Promise<void>
   close: () => void
+  setTab: (tab: SessionStore['tab']) => void
+  requestSearch: () => void
   archive: (id: string, archived: boolean) => Promise<boolean>
 
   /**
@@ -83,8 +87,10 @@ export const useSessions = create<SessionStore>((set, get) => ({
   hits: null,
   query: '',
   project: null,
+  tab: 'list',
   opened: null,
   opening: null,
+  searchRequest: 0,
   scanning: false,
   searching: false,
   exporting: false,
@@ -150,6 +156,9 @@ export const useSessions = create<SessionStore>((set, get) => ({
     openingGeneration += 1
     set({ opened: null, opening: null, error: null })
   },
+
+  setTab: (tab) => set({ tab }),
+  requestSearch: () => set({ tab: 'list', searchRequest: get().searchRequest + 1 }),
 
   archive: async (id, archived) => {
     try {

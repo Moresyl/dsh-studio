@@ -1,8 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronRight, Copy, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
 
-import { Ambient } from '@/components/Ambient'
-import { BrandMark } from '@/components/BrandMark'
 import { Button } from '@/components/Button'
 import { EnvironmentChecks, EnvironmentProgress } from '@/components/Environment'
 import { LogConsole } from '@/components/LogConsole'
@@ -19,34 +17,23 @@ import { contextMenu } from '@/state/menu'
 /**
  * The console: the state of the machine, and the harness's own output.
  *
- * Two regions, not one centred column. A rail on the left holds what the
- * machine has and the one button that changes it; the rest of the pane is the
- * output of the thing being supervised. That is the shape of a tool that
- * supervises something — controls on one side, the thing being controlled on
- * the other — and it is the reason the window looks occupied at 1360px instead
- * of holding a small card in the middle of a lot of nothing.
- *
- * Inside the rail the sections run static-first — what the machine has, then
- * what it will run as — so that a section appearing pushes nothing that was
- * already being read. Everything that is a diagnostic rather than a decision is
- * behind one fold, closed until it is asked for: the runtimes this chose between
- * and the address it ended up on are worth having, and neither is worth the room
- * it takes on a rail somebody is reading for the first time. The action sits on
- * the bottom edge whatever is above it, which is where a pane's primary button
- * belongs and what turns the leftover height into margin instead of a hole.
+ * Runtime state and decisions stay above the output. This gives the log the
+ * full reading width while the shared sidebar owns navigation for every pane.
  */
 export function ConsolePane() {
   return (
-    <div className="flex min-h-0 flex-1 animate-rise">
+    <div className="flex min-h-0 flex-1 flex-col animate-rise">
       <ConsoleRail />
-      <HarnessLog />
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1">
+        <HarnessLog />
+      </div>
     </div>
   )
 }
 
 /**
  * Runtime controls are isolated from the hot log subscription. A busy harness
- * can emit hundreds of lines per second; none of them changes this rail, so it
+ * can emit hundreds of lines per second; none of them changes this section, so it
  * should not rebuild the environment cards and menus for every line.
  */
 function ConsoleRail() {
@@ -73,49 +60,54 @@ function ConsoleRail() {
   const runtimes = environment?.allNodeRuntimes ?? []
 
   return (
-    <aside className="chrome relative flex w-[340px] shrink-0 flex-col border-r border-line">
-      <Ambient />
-
-      <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
-        <div className="flex items-center gap-3">
-          <BrandMark size={38} className="rounded-[9px] shadow-lift" />
-          <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-ui-lg leading-none font-semibold tracking-[-0.01em] text-text">
-              DSH Studio
-            </h1>
-            <p className="flex items-center gap-1.5 text-ui-sm leading-none text-muted">
+    <section className="@container max-h-[55%] shrink-0 overflow-y-auto border-b border-line bg-canvas">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-7 py-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-ui-lg leading-tight font-semibold text-text">{t('nav.console')}</h1>
+            <p className="mt-1 flex items-center gap-1.5 text-ui-caption text-muted">
               <StatusDot tone={toneOf(status)} size={6} />
               {labelOf(status)}
             </p>
           </div>
+          {running ? (
+            <Button variant="secondary" onClick={() => void stop()} disabled={busy}>
+              <Square size={13} strokeWidth={2.6} />
+              {t('action.stop')}
+            </Button>
+          ) : (
+            <Button onClick={() => void start()} disabled={!runnable || starting || working}>
+              {starting ? <Loader2 size={14} className="animate-spin" /> : <Terminal size={14} />}
+              {starting
+                ? t('action.starting')
+                : status.phase === 'failed'
+                  ? t('action.retry')
+                  : t('action.start')}
+            </Button>
+          )}
         </div>
 
-        <Section
-          title={t('section.environment')}
-          action={
-            <Button
-              variant="ghost"
-              className="h-5 px-1.5 text-[11.5px]"
-              // The store already puts the reason beside this control; catch
-              // here so a manual failed probe is not also an unhandled browser
-              // promise rejection.
-              onClick={() => void inspect().catch(() => {})}
-              disabled={working}
-            >
-              <RotateCw size={11} strokeWidth={2.4} />
-              {t('action.recheck')}
-            </Button>
-          }
-        >
-          <EnvironmentChecks />
-        </Section>
-
-        {/* A decision and not a diagnostic, so it stays out on the rail: the
-              guide asks it once on a first run, and this is where it is asked
-              again afterwards. */}
-        <Section title={t('section.agent')}>
-          <PresetPicker />
-        </Section>
+        <div className="grid gap-5 @min-[900px]:grid-cols-2">
+          <Section
+            title={t('section.environment')}
+            action={
+              <Button
+                variant="ghost"
+                className="h-6 px-1.5 text-ui-sm"
+                onClick={() => void inspect().catch(() => {})}
+                disabled={working}
+              >
+                <RotateCw size={12} strokeWidth={2.2} />
+                {t('action.recheck')}
+              </Button>
+            }
+          >
+            <EnvironmentChecks />
+          </Section>
+          <Section title={t('section.agent')}>
+            <PresetPicker />
+          </Section>
+        </div>
 
         {/* Nothing in here is needed to use the app, and both of them only
               exist some of the time — one runtime installed makes the list a
@@ -145,46 +137,13 @@ function ConsoleRail() {
 
         <EnvironmentProgress />
 
-        <div className="mt-auto flex flex-col gap-2">
-          {running ? (
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={() => void stop()}
-              disabled={busy}
-            >
-              <Square size={13} strokeWidth={2.6} />
-              {t('action.stop')}
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              className="w-full"
-              onClick={() => void start()}
-              disabled={!runnable || starting || working}
-            >
-              {starting ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  {t('action.starting')}
-                </>
-              ) : (
-                <>
-                  <Terminal size={14} strokeWidth={2.3} />
-                  {status.phase === 'failed' ? t('action.retry') : t('action.start')}
-                </>
-              )}
-            </Button>
-          )}
-
-          {error && (
-            <p className="selectable max-h-36 min-w-0 overflow-y-auto rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-danger [overflow-wrap:anywhere]">
-              {error}
-            </p>
-          )}
-        </div>
+        {error && (
+          <p className="selectable max-h-36 overflow-y-auto rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-ui-caption leading-relaxed whitespace-pre-wrap text-danger [overflow-wrap:anywhere]">
+            {error}
+          </p>
+        )}
       </div>
-    </aside>
+    </section>
   )
 }
 
