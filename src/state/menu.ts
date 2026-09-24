@@ -13,6 +13,8 @@ import { create } from 'zustand'
 export interface MenuAction {
   label: string
   icon?: LucideIcon
+  /** Marks the current value in menus that choose exactly one option. */
+  selected?: boolean
   /** Present but not available — greyed rather than missing, so the menu keeps its shape. */
   disabled?: boolean
   /** Destructive, and coloured like it. */
@@ -29,15 +31,30 @@ interface MenuState {
   /** Null when nothing is open, which is nearly always. */
   at: { x: number; y: number } | null
   entries: MenuEntry[]
-  show: (x: number, y: number, entries: MenuEntry[]) => void
+  owner: string | null
+  minWidth: number | null
+  show: (
+    x: number,
+    y: number,
+    entries: MenuEntry[],
+    options?: { owner?: string; minWidth?: number },
+  ) => void
   hide: () => void
 }
 
 export const useMenu = create<MenuState>((set) => ({
   at: null,
   entries: [],
-  show: (x, y, entries) => set({ at: { x, y }, entries }),
-  hide: () => set({ at: null, entries: [] }),
+  owner: null,
+  minWidth: null,
+  show: (x, y, entries, options) =>
+    set({
+      at: { x, y },
+      entries,
+      owner: options?.owner ?? null,
+      minWidth: options?.minWidth ?? null,
+    }),
+  hide: () => set({ at: null, entries: [], owner: null, minWidth: null }),
 }))
 
 /**

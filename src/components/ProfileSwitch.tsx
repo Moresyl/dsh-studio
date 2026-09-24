@@ -1,5 +1,5 @@
 import { useEffect, type MouseEvent } from 'react'
-import { Check, ChevronDown, Layers, Settings2 } from 'lucide-react'
+import { ChevronDown, Layers, Settings2 } from 'lucide-react'
 
 import { t } from '@/lib/i18n'
 import { useHarness } from '@/state/harness'
@@ -48,7 +48,7 @@ export function ProfileSwitch({ onManage }: ProfileSwitchProps) {
       label: profile.servesWindow
         ? profile.name
         : `${profile.name} · ${t('profile.noInterfaceTag')}`,
-      icon: profile.name === selected ? Check : undefined,
+      selected: profile.name === selected,
       run: () => void switchProfile(profile.name),
     }))
     entries.push(SEPARATOR, { label: t('profile.manage'), icon: Settings2, run: onManage })

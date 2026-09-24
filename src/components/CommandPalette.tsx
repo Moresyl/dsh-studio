@@ -548,7 +548,7 @@ function Row({ command, at, heading, active, onHover }: RowProps) {
         }}
         className={[
           'mx-1.5 flex h-[34px] cursor-pointer items-center gap-2.5 rounded-control px-2 transition-colors duration-75',
-          active ? 'bg-surface-2 text-text' : 'text-muted',
+          active ? 'bg-control-fill text-text opacity-100' : 'text-muted opacity-75',
         ].join(' ')}
       >
         <Icon

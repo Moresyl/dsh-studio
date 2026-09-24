@@ -130,10 +130,8 @@ export function SettingsPane() {
               <SelectControl
                 value={presentation}
                 aria-label={t('settings.presentation')}
-                onChange={(event) =>
-                  choosePresentation(
-                    event.target.value as 'compatibility' | 'extended' | 'advanced',
-                  )
+                onValueChange={(value) =>
+                  choosePresentation(value as 'compatibility' | 'extended' | 'advanced')
                 }
                 density="compact"
               >
@@ -148,8 +146,8 @@ export function SettingsPane() {
                 value={state?.logLevel ?? 'info'}
                 aria-label={t('settings.logLevel')}
                 disabled={!ready || busy}
-                onChange={(event) =>
-                  void setLogLevel(event.target.value as 'debug' | 'info' | 'warn' | 'error')
+                onValueChange={(value) =>
+                  void setLogLevel(value as 'debug' | 'info' | 'warn' | 'error')
                 }
                 density="compact"
               >

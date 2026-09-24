@@ -142,7 +142,7 @@ export function EnvironmentChecks() {
             <SelectControl
               aria-label={t('harness.versions')}
               value={selectedVersion}
-              onChange={(event) => setSelectedVersion(event.target.value)}
+              onValueChange={setSelectedVersion}
               disabled={busy || installing || provisioningNode}
               density="compact"
               containerClassName="min-w-0 flex-1"

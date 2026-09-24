@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { Check } from 'lucide-react'
 
 import { SEPARATOR, useMenu, type MenuAction, type MenuEntry } from '@/state/menu'
 
@@ -32,6 +33,8 @@ const swallow = (event: Event): void => {
 export function ContextMenu() {
   const at = useMenu((state) => state.at)
   const entries = useMenu((state) => state.entries)
+  const owner = useMenu((state) => state.owner)
+  const minWidth = useMenu((state) => state.minWidth)
   const hide = useMenu((state) => state.hide)
 
   const surface = useRef<HTMLDivElement>(null)
@@ -56,13 +59,15 @@ export function ContextMenu() {
       x: at.x + width + MARGIN > window.innerWidth ? Math.max(MARGIN, at.x - width) : at.x,
       y: at.y + height + MARGIN > window.innerHeight ? Math.max(MARGIN, at.y - height) : at.y,
     })
-    setActive(-1)
+    setActive(
+      entries.findIndex((entry) => entry !== SEPARATOR && entry.selected && !entry.disabled),
+    )
     element.focus()
 
     return () => {
       if (previous instanceof HTMLElement) previous.focus()
     }
-  }, [at])
+  }, [at, entries])
 
   // Anything that is not this menu dismisses it, which is the rule every system
   // menu follows. In the capture phase, so the press is taken before anything
@@ -140,12 +145,17 @@ export function ContextMenu() {
     <div
       ref={surface}
       role="menu"
+      id={owner ? `${owner}-menu` : undefined}
+      aria-activedescendant={active >= 0 ? `${owner ?? 'context-menu'}-item-${active}` : undefined}
       tabIndex={-1}
       onKeyDown={onKeyDown}
       // The menu owns its own right-click too, or the one underneath reopens.
       onContextMenu={(event) => event.preventDefault()}
-      style={{ left: position.x, top: position.y }}
-      className="fixed z-50 min-w-[184px] rounded-panel border border-line-strong bg-surface py-1 shadow-lift outline-none select-none"
+      style={{ left: position.x, top: position.y, minWidth: minWidth ?? undefined }}
+      className={[
+        'menu-surface fixed z-50 outline-none select-none',
+        owner ? 'menu-surface--dropdown' : '',
+      ].join(' ')}
     >
       {entries.map((entry, index) =>
         entry === SEPARATOR ? (
@@ -153,8 +163,11 @@ export function ContextMenu() {
         ) : (
           <button
             key={index}
+            id={`${owner ?? 'context-menu'}-item-${index}`}
             type="button"
-            role="menuitem"
+            role={entry.selected === undefined ? 'menuitem' : 'menuitemradio'}
+            aria-checked={entry.selected === undefined ? undefined : entry.selected}
+            data-selected={entry.selected || undefined}
             disabled={entry.disabled}
             // On the press, the way a system menu answers, rather than waiting
             // for the release somewhere else to make it a click.
@@ -163,25 +176,26 @@ export function ContextMenu() {
             }}
             onMouseEnter={() => setActive(index)}
             className={[
-              'flex w-full items-center gap-2.5 px-2.5 py-[5px] text-left text-[12.5px] whitespace-nowrap',
-              entry.disabled
-                ? 'cursor-default text-faint/60'
-                : entry.danger
-                  ? 'text-danger'
-                  : 'text-text',
+              'menu-item',
+              entry.disabled ? 'menu-item--disabled' : entry.danger ? 'menu-item--danger' : '',
+              entry.selected ? 'menu-item--selected' : '',
               !entry.disabled && index === active
                 ? entry.danger
-                  ? 'bg-danger/12'
-                  : 'bg-surface-2'
+                  ? 'menu-item--danger-active'
+                  : 'menu-item--active'
                 : '',
             ].join(' ')}
           >
             {/* A fixed gutter whether or not this row has an icon, so labels
                 line up the way they do in a system menu. */}
-            <span className="flex w-[14px] shrink-0 justify-center">
-              {entry.icon && <entry.icon size={13} strokeWidth={2} aria-hidden="true" />}
+            <span className="menu-item__indicator">
+              {entry.selected ? (
+                <Check size={18} strokeWidth={2.2} aria-hidden="true" />
+              ) : (
+                entry.icon && <entry.icon size={14} strokeWidth={2} aria-hidden="true" />
+              )}
             </span>
-            {entry.label}
+            <span className="menu-item__label">{entry.label}</span>
           </button>
         ),
       )}

@@ -231,10 +231,10 @@ export function PluginMarket() {
               <SelectControl
                 value={activeSource?.id ?? 'npm'}
                 disabled={working !== null || sourceWorking}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   setCategory(null)
                   setPage(0)
-                  void selectSource(event.target.value)
+                  void selectSource(value)
                 }}
                 aria-label={t('plugins.source')}
                 density="small"
@@ -315,8 +315,8 @@ export function PluginMarket() {
             <div className="flex h-9 items-center gap-2 border-t border-line/70 px-4">
               <SelectControl
                 value={category ?? ''}
-                onChange={(event) => {
-                  setCategory(event.target.value || null)
+                onValueChange={(value) => {
+                  setCategory(value || null)
                   setPage(0)
                 }}
                 aria-label={t('plugins.category.all')}
@@ -334,8 +334,8 @@ export function PluginMarket() {
               <SelectControl
                 value={sort}
                 aria-label={t('plugins.sort.label')}
-                onChange={(event) => {
-                  setSort(event.target.value as PluginSort)
+                onValueChange={(value) => {
+                  setSort(value as PluginSort)
                   setPage(0)
                 }}
                 density="small"

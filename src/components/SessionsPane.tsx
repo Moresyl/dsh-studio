@@ -755,7 +755,7 @@ function Filter({
     const entries: MenuEntry[] = [
       {
         label: t('sessions.allProjects'),
-        icon: project === null ? Check : undefined,
+        selected: project === null,
         run: () => onPick(null),
       },
     ]
@@ -764,7 +764,7 @@ function Filter({
     for (const path of reach) {
       entries.push({
         label: leaf(path),
-        icon: path === project ? Check : undefined,
+        selected: path === project,
         run: () => onPick(path),
       })
     }

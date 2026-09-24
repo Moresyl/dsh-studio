@@ -699,7 +699,7 @@ function SidePicker({ label, value, options, onPick }: SidePickerProps) {
       box.bottom + 4,
       options.map((name) => ({
         label: name,
-        icon: name === value ? Check : undefined,
+        selected: name === value,
         run: () => onPick(name),
       })),
     )
