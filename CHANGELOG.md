@@ -9,6 +9,28 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.14] — 2026-09-25
+
+### Added
+
+- Bundle OpenAI Sans Regular, Medium, and Semibold with the application so the desktop interface uses the intended 400, 510, and 590 weights consistently instead of depending on a system-installed font.
+
+### Changed
+
+- Match the updated desktop reference with a 36 px title bar, 20 px default buttons, 22–28 px field and selector sizes, a 450 px confirmation dialog, a 520 px command palette, and the corresponding 6–16 px corner radii.
+- Use the reference tooltip treatment and compact typography: 14 px dark tooltips, 12 px controls, restrained neutral fills, and a blue focus edge only where focus needs to remain explicit.
+- Rework preset choices as neutral 16 px radios with a 6 px inverse center, stable selected-row geometry, roving focus, and wrapping arrow, Home, and End key navigation.
+
+### Fixes and polish
+
+- Treat malformed worktree replies as an empty collection so the Settings pane degrades cleanly instead of crashing while a backend or browser fixture is incomplete.
+- Extend the browser fixture with startup, worktree, and preset commands so the same Settings and preset surfaces can be inspected without native IPC.
+
+### Verification
+
+- Local release validation passed: production build, lint, 277 frontend tests at 95.1% statement coverage, 59 packaging tests, 408 Rust tests, accessibility checks, public-contract checks, and bilingual documentation checks.
+- Browser checks covered dark and light themes, the open selector, preset pointer and keyboard selection, command-palette geometry, tooltip geometry, font loading, and a clean console after a full reload.
+
 ## [0.9.13] — 2026-09-25
 
 ### Changed
