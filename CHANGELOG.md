@@ -9,6 +9,27 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.10] — 2026-09-24
+
+### Added
+
+- Give the Studio workbench a persistent, collapsible sidebar for its tools, recent sessions, settings, and profile selection. Recent sessions open directly.
+
+### Changed
+
+- Adopt a neutral light/dark palette and a native system UI font stack. The managed Harness integration synchronizes semantic theme colors with the Studio window.
+- Keep Harness's own conversation sidebar in chat mode instead of stacking two navigation columns. Put runtime state above a full-width console log and switch to one column when the content area is narrow.
+
+### Fixes and polish
+
+- Make the workbench search action open the session list and focus its search field, including when leaving a reader or another session tab.
+- Update capture fixtures for the current session, profile, and plugin catalog contracts and wait for lazy panes before taking preview frames.
+
+### Verification
+
+- Local frontend build, lint, 269 frontend tests, 53 packaging script tests, Rust workspace tests, and public-contract checks passed.
+- Browser checks covered both themes, minimum window width, collapsed navigation, recent-session opening, search focus, and Harness theme-token overrides. The release pipeline validates native packages.
+
 ## [0.9.9] — 2026-09-22
 
 ### Changed
