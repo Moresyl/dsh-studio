@@ -9,6 +9,27 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.13] — 2026-09-25
+
+### Changed
+
+- Replace the remaining native dropdown popups with the shared menu-backed selector so trigger, open, highlighted, selected, disabled, pointer, and keyboard states use one measured desktop interaction model.
+- Match the reference control geometry with 8×5 px chevrons, 12 px dropdown corners, 6 px menu gutters, 8×12 px item padding, 14 px item text, 18 px selection indicators, and 590 selected-item weight.
+- Give command-palette rows the reference 75% resting opacity and quiet translucent highlight instead of the heavier secondary surface.
+
+### Fixes and polish
+
+- Keep outline inputs transparent and use the neutral 50% inset focus edge from the reference tokens; selectors retain the distinct inward 2 px blue focus ring.
+- Mark single-choice menu entries with checked radio-menu semantics, restore focus when the menu closes, and expose the active descendant while navigating with the keyboard.
+- Remove owned, content-hashed web assets before Windows NSIS upgrades so old bundles cannot survive an in-place install or block complete uninstall. Full installers also refresh their owned offline payload, while Lite updates preserve it.
+- Supersede the incomplete `v0.9.12` release run, whose Windows Full upgrade check correctly caught stale assets left by the previous installer.
+
+### Verification
+
+- Local frontend build, lint, 275 frontend tests at 95.1% statement coverage, 59 packaging script tests, Rust workspace tests, accessibility checks, and public-contract checks passed.
+- Lite and Full Windows NSIS installers compiled locally with their separate upgrade hooks. Browser checks verified selected dropdowns and input geometry in dark and light themes.
+- The release pipeline validates Lite and Full packages on Linux, Windows, and macOS, including an in-place Windows upgrade and clean uninstall, before publishing checksums and the signed updater manifest.
+
 ## [0.9.12] — 2026-09-24
 
 ### Fixes and polish
