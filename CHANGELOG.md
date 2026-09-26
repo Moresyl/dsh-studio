@@ -9,6 +9,26 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.15] — 2026-09-26
+
+### Changed
+
+- Rebuild the desktop hierarchy around a black navigation rail, an `#181818` workspace, `#212121` work surfaces, and inverse selected controls, with matching light-theme relationships instead of a flat single-surface layout.
+- Tighten the desktop shell to a 264 px sidebar and 36 px title bar, center the mode selector, expose the current page in the title bar, and use 20 px content headings with bounded 780 px and 1040 px reading widths.
+- Give the plugin marketplace a contained work surface and align Settings, About, Remote, Console, sidebar rows, tabs, theme controls, and page actions to the same compact geometry and typography.
+- Replace all six English and Chinese README screenshots and animations with clean `1120×700` captures of the updated interface.
+
+### Fixes and polish
+
+- Update the deterministic plugin-install capture backend for the current one-shot preview-token contract, show the security review before confirmation, and end on the correct Installed tab after the marketplace gained an Installable tab.
+- Keep README capture overlays outside the recorded application area and validate every animation frame before APNG encoding.
+
+### Verification
+
+- Local release validation passed: production build, lint, 281 frontend tests at 95.1% statement coverage, 59 packaging tests, 408 Rust tests, accessibility checks, public-contract checks, and bilingual documentation checks.
+- Browser checks covered dark and light themes, the open selector, compact and 744 px layouts, loaded OpenAI Sans faces, zero horizontal overflow, and a clean error console after a full reload.
+- The documentation assets were verified at `1120×700`: 34 frames per plugin animation, 12 frames per remote-pairing animation, and one frame per console image.
+
 ## [0.9.14] — 2026-09-25
 
 ### Added
