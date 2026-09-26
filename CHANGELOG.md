@@ -9,6 +9,33 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.18] — 2026-09-27
+
+### Added
+
+- Show resolved installed plugin versions and provide a check for available versions. Changes use the existing exact-version review, dependency preflight, one-shot confirmation and recovery path.
+- Add repeatable isolated desktop checks for real WebView permissions, profile round trips, preset packages, session search/export/archive and PTY input/output, plus timed UI and Harness readiness regression.
+
+### Changed
+
+- Replace dense plugin rows with responsive cards, readable titles and descriptions, retained package identities, clearer installed states and a larger detail dialog.
+- Rename Console to Runtime, collapse routine logs by default, keep skipped-plugin summaries visible, and add issue/search filters and copying of visible log lines. Collapsing logs returns space to runtime settings.
+- Check official Harness module dependency ranges as well as the root package, preserve exact-version semantics, and show installed-package incompatibility without granting exemptions.
+- Refresh all six English/Chinese README screenshots and animations from the current UI, and derive capture version labels from the application and runtime manifests.
+
+### Fixes and polish
+
+- Filter uninstalled items before catalog pagination, reset the result viewport after navigation, and reset pagination when clearing search.
+- Restore modal focus when the primary action is blocked or content changes, trap all visible keyboard stops, and improve menu Home/End, wrapping, Tab dismissal and ordinary click activation.
+- Keep exact-version safety details visible when replacing an installed package, and distinguish the installed version from its requested range or local source.
+
+### Verification
+
+- Local validation passed 307 frontend tests (95.27% statement coverage in the configured core subset), 426 Rust tests with five conditional tests ignored, and 63 packaging tests, plus build, lint, accessibility and contract checks.
+- Real isolated Windows WebView checks passed native file-offer ACL, profile and preset round trips, session exports in three formats, archive restoration, PTY lifecycle, and an actual 6.0.0 → 7.0.0 test dependency replacement.
+- The first 20-minute UI exercise completed 38 passes with no uncaught renderer exceptions. The final runtime soak is recorded separately before release.
+- Third-party plugin compatibility is not overridden. macOS physical-device and external credential-dependent workflows are outside local Windows acceptance.
+
 ## [0.9.17] — 2026-09-26
 
 ### Added
