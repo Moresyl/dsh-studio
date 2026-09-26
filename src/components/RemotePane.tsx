@@ -91,7 +91,7 @@ export function RemotePane() {
 
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col">
-      <PaneHeader title={t('remote.title')} subtitle={t('remote.subtitle')}>
+      <PaneHeader title={t('remote.title')} subtitle={t('remote.subtitle')} width="narrow">
         <span className="flex items-center gap-1.5 text-[11.5px] text-muted">
           <StatusDot
             tone={{
@@ -138,7 +138,7 @@ export function RemotePane() {
         )}
       </PaneHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 py-5">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
         <div className="mx-auto flex max-w-[780px] flex-col gap-4">
           {status?.open ? (
             <>

@@ -43,9 +43,9 @@
    * Near-neutral on purpose. Saturated chrome is most of what makes a desktop
    * app read as a web page wearing a title bar; the colour budget is spent on
    * the one accent and on status, where it carries meaning. */
-  --color-canvas: #212121;
-  --color-canvas-deep: #0d0d0d;
-  --color-surface: #181818;
+  --color-canvas: #181818;
+  --color-canvas-deep: #212121;
+  --color-surface: #0d0d0d;
   --color-surface-2: #303030;
   --color-line: #ffffff1a;
   --color-line-strong: #ffffff1f;
@@ -53,10 +53,10 @@
   --color-control-border-hover: #ffffff4d;
   --color-control-border-focus: #ffffff80;
   --color-control-border-disabled: #ffffff0f;
-  --color-control-fill: #ffffff1f;
-  --color-control-fill-hover: #ffffff29;
+  --color-control-fill: #ffffff12;
+  --color-control-fill-hover: #ffffff1f;
   --color-control-fill-disabled: #ffffff0d;
-  --color-menu-item: #ffffff1a;
+  --color-menu-item: #ffffff14;
   --color-focus: #0285ff;
   --color-switch-off: #414141;
   --color-switch-off-hover: #4f4f4f;
@@ -90,7 +90,7 @@
   /* Stable UI roles keep typography coherent as individual panes evolve. The
      setting changes only these tokens, never the root rem scale, so geometry
      stays stable while text remains comfortable for long sessions. */
-  --ui-font-size: 13px;
+  --ui-font-size: 14px;
   --text-ui-xl: calc(var(--ui-font-size) + 4px);
   --text-ui-lg: calc(var(--ui-font-size) + 2px);
   --text-ui-base: var(--ui-font-size);
@@ -103,7 +103,7 @@
   /* A window corner is 8px, so nothing framed by one has any business being
      rounder than that. Controls sit a step tighter again. */
   --radius-panel: 0.5rem;
-  --radius-control: 0.4375rem;
+  --radius-control: 0.375rem;
 
   --shadow-panel: 0 1px 2px #00000030;
   --shadow-lift: 0 6px 18px -8px #00000066;
@@ -223,7 +223,7 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme='dark']) {
     --color-canvas: #ffffff;
-    --color-canvas-deep: #f3f3f3;
+    --color-canvas-deep: #f9f9f9;
     --color-surface: #f9f9f9;
     --color-surface-2: #ededed;
     --color-line: #00000014;
@@ -232,10 +232,10 @@
     --color-control-border-hover: #00000040;
     --color-control-border-focus: #00000080;
     --color-control-border-disabled: #0000000f;
-    --color-control-fill: #00000014;
-    --color-control-fill-hover: #0000001f;
+    --color-control-fill: #0000000a;
+    --color-control-fill-hover: #00000014;
     --color-control-fill-disabled: #0000000d;
-    --color-menu-item: #00000014;
+    --color-menu-item: #0000000f;
     --color-focus: #0169cc;
     --color-switch-off: #dfdfdf;
     --color-switch-off-hover: #cdcdcd;
@@ -281,7 +281,7 @@
 
 :root[data-theme='light'] {
   --color-canvas: #ffffff;
-  --color-canvas-deep: #f3f3f3;
+  --color-canvas-deep: #f9f9f9;
   --color-surface: #f9f9f9;
   --color-surface-2: #ededed;
   --color-line: #00000014;
@@ -290,10 +290,10 @@
   --color-control-border-hover: #00000040;
   --color-control-border-focus: #00000080;
   --color-control-border-disabled: #0000000f;
-  --color-control-fill: #00000014;
-  --color-control-fill-hover: #0000001f;
+  --color-control-fill: #0000000a;
+  --color-control-fill-hover: #00000014;
   --color-control-fill-disabled: #0000000d;
-  --color-menu-item: #00000014;
+  --color-menu-item: #0000000f;
   --color-focus: #0169cc;
   --color-switch-off: #dfdfdf;
   --color-switch-off-hover: #cdcdcd;
@@ -407,6 +407,8 @@
     background-color: var(--ground-window);
     color: var(--color-text);
     font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
     font-feature-settings: normal;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -563,6 +565,16 @@
     font-weight: 500;
     letter-spacing: 0;
     color: var(--color-faint);
+  }
+
+  /* Page-level commands use the reference's 28px medium control, while dense
+     table and toolbar buttons keep the 20px default. Segmented controls carry
+     aria-pressed and preserve their own shared-track geometry. */
+  .pane-header-actions :where(button:not([aria-pressed])) {
+    height: 28px;
+    min-height: 28px;
+    gap: 6px;
+    padding-inline: 10px;
   }
 
   /* Outline inputs stay transparent. Their focus is a stronger neutral inset

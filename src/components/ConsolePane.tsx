@@ -61,11 +61,13 @@ function ConsoleRail() {
 
   return (
     <section className="@container max-h-[55%] shrink-0 overflow-y-auto border-b border-line bg-canvas">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-7 py-5">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-7 pt-6 pb-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-ui-lg leading-tight font-semibold text-text">{t('nav.console')}</h1>
-            <p className="mt-1 flex items-center gap-1.5 text-ui-caption text-muted">
+            <h1 className="text-[20px] leading-tight font-semibold text-text">
+              {t('nav.console')}
+            </h1>
+            <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-muted">
               <StatusDot tone={toneOf(status)} size={6} />
               {labelOf(status)}
             </p>

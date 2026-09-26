@@ -294,6 +294,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [managing, stage, show])
 
+  const activePage = view === SETTINGS.id ? SETTINGS : VIEWS.find((entry) => entry.id === view)
+  const pageTitle =
+    stage === 'guiding'
+      ? 'DSH Studio'
+      : showPanel && activePage
+        ? t(activePage.label)
+        : t('view.harness')
+  const sectionTitle =
+    stage === 'guiding'
+      ? undefined
+      : showPanel
+        ? t('view.panel')
+        : presentation === 'extended'
+          ? t('view.extended')
+          : undefined
+
   return (
     // No ground of its own: the body is the window's ground, and where a
     // backdrop material is drawn behind it, a second fill here would cover it.
@@ -302,6 +318,8 @@ export default function App() {
         serving={origin !== null}
         mode={presentation}
         sidebarCollapsed={sidebarCollapsed || !showPanel}
+        pageTitle={pageTitle}
+        sectionTitle={sectionTitle}
         onToggleSidebar={
           stage === 'guiding' || !showPanel
             ? undefined

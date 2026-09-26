@@ -225,237 +225,239 @@ export function PluginMarket() {
           </Button>
         </PaneHeader>
 
-        {(tab === 'discover' || tab === 'installable') && (
-          <div className="shrink-0 border-b border-line">
-            <div className="flex h-11 items-center gap-2 px-4">
-              <SelectControl
-                value={activeSource?.id ?? 'npm'}
-                disabled={working !== null || sourceWorking}
-                onValueChange={(value) => {
-                  setCategory(null)
-                  setPage(0)
-                  void selectSource(value)
-                }}
-                aria-label={t('plugins.source')}
-                density="small"
-                containerClassName="max-w-[150px]"
-                className="text-muted"
-              >
-                {sources.map((source) => (
-                  <option key={source.id} value={source.id}>
-                    {source.label}
-                  </option>
-                ))}
-              </SelectControl>
-              <button
-                type="button"
-                onClick={() => setManagingSources(true)}
-                disabled={working !== null || sourceWorking}
-                data-hint={t('plugins.sources.manage')}
-                aria-label={t('plugins.sources.manage')}
-                className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text"
-              >
-                <Settings2 size={13} aria-hidden="true" />
-              </button>
-              <Search
-                size={14}
-                strokeWidth={2.1}
-                className="shrink-0 text-faint"
-                aria-hidden="true"
-              />
-              <input
-                ref={field}
-                aria-label={t('plugins.search')}
-                type="search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value)
-                  setPage(0)
-                }}
-                // Escape empties a search field on every platform, and does it
-                // without taking the caret out of the field.
-                onKeyDown={(event) => {
-                  if (event.key === 'Escape' && query !== '') {
-                    event.stopPropagation()
-                    setQuery('')
-                  }
-                }}
-                placeholder={t('plugins.search')}
-                spellCheck={false}
-                autoComplete="off"
-                className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
-              />
-              {searching && (
-                <Loader2
-                  size={13}
-                  className="shrink-0 animate-spin text-faint"
-                  aria-hidden="true"
-                />
-              )}
-              {/* The browser's own clear button is hidden, so here is one that
-                matches the rest of the window — and clearing puts the caret
-                back where the typing was. */}
-              {query !== '' && !searching && (
+        <div className="mx-auto mb-5 flex min-h-0 w-[calc(100%-48px)] max-w-[1040px] flex-1 flex-col overflow-hidden rounded-panel border border-line bg-canvas-deep/45 shadow-panel">
+          {(tab === 'discover' || tab === 'installable') && (
+            <div className="shrink-0 border-b border-line">
+              <div className="flex h-11 items-center gap-2 px-4">
+                <SelectControl
+                  value={activeSource?.id ?? 'npm'}
+                  disabled={working !== null || sourceWorking}
+                  onValueChange={(value) => {
+                    setCategory(null)
+                    setPage(0)
+                    void selectSource(value)
+                  }}
+                  aria-label={t('plugins.source')}
+                  density="small"
+                  containerClassName="max-w-[150px]"
+                  className="text-muted"
+                >
+                  {sources.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.label}
+                    </option>
+                  ))}
+                </SelectControl>
                 <button
                   type="button"
-                  data-hint={t('action.clearSearch')}
-                  aria-label={t('action.clearSearch')}
-                  onClick={() => {
-                    setQuery('')
-                    setPage(0)
-                    field.current?.focus()
-                  }}
-                  className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
+                  onClick={() => setManagingSources(true)}
+                  disabled={working !== null || sourceWorking}
+                  data-hint={t('plugins.sources.manage')}
+                  aria-label={t('plugins.sources.manage')}
+                  className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text"
                 >
-                  <X size={11} strokeWidth={2.4} aria-hidden="true" />
+                  <Settings2 size={13} aria-hidden="true" />
                 </button>
-              )}
-            </div>
-
-            <div className="flex h-9 items-center gap-2 border-t border-line/70 px-4">
-              <SelectControl
-                value={category ?? ''}
-                onValueChange={(value) => {
-                  setCategory(value || null)
-                  setPage(0)
-                }}
-                aria-label={t('plugins.category.all')}
-                density="small"
-                containerClassName="max-w-[170px]"
-                className="text-muted"
-              >
-                <option value="">{t('plugins.category.all')}</option>
-                {categories.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </SelectControl>
-              <SelectControl
-                value={sort}
-                aria-label={t('plugins.sort.label')}
-                onValueChange={(value) => {
-                  setSort(value as PluginSort)
-                  setPage(0)
-                }}
-                density="small"
-                className="text-muted"
-              >
-                {(['relevance', 'updated', 'name', 'downloads'] as const).map((value) => (
-                  <option key={value} value={value}>
-                    {t(`plugins.sort.${value}`)}
-                  </option>
-                ))}
-              </SelectControl>
-              <button
-                type="button"
-                onClick={() => {
-                  setPage(0)
-                  void search(query, category, sort, 0, true)
-                }}
-                disabled={searching}
-                data-hint={t('plugins.index.refresh')}
-                aria-label={t('plugins.index.refresh')}
-                className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
-              >
-                <RefreshCw
-                  size={12}
-                  className={searching ? 'animate-spin' : ''}
+                <Search
+                  size={14}
+                  strokeWidth={2.1}
+                  className="shrink-0 text-faint"
                   aria-hidden="true"
                 />
-              </button>
-              <span className="min-w-0 flex-1 truncate text-[10.5px] text-faint">
-                {t('plugins.index.summary', {
-                  total,
-                  page: landedPage + 1,
-                  pages: Math.max(1, Math.ceil(total / pageSize)),
-                })}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage(Math.max(0, landedPage - 1))}
-                disabled={searching || landedPage === 0}
-                aria-label={t('plugins.page.previous')}
-                className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
-              >
-                <ChevronLeft size={13} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setPage(landedPage + 1)}
-                disabled={searching || !hasMore}
-                aria-label={t('plugins.page.next')}
-                className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
-              >
-                <ChevronRight size={13} aria-hidden="true" />
-              </button>
+                <input
+                  ref={field}
+                  aria-label={t('plugins.search')}
+                  type="search"
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value)
+                    setPage(0)
+                  }}
+                  // Escape empties a search field on every platform, and does it
+                  // without taking the caret out of the field.
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && query !== '') {
+                      event.stopPropagation()
+                      setQuery('')
+                    }
+                  }}
+                  placeholder={t('plugins.search')}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
+                />
+                {searching && (
+                  <Loader2
+                    size={13}
+                    className="shrink-0 animate-spin text-faint"
+                    aria-hidden="true"
+                  />
+                )}
+                {/* The browser's own clear button is hidden, so here is one that
+                matches the rest of the window — and clearing puts the caret
+                back where the typing was. */}
+                {query !== '' && !searching && (
+                  <button
+                    type="button"
+                    data-hint={t('action.clearSearch')}
+                    aria-label={t('action.clearSearch')}
+                    onClick={() => {
+                      setQuery('')
+                      setPage(0)
+                      field.current?.focus()
+                    }}
+                    className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
+                  >
+                    <X size={11} strokeWidth={2.4} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex h-9 items-center gap-2 border-t border-line/70 px-4">
+                <SelectControl
+                  value={category ?? ''}
+                  onValueChange={(value) => {
+                    setCategory(value || null)
+                    setPage(0)
+                  }}
+                  aria-label={t('plugins.category.all')}
+                  density="small"
+                  containerClassName="max-w-[170px]"
+                  className="text-muted"
+                >
+                  <option value="">{t('plugins.category.all')}</option>
+                  {categories.map((value) => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </SelectControl>
+                <SelectControl
+                  value={sort}
+                  aria-label={t('plugins.sort.label')}
+                  onValueChange={(value) => {
+                    setSort(value as PluginSort)
+                    setPage(0)
+                  }}
+                  density="small"
+                  className="text-muted"
+                >
+                  {(['relevance', 'updated', 'name', 'downloads'] as const).map((value) => (
+                    <option key={value} value={value}>
+                      {t(`plugins.sort.${value}`)}
+                    </option>
+                  ))}
+                </SelectControl>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPage(0)
+                    void search(query, category, sort, 0, true)
+                  }}
+                  disabled={searching}
+                  data-hint={t('plugins.index.refresh')}
+                  aria-label={t('plugins.index.refresh')}
+                  className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
+                >
+                  <RefreshCw
+                    size={12}
+                    className={searching ? 'animate-spin' : ''}
+                    aria-hidden="true"
+                  />
+                </button>
+                <span className="min-w-0 flex-1 truncate text-[10.5px] text-faint">
+                  {t('plugins.index.summary', {
+                    total,
+                    page: landedPage + 1,
+                    pages: Math.max(1, Math.ceil(total / pageSize)),
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage(Math.max(0, landedPage - 1))}
+                  disabled={searching || landedPage === 0}
+                  aria-label={t('plugins.page.previous')}
+                  className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                >
+                  <ChevronLeft size={13} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage(landedPage + 1)}
+                  disabled={searching || !hasMore}
+                  aria-label={t('plugins.page.next')}
+                  className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
+                >
+                  <ChevronRight size={13} aria-hidden="true" />
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-
-        {profile && !profile.packageManager && (
-          <Notice tone="warn" icon={TriangleAlert}>
-            {t('plugins.bootstrap')}
-          </Notice>
-        )}
-
-        {error && (
-          <Notice tone="danger" icon={TriangleAlert}>
-            {error}
-          </Notice>
-        )}
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {tab === 'discover' ? (
-            <Discover
-              results={results}
-              searching={searching}
-              selected={selected}
-              working={working}
-              onOpen={(listing) => void select(listing.name, listing.sourceId, listing.version)}
-              isInstalled={(name) => isInstalled(profile, name)}
-            />
-          ) : tab === 'installable' ? (
-            <Discover
-              results={results.filter(
-                (listing) => listing.installable && !isInstalled(profile, listing.name),
-              )}
-              searching={searching}
-              selected={selected}
-              working={working}
-              onOpen={(listing) => void select(listing.name, listing.sourceId, listing.version)}
-              isInstalled={() => false}
-            />
-          ) : tab === 'installed' ? (
-            <Installed
-              plugins={installed}
-              initialized={profile?.initialized ?? false}
-              working={working}
-              onOpen={selectInstalled}
-              onToggle={(name, on) => void toggle(name, on)}
-              onRemove={(name) => void confirmRemove(name)}
-            />
-          ) : (
-            <Sources
-              sources={sources}
-              working={working !== null || sourceWorking}
-              onSelect={(id) => void selectSource(id)}
-              onManage={() => setManagingSources(true)}
-            />
           )}
-        </div>
 
-        {working !== null && (
-          <div className="flex h-8 shrink-0 items-center gap-2 border-t border-line bg-canvas-deep px-4">
-            <Loader2 size={12} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
-            <span className="truncate font-mono text-[11px] text-muted">{latest || working}</span>
+          {profile && !profile.packageManager && (
+            <Notice tone="warn" icon={TriangleAlert}>
+              {t('plugins.bootstrap')}
+            </Notice>
+          )}
+
+          {error && (
+            <Notice tone="danger" icon={TriangleAlert}>
+              {error}
+            </Notice>
+          )}
+
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {tab === 'discover' ? (
+              <Discover
+                results={results}
+                searching={searching}
+                selected={selected}
+                working={working}
+                onOpen={(listing) => void select(listing.name, listing.sourceId, listing.version)}
+                isInstalled={(name) => isInstalled(profile, name)}
+              />
+            ) : tab === 'installable' ? (
+              <Discover
+                results={results.filter(
+                  (listing) => listing.installable && !isInstalled(profile, listing.name),
+                )}
+                searching={searching}
+                selected={selected}
+                working={working}
+                onOpen={(listing) => void select(listing.name, listing.sourceId, listing.version)}
+                isInstalled={() => false}
+              />
+            ) : tab === 'installed' ? (
+              <Installed
+                plugins={installed}
+                initialized={profile?.initialized ?? false}
+                working={working}
+                onOpen={selectInstalled}
+                onToggle={(name, on) => void toggle(name, on)}
+                onRemove={(name) => void confirmRemove(name)}
+              />
+            ) : (
+              <Sources
+                sources={sources}
+                working={working !== null || sourceWorking}
+                onSelect={(id) => void selectSource(id)}
+                onManage={() => setManagingSources(true)}
+              />
+            )}
           </div>
-        )}
 
-        <footer className="flex h-8 shrink-0 items-center gap-2 border-t border-line px-4">
-          <Info size={12} strokeWidth={2} className="shrink-0 text-faint" aria-hidden="true" />
-          <p className="truncate text-[11.5px] text-faint">{t('plugins.restart')}</p>
-        </footer>
+          {working !== null && (
+            <div className="flex h-8 shrink-0 items-center gap-2 border-t border-line bg-canvas-deep px-4">
+              <Loader2 size={12} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
+              <span className="truncate font-mono text-[11px] text-muted">{latest || working}</span>
+            </div>
+          )}
+
+          <footer className="flex h-8 shrink-0 items-center gap-2 border-t border-line px-4">
+            <Info size={12} strokeWidth={2} className="shrink-0 text-faint" aria-hidden="true" />
+            <p className="truncate text-[11.5px] text-faint">{t('plugins.restart')}</p>
+          </footer>
+        </div>
       </section>
 
       {/* Outside the pane rather than inside it: the pane plays a transform on

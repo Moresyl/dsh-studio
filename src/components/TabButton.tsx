@@ -9,7 +9,9 @@
  *
  * `onClick` is dropped while active: re-selecting the tab you are on is a
  * state change to nothing, and leaving the handler attached is what makes an
- * active tab hover like something that would do something.
+ * active tab hover like something that would do something. The selected
+ * segment is deliberately inverse, matching the desktop reference rather than
+ * relying on a barely different gray fill.
  */
 export function TabButton({
   label,
@@ -26,9 +28,9 @@ export function TabButton({
       aria-pressed={active}
       onClick={active ? undefined : onClick}
       className={[
-        'h-[22px] rounded-[3px] px-2.5 text-[11.5px] transition-colors duration-100',
+        'h-[24px] rounded-[5px] px-2.5 text-[12px] font-medium transition-colors duration-100',
         active
-          ? 'cursor-default bg-surface-2 text-text shadow-panel'
+          ? 'cursor-default bg-text text-canvas shadow-panel'
           : 'text-faint hover:bg-surface-2/60 hover:text-text',
       ].join(' ')}
     >

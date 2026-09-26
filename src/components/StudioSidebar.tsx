@@ -70,12 +70,12 @@ export function StudioSidebar({
       aria-label={t('sidebar.navigation')}
       className={[
         'studio-sidebar chrome flex min-h-0 shrink-0 flex-col border-r border-line transition-[width] duration-150',
-        collapsed ? 'w-[58px]' : 'w-[275px]',
+        collapsed ? 'w-[52px]' : 'w-[264px]',
       ].join(' ')}
     >
       <nav
         aria-label={t('sidebar.navigation')}
-        className="min-h-0 flex-1 overflow-y-auto px-2 pt-3 pb-3"
+        className="min-h-0 flex-1 overflow-y-auto px-2 pt-2.5 pb-3"
       >
         {serving && (
           <SidebarItem
@@ -96,7 +96,7 @@ export function StudioSidebar({
           onClick={onSearch}
         />
 
-        <div className="my-3 border-t border-line" />
+        <div className="my-2.5 border-t border-line" />
         {VIEWS.filter((entry) => entry.id !== 'about').map((entry, index) => (
           <SidebarItem
             key={entry.id}
@@ -215,13 +215,13 @@ function SidebarItem({
       data-hint={collapsed ? hint : undefined}
       onClick={onClick}
       className={[
-        'flex h-10 w-full items-center gap-3 rounded-control px-2 text-left text-ui-caption transition-colors duration-100',
+        'flex h-9 w-full items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[13px] transition-colors duration-100',
         active
           ? 'bg-surface-2 font-medium text-text'
           : 'text-muted hover:bg-surface-2/80 hover:text-text',
       ].join(' ')}
     >
-      <Icon size={17} strokeWidth={1.8} className="shrink-0" aria-hidden="true" />
+      <Icon size={16} strokeWidth={1.8} className="shrink-0" aria-hidden="true" />
       {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
       {badge !== undefined && (
         <span className={collapsed ? 'ml-auto' : 'text-ui-xs text-faint'} aria-hidden="true">

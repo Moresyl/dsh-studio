@@ -20,6 +20,10 @@ interface TitleBarProps {
   serving: boolean
   mode: Presentation
   sidebarCollapsed: boolean
+  /** Current content identity, kept visible while the page scrolls. */
+  pageTitle: string
+  /** Broader workspace name, when it adds context rather than repeating the title. */
+  sectionTitle?: string
   onToggleSidebar?: () => void
   /** Switch presentations. Absent while there is only one surface to show. */
   onPresentation?: (mode: Presentation) => void
@@ -43,6 +47,8 @@ export function TitleBar({
   serving,
   mode,
   sidebarCollapsed,
+  pageTitle,
+  sectionTitle,
   onToggleSidebar,
   onPresentation,
 }: TitleBarProps) {
@@ -120,7 +126,7 @@ export function TitleBar({
         data-tauri-drag-region
         className={[
           'chrome flex shrink-0 items-center gap-2 self-stretch border-r border-line bg-surface px-3 transition-[width] duration-150',
-          sidebarCollapsed ? 'w-[58px] justify-center' : 'w-[275px]',
+          sidebarCollapsed ? 'w-[52px] justify-center px-2' : 'w-[264px]',
         ].join(' ')}
       >
         {(!sidebarCollapsed || !onToggleSidebar) && (
@@ -159,9 +165,29 @@ export function TitleBar({
 
       <div
         data-tauri-drag-region
-        className="flex min-w-0 flex-1 items-center justify-center self-stretch px-3"
+        className="relative flex min-w-0 flex-1 items-center self-stretch"
       >
-        {serving && onPresentation && <ViewSwitch mode={mode} onChoose={onPresentation} />}
+        <div
+          data-tauri-drag-region
+          className="flex min-w-0 items-baseline gap-2 pl-4 max-[860px]:hidden"
+        >
+          <span className="truncate text-[13px] font-semibold text-text">{pageTitle}</span>
+          {sectionTitle && (
+            <span className="truncate text-[11px] text-faint before:mr-2 before:content-['·']">
+              {sectionTitle}
+            </span>
+          )}
+        </div>
+
+        <div data-tauri-drag-region className="min-w-3 flex-1 self-stretch" />
+
+        {serving && onPresentation && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="pointer-events-auto">
+              <ViewSwitch mode={mode} onChoose={onPresentation} />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Beside the window buttons rather than inside a pane, because the theme
@@ -219,7 +245,7 @@ function ViewSwitch({
   onChoose: (mode: Presentation) => void
 }) {
   return (
-    <div className="flex items-center gap-0.5 rounded-control bg-surface p-0.5">
+    <div className="flex items-center gap-0.5 rounded-[8px] bg-canvas-deep p-0.5 hairline">
       <SwitchTab
         label={t('view.harness')}
         active={mode === 'compatibility'}
@@ -254,11 +280,11 @@ function SwitchTab({ label, active, onClick }: SwitchTabProps) {
       aria-pressed={active}
       onClick={active ? undefined : onClick}
       className={[
-        'h-7 rounded-control px-2.5 text-ui-caption transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px',
+        'h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px',
         // The raised half of the pair does nothing when pressed, so it does not
         // offer the hand that promises it would.
         active
-          ? 'cursor-default bg-surface-2 text-text shadow-panel'
+          ? 'cursor-default bg-text text-canvas shadow-panel'
           : 'text-faint hover:bg-surface-2/60 hover:text-text',
       ].join(' ')}
     >

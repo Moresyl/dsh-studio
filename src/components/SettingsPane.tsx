@@ -71,10 +71,10 @@ export function SettingsPane() {
 
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col">
-      <PaneHeader title={t('settings.title')} subtitle={t('settings.subtitle')} />
+      <PaneHeader title={t('settings.title')} subtitle={t('settings.subtitle')} width="narrow" />
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 py-6">
-        <div className="mx-auto flex max-w-[620px] flex-col gap-4">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
+        <div className="mx-auto flex max-w-[780px] flex-col gap-4">
           <div className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
             <Row icon={Power} label={t('settings.autostart')} hint={t('settings.autostartHint')}>
               <Switch

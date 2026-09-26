@@ -145,7 +145,7 @@ export function AboutPane() {
 
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col">
-      <PaneHeader title={t('about.title')} subtitle={t('about.subtitle')}>
+      <PaneHeader title={t('about.title')} subtitle={t('about.subtitle')} width="narrow">
         <Button variant="secondary" onClick={() => void check()} disabled={checking || installing}>
           {checking ? (
             <>
@@ -161,8 +161,8 @@ export function AboutPane() {
         </Button>
       </PaneHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 py-6">
-        <div className="mx-auto flex max-w-[620px] flex-col gap-4">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
+        <div className="mx-auto flex max-w-[780px] flex-col gap-4">
           <div className="flex items-center gap-4 rounded-panel border border-line bg-canvas-deep/50 px-5 py-4">
             <BrandMark size={52} className="shrink-0 rounded-[12px] shadow-lift" />
             <div className="flex min-w-0 flex-col gap-1.5">
