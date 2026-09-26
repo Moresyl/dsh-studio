@@ -253,6 +253,9 @@ tracked release conditions.
 | Supervisor, backoff restart, health probing    | ✅                                                                  |
 | Process-tree reclamation (Windows / Unix)      | ✅                                                                  |
 | Harness hosting, log console, English + 中文   | ✅                                                                  |
+| Harness 0.1.7 plans, goals, jobs, workflows    | ✅ qualified runtime and real-Profile boot                           |
+| Subagents, user questions, deliverable preview | ✅                                                                  |
+| Agent Preset editor and portable packages      | ✅ legacy migration + per-file SHA-256 validation                    |
 | Plugin marketplace — install, switch, remove   | ✅                                                                  |
 | Remote access, single-use QR, revocable keys   | ✅                                                                  |
 | Signed in-app update, checked on a schedule    | ✅                                                                  |

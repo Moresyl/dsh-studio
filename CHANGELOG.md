@@ -9,6 +9,20 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Added
+
+- Move the qualified Harness baseline to `0.1.7-rc.2`, enabling its current plan mode, goals, background jobs and schedules, workflows, subagents, user questions, deliverables, and Office/PDF preview surfaces in the hosted Web profile.
+- Migrate legacy directory-based Agent Presets into the selected Profile on first modern-runtime launch. Existing source directories remain untouched, the original Profile patch receives a first-write backup, and repeated launches preserve edits made through the new Profile surface.
+
+### Changed
+
+- Install the complete peer-service graph recorded by the qualified runtime lock, use the new CLI entry contract, and accept both absolute and directory-relative clean authentication redirects while continuing to reject cross-origin or credential-bearing targets.
+- Keep all runtime lock entries on the official npm registry with SHA-512 integrity and redact the one-time launch token from cold-install verification output.
+
+### Verification
+
+- The isolated JavaScript verifier and the Rust installer both cold-installed all 599 packages, launched a real Web Profile, completed cookie authentication, and validated Host Protocol 1 against `0.1.7-rc.2`.
+
 ## [0.9.15] — 2026-09-26
 
 ### Changed

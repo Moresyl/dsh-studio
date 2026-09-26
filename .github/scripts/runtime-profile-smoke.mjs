@@ -27,6 +27,23 @@ export function parseReadyOrigin(line) {
   return token ? `${url.origin}/?${new URLSearchParams({ token })}` : url.origin
 }
 
+/** Accept equivalent clean-root redirects without allowing an origin change. */
+export function isCleanAuthenticationRedirect(requestUrl, location) {
+  if (location === null) return false
+  try {
+    const request = new URL(requestUrl)
+    const target = new URL(location, request)
+    return (
+      target.origin === request.origin &&
+      target.pathname === '/' &&
+      target.search === '' &&
+      target.hash === ''
+    )
+  } catch {
+    return false
+  }
+}
+
 /** Write only the public profile contract that the product itself bootstraps. */
 export async function prepareSmokeProfile(runtimeRoot, dshHome) {
   const profile = join(dshHome, 'profiles', 'web')
@@ -234,8 +251,16 @@ export async function verifyProfileBoot({
       const sessionCookies = exchange.headers.getSetCookie()
       const cookies = sessionCookies.map((value) => value.split(';')[0])
       await exchange.body?.cancel()
-      if (exchange.status !== 303 || exchange.headers.get('location') !== '/' || !cookies.length) {
-        throw bootFailure('Harness authentication handshake failed', output)
+      const location = exchange.headers.get('location')
+      if (
+        exchange.status !== 303 ||
+        !isCleanAuthenticationRedirect(address, location) ||
+        !cookies.length
+      ) {
+        throw bootFailure(
+          `Harness authentication handshake failed (HTTP ${exchange.status}, location ${JSON.stringify(location)}, cookies ${cookies.length})`,
+          output,
+        )
       }
       // No SameSite constraint is asserted here: the shell is served from the
       // same loopback site as the Harness (see src-tauri/src/shell.rs), so the

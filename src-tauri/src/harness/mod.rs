@@ -118,6 +118,9 @@ fn launch_plan_for_profile(
     }
     let resolver = install::ensure_runtime_resolver(&paths::harness_dir())?;
     let serves_studio = crate::profiles::prepare_for_studio(&profile)?;
+    if serves_studio && check_plugin_recovery {
+        crate::presets::migrate_legacy_profile(&profile)?;
+    }
     if check_plugin_recovery {
         if let Some(problem) = crate::plugins::recovery::blocking_problem(&profile) {
             return Err(Error::Plugin(problem));

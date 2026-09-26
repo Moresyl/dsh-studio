@@ -3,6 +3,9 @@
 This matrix separates automated evidence from platform acceptance. A green local
 test does not imply that every desktop environment has been physically verified.
 
+The managed baseline is `@deepseek-ai/dsh@0.1.7-rc.2`. CI cold-installs its
+integrity-locked graph and boots a real authenticated Web Profile before release.
+
 | Area | Windows | macOS | Linux |
 | --- | --- | --- | --- |
 | Rust and frontend unit tests | CI + local | CI build target | CI build target |

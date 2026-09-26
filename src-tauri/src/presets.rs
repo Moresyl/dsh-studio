@@ -1,19 +1,16 @@
-//! Which agent the harness starts new sessions as.
+//! Which Agent Preset the harness uses for new sessions.
 //!
-//! The harness ships a handful of agent presets and picks between them with one
-//! key — `agent-presets.default` in its settings document. That key is the whole
-//! of this module's business with it, and the smallness is the point: a preset
-//! directory carries a `preset.yml` whose only job is to give a picker a name and
-//! a description, and the default is re-read for every session that starts, so
-//! writing it while the harness is running changes the next session and leaves
-//! the ones already open alone.
+//! Harness releases before 0.1.7 discover preset directories and read
+//! `agent-presets.default` from `settings.yaml`. Modern releases compose presets
+//! as Profile rows and store the selection on `agent-preset-registry`. This
+//! module preserves both contracts, converts valid legacy directories once, and
+//! retains their source for portable import/export.
 //!
-//! Nothing here invents a layer. The presets are the harness's, the settings
-//! document is the harness's, and the shell's part is to show what is there and
-//! to change one scalar in a file somebody else formats. That is why the edit
-//! below rewrites a line instead of parsing the document and serialising it back:
-//! a round trip through a YAML library would reorder keys and drop comments, and
-//! a diff nobody asked for is worse than a document this refuses to touch.
+//! All edits are narrow text patches. Cordis YAML can contain `!!js` expressions,
+//! and a generic serializer would either reject them or rewrite unrelated rows
+//! and comments. The migration therefore validates the list shape, preserves the
+//! original composition bytes, backs up the Profile patch, and appends an owned,
+//! idempotent section.
 
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -47,6 +44,15 @@ const PACKAGE_MAX_FILES: usize = 128;
 const PACKAGE_MAX_ENTRY_BYTES: u64 = 4 * 1024 * 1024;
 const PACKAGE_MAX_TOTAL_BYTES: u64 = 16 * 1024 * 1024;
 const PACKAGE_MAX_MANIFEST_BYTES: u64 = 256 * 1024;
+const LEGACY_SECTION_START: &str = "# dsh-studio legacy presets begin";
+const LEGACY_SECTION_END: &str = "# dsh-studio legacy presets end";
+const PROFILE_PATCH_BACKUP: &str = "cordis.patch.yml.pre-0.1.7-backup";
+const BUILT_IN_PRESETS: [(&str, f64); 4] = [
+    ("standard", 1.0),
+    ("ptc", 2.0),
+    ("minimal", 3.0),
+    ("cordis", 4.0),
+];
 
 /// What the picker shows for one preset.
 #[derive(Clone, Debug, Serialize)]
@@ -116,6 +122,12 @@ fn shipped_root() -> PathBuf {
         .join("agent-presets")
 }
 
+fn modern_runtime() -> bool {
+    crate::harness::install::runtime_version(&paths::harness_dir())
+        .and_then(|version| semver::Version::parse(&version).ok())
+        .is_some_and(|version| (version.major, version.minor, version.patch) >= (0, 1, 7))
+}
+
 /// Where a preset the user wrote themselves goes.
 fn user_root() -> PathBuf {
     paths::dsh_home().join(".agent-presets")
@@ -139,19 +151,34 @@ fn is_id(value: &str) -> bool {
 /// Read every preset the harness would offer, in the order it would offer them.
 pub fn roster() -> Roster {
     let mut presets = Vec::new();
+    let modern = modern_runtime();
 
     // Shipped first, which is also the precedence: the harness appends the user
     // root rather than prepending it, so a locally authored directory that
     // claimed a shipped id loses. Scanning in the same order with a
     // first-one-wins rule is the same answer, arrived at the same way.
-    scan(&shipped_root(), true, &mut presets);
-    scan(&user_root(), false, &mut presets);
+    if modern {
+        presets.extend(BUILT_IN_PRESETS.map(|(id, order)| Preset {
+            id: id.to_string(),
+            name: None,
+            description: None,
+            shipped: true,
+            order: Some(order),
+        }));
+    } else {
+        scan(&shipped_root(), true, false, &mut presets);
+    }
+    scan(&user_root(), false, modern, &mut presets);
 
     sort(&mut presets);
 
     Roster {
         presets,
-        default: current_default(),
+        default: if modern {
+            profile_default(&crate::profiles::selected()).or_else(current_default)
+        } else {
+            current_default()
+        },
     }
 }
 
@@ -167,7 +194,7 @@ fn sort(presets: &mut [Preset]) {
 }
 
 /// Add every preset directory under `root` that is not already listed.
-fn scan(root: &Path, shipped: bool, into: &mut Vec<Preset>) {
+fn scan(root: &Path, shipped: bool, require_list: bool, into: &mut Vec<Preset>) {
     // No directory is the ordinary case for the user root, and for the shipped
     // root before the harness has been installed.
     let Ok(entries) = std::fs::read_dir(root) else {
@@ -187,7 +214,15 @@ fn scan(root: &Path, shipped: bool, into: &mut Vec<Preset>) {
         // row, because a skipped one still occupies its id; reproducing that here
         // would mean carrying a copy of its loader, so this checks only that the
         // file is present and leaves the diagnosis to the thing that mounts it.
-        if !directory.join(COMPOSITION).is_file() {
+        let composition = directory.join(COMPOSITION);
+        if !composition.is_file()
+            || (require_list
+                && !crate::bounded_file::read_string(
+                    &composition,
+                    crate::bounded_file::CONTROL_BYTES,
+                )
+                .is_ok_and(|document| valid_composition(&document)))
+        {
             continue;
         }
 
@@ -495,6 +530,350 @@ fn current_default() -> Option<String> {
     )
 }
 
+fn profile_default(profile: &str) -> Option<String> {
+    let document = crate::bounded_file::read_string(
+        &paths::profile_dir(profile).join("cordis.patch.yml"),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .ok()?;
+    read_profile_default(&document)
+}
+
+fn read_profile_default(document: &str) -> Option<String> {
+    let lines = document.lines().collect::<Vec<_>>();
+    let (start, end) = profile_entry(&lines, "agent-preset-registry")?;
+    for key in ["selectedDefault", "default"] {
+        if let Some(value) = lines[start + 1..end].iter().find_map(|line| {
+            let trimmed = line.trim_start();
+            let indent = line.len() - trimmed.len();
+            (indent == 4)
+                .then(|| trimmed.split_once(':'))
+                .flatten()
+                .filter(|(name, _)| *name == key)
+                .and_then(|(_, value)| plain(value))
+        }) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn profile_entry(lines: &[&str], id: &str) -> Option<(usize, usize)> {
+    let needle = format!("- id: {id}");
+    let start = lines.iter().position(|line| line.trim_end() == needle)?;
+    let end = lines[start + 1..]
+        .iter()
+        .position(|line| line.starts_with("- "))
+        .map(|offset| start + 1 + offset)
+        .unwrap_or(lines.len());
+    Some((start, end))
+}
+
+fn edit_profile_default(document: &str, id: &str) -> Result<String> {
+    let mut lines = document.lines().map(str::to_string).collect::<Vec<_>>();
+    let location = {
+        let borrowed = lines.iter().map(String::as_str).collect::<Vec<_>>();
+        profile_entry(&borrowed, "agent-preset-registry")
+    };
+    if let Some((start, mut end)) = location {
+        let config = lines[start + 1..end]
+            .iter()
+            .position(|line| line == "  config:")
+            .map(|offset| start + 1 + offset)
+            .ok_or_else(|| {
+                Error::Preset(
+                    "the agent-preset-registry Profile row has no editable config block".into(),
+                )
+            })?;
+        if let Some(offset) = lines[config + 1..end]
+            .iter()
+            .position(|line| line.trim_start().starts_with("selectedDefault:"))
+        {
+            lines[config + 1 + offset] = format!("    selectedDefault: {}", scalar(id));
+        } else {
+            lines.insert(config + 1, format!("    selectedDefault: {}", scalar(id)));
+            end += 1;
+        }
+        if !lines[config + 1..end]
+            .iter()
+            .any(|line| line.trim_start().starts_with("default:"))
+        {
+            lines.insert(config + 1, "    default: standard".into());
+        }
+    } else {
+        if !lines.is_empty() && !lines.last().is_some_and(String::is_empty) {
+            lines.push(String::new());
+        }
+        lines.extend([
+            "- id: agent-preset-registry".into(),
+            "  config:".into(),
+            "    default: standard".into(),
+            format!("    selectedDefault: {}", scalar(id)),
+        ]);
+    }
+    let mut edited = lines.join("\n");
+    edited.push('\n');
+    Ok(edited)
+}
+
+fn valid_composition(document: &str) -> bool {
+    let document = document.strip_prefix('\u{feff}').unwrap_or(document);
+    let mut row = false;
+    for line in document.lines() {
+        if line.trim().is_empty() || line.trim_start().starts_with('#') {
+            continue;
+        }
+        if line.starts_with([' ', '\t']) {
+            continue;
+        }
+        if !line.starts_with("- ") {
+            return false;
+        }
+        row = true;
+    }
+    row
+}
+
+fn yaml_text(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".into())
+}
+
+fn migrated_preset_patch(id: &str, composition: &str, metadata: &Description) -> String {
+    let built_in = BUILT_IN_PRESETS
+        .iter()
+        .any(|(candidate, _)| candidate == &id);
+    let mut fields = vec![format!("        id: {id}")];
+    if let Some(name) = &metadata.name {
+        fields.push(format!("        name: {}", yaml_text(name)));
+    }
+    if let Some(description) = &metadata.description {
+        fields.push(format!("        description: {}", yaml_text(description)));
+    }
+    if let Some(order) = metadata.order {
+        fields.push(format!("        order: {order}"));
+    }
+    let plugins = composition
+        .trim_end()
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                String::new()
+            } else {
+                format!("          {line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let (header, indent) = if built_in {
+        (format!("- id: preset-{id}\n  config:"), "")
+    } else {
+        (
+            format!(
+                "- insert:\n    - id: preset-{id}\n      name: '@deepseek-ai/dsh-agent-preset'\n      config:"
+            ),
+            "  ",
+        )
+    };
+    let fields = fields
+        .into_iter()
+        .map(|line| format!("{indent}{line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let plugins = plugins
+        .lines()
+        .map(|line| format!("{indent}{line}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("{header}\n{fields}\n{indent}        plugins:\n{plugins}\n")
+}
+
+fn patch_has_preset(document: &str, id: &str) -> bool {
+    let needle = format!("- id: preset-{id}");
+    document
+        .lines()
+        .any(|line| line.trim_end() == needle || line.trim() == needle)
+}
+
+fn append_migrated_rows(document: &str, rows: &[(String, String)]) -> Result<String> {
+    let start = document.find(LEGACY_SECTION_START);
+    let end = document.find(LEGACY_SECTION_END);
+    if start.is_some() != end.is_some() || start.zip(end).is_some_and(|(start, end)| end < start) {
+        return Err(Error::Preset(
+            "the legacy preset section in the Profile patch is incomplete".into(),
+        ));
+    }
+    let pending = rows
+        .iter()
+        .filter(|(id, _)| !patch_has_preset(document, id))
+        .map(|(_, patch)| patch.trim_end())
+        .collect::<Vec<_>>();
+    if pending.is_empty() {
+        return Ok(document.to_string());
+    }
+    if let Some(end) = end {
+        let additional = pending.iter().map(|row| row.len()).sum::<usize>();
+        let mut edited = String::with_capacity(document.len() + additional);
+        edited.push_str(&document[..end]);
+        if !edited.ends_with('\n') {
+            edited.push('\n');
+        }
+        edited.push_str(&pending.join("\n\n"));
+        edited.push('\n');
+        edited.push_str(&document[end..]);
+        return Ok(edited);
+    }
+
+    let mut base = document.to_string();
+    let meaningful = base
+        .lines()
+        .filter(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+        .collect::<Vec<_>>();
+    if meaningful == ["[]"] {
+        base = base
+            .lines()
+            .filter(|line| line.trim() != "[]")
+            .collect::<Vec<_>>()
+            .join("\n");
+    }
+    let mut edited = base.trim_end().to_string();
+    if !edited.is_empty() {
+        edited.push_str("\n\n");
+    }
+    edited.push_str(LEGACY_SECTION_START);
+    edited.push('\n');
+    edited.push_str(&pending.join("\n\n"));
+    edited.push('\n');
+    edited.push_str(LEGACY_SECTION_END);
+    edited.push('\n');
+    Ok(edited)
+}
+
+fn backup_profile_patch(profile_dir: &Path, document: &str) -> Result<()> {
+    use std::fs::OpenOptions;
+
+    let path = profile_dir.join(PROFILE_PATCH_BACKUP);
+    match OpenOptions::new().write(true).create_new(true).open(&path) {
+        Ok(mut file) => file.write_all(document.as_bytes()).map_err(|cause| {
+            Error::Preset(format!(
+                "{} could not be backed up: {cause}",
+                path.display()
+            ))
+        }),
+        Err(cause) if cause.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        Err(cause) => Err(Error::Preset(format!(
+            "{} could not be backed up: {cause}",
+            path.display()
+        ))),
+    }
+}
+
+fn migrate_legacy_profile_in(home: &Path, profile_dir: &Path) -> Result<usize> {
+    let root = home.join(".agent-presets");
+    let entries = match std::fs::read_dir(&root) {
+        Ok(entries) => Some(entries),
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => None,
+        Err(cause) => {
+            return Err(Error::Preset(format!(
+                "{} could not be read for migration: {cause}",
+                root.display()
+            )));
+        }
+    };
+    let mut directories = entries.into_iter().flatten().flatten().collect::<Vec<_>>();
+    directories.sort_by_key(|entry| entry.file_name());
+    let mut rows = Vec::new();
+    for entry in directories {
+        let id = entry.file_name().to_string_lossy().to_string();
+        if !is_id(&id)
+            || !entry
+                .file_type()
+                .is_ok_and(|kind| kind.is_dir() && !kind.is_symlink())
+        {
+            continue;
+        }
+        let composition = match crate::bounded_file::read_string(
+            &entry.path().join(COMPOSITION),
+            crate::bounded_file::CONTROL_BYTES,
+        ) {
+            Ok(composition) if valid_composition(&composition) => composition,
+            _ => continue,
+        };
+        let metadata = crate::bounded_file::read_string(
+            &entry.path().join(METADATA),
+            crate::bounded_file::CONTROL_BYTES,
+        )
+        .map(|raw| describe(&raw))
+        .unwrap_or_default();
+        rows.push((
+            id.clone(),
+            migrated_preset_patch(&id, &composition, &metadata),
+        ));
+    }
+    let legacy_default = crate::bounded_file::read_string(
+        &home.join("settings.yaml"),
+        crate::bounded_file::CONTROL_BYTES,
+    )
+    .ok()
+    .and_then(|document| read_default(&document))
+    .filter(|id| {
+        is_id(id)
+            && (BUILT_IN_PRESETS
+                .iter()
+                .any(|(candidate, _)| candidate == id)
+                || rows.iter().any(|(candidate, _)| candidate == id))
+    });
+    if rows.is_empty() && legacy_default.is_none() {
+        return Ok(0);
+    }
+    std::fs::create_dir_all(profile_dir).map_err(|cause| {
+        Error::Preset(format!(
+            "{} could not be prepared for preset migration: {cause}",
+            profile_dir.display()
+        ))
+    })?;
+    let patch_path = profile_dir.join("cordis.patch.yml");
+    let previous =
+        match crate::bounded_file::read_string(&patch_path, crate::bounded_file::CONTROL_BYTES) {
+            Ok(document) => document,
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => "[]\n".into(),
+            Err(cause) => {
+                return Err(Error::Preset(format!(
+                    "{} could not be read safely: {cause}",
+                    patch_path.display()
+                )));
+            }
+        };
+    let mut migrated = append_migrated_rows(&previous, &rows)?;
+    if read_profile_default(&migrated).is_none() {
+        if let Some(default) = legacy_default {
+            migrated = edit_profile_default(&migrated, &default)?;
+        }
+    }
+    if migrated == previous {
+        return Ok(0);
+    }
+    backup_profile_patch(profile_dir, &previous)?;
+    crate::atomic::write(&patch_path, migrated).map_err(|cause| {
+        Error::Preset(format!(
+            "{} could not publish migrated presets: {cause}",
+            patch_path.display()
+        ))
+    })?;
+    Ok(rows
+        .iter()
+        .filter(|(id, _)| !patch_has_preset(&previous, id))
+        .count())
+}
+
+/// Publish legacy directory presets into the selected modern Profile.
+/// The source tree is retained as the portable-package authority.
+pub fn migrate_legacy_profile(profile: &str) -> Result<usize> {
+    if !modern_runtime() {
+        return Ok(0);
+    }
+    migrate_legacy_profile_in(&paths::dsh_home(), &paths::profile_dir(profile))
+}
+
 /* -------------------------------------------------------------------------- */
 /* Commands                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -516,6 +895,32 @@ pub fn preset_choose(id: String) -> Result<Roster> {
     // where a string becomes part of a file the harness parses.
     if !is_id(&id) {
         return Err(Error::Preset(format!("{id} is not an agent preset id")));
+    }
+    let available = roster();
+    if !available.presets.iter().any(|preset| preset.id == id) {
+        return Err(Error::Preset(format!(
+            "there is no agent preset called {id}"
+        )));
+    }
+
+    if modern_runtime() {
+        let profile = crate::profiles::selected();
+        migrate_legacy_profile(&profile)?;
+        let profile_dir = paths::profile_dir(&profile);
+        let path = profile_dir.join("cordis.patch.yml");
+        let document = crate::bounded_file::read_string(&path, crate::bounded_file::CONTROL_BYTES)
+            .map_err(|cause| {
+                Error::Preset(format!(
+                    "{} could not be read safely: {cause}",
+                    path.display()
+                ))
+            })?;
+        let edited = edit_profile_default(&document, &id)?;
+        backup_profile_patch(&profile_dir, &document)?;
+        crate::atomic::write(&path, edited).map_err(|cause| {
+            Error::Preset(format!("{} could not be written: {cause}", path.display()))
+        })?;
+        return Ok(roster());
     }
 
     let path = settings_file();
@@ -566,6 +971,9 @@ pub fn preset_package(path: PathBuf) -> Result<PackagePreview> {
 #[tauri::command]
 pub fn preset_import(path: PathBuf) -> Result<Roster> {
     import_into(&path, &user_root())?;
+    if modern_runtime() {
+        migrate_legacy_profile(&crate::profiles::selected())?;
+    }
     Ok(roster())
 }
 
@@ -785,6 +1193,15 @@ fn inspect_package(path: &Path) -> Result<InspectedPackage> {
                 "preset package integrity check failed for {}",
                 file.path
             )));
+        }
+        if file.path == COMPOSITION
+            && !std::str::from_utf8(&bytes)
+                .map(valid_composition)
+                .unwrap_or(false)
+        {
+            return Err(Error::Preset(
+                "preset composition must contain a YAML plugin list".into(),
+            ));
         }
         total = total.saturating_add(bytes.len() as u64);
         seen.insert(name);
@@ -1173,6 +1590,124 @@ mod tests {
                 "undeclared"
             ]
         );
+    }
+
+    #[test]
+    fn modern_profile_default_is_added_and_updated_without_touching_other_rows() {
+        let original = "- id: untouched\n  disabled: true\n";
+        let first = edit_profile_default(original, "custom").expect("default row");
+        assert!(first.contains("- id: untouched\n  disabled: true"));
+        assert!(first.contains("- id: agent-preset-registry"));
+        assert!(first.contains("    default: standard"));
+        assert!(first.contains("    selectedDefault: custom"));
+
+        let updated = edit_profile_default(&first, "minimal").expect("updated default");
+        assert_eq!(updated.matches("- id: agent-preset-registry").count(), 1);
+        assert!(updated.contains("    selectedDefault: minimal"));
+        assert!(!updated.contains("selectedDefault: custom"));
+    }
+
+    #[test]
+    fn legacy_presets_migrate_once_and_keep_their_source_and_profile_backup() {
+        let (_, _, root) = package_fixture("legacy-migration");
+        let home = root.join("home");
+        let source = home.join(".agent-presets/custom");
+        let profile = home.join("profiles/web");
+        std::fs::create_dir_all(&source).expect("legacy preset");
+        std::fs::create_dir_all(&profile).expect("profile");
+        let composition = "- id: persona\n  name: '@deepseek-ai/dsh-persona'\n  disabled: !!js process.platform === 'win32'\n";
+        std::fs::write(source.join(COMPOSITION), composition).expect("composition");
+        std::fs::write(
+            source.join(METADATA),
+            "name: Custom mode\ndescription: Local mode\norder: 9\n",
+        )
+        .expect("metadata");
+        std::fs::write(profile.join("cordis.patch.yml"), "[]\n").expect("profile patch");
+
+        assert_eq!(migrate_legacy_profile_in(&home, &profile).unwrap(), 1);
+        let migrated = std::fs::read_to_string(profile.join("cordis.patch.yml")).unwrap();
+        assert!(migrated.contains(LEGACY_SECTION_START));
+        assert!(migrated.contains("- id: preset-custom"));
+        assert!(migrated.contains("id: custom"));
+        assert!(migrated.contains("disabled: !!js process.platform === 'win32'"));
+        assert!(migrated.contains("name: \"Custom mode\""));
+        assert_eq!(
+            std::fs::read_to_string(profile.join(PROFILE_PATCH_BACKUP)).unwrap(),
+            "[]\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(source.join(COMPOSITION)).unwrap(),
+            composition
+        );
+        assert_eq!(migrate_legacy_profile_in(&home, &profile).unwrap(), 0);
+        assert_eq!(
+            std::fs::read_to_string(profile.join("cordis.patch.yml")).unwrap(),
+            migrated
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn a_legacy_builtin_default_migrates_without_a_custom_preset_directory() {
+        let (_, _, root) = package_fixture("legacy-default");
+        let home = root.join("home");
+        let profile = home.join("profiles/web");
+        std::fs::create_dir_all(&profile).expect("profile");
+        std::fs::write(
+            home.join("settings.yaml"),
+            "agent-presets:\n  default: minimal\n",
+        )
+        .expect("legacy settings");
+        std::fs::write(profile.join("cordis.patch.yml"), "[]\n").expect("profile patch");
+
+        assert_eq!(migrate_legacy_profile_in(&home, &profile).unwrap(), 0);
+        let patch = std::fs::read_to_string(profile.join("cordis.patch.yml")).unwrap();
+        assert_eq!(read_profile_default(&patch).as_deref(), Some("minimal"));
+        assert!(patch.contains("    default: standard"));
+        assert_eq!(
+            std::fs::read_to_string(profile.join(PROFILE_PATCH_BACKUP)).unwrap(),
+            "[]\n"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn migration_skips_non_list_compositions_and_can_override_a_built_in() {
+        assert!(valid_composition(
+            "# mode\n- id: persona\n  name: package\n"
+        ));
+        assert!(!valid_composition("id: persona\nname: package\n"));
+        let standard = migrated_preset_patch(
+            "standard",
+            "- id: persona\n  name: package\n",
+            &Description::default(),
+        );
+        assert!(standard.starts_with("- id: preset-standard\n  config:"));
+        assert!(!standard.contains("name: '@deepseek-ai/dsh-agent-preset'"));
+    }
+
+    #[test]
+    fn modern_roster_scan_excludes_presets_the_profile_cannot_mount() {
+        let (_, _, root) = package_fixture("modern-roster");
+        let valid = root.join("valid");
+        let broken = root.join("broken");
+        std::fs::create_dir_all(&valid).expect("valid preset");
+        std::fs::create_dir_all(&broken).expect("broken preset");
+        std::fs::write(valid.join(COMPOSITION), "- id: persona\n  name: package\n")
+            .expect("valid composition");
+        std::fs::write(broken.join(COMPOSITION), "id: persona\nname: package\n")
+            .expect("broken composition");
+
+        let mut presets = Vec::new();
+        scan(&root, false, true, &mut presets);
+        assert_eq!(
+            presets
+                .iter()
+                .map(|preset| preset.id.as_str())
+                .collect::<Vec<_>>(),
+            ["valid"]
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

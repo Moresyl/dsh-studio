@@ -703,13 +703,14 @@ mod tests {
 
     #[test]
     fn detail_pins_the_registry_version_and_records_its_source() {
+        let runtime = crate::harness::install::selected_version();
         let detail = detail_from_manifest(
             "@vendor/tool",
             "https://registry.example",
             &serde_json::json!({
                 "name": "@vendor/tool",
                 "version": "1.2.3",
-                "peerDependencies": { "@deepseek-ai/dsh": "^0.1.1-rc.1" }
+                "peerDependencies": { "@deepseek-ai/dsh": runtime }
             }),
         );
         assert_eq!(detail.install_spec, "@vendor/tool@1.2.3");
@@ -811,13 +812,14 @@ mod tests {
     #[test]
     fn trust_report_and_resource_footprint_are_derived_from_install_evidence() {
         let integrity = format!("sha512-{}==", "A".repeat(86));
+        let runtime = crate::harness::install::selected_version();
         let mut detail = detail_from_manifest(
             "safe-plugin",
             "npm",
             &serde_json::json!({
                 "name": "safe-plugin",
                 "version": "1.2.3",
-                "peerDependencies": { "@deepseek-ai/dsh": "^0.1.1-rc.1" },
+                "peerDependencies": { "@deepseek-ai/dsh": runtime },
                 "dependencies": { "one": "1.0.0", "two": "2.0.0" },
                 "dsh": { "bundle": { "patch": [] } },
                 "dist": {

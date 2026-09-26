@@ -4,7 +4,7 @@
 
 ## 安装插件出现 404 / No authorization header
 
-如果日志指向 `@deepseek-ai/dsh@0.0.1-rc.1`，并提示 `@deepseek-ai/dsh-code-runtime-worker` 在镜像中不存在，问题来自旧版上游依赖图，不是你的登录状态。当前 Studio 固定使用已验证的 `0.1.1-rc.2` 家族；在环境页点击「修复」即可原子替换旧运行时。若仍报错：
+如果日志指向 `@deepseek-ai/dsh@0.0.1-rc.1`，并提示 `@deepseek-ai/dsh-code-runtime-worker` 在镜像中不存在，问题来自旧版上游依赖图，不是你的登录状态。当前 Studio 固定使用已验证的 `0.1.7-rc.2` 家族；在环境页点击「修复」即可原子替换旧运行时。若仍报错：
 
 1. 检查 npm registry 是否被设为不完整的镜像；作用域私有包才需要认证，公开包不应依赖 Authorization 头。
 2. 切回 `https://registry.npmjs.org/` 后重试。

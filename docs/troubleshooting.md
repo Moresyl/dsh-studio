@@ -4,7 +4,7 @@
 
 ## Plugin install reports 404 / “No authorization header”
 
-If the log names `@deepseek-ai/dsh@0.0.1-rc.1` and a missing `@deepseek-ai/dsh-code-runtime-worker`, the failure is the old upstream dependency graph, not a missing login. Current Studio pins the qualified `0.1.1-rc.2` family. Use **Repair** in Environment to atomically replace the stale runtime.
+If the log names `@deepseek-ai/dsh@0.0.1-rc.1` and a missing `@deepseek-ai/dsh-code-runtime-worker`, the failure is the old upstream dependency graph, not a missing login. Current Studio pins the qualified `0.1.7-rc.2` family. Use **Repair** in Environment to atomically replace the stale runtime.
 
 If it continues, check whether npm is configured to use an incomplete mirror. Public packages do not need an Authorization header; only a genuinely private scope does. Retry with `https://registry.npmjs.org/`, then export diagnostics rather than deleting a live profile by hand.
 

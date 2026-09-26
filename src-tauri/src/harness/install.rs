@@ -26,12 +26,11 @@ pub const PACKAGE: &str = "@deepseek-ai/dsh";
 
 /// One coherent upstream release, never an npm moving tag.
 ///
-/// Every official package in this release depends on the matching rc.2 family,
-/// including the public `dsh-code-runtime-worker-thread` package. Pinning the
-/// root keeps a newly installed machine from silently selecting an unrelated
-/// release graph.
-pub const VERSION: &str = "0.1.1-rc.2";
-pub const SPEC: &str = "@deepseek-ai/dsh@0.1.1-rc.2";
+/// Every official package in this release depends on the matching rc.2 family.
+/// Pinning the root keeps a newly installed machine from silently selecting an
+/// unrelated release graph.
+pub const VERSION: &str = "0.1.7-rc.2";
+pub const SPEC: &str = "@deepseek-ai/dsh@0.1.7-rc.2";
 
 /// Accept immutable npm versions only; tags, ranges and paths are never commands.
 pub fn validate_version(version: &str) -> Result<()> {
@@ -40,7 +39,7 @@ pub fn validate_version(version: &str) -> Result<()> {
             .is_ok_and(|parsed| parsed.build.is_empty() && parsed.to_string() == version)
     {
         return Err(Error::Install(
-            "select an exact Harness version such as 0.1.1-rc.2".into(),
+            "select an exact Harness version such as 0.1.7-rc.2".into(),
         ));
     }
     Ok(())
@@ -81,7 +80,7 @@ pub fn selected_version() -> String {
 }
 pub const PNPM_VERSION: &str = "11.7.0";
 pub const PNPM_SPEC: &str = "pnpm@11.7.0";
-const RUNTIME_SCHEMA: u8 = 2;
+const RUNTIME_SCHEMA: u8 = 3;
 const INTEGRATION_PACKAGE: &str = "@moresyl/dsh-studio-integration";
 const OFFICIAL_REGISTRY: &str = "https://registry.npmjs.org/";
 const INSTALL_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
@@ -215,10 +214,9 @@ impl InstallPlan {
             .arg("ci")
             .arg("--prefix")
             .arg(&self.target)
-            // Upstream rc.8 declares React 18 and ReactDOM 19 through separate
-            // peer chains. The qualified lock records that exact working graph;
-            // asking npm to solve those peers again defeats the lock and fails.
-            .arg("--legacy-peer-deps")
+            // npm must materialize the peer packages recorded by the qualified
+            // lock. Harness 0.1.7 declares runtime services as peers, and
+            // legacy peer mode silently omits them.
             .arg("--no-audit")
             .arg("--no-fund")
             .arg("--foreground-scripts")
@@ -1350,7 +1348,7 @@ mod tests {
         );
         fs::write(
             root.join("dsh-studio-runtime.json"),
-            r#"{"schema":2,"version":"0.1.5-rc.2"}"#,
+            format!(r#"{{"schema":{RUNTIME_SCHEMA},"version":"0.1.5-rc.2"}}"#),
         )
         .unwrap();
         assert!(
@@ -1361,7 +1359,7 @@ mod tests {
         assert!(runtime_compatible(&root));
         fs::write(
             root.join("dsh-studio-runtime.json"),
-            r#"{"schema":2,"version":"latest"}"#,
+            format!(r#"{{"schema":{RUNTIME_SCHEMA},"version":"latest"}}"#),
         )
         .unwrap();
         assert!(!runtime_compatible(&root));

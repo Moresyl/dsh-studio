@@ -4,7 +4,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 
-import { parseReadyOrigin, prepareSmokeProfile } from './runtime-profile-smoke.mjs'
+import {
+  isCleanAuthenticationRedirect,
+  parseReadyOrigin,
+  prepareSmokeProfile,
+} from './runtime-profile-smoke.mjs'
 
 test('readiness accepts only an explicit loopback HTTP port', () => {
   assert.equal(parseReadyOrigin('ordinary output'), undefined)
@@ -28,6 +32,17 @@ test('readiness rejects malformed, remote, secure, and implicit-port origins', (
   ]) {
     assert.throws(() => parseReadyOrigin(line), /announced/)
   }
+})
+
+test('authentication redirect accepts clean equivalent roots only', () => {
+  const request = 'http://127.0.0.1:3080/?token=secret'
+  assert.equal(isCleanAuthenticationRedirect(request, '/'), true)
+  assert.equal(isCleanAuthenticationRedirect(request, './'), true)
+  assert.equal(isCleanAuthenticationRedirect(request, '/?token=secret'), false)
+  assert.equal(isCleanAuthenticationRedirect(request, '/#fragment'), false)
+  assert.equal(isCleanAuthenticationRedirect(request, 'http://localhost:3080/'), false)
+  assert.equal(isCleanAuthenticationRedirect(request, null), false)
+  assert.equal(isCleanAuthenticationRedirect(request, 'http://['), false)
 })
 
 test('smoke profile mirrors the product bootstrap and materializes integration', async () => {

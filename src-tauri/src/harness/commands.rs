@@ -347,18 +347,19 @@ mod tests {
 
     #[test]
     fn catalog_is_bounded_sorted_and_marks_only_the_qualified_contract() {
+        let mut entries = serde_json::Map::new();
+        for version in ["0.1.0-rc.1", "0.1.1-rc.2", "0.1.5-rc.2"] {
+            entries.insert(version.into(), serde_json::json!({}));
+        }
+        entries.insert(install::VERSION.into(), serde_json::json!({}));
+        entries.insert("not-semver".into(), serde_json::json!({}));
+        entries.insert("1.0.0+build".into(), serde_json::json!({}));
         let raw = serde_json::json!({
-            "versions": {
-                "0.1.0-rc.1": {},
-                "0.1.1-rc.2": {},
-                "0.1.5-rc.2": {},
-                "not-semver": {},
-                "1.0.0+build": {}
-            }
+            "versions": entries
         })
         .to_string();
         let versions = parse_harness_versions(&raw, Some(install::VERSION)).expect("catalog");
-        assert_eq!(versions[0].version, "0.1.5-rc.2");
+        assert_eq!(versions[0].version, install::VERSION);
         assert!(versions
             .iter()
             .any(|version| version.version == install::VERSION

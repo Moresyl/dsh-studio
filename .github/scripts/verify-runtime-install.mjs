@@ -1,10 +1,10 @@
-import { copyFile, cp, lstat, mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { copyFile, cp, lstat, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { verifyProfileBoot } from './runtime-profile-smoke.mjs'
 
-const expected = '0.1.1-rc.2'
+const expected = '0.1.7-rc.2'
 const expectedPnpm = '11.7.0'
 const directory = await mkdtemp(join(tmpdir(), 'dsh-runtime-contract-'))
 
@@ -37,7 +37,6 @@ try {
     '--no-audit',
     '--no-fund',
     '--ignore-scripts=false',
-    '--legacy-peer-deps',
     '--install-links',
     '--foreground-scripts',
     '--loglevel=http',
@@ -52,6 +51,12 @@ try {
   }
   const entry = join(packageRoot, 'lib', 'bin.js')
   await stat(entry)
+  const launcher = join(directory, 'studio-cli.mjs')
+  await writeFile(
+    launcher,
+    "const cli = await import('./node_modules/@deepseek-ai/dsh/lib/bin.js');\n" +
+      "if (typeof cli.runCli === 'function') await cli.runCli();\n",
+  )
   const pnpm = JSON.parse(
     await readFile(join(directory, 'node_modules', 'pnpm', 'package.json'), 'utf8'),
   )
@@ -79,23 +84,23 @@ try {
     'function DirectoryBrowser({ open, listDirectory, createDirectory, onOpen, onClose, busy, t }) {',
     'const parentInert = busy || folderDraft !== null;',
     'if (targetPath !== null) onOpen(targetPath);',
-    'createDirectory: (path, name) => ctx.workspaces.createDirectory(path, name),',
+    'createDirectory: (path, name) => ctx.uiWorkspace.createDirectory(path, name),',
   ]) {
     if (picker.split(seam).length !== 2) {
       throw new Error(`qualified directory picker seam changed: ${seam}`)
     }
   }
-  await run(process.execPath, [entry, '--help'], { timeout: 120_000 })
+  await run(process.execPath, [launcher, '--help'], { timeout: 120_000 })
   const dshHome = join(directory, 'dsh-home')
   const origin = await verifyProfileBoot({
-    entry,
+    entry: launcher,
     runtimeRoot: directory,
     dshHome,
     studioVersion,
     harnessVersion: expected,
   })
   console.log(
-    `cold-installed and fully booted the pinned ${manifest.name}@${expected} runtime graph at ${origin}`,
+    `cold-installed and fully booted the pinned ${manifest.name}@${expected} runtime graph at ${new URL(origin).origin}`,
   )
 } finally {
   await rm(directory, { recursive: true, force: true })

@@ -26,7 +26,7 @@ an exact published version. A Harness plugin SHOULD declare:
 ```json
 {
   "peerDependencies": {
-    "@deepseek-ai/dsh": "^0.1.1-rc.2"
+    "@deepseek-ai/dsh": "^0.1.7-rc.2"
   },
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" }

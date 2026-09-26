@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 
 export const NODE_VERSION = '22.19.0'
 export const HARNESS_PACKAGE = '@deepseek-ai/dsh'
-export const HARNESS_VERSION = '0.1.1-rc.2'
+export const HARNESS_VERSION = '0.1.7-rc.2'
 export const PNPM_VERSION = '11.7.0'
 
 const TARGETS = {
@@ -239,9 +239,8 @@ export function offlineNpmCiArgs(prefix) {
     '--no-audit',
     '--no-fund',
     '--ignore-scripts=false',
-    // The committed lock records the qualified peer graph. npm must use the
-    // same peer mode that produced it instead of trying to solve it again.
-    '--legacy-peer-deps',
+    // Harness runtime services are peers in 0.1.7. The committed lock records
+    // their complete graph, so npm must materialize rather than omit them.
     // The contract's bundled Studio integration is a local file dependency.
     // Materialize it exactly as online install and cold verification do; npm's
     // default link representation is not compatible with this qualified lock.
