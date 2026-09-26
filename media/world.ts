@@ -408,7 +408,16 @@ const DETAILS: Record<string, PluginDetail> = {
     deprecated: null,
     repositoryVerified: true,
     integrityVerified: true,
-    trust: { level: 'verified', signals: [] },
+    trust: {
+      level: 'review',
+      signals: [
+        {
+          code: 'harness-compatibility',
+          state: 'review',
+          detail: 'no Harness version range declared',
+        },
+      ],
+    },
     resources: {
       directDependencies: 0,
       unpackedBytes: null,
@@ -440,7 +449,16 @@ const detailFor = (name: string): PluginDetail => {
     deprecated: null,
     repositoryVerified: true,
     integrityVerified: true,
-    trust: { level: 'verified', signals: [] },
+    trust: {
+      level: 'review',
+      signals: [
+        {
+          code: 'harness-compatibility',
+          state: 'review',
+          detail: 'no Harness version range declared',
+        },
+      ],
+    },
     resources: {
       directDependencies: 0,
       unpackedBytes: null,
@@ -558,7 +576,7 @@ export const free = async (): Promise<void> => {
 
 /** The lines a harness prints between `start` and serving. */
 const BOOT: string[] = [
-  'dsh 0.1.0-rc.6 starting',
+  `dsh ${runtimePackage.dependencies['@deepseek-ai/dsh']} starting`,
   `profile ${PROFILE} · 4 layers composed`,
   'bundle @deepseek-ai/dsh-web-app ready',
   'bundle dsh-design-playbook ready',
@@ -615,6 +633,7 @@ const add = async (token: string): Promise<PluginState> => {
     installed.unshift({
       name,
       spec: `^${detailFor(name).version}`,
+      installedVersion: detailFor(name).version,
       active: true,
       disabled: false,
       builtin: false,
