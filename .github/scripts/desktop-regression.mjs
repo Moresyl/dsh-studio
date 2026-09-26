@@ -119,9 +119,20 @@ try {
     pass += 1
     // These routes perform local reads only. Remote access is never opened;
     // terminal sessions, installs, updates and removals are not triggered.
-    for (const label of ['运行状态', '终端', '会话', '插件', '远程', '关于', '设置']) {
+    for (const [label, heading] of [
+      ['运行状态', '运行状态'],
+      ['终端', '终端'],
+      ['会话', '会话'],
+      ['插件', '插件市场'],
+      ['远程', '远程访问'],
+      ['关于', '关于'],
+      ['设置', '设置'],
+    ]) {
       await clickText(label, "document.querySelector('aside')")
-      await pause(250)
+      await waitFor(
+        `[...document.querySelectorAll('h1,h2')].some(h => h.getClientRects().length && h.innerText.trim() === ${JSON.stringify(heading)})`,
+        `visible content heading: ${label}`,
+      )
       const result = await evaluate(`({
         route: document.querySelector('aside [aria-current="page"]')?.innerText.trim().split('\\n')[0],
         overflow: document.documentElement.scrollWidth > innerWidth,

@@ -35,7 +35,7 @@ pre-1.0 caveat that anything may still move.
 
 - Local validation passed 307 frontend tests (95.27% statement coverage in the configured core subset), 426 ordinary Rust tests, 4,716 npm range comparisons, and 63 packaging tests, plus build, lint, accessibility and contract checks. Five other conditional Rust tests were ignored locally.
 - Real isolated Windows WebView checks passed native file-offer ACL, profile and preset round trips, session exports in three formats, archive restoration, PTY lifecycle, and an actual 6.0.0 → 7.0.0 test dependency replacement.
-- The first 20-minute UI exercise completed 38 passes with no uncaught renderer exceptions. The final runtime soak is recorded separately before release.
+- The final candidate completed a 150-minute Windows WebView soak (2026-09-26 19:30–22:00 UTC): 280 UI passes, no uncaught renderer exceptions, and the same Harness process ready throughout. A follow-up pass also verified each page's visible content heading. Native 900×620 dark/light and emulated forced-colour/reduced-motion checks passed.
 - Third-party plugin compatibility is not overridden. macOS physical-device and external credential-dependent workflows are outside local Windows acceptance.
 
 ## [0.9.17] — 2026-09-26
