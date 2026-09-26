@@ -25,6 +25,8 @@
  */
 import { emit } from '@tauri-apps/api/event'
 import { mockIPC, mockWindows } from '@tauri-apps/api/mocks'
+import appPackage from '../package.json'
+import runtimePackage from '../src-tauri/runtime-contract/package.json'
 
 import type {
   About,
@@ -115,8 +117,8 @@ const environment: Environment = {
   minimumNode: { major: 22, minor: 19, patch: 0 },
   harnessInstalled: true,
   harnessCompatible: true,
-  harnessVersion: '0.1.0-rc.8',
-  expectedHarnessVersion: '0.1.0-rc.8',
+  harnessVersion: runtimePackage.dependencies['@deepseek-ai/dsh'],
+  expectedHarnessVersion: runtimePackage.dependencies['@deepseek-ai/dsh'],
   harnessProblem: null,
   harnessEntry: `${HARNESS_DIR}\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js`,
   workspace: `${HOME}\\projects\\atlas`,
@@ -124,7 +126,7 @@ const environment: Environment = {
 }
 
 const about: About = {
-  version: '0.4.0',
+  version: appPackage.version,
   platform: 'windows',
   arch: 'x86_64',
   edition: 'lite',

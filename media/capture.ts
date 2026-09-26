@@ -91,12 +91,16 @@ const market = () => pane(t('plugins.title'))
 const doorPane = () => pane(t('remote.title'))
 
 const row = (name: string): HTMLElement => {
-  const found = seek<HTMLElement>(market(), 'li').find((node) => node.textContent?.startsWith(name))
+  const found = seek<HTMLElement>(market(), 'li').find((node) =>
+    seek<HTMLElement>(node, 'button').some((button) =>
+      button.getAttribute('aria-label')?.includes(` · ${name} · `),
+    ),
+  )
   if (!found) throw new Error(`capture: no row for ${name}`)
   return found
 }
 
-/** Each discover row has exactly one button, and it is the one that says Install. */
+/** Each discover card has one action that opens its package details. */
 const rowAction = (name: string) => need(row(name), 'button')
 
 /** Discover, then Installed. */

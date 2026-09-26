@@ -24,3 +24,23 @@ xterm 的流式正文属于第三方界面；外围 DSH Studio 原生壳仍受�
 
 目前没有 Apple 设备。macOS 构建和 headless 测试只能作为兼容性证据，不能声称 VoiceOver、
 缩放、通知、终端或安装器流程已经通过真机验收。
+
+## 隔离桌面回归
+
+构建调试版 QA 应用时，使用独立的 Tauri 标识、应用名称和深链接协议。启动时指定独立的
+`DSH_STUDIO_DATA_DIR`、`DSH_HOME` 和 `DSH_STUDIO_WEBVIEW_DEBUG_PORT=9223`，不要复用
+日常安装的数据目录。QA 数据目录中应已安装运行时。两个脚本都会先核对实际配置路径，
+再执行修改。
+
+```powershell
+node .github/scripts/desktop-regression.mjs --port=9223 --minutes=20 --qa-home=D:/qa/home --output=D:/qa/ui-results
+node .github/scripts/desktop-ipc-regression.mjs D:/qa/home D:/qa/native-results 9223
+```
+
+界面脚本检查七个壳页面、横向溢出、插件卡片语义、弹窗焦点及 Escape 恢复，以及未捕获的
+WebView 异常。定时运行保留截图和 DOM/堆内存数据；这些采样本身不能证明不存在泄漏。
+原生命令脚本通过真实 WebView ACL 检查配置往返导入导出、自定义智能体包、会话搜索/
+导出/归档，以及真实 PTY。它创建唯一的 QA 样本，结束后清理临时配置、样本和终端；导出
+文件与结果报告保留在指定输出目录。两个脚本按顺序运行，界面回归期间不要操作同一 QA 窗口。
+
+这些检查用于补充人工矩阵，不涵盖模型服务商凭据、真实外部 SSH 账户、Narrator 或 macOS 真机。

@@ -51,7 +51,11 @@ async function evaluate(expression) {
     userGesture: true,
   })
   if (result.exceptionDetails) {
-    throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text)
+    throw new Error(
+      result.exceptionDetails.exception?.description ??
+        result.exceptionDetails.exception?.value ??
+        result.exceptionDetails.text,
+    )
   }
   return result.result.value
 }
