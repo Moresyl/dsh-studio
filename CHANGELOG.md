@@ -9,19 +9,30 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.16] — 2026-09-26
+
 ### Added
 
 - Move the qualified Harness baseline to `0.1.7-rc.2`, enabling its current plan mode, goals, background jobs and schedules, workflows, subagents, user questions, deliverables, and Office/PDF preview surfaces in the hosted Web profile.
 - Migrate legacy directory-based Agent Presets into the selected Profile on first modern-runtime launch. Existing source directories remain untouched, the original Profile patch receives a first-write backup, and repeated launches preserve edits made through the new Profile surface.
+- Register `.dshpreset` as a native desktop file type. Packages can now be opened from the operating system or dropped onto Studio, with startup and single-instance delivery routed to the foreground window.
 
 ### Changed
 
 - Install the complete peer-service graph recorded by the qualified runtime lock, use the new CLI entry contract, and accept both absolute and directory-relative clean authentication redirects while continuing to reject cross-origin or credential-bearing targets.
 - Keep all runtime lock entries on the official npm registry with SHA-512 integrity and redact the one-time launch token from cold-install verification output.
+- Use one preview-and-confirm path for picker, file-association, and drag-and-drop imports. Studio verifies every recorded package digest and shows identity, file count, and unpacked size before any Profile mutation.
+
+### Fixes and polish
+
+- Target live file-open events at the foreground Studio window and consume retained startup offers, avoiding duplicate trust dialogs across multiple windows or repeated imports after a later window opens.
+- Reject malformed, non-preset, and ambiguous native open arguments before they reach the renderer; failed integrity checks and declined trust prompts leave the active Profile unchanged.
 
 ### Verification
 
 - The isolated JavaScript verifier and the Rust installer both cold-installed all 599 packages, launched a real Web Profile, completed cookie authentication, and validated Host Protocol 1 against `0.1.7-rc.2`.
+- The real-runtime gate now also requires the qualified plan, goals, jobs, workflow, subagent, user-question, deliverable, Agent Preset, presentation, scheduling, and Office surfaces instead of accepting a server that merely answers HTTP.
+- Local validation passed with 285 frontend tests at 95.1% statement coverage, 62 packaging tests, and 415 Rust tests, plus production build, lint, accessibility, public-contract, and bilingual-documentation checks.
 
 ## [0.9.15] — 2026-09-26
 
