@@ -166,9 +166,9 @@ flowchart LR
 
 <div align="center">
 
-<img src="assets/console.zh.png" width="820" alt="控制面板：环境检查、服务地址与 PID，以及 harness 的输出">
+<img src="assets/console.zh.png" width="820" alt="运行状态：环境检查、智能体选择，以及按需展开的诊断日志">
 
-<sub>五步走完之后的控制面板：检测到了什么、内核发下来的是什么，以及服务自己的输出。
+<sub>启动后的运行状态页：环境检查与智能体选择保持可见，详细运行日志按需展开。
 本页每一张图都由 <a href="media/"><code>media/</code></a> 里那个确定性脚本
 从实际发布的界面上抓取，跑在一个替身后端上——
 所以里面不会出现任何真实的用户目录、局域网地址或配对码。</sub>

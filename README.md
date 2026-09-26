@@ -184,10 +184,10 @@ a failure the terminal version has:
 
 <div align="center">
 
-<img src="assets/console.png" width="820" alt="The control panel: environment checks, the service address and PID, and the harness output">
+<img src="assets/console.png" width="820" alt="Runtime page: environment checks, agent choices, and diagnostic output collapsed until needed">
 
-<sub>The control panel after all five steps: what was detected, what the kernel
-handed out, and the service's own output. Every image on this page is captured
+<sub>The Runtime page after startup: environment checks and agent choices stay
+visible, with detailed output available on demand. Every image on this page is captured
 from the shipped UI by the deterministic script in <a href="media/"><code>media/</code></a>,
 against a stand-in backend — which is why no real home directory, LAN address or
 pairing key appears in any of them.</sub>
