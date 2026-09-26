@@ -5,27 +5,24 @@ const managedRequire = createRequire(__filename)
 const managedScope = '@deepseek-ai/'
 
 /**
- * Preserve normal Profile resolution and consult the qualified managed runtime
- * only when an official Harness package is otherwise unavailable. This keeps
- * Profile-installed packages authoritative while avoiding the Windows junction
- * fallback used by upstream DSH as a single point of failure.
+ * Keep the official Harness graph on the one version Studio qualified.
+ *
+ * Third-party Profile packages can leave older `@deepseek-ai/*` peers in their
+ * local node_modules. Letting those copies win mixes two Harness releases in one
+ * process: storage migration and even named ESM exports then disagree. Ordinary
+ * third-party packages still resolve from the Profile; only the upstream scope
+ * is pinned to the managed runtime.
  */
 registerHooks({
   resolve(specifier, context, nextResolve) {
-    try {
-      return nextResolve(specifier, context)
-    } catch (failure) {
-      if (failure?.code !== 'ERR_MODULE_NOT_FOUND' || !specifier.startsWith(managedScope)) {
-        throw failure
-      }
+    if (!specifier.startsWith(managedScope)) return nextResolve(specifier, context)
 
-      try {
-        return nextResolve(pathToFileURL(managedRequire.resolve(specifier)).href, context)
-      } catch {
-        // Keep Node's original Profile-anchored diagnostic. It is more useful
-        // than replacing it with a second miss from the managed installation.
-        throw failure
-      }
+    try {
+      return nextResolve(pathToFileURL(managedRequire.resolve(specifier)).href, context)
+    } catch {
+      // Preserve the Profile-side diagnostic for an official extension the
+      // selected runtime genuinely does not ship.
+      return nextResolve(specifier, context)
     }
   },
 })

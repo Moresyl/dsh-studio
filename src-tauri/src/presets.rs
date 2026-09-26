@@ -569,7 +569,33 @@ fn profile_entry(lines: &[&str], id: &str) -> Option<(usize, usize)> {
     Some((start, end))
 }
 
+/// Remove the empty sequence marker before turning an otherwise empty patch
+/// into a list with rows. Comments are retained, including the explanatory
+/// header written by the Harness profile template.
+fn without_empty_sequence(document: &str) -> String {
+    document
+        .lines()
+        .filter(|line| *line != "[]")
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Repair the exact invalid shape written by 0.9.16: an empty sequence followed
+/// by list rows. A genuinely empty `[]` patch remains untouched.
+fn repair_concatenated_empty_sequence(document: &str) -> String {
+    let meaningful = document
+        .lines()
+        .filter(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
+        .collect::<Vec<_>>();
+    if meaningful.first() == Some(&"[]") && meaningful.len() > 1 {
+        without_empty_sequence(document)
+    } else {
+        document.to_string()
+    }
+}
+
 fn edit_profile_default(document: &str, id: &str) -> Result<String> {
+    let document = without_empty_sequence(document);
     let mut lines = document.lines().map(str::to_string).collect::<Vec<_>>();
     let location = {
         let borrowed = lines.iter().map(String::as_str).collect::<Vec<_>>();
@@ -822,9 +848,6 @@ fn migrate_legacy_profile_in(home: &Path, profile_dir: &Path) -> Result<usize> {
                 .any(|(candidate, _)| candidate == id)
                 || rows.iter().any(|(candidate, _)| candidate == id))
     });
-    if rows.is_empty() && legacy_default.is_none() {
-        return Ok(0);
-    }
     std::fs::create_dir_all(profile_dir).map_err(|cause| {
         Error::Preset(format!(
             "{} could not be prepared for preset migration: {cause}",
@@ -843,7 +866,8 @@ fn migrate_legacy_profile_in(home: &Path, profile_dir: &Path) -> Result<usize> {
                 )));
             }
         };
-    let mut migrated = append_migrated_rows(&previous, &rows)?;
+    let repaired = repair_concatenated_empty_sequence(&previous);
+    let mut migrated = append_migrated_rows(&repaired, &rows)?;
     if read_profile_default(&migrated).is_none() {
         if let Some(default) = legacy_default {
             migrated = edit_profile_default(&migrated, &default)?;
@@ -1605,6 +1629,43 @@ mod tests {
         assert_eq!(updated.matches("- id: agent-preset-registry").count(), 1);
         assert!(updated.contains("    selectedDefault: minimal"));
         assert!(!updated.contains("selectedDefault: custom"));
+    }
+
+    #[test]
+    fn modern_profile_default_replaces_an_empty_sequence_instead_of_appending_to_it() {
+        let original = "# profile patch\n[]\n";
+        let edited = edit_profile_default(original, "cordis").expect("default row");
+
+        assert_eq!(
+            edited,
+            "# profile patch\n\n- id: agent-preset-registry\n  config:\n    default: standard\n    selectedDefault: cordis\n"
+        );
+        assert!(!edited.lines().any(|line| line == "[]"));
+    }
+
+    #[test]
+    fn migration_repairs_the_invalid_patch_written_by_0_9_16() {
+        let (_, _, root) = package_fixture("repair-0-9-16-patch");
+        let home = root.join("home");
+        let profile = home.join("profiles/web");
+        std::fs::create_dir_all(&profile).expect("profile");
+        let broken = "# profile patch\n[]\n\n- id: agent-preset-registry\n  config:\n    default: standard\n    selectedDefault: cordis\n";
+        std::fs::write(profile.join("cordis.patch.yml"), broken).expect("broken patch");
+
+        assert_eq!(migrate_legacy_profile_in(&home, &profile).unwrap(), 0);
+        let repaired = std::fs::read_to_string(profile.join("cordis.patch.yml")).unwrap();
+        assert!(!repaired.lines().any(|line| line == "[]"));
+        assert_eq!(read_profile_default(&repaired).as_deref(), Some("cordis"));
+        assert_eq!(
+            std::fs::read_to_string(profile.join(PROFILE_PATCH_BACKUP)).unwrap(),
+            broken
+        );
+        assert_eq!(migrate_legacy_profile_in(&home, &profile).unwrap(), 0);
+        assert_eq!(
+            std::fs::read_to_string(profile.join("cordis.patch.yml")).unwrap(),
+            repaired
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

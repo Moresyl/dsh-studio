@@ -118,9 +118,9 @@ impl LaunchPlan {
     fn launcher_command(&self) -> Command {
         let mut command = Command::new(&self.node);
         command
-            // Node options must precede the script entry. The resolver keeps
-            // normal Profile resolution first and handles only missing
-            // installation-owned `@deepseek-ai/*` packages.
+            // Node options must precede the script entry. The resolver pins
+            // installation-owned `@deepseek-ai/*` packages to this qualified
+            // runtime while leaving third-party Profile packages alone.
             .arg("--require")
             .arg(&self.resolver)
             .arg(&self.entry)

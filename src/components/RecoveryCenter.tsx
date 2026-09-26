@@ -16,6 +16,7 @@ import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import { holdFocus } from '@/lib/modal'
+import { useHarness } from '@/state/harness'
 import { useProfiles } from '@/state/profiles'
 
 type Preview =
@@ -29,6 +30,7 @@ type Preview =
  * failures can never stack two modal backdrops over each other.
  */
 export function RecoveryCenter() {
+  const harnessPhase = useHarness((state) => state.status.phase)
   const [plugin, setPlugin] = useState<ipc.PluginRecoveryNotice | null>(null)
   const [profile, setProfile] = useState<ipc.ProfileStartupRecovery | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -57,6 +59,22 @@ export function RecoveryCenter() {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    if (harnessPhase !== 'ready') return
+    let active = true
+    void ipc
+      .profileRecoveryNotice()
+      .then((notice) => {
+        if (active) setProfile(notice)
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(describe(cause))
+      })
+    return () => {
+      active = false
+    }
+  }, [harnessPhase])
 
   const current = useMemo(
     () =>

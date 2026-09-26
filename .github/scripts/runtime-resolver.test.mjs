@@ -35,7 +35,7 @@ function runFixture(resolver, entry) {
   })
 }
 
-test('runtime resolver falls back only to managed official Harness packages', async () => {
+test('runtime resolver supplies only managed official Harness packages', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-studio-runtime-resolver-'))
   try {
     const managed = join(root, 'managed')
@@ -73,7 +73,7 @@ test('runtime resolver falls back only to managed official Harness packages', as
   }
 })
 
-test('runtime resolver preserves a Profile-installed official package', async () => {
+test('runtime resolver rejects Profile version skew for official packages', async () => {
   const root = await mkdtemp(join(tmpdir(), 'dsh-studio-runtime-resolver-priority-'))
   try {
     const managed = join(root, 'managed')
@@ -98,7 +98,7 @@ test('runtime resolver preserves a Profile-installed official package', async ()
     )
     const loaded = runFixture(resolver, entry)
     assert.equal(loaded.status, 0, loaded.stderr)
-    assert.equal(loaded.stdout.trim(), 'profile')
+    assert.equal(loaded.stdout.trim(), 'managed')
   } finally {
     await rm(root, { recursive: true, force: true })
   }

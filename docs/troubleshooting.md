@@ -20,7 +20,7 @@ If npm finishes but Contract 2 rejects the runtime, use Studio v0.9.4 or newer a
 
 ## Managed Harness modules are unavailable
 
-Older Studio builds depended entirely on the upstream per-package links under `$DSH_HOME/profiles/node_modules`. Windows can intermittently refuse to traverse these junctions, producing `ERR_MODULE_NOT_FOUND` even though the same managed package exists. Current builds preserve normal Profile resolution, then fall back only missing `@deepseek-ai/*` imports to the qualified managed Harness. The selected Profile, its installed package versions and third-party plugins remain authoritative and are not deleted.
+Older Studio builds depended entirely on the upstream per-package links under `$DSH_HOME/profiles/node_modules`. Windows can intermittently refuse to traverse these junctions, producing `ERR_MODULE_NOT_FOUND` even though the same managed package exists. Current builds resolve `@deepseek-ai/*` imports from the qualified managed Harness so stale peer copies left by Profile plugins cannot mix two Harness releases in one process. Third-party packages remain Profile-owned and are not deleted; their declared peer compatibility decides whether the Harness activates or isolates them.
 
 Restart once after upgrading so the Studio-owned resolver is materialized. If the message still appears on a current build, use **Repair** in Environment and export diagnostics; do not delete the Profile by hand.
 

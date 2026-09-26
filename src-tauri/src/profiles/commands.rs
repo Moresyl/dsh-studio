@@ -23,6 +23,30 @@ pub struct StartupRecovery {
     plugins: Vec<String>,
 }
 
+/// IPC view of a profile declaration.
+///
+/// `Declaration::verified` is intentionally skipped when the declaration is
+/// serialized to its portable YAML file: it is computed while reading and must
+/// never be trusted from disk. The renderer still needs that result for the
+/// import preview, so the command wraps the file shape with the computed flag.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeclarationPreview {
+    #[serde(flatten)]
+    declaration: Declaration,
+    verified: bool,
+}
+
+impl From<Declaration> for DeclarationPreview {
+    fn from(declaration: Declaration) -> Self {
+        let verified = declaration.verified;
+        Self {
+            declaration,
+            verified,
+        }
+    }
+}
+
 #[tauri::command]
 pub fn profile_roster() -> Roster {
     super::roster()
@@ -198,8 +222,8 @@ pub fn profile_export(name: String, path: PathBuf) -> Result<()> {
 
 /// Read an exported profile so the manager can show what is in it.
 #[tauri::command]
-pub fn profile_declaration(path: PathBuf) -> Result<Declaration> {
-    super::declaration(&path)
+pub fn profile_declaration(path: PathBuf) -> Result<DeclarationPreview> {
+    super::declaration(&path).map(DeclarationPreview::from)
 }
 
 /// Make a profile from an exported one.
@@ -279,4 +303,31 @@ fn idle(name: &str, state: &State<'_, AppState>) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeMap;
+
+    use super::*;
+
+    #[test]
+    fn declaration_preview_exposes_computed_verification_without_nesting_the_file_shape() {
+        let preview = DeclarationPreview::from(Declaration {
+            kind: "dsh-studio-profile".into(),
+            version: 2,
+            name: "work".into(),
+            plugins: BTreeMap::new(),
+            disabled: Vec::new(),
+            patch: "[]\n".into(),
+            integrity: Some("sha256:abc".into()),
+            verified: true,
+        });
+
+        let value = serde_json::to_value(preview).expect("serialized preview");
+        assert_eq!(value["name"], "work");
+        assert_eq!(value["integrity"], "sha256:abc");
+        assert_eq!(value["verified"], true);
+        assert!(value.get("declaration").is_none());
+    }
 }

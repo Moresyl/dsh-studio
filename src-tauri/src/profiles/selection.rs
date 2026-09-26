@@ -190,7 +190,23 @@ impl Store {
         state.active = name.to_string();
         state.last_known_good = name.to_string();
         state.pending = None;
-        self.write(&state)
+        self.write(&state)?;
+
+        // A repaired profile can succeed after a previous failed launch in
+        // the same app session. Clear only that profile's stale notice. When
+        // another profile recovered successfully, preserve the notice so the
+        // user can still inspect the failed candidate and its rollback.
+        let notice =
+            crate::bounded_file::read(&self.notice_path(), crate::bounded_file::CONTROL_BYTES)
+                .ok()
+                .and_then(|body| serde_json::from_slice::<RecoveryNotice>(&body).ok());
+        if notice
+            .as_ref()
+            .is_some_and(|notice| notice.failed_profile == name)
+        {
+            remove_notice(&self.notice_path())?;
+        }
+        Ok(())
     }
 
     fn failed(&self, name: &str, reason: &str) -> Result<Option<String>> {
@@ -357,8 +373,11 @@ pub fn notice() -> Option<RecoveryNotice> {
 }
 
 pub fn acknowledge() -> Result<()> {
-    let path = Store::managed().notice_path();
-    match std::fs::remove_file(&path) {
+    remove_notice(&Store::managed().notice_path())
+}
+
+fn remove_notice(path: &Path) -> Result<()> {
+    match std::fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(cause) => Err(Error::Profile(format!(
@@ -427,6 +446,37 @@ mod tests {
             .generation
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit()));
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn a_repaired_profile_clears_its_own_stale_failure_notice() {
+        let (store, base) = store("repaired-notice");
+
+        store.failed("web", "invalid overlay").expect("failed");
+        assert!(store.notice_path().is_file());
+
+        store.mark_healthy("web").expect("healthy");
+        assert!(!store.notice_path().exists());
+        let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn a_fallback_success_keeps_the_failed_candidate_notice() {
+        let (store, base) = store("fallback-notice");
+        std::fs::create_dir_all(store.profiles.join("broken")).expect("broken profile");
+        store.choose("broken").expect("choose");
+
+        assert_eq!(
+            store.failed("broken", "bundle failed").expect("failed"),
+            Some("web".into())
+        );
+        store.mark_healthy("web").expect("fallback healthy");
+
+        let notice: RecoveryNotice =
+            serde_json::from_slice(&std::fs::read(store.notice_path()).expect("notice"))
+                .expect("valid notice");
+        assert_eq!(notice.failed_profile, "broken");
         let _ = std::fs::remove_dir_all(base);
     }
 

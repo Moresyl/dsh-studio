@@ -94,6 +94,10 @@ struct Live {
     input: mpsc::Sender<Vec<u8>>,
     /// Ends the shell without waiting for it.
     killer: Box<dyn ChildKiller + Send + Sync>,
+    /// Windows' portable-pty killer reverses the TerminateProcess success test;
+    /// retain the process id so Studio can make the kernel call correctly.
+    #[cfg(windows)]
+    pid: u32,
     /// Repeated back by `list`, so a reopened pane can rebuild its tabs.
     describe: Session,
 }
@@ -212,6 +216,8 @@ impl Terminals {
                 master: pair.master,
                 input,
                 killer,
+                #[cfg(windows)]
+                pid,
                 describe: describe.clone(),
             },
         );
@@ -295,10 +301,24 @@ impl Terminals {
     pub fn close(&self, id: &str) -> Result<()> {
         let mut live = self.sessions();
         let session = live.get_mut(id).ok_or_else(|| Self::gone(id))?;
-        session
-            .killer
-            .kill()
-            .map_err(|failure| Error::Terminal(format!("could not end the terminal: {failure}")))
+
+        let outcome = session.killer.kill();
+
+        // portable-pty 0.9 reverses the Win32 TerminateProcess result test and
+        // reports a stale OS error after it has successfully ended the shell.
+        // Keep its retained process handle as the authority for termination,
+        // then correct only that false negative after independently confirming
+        // the original process is no longer active.
+        #[cfg(windows)]
+        if outcome.is_err()
+            && !process_active(session.pid).map_err(|failure| {
+                Error::Terminal(format!("could not verify the terminal exit: {failure}"))
+            })?
+        {
+            return Ok(());
+        }
+
+        outcome.map_err(|failure| Error::Terminal(format!("could not end the terminal: {failure}")))
     }
 
     /// Every open terminal, so a pane that remounted can rebuild its tabs.
@@ -391,6 +411,36 @@ impl Terminals {
         command.cwd(paths::default_workspace_dir());
         command
     }
+}
+
+/// Whether the original ConPTY child is still active after a kill attempt.
+#[cfg(windows)]
+fn process_active(pid: u32) -> io::Result<bool> {
+    use windows_sys::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
+    use windows_sys::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle.is_null() {
+        let failure = io::Error::last_os_error();
+        // There is no process left to query. The waiter will remove the tab once
+        // this method releases the sessions lock.
+        if failure.raw_os_error() == Some(87) {
+            return Ok(false);
+        }
+        return Err(failure);
+    }
+
+    let result = (|| {
+        let mut exit_code = 0;
+        if unsafe { GetExitCodeProcess(handle, &mut exit_code) } == 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(exit_code == STILL_ACTIVE as u32)
+    })();
+    unsafe { CloseHandle(handle) };
+    result
 }
 
 /// `PATH` for a terminal: the harness's tools, then everything already there.

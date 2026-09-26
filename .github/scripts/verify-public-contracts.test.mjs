@@ -6,6 +6,7 @@ import {
   protocolNumber,
   validateCapabilities,
   validateCatalogSchema,
+  validateCommandAcl,
   validateVersions,
   verifyPublicContracts,
 } from './verify-public-contracts.mjs'
@@ -20,6 +21,7 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
     'process:allow-restart',
     'updater:allow-check',
     'updater:allow-download-and-install',
+    'shell-commands',
   ]
   assert.doesNotThrow(() => validateCapabilities({ permissions }))
   assert.throws(
@@ -32,6 +34,46 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
         permissions: permissions.filter((item) => item !== 'dialog:allow-save'),
       }),
     /dialog:allow-save/,
+  )
+})
+
+test('every renderer command is both registered and allowed by the shell ACL', () => {
+  const ipc = `invoke('desktop_offer'); invoke<Result>('desktop_file_offer')`
+  const rust = `tauri::generate_handler![
+    desktop::desktop_offer,
+    desktop::desktop_file_offer,
+  ])`
+  const permissions = `commands.allow = [
+    "desktop_offer",
+    "desktop_file_offer",
+  ]`
+
+  assert.deepEqual(validateCommandAcl(ipc, rust, permissions), {
+    invoked: 2,
+    registered: 2,
+    allowed: 2,
+  })
+  assert.throws(
+    () =>
+      validateCommandAcl(
+        ipc,
+        rust,
+        `commands.allow = [
+      "desktop_offer",
+    ]`,
+      ),
+    /desktop_file_offer is not allowed/,
+  )
+  assert.throws(
+    () =>
+      validateCommandAcl(
+        ipc,
+        `tauri::generate_handler![
+          desktop::desktop_offer,
+        ])`,
+        permissions,
+      ),
+    /desktop_file_offer is not registered/,
   )
 })
 
@@ -79,5 +121,6 @@ test('repository public contracts agree end to end', async () => {
     hostProtocol: 1,
     schema: '1.0.0',
     version: manifest.version,
+    commands: { invoked: 88, registered: 92, allowed: 92 },
   })
 })

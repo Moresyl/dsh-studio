@@ -15,6 +15,7 @@ commands.allow = [
     "desktop_badge",
     "desktop_notify",
     "desktop_offer",
+    "desktop_file_offer",
     "harness_environment",
     "harness_install",
     "harness_log",

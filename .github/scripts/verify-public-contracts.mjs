@@ -76,6 +76,45 @@ export function validateCapabilities(capabilities) {
       throw new Error(`desktop capabilities must not grant broad ${broad}`)
     }
   }
+  if (!identifiers.includes('shell-commands')) {
+    throw new Error('desktop capabilities must retain the shell-commands permission set')
+  }
+}
+
+/** Keep renderer calls, native registration and the loopback-origin ACL in lockstep. */
+export function validateCommandAcl(ipcSource, rustSource, permissionSource) {
+  const invoked = new Set(
+    [...ipcSource.matchAll(/\binvoke(?:<[^>]+>)?\s*\(\s*['"]([a-z0-9_]+)['"]/g)].map(
+      (match) => match[1],
+    ),
+  )
+  const handler = rustSource.match(/tauri::generate_handler!\[([\s\S]*?)\]\)/)
+  if (!handler) throw new Error('native command handler list is missing')
+  const registered = new Set(
+    [...handler[1].matchAll(/^\s*(?:[a-z0-9_]+::)*([a-z0-9_]+),?\s*$/gim)].map((match) => match[1]),
+  )
+  const allow = permissionSource.match(/commands\.allow\s*=\s*\[([\s\S]*?)\]/)
+  if (!allow) throw new Error('shell command ACL allow list is missing')
+  const allowed = new Set([...allow[1].matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]))
+
+  if (invoked.size === 0 || registered.size === 0 || allowed.size === 0) {
+    throw new Error('command contract extraction returned an empty surface')
+  }
+  for (const command of invoked) {
+    if (!registered.has(command)) {
+      throw new Error(`renderer command ${command} is not registered by the native handler`)
+    }
+    if (!allowed.has(command)) {
+      throw new Error(`renderer command ${command} is not allowed by the shell ACL`)
+    }
+  }
+  for (const command of allowed) {
+    if (!registered.has(command)) {
+      throw new Error(`shell ACL command ${command} is not registered by the native handler`)
+    }
+  }
+
+  return { invoked: invoked.size, registered: registered.size, allowed: allowed.size }
 }
 
 /** Verify every duplicated public-contract marker against authoritative source. */
@@ -98,6 +137,9 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
       'sdk/package.json',
       'src-tauri/tauri.conf.json',
       'src-tauri/capabilities/default.json',
+      'src/lib/ipc.ts',
+      'src-tauri/src/lib.rs',
+      'src-tauri/permissions/shell.toml',
     ].map((path) => readFile(join(root, path), 'utf8')),
   )
   const [
@@ -117,6 +159,9 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     sdkPackageRaw,
     tauriConfigRaw,
     capabilitiesRaw,
+    ipcSource,
+    rustSource,
+    permissionSource,
   ] = files
 
   const protocols = [
@@ -166,11 +211,13 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     JSON.parse(tauriConfigRaw),
   )
   validateCapabilities(JSON.parse(capabilitiesRaw))
+  const commands = validateCommandAcl(ipcSource, rustSource, permissionSource)
   return {
     protocol: protocols[0],
     hostProtocol: hostProtocols[0],
     schema: '1.0.0',
     version: JSON.parse(rootPackageRaw).version,
+    commands,
   }
 }
 
@@ -180,6 +227,6 @@ if (invoked) {
     process.argv[2] ? resolve(process.argv[2]) : DEFAULT_ROOT,
   )
   console.log(
-    `verified public contracts: Protocol ${result.protocol}, Host Protocol ${result.hostProtocol}, catalog ${result.schema}, SDK ${result.version}`,
+    `verified public contracts: Protocol ${result.protocol}, Host Protocol ${result.hostProtocol}, catalog ${result.schema}, SDK ${result.version}, ${result.commands.invoked} renderer commands`,
   )
 }

@@ -22,7 +22,7 @@ Studio 会从官方 npm registry 安装经过验证的运行时，并在控制�
 
 ## 托管 Harness 模块不可用
 
-旧版 Studio 完全依赖上游在 `$DSH_HOME/profiles/node_modules` 中建立的逐包链接。Windows 偶尔会拒绝遍历这些 Junction，于是同一个托管包明明存在，仍会出现 `ERR_MODULE_NOT_FOUND`。当前版本会先保持 Profile 的正常解析；仅当 `@deepseek-ai/*` 确实缺失时，才回退到已验证的托管 Harness。所选 Profile、其中安装的包版本和第三方插件仍然优先，不会被删除。
+旧版 Studio 完全依赖上游在 `$DSH_HOME/profiles/node_modules` 中建立的逐包链接。Windows 偶尔会拒绝遍历这些 Junction，于是同一个托管包明明存在，仍会出现 `ERR_MODULE_NOT_FOUND`。当前版本统一从已验证的托管 Harness 解析 `@deepseek-ai/*`，避免 Profile 插件留下的旧 peer 副本把两个 Harness 版本混入同一进程。第三方包仍归 Profile 所有且不会被删除；Harness 会依据它们声明的 peer 兼容性决定启用或隔离。
 
 升级后重启一次，Studio 会自动物化自己的解析器。若当前版本仍出现此提示，请在环境页点击「修复」并导出诊断；不要手工删除 Profile。
 

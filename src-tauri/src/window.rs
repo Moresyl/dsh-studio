@@ -225,6 +225,21 @@ fn shell<'a, R: Runtime, M: Manager<R>>(
     #[cfg(not(target_os = "macos"))]
     let builder = builder.decorations(false);
 
+    // Debug builds can expose this exact WebView to the local UI acceptance
+    // runner. Release builds compile the switch out completely.
+    #[cfg(all(target_os = "windows", debug_assertions))]
+    let builder = match std::env::var("DSH_STUDIO_WEBVIEW_DEBUG_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|port| *port != 0)
+    {
+        Some(port) => builder.additional_browser_args(&format!(
+            "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection \
+             --autoplay-policy=no-user-gesture-required --remote-debugging-port={port}"
+        )),
+        None => builder,
+    };
+
     builder
 }
 
