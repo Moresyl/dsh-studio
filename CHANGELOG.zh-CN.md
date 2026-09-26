@@ -9,6 +9,31 @@
 
 ## [未发布]
 
+## [0.9.17] —— 2026-09-26
+
+### 新增
+
+- 增加仅在 debug 构建中启用的真实 WebView2 验收入口与 CDP 工具，可直接检查 Tauri renderer、原生 IPC、页面截图和最小窗口布局；正式发布构建不会暴露调试端口。
+
+### 变更
+
+- 所有官方 `@deepseek-ai/*` 导入统一来自唯一经过验证的托管运行时，第三方包仍由 Profile 管理，避免旧版传递依赖与 Harness `0.1.7-rc.2` 混用存储 schema 或 ESM 导出。
+- 公共契约门禁现在会把 renderer 中的每个静态调用同时与 Tauri handler 注册表和经过审查的 shell ACL 交叉核对，也会检查原生已允许但 renderer 当前未调用的命令。
+
+### 修复与打磨
+
+- 自动修复 `0.9.16` 写出的“`[]` 后继续追加列表”无效 Profile patch，保留首次写入备份，并避免今后切换默认 Agent Preset 时再次产生该 YAML 结构。
+- 将已审查的 `desktop_file_offer` 加入 shell ACL，系统打开和拖入的预设文件不再报 `not allowed by ACL`。
+- Windows 终端关闭时核验原子进程已经退出，不再把 `portable-pty` 颠倒的终止返回值误报为失败。
+- 同一个 Profile 修复后成功启动时自动清除旧恢复通知；如果实际由另一个最后健康 Profile 回退成功，则仍保留原失败记录。
+- 把 Profile 备份的实际完整性验证结果返回导入预览，不再把已验证的新版导出错误标成旧版文件。
+
+### 验证
+
+- 本地发布门禁通过 285 项前端测试（语句覆盖率 95.1%）、63 项打包与契约测试和 420 项 Rust 测试，以及生产构建、lint、无障碍、公开契约、双语文档和网站文档检查。
+- 在真实 Windows WebView2 中逐项测试 Harness 停止/启动、全部工作台页面、终端创建/关闭、会话搜索与阅读、插件源搜索、局域网访问开启/二维码/关闭、全部启动设置并逐字段恢复、Profile 创建/复制/对比/重命名/导出/校验/导入/删除、主题、界面模式、侧栏、命令面板、恢复中心和 900×620 最小布局。
+- 修复后的真实 Profile 多次启动 Harness `0.1.7-rc.2` 均成功，没有删除会话缓存或第三方 Profile 数据；不兼容的 `dsh-diagram@0.2.0` 仍由现有兼容性门禁隔离。
+
 ## [0.9.16] —— 2026-09-26
 
 ### 新增
@@ -924,7 +949,9 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.7...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...HEAD
+[0.9.17]: https://github.com/Moresyl/dsh-studio/compare/v0.9.16...v0.9.17
+[0.9.16]: https://github.com/Moresyl/dsh-studio/compare/v0.9.15...v0.9.16
 [0.9.4]: https://github.com/Moresyl/dsh-studio/compare/v0.9.2...v0.9.4
 [0.9.2]: https://github.com/Moresyl/dsh-studio/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...v0.9.1

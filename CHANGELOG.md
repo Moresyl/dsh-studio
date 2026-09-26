@@ -9,6 +9,31 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.17] — 2026-09-26
+
+### Added
+
+- Add a debug-only WebView2 acceptance entry point and CDP runner for exercising the real Tauri renderer, native IPC, screenshots, and minimum-window layouts without exposing a debugging port in release builds.
+
+### Changed
+
+- Resolve every official `@deepseek-ai/*` import from the single qualified managed runtime while leaving third-party packages Profile-owned. This prevents an older transitive Profile copy from mixing storage schemas or ESM exports with Harness `0.1.7-rc.2`.
+- Extend the public-contract gate to cross-check every literal renderer invocation against both the Tauri handler registry and the reviewed shell ACL, including commands allowed natively but not currently invoked by the renderer.
+
+### Fixes and polish
+
+- Repair the invalid `[]`-followed-by-list Profile patch written by `0.9.16`, preserve its first-write backup, and avoid producing that YAML shape when changing the default Agent Preset.
+- Allow the reviewed `desktop_file_offer` command through the shell ACL so native-open and dropped preset offers reach the renderer instead of failing with `not allowed by ACL`.
+- Close Windows terminal tabs without reporting the reversed `portable-pty` termination result as a failure, while verifying the original child process actually exited.
+- Clear a failed-start recovery notice when that same Profile later reaches readiness, but preserve the notice when a different last-known-good Profile recovered.
+- Return the computed Profile-backup integrity result to the import preview instead of mislabelling a verified current export as legacy.
+
+### Verification
+
+- Local release validation passed with 285 frontend tests at 95.1% statement coverage, 63 packaging and contract tests, and 420 Rust tests, plus production build, lint, accessibility, public-contract, bilingual-documentation, and website-documentation checks.
+- A real Windows WebView2 session exercised Harness stop/start, every workbench page, terminal create/close, session search and reading, registry search, LAN remote open/QR/close, every startup setting with exact rollback, Profile create/copy/compare/rename/export/verify/import/remove, themes, presentation modes, sidebar, command palette, recovery dismissal, and the 900×620 minimum layout.
+- The repaired real Profile booted Harness `0.1.7-rc.2` repeatedly without deleting session caches or third-party Profile data; the incompatible `dsh-diagram@0.2.0` remained contained by the existing compatibility gate.
+
 ## [0.9.16] — 2026-09-26
 
 ### Added
@@ -1064,7 +1089,9 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.7...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...HEAD
+[0.9.17]: https://github.com/Moresyl/dsh-studio/compare/v0.9.16...v0.9.17
+[0.9.16]: https://github.com/Moresyl/dsh-studio/compare/v0.9.15...v0.9.16
 [0.9.4]: https://github.com/Moresyl/dsh-studio/compare/v0.9.2...v0.9.4
 [0.9.2]: https://github.com/Moresyl/dsh-studio/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Moresyl/dsh-studio/compare/v0.9.0...v0.9.1
