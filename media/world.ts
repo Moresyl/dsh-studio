@@ -588,7 +588,20 @@ const ADD_LOG: string[] = [
   'added 4 packages in 3s',
 ]
 
-const add = async (spec: string): Promise<PluginState> => {
+const previews = new Map<string, string>()
+let previewSequence = 0
+
+const preview = async (spec: string) => {
+  await beat(180)
+  const token = `capture-plugin-preview-${++previewSequence}`
+  previews.set(token, spec)
+  return { token, expiresInSeconds: 300 }
+}
+
+const add = async (token: string): Promise<PluginState> => {
+  const spec = previews.get(token)
+  if (!spec) throw new Error('The install preview is missing or expired.')
+  previews.delete(token)
   const name = spec.replace(/@[^@/]+$/, '') || spec
   say(`installing ${name} into profile ${PROFILE}`)
   for (const line of ADD_LOG) {
@@ -758,8 +771,10 @@ export function answerCommands(): void {
           return discover(text(args, 'query'))
         case 'plugin_detail':
           return beat(220).then(() => detailFor(text(args, 'name')))
+        case 'plugin_preview':
+          return preview(text(args, 'spec'))
         case 'plugin_add':
-          return add(text(args, 'spec'))
+          return add(text(args, 'token'))
         case 'plugin_remove':
           return remove(text(args, 'name'))
         case 'plugin_switch':

@@ -296,13 +296,19 @@ const SCENES: Record<string, () => Promise<void>> = {
 
     glide(() => dialogAction())
     click(() => dialogAction(), 420)
+    // Preview binds the exact source, package and version to a one-shot token.
+    // Leave the resulting manifest on screen before confirming that token.
+    at(1500, pass)
+
+    glide(() => dialogAction())
+    click(() => dialogAction(), 420)
     for (let line = 0; line < 5; line += 1) at(300, pass)
     at(1600, pass)
 
     glide(() => dialogClose())
     click(() => dialogClose(), 1200)
-    glide(() => tab(1))
-    click(() => tab(1), 2400)
+    glide(() => tab(2))
+    click(() => tab(2), 2400)
   },
 
   /** A door opened on the LAN, a code with a life on it, and a phone that used it. */
