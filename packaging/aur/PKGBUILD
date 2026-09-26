@@ -2,7 +2,7 @@
 # Maintainer: Moresyl <Moresyl@users.noreply.github.com>
 
 pkgname=dsh-studio-bin
-pkgver=0.9.15
+pkgver=0.9.16
 pkgrel=1
 pkgdesc="Native desktop shell for DeepSeek Harness"
 arch=('x86_64')
@@ -13,9 +13,9 @@ optdepends=('nodejs: use the system Node.js instead of letting the app fetch one
 provides=('dsh-studio')
 conflicts=('dsh-studio')
 options=('!strip' '!emptydirs')
-source=("${pkgname}-${pkgver}.deb::https://github.com/Moresyl/dsh-studio/releases/download/v0.9.15/DSH.Studio_0.9.15_amd64.deb"
-        "${pkgname}-${pkgver}-LICENSE::https://raw.githubusercontent.com/Moresyl/dsh-studio/v0.9.15/LICENSE")
-sha256sums=('93be4510aa79efb45125fe05754d69042e538995883eae22341f6e41f63bbfa9'
+source=("${pkgname}-${pkgver}.deb::https://github.com/Moresyl/dsh-studio/releases/download/v0.9.16/DSH.Studio_0.9.16_amd64.deb"
+        "${pkgname}-${pkgver}-LICENSE::https://raw.githubusercontent.com/Moresyl/dsh-studio/v0.9.16/LICENSE")
+sha256sums=('817ea67767d44a03f9dbed555bea14e1c856ebca27db9a1c89a0273d511c0983'
             '550f4b329f634d289d8c6180ac5cdcbc3f0dcf0348a1f3f0c7e63306f494eaec')
 
 package() {
