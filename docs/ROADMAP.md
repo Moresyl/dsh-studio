@@ -40,31 +40,31 @@ The remaining gaps are concentrated in:
 
 ## Current capability matrix
 
-| Capability              | Benchmark head `c52f450d`                 | DSH Studio now                                                                                                                         |
-| ----------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| No system Node required | Bundled Electron/runtime                  | Lite downloads and verifies official Node; Full carries SHA-256-pinned Node, Harness and pnpm                                          |
-| Real runtime gate       | Profile boot smoke                        | Cold-installs the full 511-package graph and boots the real Profile, Loader, Web server and Host probe on Windows/Linux/macOS CI       |
-| Presentation            | Compatibility / Extended / Advanced       | All three; Extended preserves upstream UI with a compact native toolbar                                                                |
-| Stable Web origin       | Fixed port support                        | Random by default or persisted 1024–65535; occupied fixed ports fail before Node starts                                                |
-| Startup recovery        | Injected recovery resources               | 12-second native watchdog and a static recovery window independent of React, Harness, Node and network                                 |
-| Profiles                | Management, switching, desktop service    | Create/copy/rename/delete/import/export/diff and cross-window switching                                                                |
-| Host plugin service     | Mutable Profile and managed pnpm services | Read-only Host Protocol 1; mutations stay behind visible Protocol 3 review, receipts and rollback                                      |
-| Plugin market           | Built-in Community Market                 | Multi-source catalogs, pagination/limits, exact npm revalidation, preview token, integrity receipt, transaction rollback and UI errors |
-| Catalog health          | Source management and tests               | Native contract/latency/installability health checks for npm, dshfind, 1024Store and custom sources                                    |
-| Terminal                | Built in                                  | PTY, Unicode 11 and process-tree ownership; no external CMD flash                                                                      |
-| Parallel agent workspace | Upstream subagents                        | Harness subagents, tabbed PTYs and native Git worktree isolation; persistent splits and guarded orchestration review remain planned     |
-| Mobile remote           | Planned                                   | Delivered: loopback Harness plus separate LAN gateway, one-use QR and revocable per-device credentials                                 |
-| Sessions                | Primarily upstream UI                     | Local full-text search, project filter, per-model token/cost reports and Markdown/HTML/JSON export                                     |
-| Usage controls          | Upstream session UI                       | Local monthly budget status, complete-price guard and spreadsheet-safe daily CSV trend export                                          |
-| Multiple windows        | Desktop window management                 | Parallel windows on one Harness with placement persistence                                                                             |
-| Platforms               | Windows x64 and macOS Universal           | Windows x64, Linux x64, macOS Intel/Apple Silicon, plus Universal Lite image                                                           |
-| Process lifetime        | Electron runtime ownership                | Windows Job Object / Unix process group owns the full Node, PTY and tool tree                                                          |
-| Diagnostics             | Logs/recovery                             | Redacted bounded ZIP, rotated logs, crash evidence, Windows minidump and headless export command                                       |
-| Durable writes          | File-backed recovery contracts            | Same-directory unique staging, full flush and atomic Windows/Unix replacement for exports and persistent state                         |
-| Accessibility           | Native-frame refinements                  | Keyboard/dialog/form semantics gate, reduced motion, forced colours and bilingual manual acceptance matrix                             |
-| Startup payload         | Bundled Electron surface                  | Terminal emulator is lazy; entry JavaScript is gated below 450 KiB and currently 364,959 bytes                                         |
-| Update                  | Desktop updater                           | Mandatory Tauri signature, GitHub + verified Pages manifest fallback, asset matrix and SHA256SUMS gates                                |
-| Package managers        | Website installers                        | Scoop live; winget/Homebrew/AUR/Flathub manifests generated and natively validated, but not all externally submitted                   |
+| Capability               | Benchmark head `c52f450d`                 | DSH Studio now                                                                                                                         |
+| ------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| No system Node required  | Bundled Electron/runtime                  | Lite downloads and verifies official Node; Full carries SHA-256-pinned Node, Harness and pnpm                                          |
+| Real runtime gate        | Profile boot smoke                        | Cold-installs the full 599-package graph and verifies authenticated app surfaces plus Profile, Loader, Web server and Host probe in CI |
+| Presentation             | Compatibility / Extended / Advanced       | All three; Extended preserves upstream UI with a compact native toolbar                                                                |
+| Stable Web origin        | Fixed port support                        | Random by default or persisted 1024–65535; occupied fixed ports fail before Node starts                                                |
+| Startup recovery         | Injected recovery resources               | 12-second native watchdog and a static recovery window independent of React, Harness, Node and network                                 |
+| Profiles                 | Management, switching, desktop service    | Create/copy/rename/delete/import/export/diff and cross-window switching                                                                |
+| Host plugin service      | Mutable Profile and managed pnpm services | Read-only Host Protocol 1; mutations stay behind visible Protocol 3 review, receipts and rollback                                      |
+| Plugin market            | Built-in Community Market                 | Multi-source catalogs, pagination/limits, exact npm revalidation, preview token, integrity receipt, transaction rollback and UI errors |
+| Catalog health           | Source management and tests               | Native contract/latency/installability health checks for npm, dshfind, 1024Store and custom sources                                    |
+| Terminal                 | Built in                                  | PTY, Unicode 11 and process-tree ownership; no external CMD flash                                                                      |
+| Parallel agent workspace | Upstream subagents                        | Harness subagents, tabbed PTYs and native Git worktree isolation; persistent splits and guarded orchestration review remain planned    |
+| Mobile remote            | Planned                                   | Delivered: loopback Harness plus separate LAN gateway, one-use QR and revocable per-device credentials                                 |
+| Sessions                 | Primarily upstream UI                     | Local full-text search, project filter, per-model token/cost reports and Markdown/HTML/JSON export                                     |
+| Usage controls           | Upstream session UI                       | Local monthly budget status, complete-price guard and spreadsheet-safe daily CSV trend export                                          |
+| Multiple windows         | Desktop window management                 | Parallel windows on one Harness with placement persistence                                                                             |
+| Platforms                | Windows x64 and macOS Universal           | Windows x64, Linux x64, macOS Intel/Apple Silicon, plus Universal Lite image                                                           |
+| Process lifetime         | Electron runtime ownership                | Windows Job Object / Unix process group owns the full Node, PTY and tool tree                                                          |
+| Diagnostics              | Logs/recovery                             | Redacted bounded ZIP, rotated logs, crash evidence, Windows minidump and headless export command                                       |
+| Durable writes           | File-backed recovery contracts            | Same-directory unique staging, full flush and atomic Windows/Unix replacement for exports and persistent state                         |
+| Accessibility            | Native-frame refinements                  | Keyboard/dialog/form semantics gate, reduced motion, forced colours and bilingual manual acceptance matrix                             |
+| Startup payload          | Bundled Electron surface                  | Terminal emulator is lazy; entry JavaScript is gated below 450 KiB and currently 364,959 bytes                                         |
+| Update                   | Desktop updater                           | Mandatory Tauri signature, GitHub + verified Pages manifest fallback, asset matrix and SHA256SUMS gates                                |
+| Package managers         | Website installers                        | Scoop live; winget/Homebrew/AUR/Flathub manifests generated and natively validated, but not all externally submitted                   |
 
 ## Delivered in this benchmark pass
 

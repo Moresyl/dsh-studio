@@ -34,6 +34,19 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["dshpreset"],
+        "name": "DSH Agent Preset",
+        "description": "Portable DSH Agent Preset package",
+        "role": "Editor",
+        "mimeType": "application/vnd.dsh.agent-preset+zip",
+        "exportedType": {
+          "identifier": "io.github.moresyl.dshstudio.agent-preset",
+          "conformsTo": ["public.zip-archive"]
+        }
+      }
+    ],
     "windows": {
       "nsis": {
         "installMode": "currentUser",

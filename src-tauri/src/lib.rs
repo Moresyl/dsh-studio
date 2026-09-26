@@ -51,7 +51,7 @@ const REMOTE_CHANNEL: &str = "remote://changed";
 pub fn run() {
     logging::install_panic_hook();
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             // A second launch surfaces the running app instead of starting
             // another harness — two would fight over the same session store.
             // Opening another window is a thing this app does; it is just not
@@ -59,6 +59,7 @@ pub fn run() {
             if let Some(existing) = window::front(app) {
                 window::reveal(&existing);
             }
+            desktop::arrive_arguments(app, &argv, &cwd);
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -128,6 +129,7 @@ pub fn run() {
             // Before `desktop::wire`, which is where a link that started the app
             // is put down for whoever asks for it first.
             app.manage(desktop::Desk::default());
+            desktop::hold_initial_file(app.handle());
 
             window::build(app.handle())?;
             application_menu::build(app.handle())?;
@@ -213,6 +215,7 @@ pub fn run() {
             material::window_material,
             window::window_open,
             desktop::commands::desktop_offer,
+            desktop::commands::desktop_file_offer,
             desktop::commands::desktop_notify,
             desktop::commands::desktop_attention,
             desktop::commands::desktop_badge,

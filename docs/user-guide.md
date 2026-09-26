@@ -59,6 +59,13 @@ the active Studio/Harness versions and a bounded Profile roster. It provides no
 native handles, command runner, package mutation, or Profile mutation. See the
 [plugin interoperability contract](plugin-interoperability.md).
 
+Portable Agent Presets use the `.dshpreset` file type. Open one from the operating
+system, drop it anywhere on Studio, or choose **Import** in the preset picker.
+Studio validates the package manifest and every recorded SHA-256 before showing
+its identity, file count, and unpacked size. Import happens only after an explicit
+trust confirmation; declining or failing validation leaves the package and the
+current Profile unchanged.
+
 Completion/failure notifications for user turns and background jobs can be enabled independently in Settings. Workspace selection uses the native folder picker and also accepts a dropped folder.
 
 ## Logs and diagnostics

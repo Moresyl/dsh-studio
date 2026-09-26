@@ -16,6 +16,13 @@ pub fn desktop_offer(app: AppHandle) -> Offer {
     super::offer(&app)
 }
 
+/// Take a package path delivered by the operating system before the renderer
+/// subscribed to live file-open events.
+#[tauri::command]
+pub fn desktop_file_offer(app: AppHandle) -> Option<String> {
+    super::file_offer(&app)
+}
+
 /// Asynchronous because showing a notification is the system's work, not this
 /// app's: it is a D-Bus round trip on Linux and a WinRT call on Windows, and
 /// neither belongs on the thread that draws the window.

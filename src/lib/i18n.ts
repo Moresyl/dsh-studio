@@ -705,6 +705,11 @@ const en = {
   'preset.importTitle': 'Import portable preset',
   'preset.transferHint': 'Portable package · no sessions or credentials',
   'preset.integrityFailed': 'The preset package integrity check failed.',
+  'preset.importBusy': 'Another preset import is already waiting for confirmation.',
+  'preset.importConfirmTitle': 'Import this agent preset?',
+  'preset.importConfirmBody':
+    'The package passed its internal integrity checks ({files} files · {bytes} bytes). Agent presets can load tools and code with your Harness permissions. Import only when you trust the source.',
+  'preset.importConfirm': 'Import preset',
   'recovery.safeMode': 'Open isolated safe mode',
   'recovery.safeModeStarting': 'Opening safe mode…',
   'profileRecovery.title': 'Profile startup recovered',
@@ -1379,6 +1384,11 @@ const zh: Record<MessageKey, string> = {
   'preset.importTitle': '导入便携预设',
   'preset.transferHint': '便携包 · 不包含会话或凭据',
   'preset.integrityFailed': '预设包完整性校验失败。',
+  'preset.importBusy': '已有另一个预设导入正在等待确认。',
+  'preset.importConfirmTitle': '导入这个 Agent 预设？',
+  'preset.importConfirmBody':
+    '这个包已通过内部完整性检查（{files} 个文件 · {bytes} 字节）。Agent 预设可以使用你的 Harness 权限加载工具和代码；请仅在信任来源时导入。',
+  'preset.importConfirm': '导入预设',
   'recovery.safeMode': '进入隔离安全模式',
   'recovery.safeModeStarting': '正在进入安全模式…',
   'profileRecovery.title': '配置启动失败已恢复',

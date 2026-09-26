@@ -16,6 +16,7 @@ import { describe } from '@/lib/errors'
 import * as ipc from '@/lib/ipc'
 import { t } from '@/lib/i18n'
 import type { AgentPreset } from '@/lib/ipc'
+import { ask } from '@/state/dialog'
 
 interface PresetStore {
   /** In the order the harness lists them; empty until it is installed. */
@@ -31,6 +32,9 @@ interface PresetStore {
 
 /** Only the newest roster read or choice may update the radio group. */
 let generation = 0
+let activeImport: { path: string; operation: Promise<boolean> } | null = null
+
+export const isPresetPackagePath = (path: string): boolean => /\.dshpreset$/i.test(path)
 
 export const usePresets = create<PresetStore>((set, get) => ({
   presets: [],
@@ -70,3 +74,45 @@ export const usePresets = create<PresetStore>((set, get) => ({
     }
   },
 }))
+
+/**
+ * Inspect and explicitly confirm a portable preset before publishing it.
+ *
+ * Both the native file association and the in-app picker use this path. Joining
+ * duplicate requests matters on macOS, where a startup file URL can be visible
+ * both as an initial offer and as a live open event during renderer startup.
+ */
+export function importPresetPackage(path: string): Promise<boolean> {
+  if (activeImport?.path === path) return activeImport.operation
+  if (activeImport) return Promise.reject(new Error(t('preset.importBusy')))
+
+  const operation = (async () => {
+    const preview = await ipc.presetPackage(path)
+    if (!preview.integrityVerified) throw new Error(t('preset.integrityFailed'))
+    const accepted = await ask({
+      title: t('preset.importConfirmTitle'),
+      body: t('preset.importConfirmBody', {
+        files: preview.files,
+        bytes: preview.bytes.toLocaleString(),
+      }),
+      subject: preview.name ? `${preview.name} (${preview.id})` : preview.id,
+      confirm: t('preset.importConfirm'),
+      tone: 'brand',
+    })
+    if (!accepted) return false
+
+    const roster = await ipc.presetImport(path)
+    ++generation
+    usePresets.setState({
+      presets: roster.presets,
+      chosen: roster.default,
+      loading: false,
+      error: null,
+    })
+    return true
+  })().finally(() => {
+    if (activeImport?.operation === operation) activeImport = null
+  })
+  activeImport = { path, operation }
+  return operation
+}

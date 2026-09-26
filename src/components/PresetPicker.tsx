@@ -24,7 +24,7 @@ import { t } from '@/lib/i18n'
 import type { AgentPreset } from '@/lib/ipc'
 import * as ipc from '@/lib/ipc'
 import { describe } from '@/lib/errors'
-import { usePresets } from '@/state/presets'
+import { importPresetPackage, usePresets } from '@/state/presets'
 
 export function PresetPicker({ detail = false }: { detail?: boolean }) {
   const presets = usePresets((state) => state.presets)
@@ -87,10 +87,7 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
         filters: [{ name: 'DSH preset', extensions: ['dshpreset'] }],
       })
       if (!path || Array.isArray(path)) return
-      const preview = await ipc.presetPackage(path)
-      if (!preview.integrityVerified) throw new Error(t('preset.integrityFailed'))
-      await ipc.presetImport(path)
-      await refresh()
+      await importPresetPackage(path)
     } catch (cause) {
       setTransferError(describe(cause))
     } finally {

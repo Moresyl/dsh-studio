@@ -253,9 +253,9 @@ tracked release conditions.
 | Supervisor, backoff restart, health probing    | ✅                                                                  |
 | Process-tree reclamation (Windows / Unix)      | ✅                                                                  |
 | Harness hosting, log console, English + 中文   | ✅                                                                  |
-| Harness 0.1.7 plans, goals, jobs, workflows    | ✅ qualified runtime and real-Profile boot                           |
+| Harness 0.1.7 plans, goals, jobs, workflows    | ✅ qualified runtime and real-Profile boot                          |
 | Subagents, user questions, deliverable preview | ✅                                                                  |
-| Agent Preset editor and portable packages      | ✅ legacy migration + per-file SHA-256 validation                    |
+| Agent Preset editor and portable packages      | ✅ migration, native open/drop, SHA-256 review                      |
 | Plugin marketplace — install, switch, remove   | ✅                                                                  |
 | Remote access, single-use QR, revocable keys   | ✅                                                                  |
 | Signed in-app update, checked on a schedule    | ✅                                                                  |
@@ -263,7 +263,7 @@ tracked release conditions.
 | macOS / Linux platform builds                  | ✅ compiled and tested in the platform CI matrix                    |
 | Node runtime fetched and verified on demand    | ✅ no system Node needed                                            |
 | Updater signatures and `SHA256SUMS.txt`        | ✅ mandatory; OS signing is applied when credentials are configured |
-| Download page, five packaging channels         | ✅ manifests generated and validated in the release pipeline         |
+| Download page, five packaging channels         | ✅ manifests generated and validated in the release pipeline        |
 | Tray icon, close-to-tray while serving         | ✅                                                                  |
 | Native context menus, saved window bounds      | ✅                                                                  |
 | Light and dark, following the system or not    | ✅                                                                  |

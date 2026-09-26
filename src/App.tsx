@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 
@@ -24,6 +24,7 @@ import { subscribeToHarness, useHarness } from '@/state/harness'
 import { useOnboarding } from '@/state/onboarding'
 import { usePalette } from '@/state/palette'
 import { usePresentation } from '@/state/presentation'
+import { importPresetPackage, isPresetPackagePath } from '@/state/presets'
 import { subscribeToProfiles } from '@/state/profiles'
 import { subscribeToRemote, useRemote } from '@/state/remote'
 import { useSessions } from '@/state/sessions'
@@ -130,6 +131,51 @@ export default function App() {
     show('sessions')
     useSessions.getState().requestSearch()
   }, [show])
+  const recentPreset = useRef<{ path: string; at: number } | null>(null)
+  const openPreset = useCallback(
+    (path: string) => {
+      const now = Date.now()
+      if (recentPreset.current?.path === path && now - recentPreset.current.at < 2_000) return
+      recentPreset.current = { path, at: now }
+      void reportAction(async () => {
+        if (await importPresetPackage(path)) show(SETTINGS.id)
+      })
+    },
+    [show],
+  )
+
+  // File associations can start this process or reach it through the
+  // single-instance handoff. Subscribe before taking the startup offer, and
+  // collapse the short overlap where macOS reports the same file both ways.
+  useEffect(() => {
+    let stop: (() => void) | null = null
+    let disposed = false
+    const subscribe = async () => {
+      const unlisten = await ipc.onDesktopPresetFile((path) => {
+        // Native code retains the request in case this listener was not ready.
+        // Taking it here prevents a later Studio window from importing it again.
+        void ipc.desktopFileOffer().then(
+          (pending) => openPreset(pending ?? path),
+          (cause) => {
+            reportFailure(cause)
+            openPreset(path)
+          },
+        )
+      })
+      if (disposed) {
+        unlisten()
+        return
+      }
+      stop = unlisten
+      const pending = await ipc.desktopFileOffer()
+      if (pending) openPreset(pending)
+    }
+    void subscribe().catch(reportFailure)
+    return () => {
+      disposed = true
+      stop?.()
+    }
+  }, [openPreset])
 
   // The one look at the machine, owned here rather than by a pane, because two
   // things now depend on the answer: the console shows it, and the guide exists
@@ -235,12 +281,16 @@ export default function App() {
         if (event.payload.type !== 'drop' || event.payload.paths.length !== 1) return
         const [path] = event.payload.paths
         if (!path) return
+        if (isPresetPackagePath(path)) {
+          openPreset(path)
+          return
+        }
         if (!showPanel && origin) pushWorkspaceDrop(path, origin)
         else void switchWorkspace(path)
       }),
       reportFailure,
     )
-  }, [origin, showPanel])
+  }, [openPreset, origin, showPanel])
 
   // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, Ctrl+comma for settings, and
   // Ctrl+Shift+N for another window. Every application with a fixed set of views

@@ -952,6 +952,8 @@ export interface DesktopOffer {
 
 /** Channel `desktop/mod.rs` forwards `dsh://` links on. */
 const LINK_CHANNEL = 'desktop://link'
+/** Channel for a `.dshpreset` opened through the operating system. */
+const PRESET_FILE_CHANNEL = 'desktop://preset-file'
 
 /**
  * Describe the desktop, and take any link that was waiting for a listener.
@@ -960,6 +962,9 @@ const LINK_CHANNEL = 'desktop://link'
  * twice answers the second caller with nothing.
  */
 export const desktopOffer = (): Promise<DesktopOffer> => invoke('desktop_offer')
+
+/** Take a package opened before this renderer subscribed to native events. */
+export const desktopFileOffer = (): Promise<string | null> => invoke('desktop_file_offer')
 
 export const desktopNotify = (title: string, body: string): Promise<void> =>
   invoke('desktop_notify', { title, body })
@@ -973,6 +978,9 @@ export const desktopBadge = (count: number): Promise<void> => invoke('desktop_ba
 
 export const onDesktopLink = (handler: (link: DesktopLink) => void): Promise<UnlistenFn> =>
   listen<DesktopLink>(LINK_CHANNEL, (message) => handler(message.payload))
+
+export const onDesktopPresetFile = (handler: (path: string) => void): Promise<UnlistenFn> =>
+  listen<string>(PRESET_FILE_CHANNEL, (message) => handler(message.payload))
 
 /* -------------------------------------------------------------------------- */
 /* Startup                                                                    */

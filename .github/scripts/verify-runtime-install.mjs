@@ -51,6 +51,23 @@ try {
   }
   const entry = join(packageRoot, 'lib', 'bin.js')
   await stat(entry)
+  for (const packageName of [
+    '@deepseek-ai/dsh-agent-tool-presentation',
+    '@deepseek-ai/dsh-schedule',
+    '@deepseek-ai/dsh-skill-office',
+  ]) {
+    const installed = JSON.parse(
+      await readFile(
+        join(directory, 'node_modules', ...packageName.split('/'), 'package.json'),
+        'utf8',
+      ),
+    )
+    if (installed.name !== packageName || installed.version !== expected) {
+      throw new Error(
+        `qualified runtime capability mismatch: expected ${packageName}@${expected}; found ${installed.name}@${installed.version}`,
+      )
+    }
+  }
   const launcher = join(directory, 'studio-cli.mjs')
   await writeFile(
     launcher,

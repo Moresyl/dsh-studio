@@ -6,8 +6,10 @@ import test from 'node:test'
 
 import {
   isCleanAuthenticationRedirect,
+  missingApplicationModules,
   parseReadyOrigin,
   prepareSmokeProfile,
+  REQUIRED_APPLICATION_MODULES,
 } from './runtime-profile-smoke.mjs'
 
 test('readiness accepts only an explicit loopback HTTP port', () => {
@@ -43,6 +45,17 @@ test('authentication redirect accepts clean equivalent roots only', () => {
   assert.equal(isCleanAuthenticationRedirect(request, 'http://localhost:3080/'), false)
   assert.equal(isCleanAuthenticationRedirect(request, null), false)
   assert.equal(isCleanAuthenticationRedirect(request, 'http://['), false)
+})
+
+test('application document must expose every qualified current-runtime surface', () => {
+  const complete = REQUIRED_APPLICATION_MODULES.map(
+    (module) => `<script src="/${module}"></script>`,
+  ).join('')
+  assert.deepEqual(missingApplicationModules(complete), [])
+  assert.deepEqual(
+    missingApplicationModules(complete.replace('@deepseek-ai/dsh-client-ui-jobs', 'missing-jobs')),
+    ['@deepseek-ai/dsh-client-ui-jobs'],
+  )
 })
 
 test('smoke profile mirrors the product bootstrap and materializes integration', async () => {

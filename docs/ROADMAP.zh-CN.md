@@ -37,7 +37,7 @@ package 自报 0.1.1；本次仍以提交 SHA 作为比较依据。我方比较�
 | 能力             | 对标最新 `c52f450d`                 | DSH Studio 当前状态                                                                                      |
 | ---------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | 零系统 Node 启动 | 内置 Electron/运行时                | 轻量版按需下载并校验官方 Node；完整离线版携带 SHA-256 固定的 Node、Harness、pnpm                         |
-| 真实运行时门禁   | 有 Profile boot smoke               | 冷安装完整 511 包图，在 Windows/Linux/macOS CI 启动真实 Profile、Loader、Web 与 Host 探针                |
+| 真实运行时门禁   | 有 Profile boot smoke               | 冷安装完整 599 包图，并在 CI 验证认证应用界面、Profile、Loader、Web 与 Host 探针                         |
 | 展示模式         | Compatibility / Extended / Advanced | 同样三种；Extended 保留完整上游页面并叠加紧凑原生工具栏                                                  |
 | 固定 Web 端口    | 支持                                | 默认随机，也可保存 1024–65535；占用时在启动 Node 前明确失败                                              |
 | 启动恢复         | 注入恢复资源                        | 12 秒原生 watchdog + 不依赖 React/Harness/Node/网络的静态恢复窗口                                        |

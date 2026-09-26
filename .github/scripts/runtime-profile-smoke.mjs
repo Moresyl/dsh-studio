@@ -5,6 +5,17 @@ import { createInterface } from 'node:readline'
 import { setTimeout as delay } from 'node:timers/promises'
 
 export const READY_PREFIX = 'dsh web: '
+const MAX_APPLICATION_DOCUMENT_BYTES = 4 * 1024 * 1024
+export const REQUIRED_APPLICATION_MODULES = [
+  '@deepseek-ai/dsh-client-ui-agent-preset',
+  '@deepseek-ai/dsh-client-ui-deliverables',
+  '@deepseek-ai/dsh-client-ui-goal',
+  '@deepseek-ai/dsh-client-ui-jobs',
+  '@deepseek-ai/dsh-client-ui-plan',
+  '@deepseek-ai/dsh-client-ui-subagent',
+  '@deepseek-ai/dsh-client-ui-user-questions',
+  '@deepseek-ai/dsh-client-ui-workflow-run',
+]
 
 /** Parse the exact loopback origin accepted by the native supervisor. */
 export function parseReadyOrigin(line) {
@@ -42,6 +53,10 @@ export function isCleanAuthenticationRedirect(requestUrl, location) {
   } catch {
     return false
   }
+}
+
+export function missingApplicationModules(document) {
+  return REQUIRED_APPLICATION_MODULES.filter((module) => !document.includes(module))
 }
 
 /** Write only the public profile contract that the product itself bootstraps. */
@@ -290,7 +305,17 @@ export async function verifyProfileBoot({
     if (!response.ok) {
       throw bootFailure(`readiness endpoint returned HTTP ${response.status}`, output)
     }
-    await response.body?.cancel()
+    const document = await response.text()
+    if (Buffer.byteLength(document, 'utf8') > MAX_APPLICATION_DOCUMENT_BYTES) {
+      throw bootFailure('readiness document exceeded the 4 MiB verification limit', output)
+    }
+    const missingModules = missingApplicationModules(document)
+    if (missingModules.length > 0) {
+      throw bootFailure(
+        `authenticated Web Profile omitted required application modules: ${missingModules.join(', ')}`,
+        output,
+      )
+    }
     const contract = await waitForContract(marker, 5_000, output)
     if (
       contract.protocol !== 1 ||

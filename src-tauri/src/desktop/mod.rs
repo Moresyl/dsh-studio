@@ -20,6 +20,8 @@ pub mod badge;
 pub mod commands;
 
 use std::collections::BTreeMap;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -44,6 +46,12 @@ const SCHEME: &str = "dsh";
 /// Channel the shell listens on for links that arrive while it is running.
 const LINK_CHANNEL: &str = "desktop://link";
 
+/// Native file-open requests stay inside the Studio shell. They are never
+/// forwarded into the Harness frame before the package has been inspected and
+/// the person at the machine has confirmed the import.
+const FILE_CHANNEL: &str = "desktop://preset-file";
+const PRESET_EXTENSION: &str = "dshpreset";
+
 /// A notification is a whole system's attention, so it is not a place to paste a
 /// log. Anything longer is cut rather than refused — a truncated message still
 /// says what happened, and a refusal says nothing at all.
@@ -65,6 +73,11 @@ pub struct Desk {
     /// exist yet: a link can start the app, and the harness takes seconds to come
     /// up after that.
     pending: Mutex<Option<Link>>,
+    /// The most recent package the operating system asked Studio to open.
+    /// One slot is deliberate: file associations launch one package at a time,
+    /// and repeating an old import after startup would be worse than replacing
+    /// an unopened request with the latest explicit one.
+    pending_file: Mutex<Option<String>>,
 }
 
 /// A `dsh://` link, already taken apart.
@@ -238,20 +251,59 @@ pub fn wire(app: &AppHandle) {
     // A link that started the app arrives before anything is listening for it.
     if let Ok(Some(urls)) = app.deep_link().get_current() {
         for url in &urls {
-            hold(app, Link::read(url));
+            hold_url(app, url);
         }
     }
 
     let handle = app.clone();
     app.deep_link().on_open_url(move |event| {
         for url in event.urls() {
-            arrive(&handle, Link::read(&url));
+            arrive_url(&handle, &url);
         }
     });
 }
 
+/// Capture a `.dshpreset` path from this process's initial command line.
+pub fn hold_initial_file(app: &AppHandle) {
+    let Ok(cwd) = std::env::current_dir() else {
+        return;
+    };
+    if let Some(path) = preset_argument(std::env::args_os(), &cwd) {
+        hold_file(app, path);
+    }
+}
+
+/// Capture a file association forwarded by the single-instance plugin.
+pub fn arrive_arguments(app: &AppHandle, arguments: &[String], cwd: &str) {
+    if let Some(path) = preset_argument(arguments, Path::new(cwd)) {
+        arrive_file(app, path);
+    }
+}
+
+/// Hand the startup file to the Studio shell exactly once.
+pub fn file_offer<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+    app.try_state::<Desk>()
+        .and_then(|desk| desk.pending_file.lock().ok()?.take())
+}
+
+fn hold_url<R: Runtime>(app: &AppHandle<R>, url: &Url) {
+    if url.scheme() == SCHEME {
+        hold(app, Link::read(url));
+    } else if let Some(path) = preset_file_url(url) {
+        hold_file(app, path);
+    }
+}
+
+fn arrive_url(app: &AppHandle, url: &Url) {
+    if url.scheme() == SCHEME {
+        arrive_link(app, Link::read(url));
+    } else if let Some(path) = preset_file_url(url) {
+        arrive_file(app, path);
+    }
+}
+
 /// A link that arrived while the app is up: show the window and pass it on.
-fn arrive(app: &AppHandle, link: Link) {
+fn arrive_link(app: &AppHandle, link: Link) {
     if let Some(main) = window::front(app) {
         // Whatever the link asks for, it was asked for by somebody who is at this
         // machine right now. Answering it behind a hidden window would look like
@@ -265,12 +317,69 @@ fn arrive(app: &AppHandle, link: Link) {
     let _ = app.emit(LINK_CHANNEL, link);
 }
 
+fn arrive_file(app: &AppHandle, path: String) {
+    // Hold before emitting so a renderer that has not subscribed yet can take
+    // the same request from `desktop_file_offer` once it mounts.
+    hold_file(app, path.clone());
+    if let Some(main) = window::front(app) {
+        window::reveal(&main);
+        // A native open belongs to the window brought to the foreground. App-
+        // wide emission would show one trust dialog in every Studio window.
+        let _ = main.emit(FILE_CHANNEL, path);
+    }
+}
+
 fn hold<R: Runtime>(app: &AppHandle<R>, link: Link) {
     if let Some(desk) = app.try_state::<Desk>() {
         if let Ok(mut pending) = desk.pending.lock() {
             *pending = Some(link);
         }
     }
+}
+
+fn hold_file<R: Runtime>(app: &AppHandle<R>, path: String) {
+    if let Some(desk) = app.try_state::<Desk>() {
+        if let Ok(mut pending) = desk.pending_file.lock() {
+            *pending = Some(path);
+        }
+    }
+}
+
+fn preset_argument<I, S>(arguments: I, cwd: &Path) -> Option<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let mut arguments = arguments.into_iter();
+    arguments.next()?;
+    let candidate = PathBuf::from(arguments.next()?.as_ref());
+    if arguments.next().is_some() {
+        return None;
+    }
+    preset_path(candidate, cwd)
+}
+
+fn preset_file_url(url: &Url) -> Option<String> {
+    (url.scheme() == "file")
+        .then(|| url.to_file_path().ok())
+        .flatten()
+        .and_then(|path| preset_path(path, Path::new("")))
+}
+
+fn preset_path(path: PathBuf, cwd: &Path) -> Option<String> {
+    if !path
+        .extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case(PRESET_EXTENSION))
+    {
+        return None;
+    }
+    let path = if path.is_absolute() {
+        path
+    } else {
+        cwd.join(path)
+    };
+    path.to_str().map(str::to_string)
 }
 
 /// The client script, with the protocol version compiled into it.
@@ -327,6 +436,30 @@ mod tests {
 
         assert_eq!(link.query["name"], "@scope/thing");
         assert_eq!(link.query["note"], "two words");
+    }
+
+    #[test]
+    fn only_one_preset_file_is_an_operating_system_open_request() {
+        let cwd = std::env::current_dir().expect("working directory");
+        let relative = preset_argument(["studio", "portable.DSHPRESET"], &cwd)
+            .expect("preset file association");
+        assert_eq!(PathBuf::from(relative), cwd.join("portable.DSHPRESET"));
+        assert!(preset_argument(["studio", "portable.zip"], &cwd).is_none());
+        assert!(preset_argument(["studio", "one.dshpreset", "two.dshpreset"], &cwd).is_none());
+        assert!(preset_argument(["studio", "--dsh-startup-standby"], &cwd).is_none());
+    }
+
+    #[test]
+    fn file_urls_accept_only_preset_packages() {
+        let path = std::env::current_dir()
+            .expect("working directory")
+            .join("portable.dshpreset");
+        let url = Url::from_file_path(&path).expect("file URL");
+        assert_eq!(preset_file_url(&url).map(PathBuf::from), Some(path));
+        assert!(
+            preset_file_url(&Url::parse("https://example.com/file.dshpreset").unwrap()).is_none()
+        );
+        assert!(preset_file_url(&Url::parse("dsh://preset/import").unwrap()).is_none());
     }
 
     /// A notification is not a log viewer. Cut on character boundaries, because
