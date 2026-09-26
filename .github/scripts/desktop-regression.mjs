@@ -105,6 +105,11 @@ assert(
   normalized(actualHome).startsWith(`${normalized(resolve(args['qa-home']))}/profiles/`),
   'refusing a non-QA profile',
 )
+// Starting Harness may select its surface; open the desktop routes explicitly.
+if (!(await evaluate("Boolean(document.querySelector('aside'))"))) {
+  await clickText('控制面板')
+  await waitFor("document.querySelector('aside')", 'desktop navigation')
+}
 
 const started = Date.now()
 const deadline = started + minutes * 60000
