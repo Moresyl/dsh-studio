@@ -55,3 +55,12 @@ operate the same QA window during the UI run.
 
 These checks complement the manual matrix; they do not cover model-provider
 credentials, real external SSH accounts, Narrator or physical macOS hardware.
+
+Verify viewport dimensions and capture reduced-motion or forced-colour mode in
+the same CDP connection, before its overrides expire. These browser simulations
+do not replace manual acceptance using Windows system settings:
+
+```powershell
+node .github/scripts/desktop-ui-acceptance.mjs 9223 viewport 900 620 D:/qa/contrast.png forced-colors
+node .github/scripts/desktop-ui-acceptance.mjs 9223 viewport 900 620 D:/qa/motion.png reduced-motion
+```

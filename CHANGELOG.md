@@ -29,10 +29,11 @@ pre-1.0 caveat that anything may still move.
 - Restore modal focus when the primary action is blocked or content changes, trap all visible keyboard stops, and improve menu Home/End, wrapping, Tab dismissal and ordinary click activation.
 - Keep exact-version safety details visible when replacing an installed package, and distinguish the installed version from its requested range or local source.
 - Reject malformed npm version ranges instead of accepting loose-parser fallbacks, and align prerelease boundaries with Harness using 4,716 differential cases against npm semver.
+- Preserve current-page and pressed-button indicators in forced-colour mode, including the sidebar and top-level tabs.
 
 ### Verification
 
-- Local validation passed 307 frontend tests (95.27% statement coverage in the configured core subset), 426 Rust tests with five conditional tests ignored, and 63 packaging tests, plus build, lint, accessibility and contract checks.
+- Local validation passed 307 frontend tests (95.27% statement coverage in the configured core subset), 426 ordinary Rust tests, 4,716 npm range comparisons, and 63 packaging tests, plus build, lint, accessibility and contract checks. Five other conditional Rust tests were ignored locally.
 - Real isolated Windows WebView checks passed native file-offer ACL, profile and preset round trips, session exports in three formats, archive restoration, PTY lifecycle, and an actual 6.0.0 → 7.0.0 test dependency replacement.
 - The first 20-minute UI exercise completed 38 passes with no uncaught renderer exceptions. The final runtime soak is recorded separately before release.
 - Third-party plugin compatibility is not overridden. macOS physical-device and external credential-dependent workflows are outside local Windows acceptance.

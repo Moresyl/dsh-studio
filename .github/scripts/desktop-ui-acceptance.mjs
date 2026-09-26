@@ -109,16 +109,34 @@ if (mode === 'inspect') {
     deviceScaleFactor: 1,
     mobile: false,
   })
+  const presentation = process.argv[7]
+  if (presentation) {
+    if (!['reduced-motion', 'forced-colors'].includes(presentation))
+      throw new Error('presentation must be reduced-motion or forced-colors')
+    await command('Emulation.setEmulatedMedia', {
+      features: [
+        { name: 'prefers-reduced-motion', value: 'reduce' },
+        { name: 'forced-colors', value: presentation === 'forced-colors' ? 'active' : 'none' },
+      ],
+    })
+  }
   // CDP overrides belong to this connection. Capture and read the actual
   // dimensions before closing it; a later invocation sees the native viewport.
   await evaluate(
     'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))',
   )
   const actual = await evaluate(
-    '({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth > innerWidth})',
+    `({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth > innerWidth,
+      reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,
+      forcedColors:matchMedia('(forced-colors: active)').matches})`,
   )
   if (actual.width !== width || actual.height !== height)
     throw new Error('viewport override did not apply')
+  if (
+    presentation &&
+    (!actual.reducedMotion || actual.forcedColors !== (presentation === 'forced-colors'))
+  )
+    throw new Error('presentation override did not apply')
   const output = process.argv[6]
   if (output) {
     const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true })

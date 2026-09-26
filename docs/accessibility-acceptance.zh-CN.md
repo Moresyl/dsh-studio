@@ -44,3 +44,11 @@ WebView 异常。定时运行保留截图和 DOM/堆内存数据；这些采样�
 文件与结果报告保留在指定输出目录。两个脚本按顺序运行，界面回归期间不要操作同一 QA 窗口。
 
 这些检查用于补充人工矩阵，不涵盖模型服务商凭据、真实外部 SSH 账户、Narrator 或 macOS 真机。
+
+可在同一次 CDP 连接中核对视口尺寸并捕获减少动画或强制颜色模式，避免连接关闭后覆盖失效。
+以下为浏览器模拟检查，不能代替 Windows 系统设置下的人工验收：
+
+```powershell
+node .github/scripts/desktop-ui-acceptance.mjs 9223 viewport 900 620 D:/qa/contrast.png forced-colors
+node .github/scripts/desktop-ui-acceptance.mjs 9223 viewport 900 620 D:/qa/motion.png reduced-motion
+```
