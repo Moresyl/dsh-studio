@@ -137,19 +137,30 @@ pub async fn plugin_search(
     sort: String,
     page: usize,
     refresh: bool,
+    available_only: Option<bool>,
 ) -> Result<super::market::Page> {
     let source = super::catalog::sources()
         .into_iter()
         .find(|source| source.active)
         .ok_or_else(|| Error::Plugin("no plugin catalog source is active".into()))?;
+    let installed = available_only.unwrap_or(false).then(|| {
+        super::state()
+            .plugins
+            .into_iter()
+            .map(|plugin| plugin.name)
+            .collect()
+    });
     super::market::search(
         &node()?,
         &source.id,
-        &query,
-        category.as_deref(),
-        &sort,
-        page,
-        refresh,
+        super::market::SearchOptions {
+            query: &query,
+            category: category.as_deref(),
+            sort: &sort,
+            page,
+            refresh,
+            available: installed.as_ref(),
+        },
     )
     .await
 }

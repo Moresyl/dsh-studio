@@ -1262,6 +1262,7 @@ mod tests {
             disabled,
             builtin,
             market_receipt: None,
+            compatibility: crate::plugins::registry::Compatibility::Unknown,
         }
     }
 

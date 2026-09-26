@@ -924,6 +924,7 @@ mod tests {
             disabled,
             builtin,
             market_receipt: None,
+            compatibility: crate::plugins::registry::Compatibility::Unknown,
         };
 
         assert_eq!(standing(&entry(false, true, false)), "disabled");

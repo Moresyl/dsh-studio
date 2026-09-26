@@ -64,6 +64,8 @@ pub struct InstalledPlugin {
     pub builtin: bool,
     /// Receipt id when this exact profile package came from the market.
     pub market_receipt: Option<String>,
+    /// Declared compatibility of the installed package, not proof it loaded.
+    pub compatibility: registry::Compatibility,
 }
 
 /// Everything the plugin panel needs before it draws anything.
@@ -274,6 +276,13 @@ pub fn state() -> PluginState {
     let receipt_ids = receipts::ids(&profile, &profile_dir);
     for plugin in &mut plugins {
         plugin.market_receipt = receipt_ids.get(&plugin.name).cloned();
+        if is_package_name(&plugin.name) {
+            if let Some(manifest) =
+                read_manifest(&profile_dir.join("node_modules").join(&plugin.name))
+            {
+                plugin.compatibility = registry::compatibility(&manifest);
+            }
+        }
     }
 
     PluginState {
@@ -328,6 +337,7 @@ pub(crate) fn list(
                     spec: spec.as_str().unwrap_or_default().to_string(),
                     builtin: false,
                     market_receipt: None,
+                    compatibility: registry::Compatibility::Unknown,
                 })
                 .collect()
         })
@@ -342,6 +352,7 @@ pub(crate) fn list(
                 disabled: false,
                 builtin: true,
                 market_receipt: None,
+                compatibility: registry::Compatibility::Unknown,
             });
         }
     }

@@ -3,6 +3,21 @@ import { describe, expect, it } from 'vitest'
 import { logTone } from '@/lib/log-tone'
 
 describe('harness log tone', () => {
+  it('distinguishes skipped plugins from a failed Harness process', () => {
+    expect(
+      logTone({
+        stream: 'stderr',
+        line: 'dsh: skipping profile bundle "dsh-diagram": Error: incompatible',
+      }),
+    ).toBe('warning')
+    expect(logTone({ stream: 'stderr', line: 'GUI shell environment: process (windows)' })).toBe(
+      'normal',
+    )
+    expect(
+      logTone({ stream: 'stderr', line: '[dsh-deeptutor] plugin loaded (html script: path)' }),
+    ).toBe('normal')
+    expect(logTone({ stream: 'stderr', line: '[dsh-deeptutor] plugin load failed' })).toBe('error')
+  })
   it('does not mistake npm cache traffic on stderr for a failure', () => {
     expect(
       logTone({

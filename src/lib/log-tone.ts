@@ -11,9 +11,12 @@ export type LogTone = 'normal' | 'warning' | 'error'
  * stderr stays red; this must never make a new failure easy to miss.
  */
 export function logTone(entry: LogLine): LogTone {
+  const line = entry.line.replace(/\x1b\[[0-9;]*m/g, '').trimStart()
+  if (/^dsh: skipping profile bundle "/.test(line)) return 'warning'
   if (entry.stream !== 'stderr') return 'normal'
 
-  const line = entry.line.replace(/\x1b\[[0-9;]*m/g, '').trimStart()
+  if (/^GUI shell environment: process \(windows\)$/.test(line)) return 'normal'
+  if (/^\[[^\]\r\n]+\] plugin loaded(?: \(|$)/.test(line)) return 'normal'
   if (/^npm warn\b/i.test(line)) return 'warning'
   if (/^npm (?:http|info|notice|verbose|verb)\b/i.test(line)) return 'normal'
   if (/^(?:>|Progress:|added \d+ packages?\b|up to date\b)/i.test(line)) return 'normal'

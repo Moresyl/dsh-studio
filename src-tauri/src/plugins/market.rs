@@ -45,15 +45,24 @@ fn cache() -> &'static Mutex<HashMap<String, Entry>> {
     CACHE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-pub async fn search(
-    node: &Path,
-    source_id: &str,
-    query: &str,
-    category: Option<&str>,
-    sort: &str,
-    page: usize,
-    refresh: bool,
-) -> Result<Page> {
+pub struct SearchOptions<'a> {
+    pub query: &'a str,
+    pub category: Option<&'a str>,
+    pub sort: &'a str,
+    pub page: usize,
+    pub refresh: bool,
+    pub available: Option<&'a BTreeSet<String>>,
+}
+
+pub async fn search(node: &Path, source_id: &str, options: SearchOptions<'_>) -> Result<Page> {
+    let SearchOptions {
+        query,
+        category,
+        sort,
+        page,
+        refresh,
+        available,
+    } = options;
     let normalized_query = query.trim().to_ascii_lowercase();
     let query_index = source_id == "npm" || source_id == super::catalog::DSHFIND_ID;
     let cache_key = if query_index {
@@ -91,14 +100,27 @@ pub async fn search(
         }
     };
 
+    let items = available_items(entry.items, available);
     page_items(
-        entry.items,
+        items,
         &normalized_query,
         category,
         sort,
         page,
         entry.indexed_at,
     )
+}
+
+/// Filter the entire index before paging, so counts and empty states describe
+/// the same set of packages that the user can browse.
+fn available_items(items: Vec<Listing>, installed: Option<&BTreeSet<String>>) -> Vec<Listing> {
+    let Some(installed) = installed else {
+        return items;
+    };
+    items
+        .into_iter()
+        .filter(|item| item.installable && !installed.contains(&item.name))
+        .collect()
 }
 
 pub async fn invalidate(source_id: &str) {
@@ -169,7 +191,26 @@ fn now() -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{page_items, Listing};
+    use super::{available_items, page_items, Listing};
+
+    #[test]
+    fn available_filter_precedes_pagination_and_preserves_discovery() {
+        let mut items: Vec<_> = (0..60)
+            .map(|n| listing(&format!("tool-{n:02}"), "agent", n))
+            .collect();
+        items[59].installable = false;
+        let installed = (0..30).map(|n| format!("tool-{n:02}")).collect();
+        assert_eq!(available_items(items.clone(), None).len(), 60);
+        let filtered = available_items(items, Some(&installed));
+        let first = page_items(filtered.clone(), "", None, "name", 0, 0).unwrap();
+        assert_eq!(first.total, 29);
+        assert_eq!(first.items.len(), 25);
+        assert_eq!(first.items[0].name, "tool-30");
+        assert!(first.has_more);
+        let second = page_items(filtered, "", None, "name", 1, 0).unwrap();
+        assert_eq!(second.items.len(), 4);
+        assert!(!second.has_more);
+    }
 
     fn listing(name: &str, category: &str, downloads: u64) -> Listing {
         Listing {

@@ -1,4 +1,11 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react'
 import { CheckCircle2, Database, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
@@ -23,6 +30,14 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
   const [label, setLabel] = useState('')
   const [endpoint, setEndpoint] = useState('')
   const card = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const previous = document.activeElement
+    card.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus()
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus()
+    }
+  }, [])
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()

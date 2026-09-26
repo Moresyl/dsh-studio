@@ -23,6 +23,7 @@ import { Button } from '@/components/Button'
 import { Switch } from '@/components/Switch'
 import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
+import { pluginDisplayName } from '@/lib/plugin-presentation'
 import { normalizeExternalUrl, openExternalUrl } from '@/lib/external-url'
 import type { InstalledPlugin } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
@@ -79,13 +80,6 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
     void select(null)
   }
 
-  // Focus lands on the action, not on the close button: this dialog is opened
-  // by pressing Install, and the thing it opened onto should be one Enter away.
-  // Deferred until the manifest is in, because until then there is no action.
-  useEffect(() => {
-    if (!loading) primary.current?.focus()
-  }, [loading, selected])
-
   // Wherever the caret was — a row, the search field — is where it goes back to.
   useEffect(() => {
     const previous = document.activeElement
@@ -93,6 +87,16 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
       if (previous instanceof HTMLElement) previous.focus()
     }
   }, [])
+
+  // Capture the opener above before moving focus. Loading, blocked and
+  // installed packages may not have an enabled primary action.
+  useEffect(() => {
+    const target =
+      !loading && primary.current && !primary.current.disabled
+        ? primary.current
+        : card.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')
+    target?.focus()
+  }, [loading, selected])
 
   if (selected === null) return null
 
@@ -128,9 +132,9 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
         role="dialog"
         aria-modal="true"
         aria-label={t('plugins.details')}
-        className="dialog-panel flex max-h-full w-full max-w-[540px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-full w-full max-w-[620px] animate-pop flex-col overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-lift"
       >
-        <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3.5">
+        <header className="flex shrink-0 items-start gap-3 border-b border-line px-5 py-4">
           <span
             aria-hidden="true"
             className="grid size-9 shrink-0 place-items-center rounded-[8px] border border-line bg-surface-2 text-brand"
@@ -139,9 +143,12 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
           </span>
 
           <div className="min-w-0 flex-1 pt-px">
-            <h2 className="selectable text-[13px] leading-snug font-semibold break-all text-text">
-              {selected}
+            <h2 className="selectable text-[17px] leading-snug font-semibold text-text [overflow-wrap:anywhere]">
+              {pluginDisplayName(selected)}
             </h2>
+            <p className="selectable mt-1 text-[12px] text-muted [overflow-wrap:anywhere]">
+              {selected}
+            </p>
             <p className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[11px] text-faint">
               {detail && <span className="font-mono tabular-nums">{detail.version}</span>}
               {listing?.publisher && <span className="truncate">{listing.publisher}</span>}
@@ -159,13 +166,13 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
             aria-label={t('plugins.close')}
             data-hint={t('plugins.close')}
             onClick={close}
-            className="-mt-0.5 -mr-1 grid size-[26px] shrink-0 place-items-center rounded-control text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
+            className="-mt-0.5 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors duration-100 hover:bg-surface-2 hover:text-text"
           >
             <X size={14} strokeWidth={2.2} aria-hidden="true" />
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
             <div className="grid h-[168px] place-items-center">
               <Loader2 size={18} className="animate-spin text-faint" aria-hidden="true" />
@@ -183,7 +190,7 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
           ) : (
             <div className="flex flex-col gap-3.5">
               {detail.description && (
-                <p className="selectable text-[12px] leading-relaxed text-muted">
+                <p className="selectable text-[13px] leading-relaxed text-muted [overflow-wrap:anywhere]">
                   {detail.description}
                 </p>
               )}
@@ -390,7 +397,11 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                 <Row label={t('plugins.compatibility')}>
                   <span
                     className={
-                      detail.compatibility.state === 'incompatible' ? 'text-danger' : 'text-ok'
+                      detail.compatibility.state === 'incompatible'
+                        ? 'text-danger'
+                        : detail.compatibility.state === 'compatible'
+                          ? 'text-ok'
+                          : 'text-muted'
                     }
                   >
                     {detail.compatibility.state === 'compatible'
@@ -442,7 +453,7 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
           )}
         </div>
 
-        <footer className="flex shrink-0 items-center gap-3 border-t border-line bg-canvas-deep/40 px-4 py-3">
+        <footer className="flex shrink-0 items-center gap-3 border-t border-line bg-canvas-deep/40 px-5 py-3 [&>button]:h-9 [&>button]:rounded-xl [&>button]:px-3 [&>button]:text-[13px]">
           {/* While a package manager is running, the footer is where it reports
               — the same tail the pane behind this shows, so closing the dialog
               loses nothing. */}
@@ -532,6 +543,7 @@ interface ProfileStateProps {
  */
 function ProfileState({ plugin, busy, locked, onToggle }: ProfileStateProps) {
   const layered = plugin.active || plugin.disabled
+  const incompatible = plugin.compatibility?.state === 'incompatible'
   const fixed = plugin.builtin || !layered
   const note = plugin.builtin
     ? t('plugins.builtinFixed')
@@ -539,7 +551,9 @@ function ProfileState({ plugin, busy, locked, onToggle }: ProfileStateProps) {
       ? t('plugins.libraryNote')
       : plugin.disabled
         ? t('plugins.offNote')
-        : null
+        : incompatible
+          ? t('plugins.runtimeBlockedHint')
+          : null
 
   return (
     <section className="rounded-control border border-line bg-canvas-deep/55 px-3 py-2.5">
@@ -554,10 +568,22 @@ function ProfileState({ plugin, busy, locked, onToggle }: ProfileStateProps) {
         <span
           className={[
             'text-[11.5px] font-medium',
-            plugin.disabled ? 'text-faint' : layered ? 'text-ok' : 'text-faint',
+            plugin.disabled
+              ? 'text-faint'
+              : incompatible
+                ? 'text-warn'
+                : layered
+                  ? 'text-ok'
+                  : 'text-faint',
           ].join(' ')}
         >
-          {layered ? (plugin.disabled ? t('plugins.off') : t('plugins.on')) : t('plugins.library')}
+          {plugin.disabled
+            ? t('plugins.off')
+            : incompatible
+              ? t('plugins.runtimeBlocked')
+              : layered
+                ? t('plugins.on')
+                : t('plugins.library')}
         </span>
 
         <Switch
@@ -577,8 +603,10 @@ function ProfileState({ plugin, busy, locked, onToggle }: ProfileStateProps) {
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-baseline gap-3">
-      <dt className="shrink-0 text-[11.5px] text-faint">{label}</dt>
-      <dd className="ml-auto min-w-0 truncate text-right text-[11.5px] text-muted">{children}</dd>
+      <dt className="shrink-0 text-[12px] text-muted">{label}</dt>
+      <dd className="ml-auto min-w-0 text-right text-[12px] text-muted [overflow-wrap:anywhere]">
+        {children}
+      </dd>
     </div>
   )
 }

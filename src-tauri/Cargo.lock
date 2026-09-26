@@ -967,6 +967,7 @@ dependencies = [
  "getrandom 0.3.4",
  "image",
  "node-runtime",
+ "nodejs-semver",
  "portable-pty",
  "proc-guard",
  "qrcodegen",
@@ -2514,6 +2515,16 @@ dependencies = [
  "dirs 6.0.0",
  "proc-guard",
  "serde",
+]
+
+[[package]]
+name = "nodejs-semver"
+version = "7.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "938185814d480ac0eff0ac4676d27deef920cbd2b83df83603a873af5b7c8fc9"
+dependencies = [
+ "smallvec",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

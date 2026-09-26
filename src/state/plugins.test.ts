@@ -107,6 +107,17 @@ describe('plugin installation identity', () => {
 })
 
 describe('installed plugin details', () => {
+  it('preserves an installed module compatibility failure in its detail review', () => {
+    const compatibility = {
+      state: 'incompatible' as const,
+      requirement: '0.1.0-rc.6',
+      reason: 'dsh-tools requires 0.1.0-rc.6',
+    }
+    usePlugins.getState().selectInstalled({ ...installed, compatibility })
+    expect(usePlugins.getState().detail?.compatibility).toEqual(compatibility)
+    expect(ipc.pluginDetail).not.toHaveBeenCalled()
+  })
+
   it('opens a local link package without querying npm', () => {
     usePlugins.getState().selectInstalled(installed)
 

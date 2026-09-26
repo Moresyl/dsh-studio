@@ -7,6 +7,7 @@
 //! asked once, because it cannot change while the app is running without npm
 //! being reconfigured underneath it.
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::process::Stdio;
 use std::time::Duration;
@@ -490,7 +491,11 @@ pub(crate) fn repository_identity(value: &str) -> Option<String> {
     Some(url.to_string().trim_end_matches('/').to_ascii_lowercase())
 }
 
-fn compatibility(manifest: &serde_json::Value) -> Compatibility {
+pub(super) fn compatibility(manifest: &serde_json::Value) -> Compatibility {
+    compatibility_with_runtime(manifest, &crate::harness::install::selected_version())
+}
+
+fn compatibility_with_runtime(manifest: &serde_json::Value, runtime: &str) -> Compatibility {
     for field in ["dependencies", "peerDependencies", "optionalDependencies"] {
         let Some(dependencies) = manifest.get(field).and_then(serde_json::Value::as_object) else {
             continue;
@@ -502,36 +507,47 @@ fn compatibility(manifest: &serde_json::Value) -> Compatibility {
             };
         }
     }
-    let requirement = ["peerDependencies", "dependencies", "optionalDependencies"]
-        .into_iter()
-        .find_map(|field| {
-            manifest
-                .pointer(&format!("/{field}/@deepseek-ai~1dsh"))
-                .and_then(serde_json::Value::as_str)
-                .map(str::trim)
-                .filter(|value| !value.is_empty())
-        });
-    let Some(requirement) = requirement else {
+    let requirements: Vec<(&str, &str)> =
+        ["peerDependencies", "dependencies", "optionalDependencies"]
+            .into_iter()
+            .filter_map(|field| manifest.get(field).and_then(serde_json::Value::as_object))
+            .flat_map(|dependencies| dependencies.iter())
+            .filter(|(name, _)| {
+                *name == "@deepseek-ai/dsh" || name.starts_with("@deepseek-ai/dsh-")
+            })
+            .map(|(name, value)| (name.as_str(), value.as_str().unwrap_or("").trim()))
+            .collect();
+    if requirements.is_empty() {
         return Compatibility::Unknown;
-    };
-
-    let Ok(requirement_parsed) = semver::VersionReq::parse(requirement) else {
-        return Compatibility::Incompatible {
-            requirement: requirement.to_string(),
-            reason: "the package declares an unreadable peer dependency range".to_string(),
+    }
+    let current =
+        nodejs_semver::Version::parse(runtime).expect("the pinned Harness version is valid semver");
+    for (name, requirement) in &requirements {
+        if matches!(*requirement, "workspace:^" | "workspace:~" | "workspace:*") {
+            continue;
+        }
+        let parsed = nodejs_semver::Range::parse(requirement);
+        let Some(parsed) = parsed.ok().filter(|_| !requirement.is_empty()) else {
+            return Compatibility::Incompatible {
+                requirement: format!("{name}: {requirement}"),
+                reason: format!("{name} declares an unreadable dependency range"),
+            };
         };
-    };
-    let current = semver::Version::parse(&crate::harness::install::selected_version())
-        .expect("the pinned Harness version is valid semver");
-    if requirement_parsed.matches(&current) {
-        Compatibility::Compatible {
-            requirement: requirement.to_string(),
+        if !parsed.satisfies_with_prerelease(&current, true) {
+            return Compatibility::Incompatible {
+                requirement: format!("{name}: {requirement}"),
+                reason: format!("{name} requires {requirement}; the selected Harness is {runtime}"),
+            };
         }
-    } else {
-        Compatibility::Incompatible {
-            requirement: requirement.to_string(),
-            reason: format!("it requires {requirement}"),
-        }
+    }
+    Compatibility::Compatible {
+        requirement: requirements
+            .iter()
+            .map(|(_, range)| *range)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
+            .join(", "),
     }
 }
 
@@ -653,8 +669,8 @@ fn string(value: &serde_json::Value, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        compatibility, detail_from_manifest, exact_requested_version, listing, refresh_trust,
-        repository_identity, validate_preflight, Compatibility, TrustLevel,
+        compatibility, compatibility_with_runtime, detail_from_manifest, exact_requested_version,
+        listing, refresh_trust, repository_identity, validate_preflight, Compatibility, TrustLevel,
     };
 
     #[test]
@@ -728,7 +744,7 @@ mod tests {
         }));
         assert!(matches!(
             previous_prerelease_line,
-            Compatibility::Incompatible { .. }
+            Compatibility::Compatible { .. }
         ));
 
         let incompatible = compatibility(&serde_json::json!({
@@ -745,6 +761,84 @@ mod tests {
             "dependencies": { "cordis": "^3.0.0" }
         }));
         assert!(matches!(legacy, Compatibility::Incompatible { .. }));
+    }
+
+    #[test]
+    fn module_only_peers_cannot_bypass_runtime_compatibility_review() {
+        let old = serde_json::json!({
+            "peerDependencies": {
+                "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+                "@deepseek-ai/dsh-session": "0.1.0-rc.6"
+            },
+            "peerDependenciesMeta": {
+                "@deepseek-ai/dsh-client-runtime": { "optional": true }
+            }
+        });
+        assert!(matches!(
+            compatibility_with_runtime(&old, "0.1.7-rc.2"),
+            Compatibility::Incompatible { .. }
+        ));
+        let mixed = serde_json::json!({
+            "peerDependencies": {
+                "@deepseek-ai/dsh": "0.1.7-rc.2",
+                "@deepseek-ai/dsh-tools": "0.1.0-rc.6"
+            }
+        });
+        assert!(matches!(
+            compatibility_with_runtime(&mixed, "0.1.7-rc.2"),
+            Compatibility::Incompatible { .. }
+        ));
+    }
+
+    #[test]
+    fn module_peers_accept_the_selected_runtime_and_upstream_workspace_ranges() {
+        for range in ["0.1.7-rc.2", "workspace:^", "workspace:~", "workspace:*"] {
+            let manifest =
+                serde_json::json!({"peerDependencies": {"@deepseek-ai/dsh-tools": range}});
+            assert!(matches!(
+                compatibility_with_runtime(&manifest, "0.1.7-rc.2"),
+                Compatibility::Compatible { .. }
+            ));
+        }
+        let unrelated = serde_json::json!({"peerDependencies": {"@deepseek-ai/cordis": "4.0.1", "react": "^18.2.0"}});
+        assert!(matches!(
+            compatibility_with_runtime(&unrelated, "0.1.7-rc.2"),
+            Compatibility::Unknown
+        ));
+        let malformed = serde_json::json!({"peerDependencies": {"@deepseek-ai/dsh-tools": null}});
+        assert!(matches!(
+            compatibility_with_runtime(&malformed, "0.1.7-rc.2"),
+            Compatibility::Incompatible { .. }
+        ));
+    }
+
+    #[test]
+    fn npm_ranges_keep_exact_versions_exact_and_include_runtime_prereleases() {
+        // Expected answers cross-checked against npm semver with the same
+        // includePrerelease option used by the pinned app-boot runtime.
+        for (range, expected) in [
+            ("0.1.7-rc.1", false),
+            ("0.1.7-rc.2", true),
+            ("0.1.7", false),
+            ("^0.1.0-rc.7", true),
+            ("*", true),
+            ("0.1.x", true),
+            ("~0.1", true),
+            (">=0.1.0-rc.6 <0.2.0", true),
+            ("0.1.0 - 0.1.7", true),
+            ("0.1.0-rc.6 || 0.1.7-rc.2", true),
+            ("", false),
+            ("invalid", false),
+        ] {
+            let manifest =
+                serde_json::json!({"peerDependencies": {"@deepseek-ai/dsh-tools": range}});
+            let result = compatibility_with_runtime(&manifest, "0.1.7-rc.2");
+            assert_eq!(
+                matches!(result, Compatibility::Compatible { .. }),
+                expected,
+                "{range}: {result:?}"
+            );
+        }
     }
 
     #[test]

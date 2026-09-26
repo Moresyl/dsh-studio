@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { open as pickFile } from '@tauri-apps/plugin-dialog'
 import {
   Check,
   ChevronLeft,
   ChevronRight,
-  Download,
   Database,
   ExternalLink,
   Info,
@@ -27,8 +26,9 @@ import { CatalogSourcesDialog } from '@/components/CatalogSourcesDialog'
 import { SelectControl } from '@/components/SelectControl'
 import { Switch } from '@/components/Switch'
 import { TabButton } from '@/components/TabButton'
-import { count, day, filesize } from '@/lib/format'
+import { count, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
+import { pluginDisplayName } from '@/lib/plugin-presentation'
 import { openExternalUrl } from '@/lib/external-url'
 import * as ipc from '@/lib/ipc'
 import type { CatalogSource, InstalledPlugin, PluginListing, PluginSort } from '@/lib/ipc'
@@ -57,10 +57,8 @@ type Tab = 'discover' | 'installable' | 'installed' | 'sources'
  * flattened the three into "installed" would explain nothing on the day one of
  * them is the reason something is not loading.
  *
- * So the pane is one wide list and nothing else. What a package declares is
- * worth a paragraph and a set of links, and a paragraph belongs in front of
- * someone who asked for it rather than in a rail that takes a third of the
- * window whether or not anything is selected.
+ * Discovery uses responsive cards with a short summary. The exact package
+ * identity remains visible; dependency and trust details open on request.
  *
  * Changes go through the harness's own plugin command, so the pane never claims
  * a result it did not get back from disk. What it does add is the sentence
@@ -98,6 +96,7 @@ export function PluginMarket() {
   const [page, setPage] = useState(0)
   const [managingSources, setManagingSources] = useState(false)
   const field = useRef<HTMLInputElement>(null)
+  const resultsViewport = useRef<HTMLDivElement>(null)
   const activeSource = sources.find((source) => source.active) ?? null
 
   // Asked here rather than at each button: all three places remove a plugin the
@@ -167,11 +166,15 @@ export function PluginMarket() {
   useEffect(() => {
     if (tab === 'installed' || tab === 'sources') return
     const timer = window.setTimeout(
-      () => void search(query, category, sort, page),
+      () => void search(query, category, sort, page, false, tab === 'installable'),
       query === '' ? 0 : DEBOUNCE,
     )
     return () => window.clearTimeout(timer)
-  }, [query, category, sort, page, search, activeSource?.id, tab])
+  }, [query, category, sort, page, search, activeSource?.id, tab, profile])
+
+  useEffect(() => {
+    resultsViewport.current?.scrollTo({ top: 0 })
+  }, [results, tab])
 
   const installed = profile?.plugins ?? []
   const removable = installed.filter((plugin) => !plugin.builtin).length
@@ -184,16 +187,22 @@ export function PluginMarket() {
           subtitle={t('plugins.subtitle', { profile: profile?.profile ?? '' })}
           subtitleHint={profile?.profileDir}
         >
-          <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
+          <div className="flex items-center gap-0.5 rounded-xl bg-canvas-deep p-1 hairline [&>button]:h-8 [&>button]:rounded-lg [&>button]:text-[13px]">
             <TabButton
               label={t('plugins.tab.discover')}
               active={tab === 'discover'}
-              onClick={() => setTab('discover')}
+              onClick={() => {
+                setTab('discover')
+                setPage(0)
+              }}
             />
             <TabButton
               label={t('plugins.tab.installable')}
               active={tab === 'installable'}
-              onClick={() => setTab('installable')}
+              onClick={() => {
+                setTab('installable')
+                setPage(0)
+              }}
             />
             <TabButton
               label={
@@ -216,6 +225,7 @@ export function PluginMarket() {
               where discovery finds nothing at all. */}
           <Button
             variant="secondary"
+            className="!h-9 !gap-2 !rounded-xl !px-3"
             onClick={() => void importArchive()}
             disabled={working !== null}
             data-hint={t('plugins.importHint')}
@@ -225,10 +235,10 @@ export function PluginMarket() {
           </Button>
         </PaneHeader>
 
-        <div className="mx-auto mb-5 flex min-h-0 w-[calc(100%-48px)] max-w-[1040px] flex-1 flex-col overflow-hidden rounded-panel border border-line bg-canvas-deep/45 shadow-panel">
+        <div className="@container mx-auto mb-5 flex min-h-0 w-[calc(100%-48px)] max-w-[1040px] flex-1 flex-col">
           {(tab === 'discover' || tab === 'installable') && (
-            <div className="shrink-0 border-b border-line">
-              <div className="flex h-11 items-center gap-2 px-4">
+            <div className="shrink-0 pb-4">
+              <div className="flex min-h-14 items-center gap-3 rounded-2xl border border-line-strong bg-canvas-deep px-4 transition-colors focus-within:border-control-border-hover">
                 <SelectControl
                   value={activeSource?.id ?? 'npm'}
                   disabled={working !== null || sourceWorking}
@@ -238,7 +248,7 @@ export function PluginMarket() {
                     void selectSource(value)
                   }}
                   aria-label={t('plugins.source')}
-                  density="small"
+                  density="compact"
                   containerClassName="max-w-[150px]"
                   className="text-muted"
                 >
@@ -259,7 +269,7 @@ export function PluginMarket() {
                   <Settings2 size={13} aria-hidden="true" />
                 </button>
                 <Search
-                  size={14}
+                  size={18}
                   strokeWidth={2.1}
                   className="shrink-0 text-faint"
                   aria-hidden="true"
@@ -279,12 +289,13 @@ export function PluginMarket() {
                     if (event.key === 'Escape' && query !== '') {
                       event.stopPropagation()
                       setQuery('')
+                      setPage(0)
                     }
                   }}
                   placeholder={t('plugins.search')}
                   spellCheck={false}
                   autoComplete="off"
-                  className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
+                  className="selectable h-14 min-w-0 flex-1 bg-transparent text-[14px] text-text outline-none placeholder:text-faint"
                 />
                 {searching && (
                   <Loader2
@@ -313,7 +324,7 @@ export function PluginMarket() {
                 )}
               </div>
 
-              <div className="flex h-9 items-center gap-2 border-t border-line/70 px-4">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <SelectControl
                   value={category ?? ''}
                   onValueChange={(value) => {
@@ -321,7 +332,7 @@ export function PluginMarket() {
                     setPage(0)
                   }}
                   aria-label={t('plugins.category.all')}
-                  density="small"
+                  density="compact"
                   containerClassName="max-w-[170px]"
                   className="text-muted"
                 >
@@ -339,7 +350,7 @@ export function PluginMarket() {
                     setSort(value as PluginSort)
                     setPage(0)
                   }}
-                  density="small"
+                  density="compact"
                   className="text-muted"
                 >
                   {(['relevance', 'updated', 'name', 'downloads'] as const).map((value) => (
@@ -352,7 +363,7 @@ export function PluginMarket() {
                   type="button"
                   onClick={() => {
                     setPage(0)
-                    void search(query, category, sort, 0, true)
+                    void search(query, category, sort, 0, true, tab === 'installable')
                   }}
                   disabled={searching}
                   data-hint={t('plugins.index.refresh')}
@@ -365,7 +376,7 @@ export function PluginMarket() {
                     aria-hidden="true"
                   />
                 </button>
-                <span className="min-w-0 flex-1 truncate text-[10.5px] text-faint">
+                <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
                   {t('plugins.index.summary', {
                     total,
                     page: landedPage + 1,
@@ -406,7 +417,10 @@ export function PluginMarket() {
             </Notice>
           )}
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div
+            ref={resultsViewport}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
+          >
             {tab === 'discover' ? (
               <Discover
                 results={results}
@@ -418,9 +432,7 @@ export function PluginMarket() {
               />
             ) : tab === 'installable' ? (
               <Discover
-                results={results.filter(
-                  (listing) => listing.installable && !isInstalled(profile, listing.name),
-                )}
+                results={results}
                 searching={searching}
                 selected={selected}
                 working={working}
@@ -453,9 +465,9 @@ export function PluginMarket() {
             </div>
           )}
 
-          <footer className="flex h-8 shrink-0 items-center gap-2 border-t border-line px-4">
+          <footer className="mt-3 flex min-h-8 shrink-0 items-center gap-2 px-1">
             <Info size={12} strokeWidth={2} className="shrink-0 text-faint" aria-hidden="true" />
-            <p className="truncate text-[11.5px] text-faint">{t('plugins.restart')}</p>
+            <p className="text-[12px] leading-relaxed text-muted">{t('plugins.restart')}</p>
           </footer>
         </div>
       </section>
@@ -553,7 +565,14 @@ interface DiscoverProps {
   isInstalled: (name: string) => boolean
 }
 
-function Discover({ results, searching, selected, working, onOpen, isInstalled }: DiscoverProps) {
+export function Discover({
+  results,
+  searching,
+  selected,
+  working,
+  onOpen,
+  isInstalled,
+}: DiscoverProps) {
   if (results.length === 0) {
     return (
       <Empty icon={Package} message={searching ? t('plugins.searching') : t('plugins.noResults')} />
@@ -561,119 +580,91 @@ function Discover({ results, searching, selected, working, onOpen, isInstalled }
   }
 
   return (
-    <ul>
+    <ul
+      className="grid grid-cols-1 gap-3 @min-[680px]:grid-cols-2"
+      aria-label={t('plugins.tab.discover')}
+      aria-busy={searching}
+    >
       {results.map((listing) => {
         const here = isInstalled(listing.name)
 
         return (
-          <li key={listing.name}>
-            <div
-              role="button"
-              tabIndex={0}
+          <li key={`${listing.sourceId}:${listing.name}`} className="min-w-0">
+            <button
+              type="button"
               onClick={() => onOpen(listing)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  onOpen(listing)
-                }
-              }}
+              disabled={working !== null}
+              aria-label={`${pluginDisplayName(listing.name)} · ${listing.name} · ${t('plugins.details')}`}
               className={[
-                'relative flex w-full items-start gap-3 border-b border-line px-4 py-3 text-left transition-colors duration-100',
-                selected === listing.name ? 'bg-surface-2' : 'hover:bg-surface-2/55',
+                'group flex h-full min-h-[228px] w-full flex-col rounded-2xl border p-5 text-left transition-colors duration-150 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text',
+                selected === listing.name
+                  ? 'border-control-border-hover bg-surface-2'
+                  : 'border-line bg-canvas-deep hover:border-line-strong hover:bg-surface-2/55',
               ].join(' ')}
             >
-              {selected === listing.name && (
-                <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[2px] bg-brand" />
-              )}
+              <span className="flex w-full items-center gap-3">
+                <Tile
+                  key={`${listing.sourceId}\0${listing.name}\0${listing.version}`}
+                  listing={listing}
+                />
 
-              <Tile
-                key={`${listing.sourceId}\0${listing.name}\0${listing.version}`}
-                listing={listing}
-              />
-
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="truncate text-[12.5px] font-medium text-text">
-                    {listing.name}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[16px] font-semibold tracking-tight text-text">
+                    {pluginDisplayName(listing.name)}
                   </span>
-                  <span className="shrink-0 font-mono text-[11px] text-faint tabular-nums">
-                    {listing.version}
+                  <span className="mt-1 block truncate text-[12px] text-muted">
+                    {listing.publisher || listing.sourceLabel}
                   </span>
-                </div>
-
-                {listing.description && (
-                  <p className="mt-1 line-clamp-2 text-[11.5px] leading-relaxed text-muted">
-                    {listing.description}
-                  </p>
+                </span>
+                <ChevronRight
+                  size={16}
+                  className="shrink-0 text-faint transition-transform group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
+              </span>
+              <span className="mt-4 line-clamp-3 text-[13px] leading-[1.65] text-muted [overflow-wrap:anywhere]">
+                {listing.description || t('plugins.noDescription')}
+              </span>
+              <span className="mt-auto flex w-full items-center gap-2 pt-5">
+                <span
+                  className="min-w-0 flex-1 truncate text-[11.5px] text-muted"
+                  title={listing.name}
+                >
+                  {listing.name}
+                </span>
+                <span className="shrink-0 rounded-full bg-control-fill px-2.5 py-1 text-[11px] text-muted">
+                  {listing.name.startsWith('@deepseek-ai/')
+                    ? t('plugins.officialComponent')
+                    : t('plugins.community')}
+                </span>
+              </span>
+              <span className="mt-3 flex w-full items-center gap-2 border-t border-line pt-3 text-[11.5px] text-muted">
+                <span className="truncate tabular-nums">v{listing.version}</span>
+                {listing.weeklyDownloads > 0 && (
+                  <span className="ml-1 truncate tabular-nums">
+                    {t('plugins.downloads', { count: count(listing.weeklyDownloads) })}
+                  </span>
                 )}
-
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
-                  {listing.publisher && <span className="truncate">{listing.publisher}</span>}
-                  <span className="truncate text-brand/80">{listing.sourceLabel}</span>
-                  {listing.weeklyDownloads > 0 && (
-                    <span className="tabular-nums">
-                      {t('plugins.downloads', { count: count(listing.weeklyDownloads) })}
-                    </span>
-                  )}
-                  {listing.updated && (
-                    <span className="tabular-nums">
-                      {t('plugins.updated', { date: day(listing.updated) })}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Both this and the row itself open the same dialog. The button
-                  is there because "install" is what the visitor came to do, and
-                  a list that only reacts to being clicked somewhere vague makes
-                  them guess where. */}
-              <RowAction
-                installed={here}
-                busy={working === listing.name}
-                onOpen={(event) => {
-                  event.stopPropagation()
-                  onOpen(listing)
-                }}
-              />
-            </div>
+                <span
+                  className={`ml-auto inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium ${here ? 'bg-ok/10 text-ok' : 'bg-text text-canvas'}`}
+                >
+                  {working === listing.name ? (
+                    <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                  ) : here ? (
+                    <Check size={13} aria-hidden="true" />
+                  ) : null}
+                  {working === listing.name
+                    ? t('plugins.installing')
+                    : here
+                      ? t('plugins.installed')
+                      : t('plugins.details')}
+                </span>
+              </span>
+            </button>
           </li>
         )
       })}
     </ul>
-  )
-}
-
-function RowAction({
-  installed,
-  busy,
-  onOpen,
-}: {
-  installed: boolean
-  busy: boolean
-  onOpen: (event: MouseEvent) => void
-}) {
-  if (installed) {
-    return (
-      <span className="mt-0.5 inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] px-2 text-[11.5px] font-medium text-ok">
-        <Check size={11} strokeWidth={2.6} aria-hidden="true" />
-        {t('plugins.installed')}
-      </span>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="mt-0.5 inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 enabled:hover:brightness-[1.2] enabled:active:brightness-95"
-    >
-      {busy ? (
-        <Loader2 size={11} className="animate-spin" aria-hidden="true" />
-      ) : (
-        <Download size={11} strokeWidth={2.4} aria-hidden="true" />
-      )}
-      {busy ? t('plugins.installing') : t('plugins.install')}
-    </button>
   )
 }
 
@@ -699,18 +690,19 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
   }
 
   return (
-    <ul>
+    <ul className="flex flex-col gap-3" aria-label={t('plugins.tab.installed')}>
       {plugins.map((plugin) => {
         // In the stack or taken out of it — either way there is a layer here to
         // switch. A package that declares no patch has none, and offering a
         // switch for it would promise something the harness would undo.
         const layered = plugin.active || plugin.disabled
         const busy = working === plugin.name
+        const incompatible = plugin.compatibility?.state === 'incompatible'
 
         return (
           <li
             key={plugin.name}
-            className="flex items-center gap-3 border-b border-line px-4 py-2.5"
+            className="flex items-start gap-4 rounded-2xl border border-line bg-canvas-deep p-5"
           >
             <Tile muted={plugin.builtin || plugin.disabled} />
 
@@ -719,15 +711,15 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
                 type="button"
                 onClick={() => onOpen(plugin)}
                 data-hint={plugin.name}
-                className="flex max-w-full items-baseline gap-2 text-left"
+                className="flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-1 text-left"
               >
                 <span
                   className={[
-                    'truncate text-[12.5px] font-medium transition-colors duration-100 hover:text-brand',
+                    'truncate text-[15px] font-semibold transition-colors duration-100 hover:text-brand',
                     plugin.disabled ? 'text-muted' : 'text-text',
                   ].join(' ')}
                 >
-                  {plugin.name}
+                  {pluginDisplayName(plugin.name)}
                 </span>
                 {plugin.spec && (
                   <span className="shrink-0 font-mono text-[11px] text-faint tabular-nums">
@@ -736,9 +728,12 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
                 )}
               </button>
 
-              <div className="mt-1 flex items-center gap-1.5">
+              <p className="mt-1 truncate text-[12px] text-muted">{plugin.name}</p>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {plugin.disabled ? (
                   <Badge tone="faint">{t('plugins.off')}</Badge>
+                ) : incompatible ? (
+                  <Badge tone="warn">{t('plugins.runtimeBlocked')}</Badge>
                 ) : (
                   <Badge tone={plugin.active ? 'ok' : 'faint'}>
                     {plugin.active ? t('plugins.layer') : t('plugins.library')}
@@ -747,6 +742,11 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
                 {plugin.builtin && <Badge tone="faint">{t('plugins.builtin')}</Badge>}
                 {plugin.marketReceipt && <Badge tone="ok">{t('plugins.marketManaged')}</Badge>}
               </div>
+              {incompatible && !plugin.disabled && (
+                <p className="mt-3 text-[12px] leading-relaxed text-warn [overflow-wrap:anywhere]">
+                  {t('plugins.runtimeBlockedHint')}
+                </p>
+              )}
             </div>
 
             {/* The reversible change sits before the one that is not, and the
@@ -814,7 +814,7 @@ function Tile({ listing, muted = false }: { listing?: PluginListing; muted?: boo
     <span
       aria-hidden="true"
       className={[
-        'mt-0.5 grid size-8 shrink-0 place-items-center rounded-[7px] border border-line',
+        'grid size-11 shrink-0 place-items-center rounded-xl border border-line',
         muted ? 'bg-surface-2/50 text-faint' : 'bg-surface-2 text-brand',
       ].join(' ')}
     >
@@ -824,21 +824,25 @@ function Tile({ listing, muted = false }: { listing?: PluginListing; muted?: boo
           alt=""
           loading="lazy"
           decoding="async"
-          className="size-full rounded-[6px] object-cover"
+          className="size-full rounded-xl object-cover"
         />
       ) : (
-        <Package size={15} strokeWidth={1.9} />
+        <Package size={21} strokeWidth={1.6} />
       )}
     </span>
   )
 }
 
-function Badge({ tone, children }: { tone: 'ok' | 'faint'; children: ReactNode }) {
+function Badge({ tone, children }: { tone: 'ok' | 'faint' | 'warn'; children: ReactNode }) {
   return (
     <span
       className={[
         'rounded-[4px] px-1.5 py-0.5 text-[10.5px] font-medium',
-        tone === 'ok' ? 'bg-ok/15 text-ok' : 'bg-surface-2 text-faint',
+        tone === 'ok'
+          ? 'bg-ok/15 text-ok'
+          : tone === 'warn'
+            ? 'bg-warn/10 text-warn'
+            : 'bg-surface-2 text-faint',
       ].join(' ')}
     >
       {children}

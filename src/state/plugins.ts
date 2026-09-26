@@ -64,6 +64,7 @@ interface PluginStore {
     sort: PluginSort,
     page: number,
     refresh?: boolean,
+    availableOnly?: boolean,
   ) => Promise<void>
   select: (name: string | null, sourceId?: string, version?: string) => Promise<void>
   /** Open an installed package without asking a registry that may never have seen it. */
@@ -162,12 +163,12 @@ export const usePlugins = create<PluginStore>((set, get) => ({
     }
   },
 
-  search: async (query, category, sort, page, refresh = false) => {
+  search: async (query, category, sort, page, refresh = false, availableOnly = false) => {
     const mine = ++generation
     const source = sourceGeneration
     set({ searching: true, error: null })
     try {
-      const answer = await ipc.pluginSearch(query, category, sort, page, refresh)
+      const answer = await ipc.pluginSearch(query, category, sort, page, refresh, availableOnly)
       if (mine === generation && source === sourceGeneration) {
         set({
           results: answer.items,
@@ -246,7 +247,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         dependencies: [],
         installSpec: plugin.name,
         source: plugin.spec || 'profile bundle',
-        compatibility: { state: 'unknown' },
+        compatibility: plugin.compatibility ?? { state: 'unknown' },
         integrity: null,
         bundlePatch: null,
         lifecycleScripts: [],

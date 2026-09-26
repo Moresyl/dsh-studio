@@ -241,6 +241,8 @@ export const workspaceWorktreeCreate = (branch: string): Promise<GitWorktree[]> 
 /* -------------------------------------------------------------------------- */
 
 export interface InstalledPlugin {
+  /** Manifest compatibility is distinct from both enablement and live activation. */
+  compatibility?: PluginDetail['compatibility']
   name: string
   /** The range recorded in the profile manifest, empty for an in-box bundle. */
   spec: string
@@ -389,7 +391,9 @@ export const pluginSearch = (
   sort: PluginSort,
   page: number,
   refresh = false,
-): Promise<PluginPage> => invoke('plugin_search', { query, category, sort, page, refresh })
+  availableOnly = false,
+): Promise<PluginPage> =>
+  invoke('plugin_search', { query, category, sort, page, refresh, availableOnly })
 
 export const pluginDetail = (
   sourceId: string,

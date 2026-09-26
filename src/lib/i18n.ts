@@ -96,6 +96,17 @@ const en = {
   'log.empty': 'No output yet.',
   'log.title': 'Harness output',
   'log.lines': '{count} lines',
+  'log.issuesCount': '{count} warnings / errors',
+  'log.collapsed': 'Detailed output is available here when you need to diagnose a problem.',
+  'log.all': 'All output',
+  'log.issues': 'Warnings & errors',
+  'log.search': 'Search output',
+  'log.noMatches': 'No matching output.',
+  'log.pluginSkipped': '{name} was skipped during startup',
+  'log.pluginIncompatible':
+    'This plugin requires a different Harness version. Review it in Plugins to find an update or disable it. This warning alone does not mean Harness failed to start.',
+  'log.pluginSkippedHint':
+    'Harness could not load this plugin. Review its details in Plugins; the original diagnostic is retained below.',
 
   'window.minimize': 'Minimize',
   'window.maximize': 'Maximize',
@@ -108,7 +119,7 @@ const en = {
   'window.newHint': 'Another window on the same harness, for a task of its own',
   'window.ordinal': 'Window {name}',
 
-  'nav.console': 'Console',
+  'nav.console': 'Runtime',
   'nav.terminal': 'Terminal',
   'nav.sessions': 'Sessions',
   'nav.plugins': 'Plugins',
@@ -158,6 +169,12 @@ const en = {
   'plugins.confirmRemoveBody':
     'The package is uninstalled from the profile, and its layer stops loading at the next start. Nothing else in the profile is touched.',
   'plugins.details': 'Package details',
+  'plugins.noDescription': 'Open the details to review this package before installing.',
+  'plugins.officialComponent': 'Official component',
+  'plugins.community': 'Community',
+  'plugins.runtimeBlocked': 'Incompatible with this runtime',
+  'plugins.runtimeBlockedHint':
+    'The installed version declares an incompatible Harness dependency. Review package details for an update, or disable this plugin. Other plugins can still run.',
   'plugins.close': 'Close',
   'plugins.on': 'On',
   'plugins.off': 'Off',
@@ -814,6 +831,17 @@ const zh: Record<MessageKey, string> = {
   'log.empty': '暂无输出。',
   'log.title': 'Harness 输出',
   'log.lines': '{count} 行',
+  'log.issuesCount': '{count} 条警告 / 错误',
+  'log.collapsed': '需要排查问题时，可在这里展开详细运行日志。',
+  'log.all': '全部日志',
+  'log.issues': '警告与错误',
+  'log.search': '搜索日志',
+  'log.noMatches': '没有符合条件的日志。',
+  'log.pluginSkipped': '启动时已跳过 {name}',
+  'log.pluginIncompatible':
+    '这个插件要求的 Harness 版本与当前版本不同。可前往插件页查看更新或暂时禁用；这条警告本身不代表 Harness 启动失败。',
+  'log.pluginSkippedHint':
+    'Harness 未能加载这个插件。可前往插件页检查详情，原始诊断信息保留在下方日志中。',
 
   'window.minimize': '最小化',
   'window.maximize': '最大化',
@@ -824,7 +852,7 @@ const zh: Record<MessageKey, string> = {
   'window.newHint': '在同一个 harness 上再开一个窗口，各跑各的任务',
   'window.ordinal': '第 {name} 个窗口',
 
-  'nav.console': '控制台',
+  'nav.console': '运行状态',
   'nav.terminal': '终端',
   'nav.sessions': '会话',
   'nav.plugins': '插件',
@@ -874,6 +902,12 @@ const zh: Record<MessageKey, string> = {
   'plugins.confirmRemoveBody':
     '这个扩展包会从配置中卸载，它的图层在下次启动时不再加载。配置里的其他东西不受影响。',
   'plugins.details': '扩展包详情',
+  'plugins.noDescription': '打开详情，查看这个扩展包的用途与安装要求。',
+  'plugins.officialComponent': '官方组件',
+  'plugins.community': '社区插件',
+  'plugins.runtimeBlocked': '与当前运行时不兼容',
+  'plugins.runtimeBlockedHint':
+    '已安装版本声明的 Harness 依赖不兼容。请打开详情检查可用更新，或暂时禁用这个插件；其他兼容插件仍可运行。',
   'plugins.close': '关闭',
   'plugins.on': '已启用',
   'plugins.off': '已停用',
