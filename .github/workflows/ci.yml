@@ -99,6 +99,8 @@ jobs:
         run: pnpm test:coverage
       - name: Rust and LAN remote regression
         run: cargo test --manifest-path src-tauri/Cargo.toml --workspace
+      - name: Compare plugin compatibility with npm semver
+        run: pnpm test:runtime-ranges
       - name: Selected Harness downgrade and real profile boot
         env:
           DSH_TEST_VERSION: 0.1.1-rc.1

@@ -42,7 +42,8 @@
     "verify:docs": "node .github/scripts/verify-bilingual-docs.mjs",
     "verify:website": "node .github/scripts/verify-website-docs.mjs",
     "test:packaging": "node --test .github/scripts/*.test.mjs",
-    "test:release": "node .github/scripts/release-notes.mjs && pnpm verify:contracts && pnpm verify:a11y && pnpm verify:docs && pnpm verify:website && pnpm build && pnpm test:packaging && cargo test --manifest-path src-tauri/Cargo.toml --workspace && pnpm lint && pnpm test:coverage",
+    "test:runtime-ranges": "cargo test --manifest-path src-tauri/Cargo.toml --lib npm_semver_matches_runtime_oracle -- --ignored --nocapture",
+    "test:release": "node .github/scripts/release-notes.mjs && pnpm verify:contracts && pnpm verify:a11y && pnpm verify:docs && pnpm verify:website && pnpm build && pnpm test:packaging && cargo test --manifest-path src-tauri/Cargo.toml --workspace && pnpm test:runtime-ranges && pnpm lint && pnpm test:coverage",
     "bundle:local": "tauri build --no-sign",
     "tauri": "tauri"
   },

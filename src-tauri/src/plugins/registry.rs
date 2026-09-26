@@ -518,25 +518,24 @@ pub(super) fn compatibility_with_runtime(
             .filter(|(name, _)| {
                 *name == "@deepseek-ai/dsh" || name.starts_with("@deepseek-ai/dsh-")
             })
-            .map(|(name, value)| (name.as_str(), value.as_str().unwrap_or("").trim()))
+            .map(|(name, value)| (name.as_str(), value.as_str().unwrap_or("")))
             .collect();
     if requirements.is_empty() {
         return Compatibility::Unknown;
     }
     let current =
-        nodejs_semver::Version::parse(runtime).expect("the pinned Harness version is valid semver");
+        semver::Version::parse(runtime).expect("the pinned Harness version is valid semver");
     for (name, requirement) in &requirements {
         if matches!(*requirement, "workspace:^" | "workspace:~" | "workspace:*") {
             continue;
         }
-        let parsed = nodejs_semver::Range::parse(requirement);
-        let Some(parsed) = parsed.ok().filter(|_| !requirement.is_empty()) else {
+        let Some(accepted) = matches_runtime_range(requirement, &current) else {
             return Compatibility::Incompatible {
                 requirement: format!("{name}: {requirement}"),
                 reason: format!("{name} declares an unreadable dependency range"),
             };
         };
-        if !parsed.satisfies_with_prerelease(&current, true) {
+        if !accepted {
             return Compatibility::Incompatible {
                 requirement: format!("{name}: {requirement}"),
                 reason: format!("{name} requires {requirement}; the selected Harness is {runtime}"),
@@ -552,6 +551,88 @@ pub(super) fn compatibility_with_runtime(
             .collect::<Vec<_>>()
             .join(", "),
     }
+}
+
+/// Parse npm syntax strictly, then compare its canonical bounds without the
+/// default prerelease exclusion. Harness uses `includePrerelease: true`.
+/// Never use a loose parser here: it can discard invalid tokens and turn a
+/// malformed or contradictory requirement into an allowed plugin install.
+fn matches_runtime_range(requirement: &str, current: &semver::Version) -> Option<bool> {
+    if requirement.trim().is_empty() {
+        return None;
+    }
+    // Validate every section, even after an OR branch matches. Parsing sections
+    // also avoids a parser's single-version length cap on a long range union.
+    let mut accepted = false;
+    for branch in requirement.split("||") {
+        let normalized = branch.split_whitespace().collect::<Vec<_>>().join(" ");
+        if normalized.contains(" - ") {
+            accepted |= matches_range_section(&normalized, current, true)?;
+            continue;
+        }
+        let mut matches = true;
+        let mut section = String::new();
+        for token in branch.split_whitespace() {
+            if !section.is_empty() {
+                section.push(' ');
+            }
+            section.push_str(token);
+            // npm permits whitespace between an operator and its operand.
+            if token
+                .chars()
+                .all(|ch| matches!(ch, '<' | '>' | '=' | '~' | '^' | 'v'))
+            {
+                continue;
+            }
+            matches &= matches_range_section(&section, current, false)?;
+            section.clear();
+        }
+        if !section.is_empty() {
+            matches &= matches_range_section(&section, current, false)?;
+        }
+        accepted |= matches;
+    }
+    Some(accepted)
+}
+
+fn matches_range_section(section: &str, current: &semver::Version, hyphen: bool) -> Option<bool> {
+    let core = section
+        .trim_start_matches(|ch: char| {
+            ch.is_whitespace() || matches!(ch, '<' | '>' | '=' | '~' | '^' | 'v')
+        })
+        .split(['-', '+'])
+        .next()?;
+    let partial = core.split('.').count() < 3 || core.contains(['x', 'X', '*']);
+    let range = js_semver::Range::parse(section).ok()?.to_string();
+    let mut matches = true;
+    for comparator in range.split_whitespace() {
+        if comparator == "*" {
+            continue;
+        }
+        let (operator, version) = [">=", "<=", ">", "<", "="]
+            .into_iter()
+            .find_map(|operator| {
+                comparator
+                    .strip_prefix(operator)
+                    .map(|version| (operator, version))
+            })
+            .unwrap_or(("=", comparator));
+        let mut bound = semver::Version::parse(version).ok()?;
+        // includePrerelease changes the lower floor of wildcard/partial
+        // and hyphen ranges to -0, but never relaxes a full explicit bound.
+        if operator == ">=" && bound.pre.is_empty() && (partial || hyphen) {
+            bound.pre = semver::Prerelease::new("0").ok()?;
+        }
+        let order = current.cmp_precedence(&bound);
+        matches &= match operator {
+            ">=" => !order.is_lt(),
+            "<=" => !order.is_gt(),
+            ">" => order.is_gt(),
+            "<" => order.is_lt(),
+            _ => order.is_eq(),
+        };
+    }
+    Some(matches)
 }
 
 /// The registry npm resolves to, without a trailing slash.
@@ -832,6 +913,21 @@ mod tests {
             ("0.1.0-rc.6 || 0.1.7-rc.2", true),
             ("", false),
             ("invalid", false),
+            ("0.1.07-rc.2", false),
+            ("00.1.7-rc.2", false),
+            ("0.1.7-rc.02", false),
+            (" v0.1.7-rc.2 ", true),
+            (" workspace:* ", false),
+            ("0.1.7-rc.2,", false),
+            ("= 0.1.7-rc.2", true),
+            ("> =0.1.0", true),
+            ("~>0.1.0", true),
+            ("0.1.7-rc.2 || invalid", false),
+            ("0.1.7-rc.2 ||", true),
+            ("0.x.7", false),
+            ("*.*.7", false),
+            ("0.1.x-rc.2", true),
+            (">= 0.1.0 < 0.2.0", true),
         ] {
             let manifest =
                 serde_json::json!({"peerDependencies": {"@deepseek-ai/dsh-tools": range}});
@@ -842,6 +938,141 @@ mod tests {
                 "{range}: {result:?}"
             );
         }
+    }
+
+    #[test]
+    #[ignore = "requires Node and the installed npm semver oracle"]
+    fn npm_semver_matches_runtime_oracle() {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+
+        let versions = [
+            "0.0.0-rc.1",
+            "0.1.0-rc.2",
+            "0.1.1-rc.1",
+            "0.1.2-rc.1",
+            "0.1.7-rc.2",
+            "0.1.7",
+            "1.0.0-beta.1",
+            "1.0.0",
+            "1.2.3+build.9",
+        ];
+        let operands = [
+            "*",
+            "0",
+            "0.x",
+            "0.1",
+            "0.1.x",
+            "0.0.0",
+            "0.1.0",
+            "0.1.7",
+            "0.1.7-rc.1",
+            "0.1.7-rc.2",
+            "0.1.8",
+            "1",
+            "1.2",
+            "1.2.3",
+            "1.0.0-beta.1",
+        ];
+        let mut ranges = Vec::new();
+        for operand in operands {
+            for operator in ["", "=", "<", ">", "<=", ">=", "~", "^", "~>"] {
+                ranges.push(format!("{operator}{operand}"));
+                if !operator.is_empty() {
+                    ranges.push(format!("{operator} {operand}"));
+                }
+            }
+        }
+        for left in operands {
+            for right in ["0.1.0", "0.1.7-rc.2", "1.2", "*"] {
+                ranges.push(format!("{left} || {right}"));
+                ranges.push(format!("{left} {right}"));
+                ranges.push(format!("{left} - {right}"));
+                ranges.push(format!("{left} - {right} >=0.0.0"));
+            }
+        }
+        ranges.extend(
+            [
+                "",
+                " ",
+                "invalid",
+                "0.1.07-rc.2",
+                "00.1.7-rc.2",
+                "0.1.7-rc.02",
+                " v0.1.7-rc.2 ",
+                "v 0.1.7-rc.2",
+                "workspace:*",
+                "workspace:^",
+                "workspace:~",
+                " workspace:* ",
+                "0.1.7-rc.2,",
+                "> =0.1.0",
+                "0.1.7-rc.2 || invalid",
+                "0.1.7-rc.2 ||",
+                "0.x.7",
+                "*.*.7",
+                "0.1.x-rc.2",
+                ">= 0.1.0 < 0.2.0",
+                ">=0.1.7-rc.2 <0.1.0",
+                "0.1.7-rc.2 garbage",
+                "||",
+                "~",
+                "^",
+                ">=0.1.0 0.1.x",
+                "0.1.x >=0.1.0",
+                "0.1.0 - 0.1.7 || invalid",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
+        ranges.push(
+            std::iter::repeat_n("0.1.7-rc.2", 40)
+                .collect::<Vec<_>>()
+                .join(" || "),
+        );
+        let cases: Vec<_> = versions
+            .iter()
+            .flat_map(|version| ranges.iter().map(move |range| (*version, range)))
+            .collect();
+        let mut oracle = Command::new("node")
+            .current_dir(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap())
+            .args(["-e", r#"
+const fs = require('node:fs');
+const semver = require('semver');
+const cases = JSON.parse(fs.readFileSync(0, 'utf8'));
+process.stdout.write(JSON.stringify(cases.map(([runtime, range]) => {
+  const requirement = ['workspace:^', 'workspace:~', 'workspace:*'].includes(range) ? runtime : range;
+  return requirement.trim() !== '' && semver.satisfies(runtime, requirement, {includePrerelease: true});
+})));
+"#])
+            .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
+            .spawn().expect("Node for npm range differential test");
+        oracle
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(&serde_json::to_vec(&cases).unwrap())
+            .unwrap();
+        let output = oracle.wait_with_output().unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let expected: Vec<bool> = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(expected.len(), cases.len());
+        let mut failures = Vec::new();
+        for ((runtime, range), expected) in cases.iter().zip(expected) {
+            let manifest = serde_json::json!({"peerDependencies":{"@deepseek-ai/dsh-tools":range}});
+            let result = compatibility_with_runtime(&manifest, runtime);
+            if matches!(result, Compatibility::Compatible { .. }) != expected {
+                failures.push(format!(
+                    "{runtime} / {range:?}: expected {expected}, got {result:?}"
+                ));
+            }
+        }
+        assert!(failures.is_empty(), "{}", failures.join("\n"));
+        println!("verified {} ranges against npm semver", cases.len());
     }
 
     #[test]

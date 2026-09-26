@@ -44,7 +44,7 @@ thiserror.workspace = true
 tokio.workspace = true
 url.workspace = true
 semver = "1"
-nodejs-semver = "7"
+js-semver = "1"
 regex = "1"
 # `macos-private-api` is what makes `.transparent()` exist on macOS, and a
 # transparent window is the prerequisite for every backdrop material — see

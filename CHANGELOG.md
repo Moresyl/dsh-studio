@@ -28,6 +28,7 @@ pre-1.0 caveat that anything may still move.
 - Filter uninstalled items before catalog pagination, reset the result viewport after navigation, and reset pagination when clearing search.
 - Restore modal focus when the primary action is blocked or content changes, trap all visible keyboard stops, and improve menu Home/End, wrapping, Tab dismissal and ordinary click activation.
 - Keep exact-version safety details visible when replacing an installed package, and distinguish the installed version from its requested range or local source.
+- Reject malformed npm version ranges instead of accepting loose-parser fallbacks, and align prerelease boundaries with Harness using 4,716 differential cases against npm semver.
 
 ### Verification
 

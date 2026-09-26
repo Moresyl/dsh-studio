@@ -966,8 +966,8 @@ dependencies = [
  "flate2",
  "getrandom 0.3.4",
  "image",
+ "js-semver",
  "node-runtime",
- "nodejs-semver",
  "portable-pty",
  "proc-guard",
  "qrcodegen",
@@ -2228,6 +2228,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "js-semver"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "184eee2d5d2fb957106f8f6779c4ad7d0ce0cc12825f1d152ddff7fab80abc74"
+
+[[package]]
 name = "js-sys"
 version = "0.3.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2515,16 +2521,6 @@ dependencies = [
  "dirs 6.0.0",
  "proc-guard",
  "serde",
-]
-
-[[package]]
-name = "nodejs-semver"
-version = "7.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "938185814d480ac0eff0ac4676d27deef920cbd2b83df83603a873af5b7c8fc9"
-dependencies = [
- "smallvec",
- "thiserror 2.0.20",
 ]
 
 [[package]]
