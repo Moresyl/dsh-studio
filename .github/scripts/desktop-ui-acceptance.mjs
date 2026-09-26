@@ -109,7 +109,22 @@ if (mode === 'inspect') {
     deviceScaleFactor: 1,
     mobile: false,
   })
-  console.log(JSON.stringify({ width, height }))
+  // CDP overrides belong to this connection. Capture and read the actual
+  // dimensions before closing it; a later invocation sees the native viewport.
+  await evaluate(
+    'new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))',
+  )
+  const actual = await evaluate(
+    '({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth > innerWidth})',
+  )
+  if (actual.width !== width || actual.height !== height)
+    throw new Error('viewport override did not apply')
+  const output = process.argv[6]
+  if (output) {
+    const screenshot = await command('Page.captureScreenshot', { format: 'png', fromSurface: true })
+    await writeFile(resolve(output), Buffer.from(screenshot.data, 'base64'))
+  }
+  console.log(JSON.stringify({ ...actual, screenshot: output ? resolve(output) : null }))
 } else if (mode === 'viewport-reset') {
   await command('Emulation.clearDeviceMetricsOverride')
   console.log(JSON.stringify({ reset: true }))
