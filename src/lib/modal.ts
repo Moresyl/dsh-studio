@@ -11,9 +11,9 @@ import type { KeyboardEvent, MouseEvent } from 'react'
 /**
  * Answer Escape, and keep Tab inside `card`.
  *
- * Buttons and text fields are all these cards hold, so that is what the ring is
- * built from — including the links, which are buttons precisely because a
- * published URL opens in the user's own browser rather than in this window.
+ * Include every visible keyboard stop, including custom controls. A loading
+ * transition can remove the focused control, so focus outside the ring must
+ * also return to the card before the browser walks into the pane behind it.
  */
 export function holdFocus(
   card: HTMLElement | null,
@@ -30,12 +30,31 @@ export function holdFocus(
 
   if (event.key !== 'Tab') return
 
-  const stops = Array.from(card?.querySelectorAll<HTMLElement>('button, input') ?? []).filter(
-    (stop) => !stop.hasAttribute('disabled'),
+  if (!card) return
+  const stops = Array.from(
+    card.querySelectorAll<HTMLElement>(
+      'button, input, textarea, select, a[href], [tabindex], [contenteditable="true"]',
+    ),
+  ).filter(
+    (stop) =>
+      stop.tabIndex >= 0 &&
+      !stop.matches(':disabled') &&
+      !stop.closest('[hidden], [inert]') &&
+      stop.getClientRects().length > 0,
   )
   const first = stops.at(0)
   const last = stops.at(-1)
-  if (!first || !last) return
+  if (!first || !last) {
+    event.preventDefault()
+    card.focus()
+    return
+  }
+
+  if (!stops.includes(document.activeElement as HTMLElement)) {
+    event.preventDefault()
+    ;(event.shiftKey ? last : first).focus()
+    return
+  }
 
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault()

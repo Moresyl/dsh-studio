@@ -66,6 +66,8 @@ pub struct InstalledPlugin {
     pub market_receipt: Option<String>,
     /// Declared compatibility of the installed package, not proof it loaded.
     pub compatibility: registry::Compatibility,
+    /// Actual package version on disk; `spec` may be a range or local path.
+    pub installed_version: Option<String>,
 }
 
 /// Everything the plugin panel needs before it draws anything.
@@ -274,15 +276,10 @@ pub fn state() -> PluginState {
         .map(|manifest| list(manifest, &switched_off))
         .unwrap_or_default();
     let receipt_ids = receipts::ids(&profile, &profile_dir);
+    let runtime = crate::harness::install::selected_version();
     for plugin in &mut plugins {
         plugin.market_receipt = receipt_ids.get(&plugin.name).cloned();
-        if is_package_name(&plugin.name) {
-            if let Some(manifest) =
-                read_manifest(&profile_dir.join("node_modules").join(&plugin.name))
-            {
-                plugin.compatibility = registry::compatibility(&manifest);
-            }
-        }
+        inspect_installed(plugin, &profile_dir, &runtime);
     }
 
     PluginState {
@@ -292,6 +289,21 @@ pub fn state() -> PluginState {
         package_manager: package_manager_available(),
         profile_dir,
     }
+}
+
+fn inspect_installed(plugin: &mut InstalledPlugin, profile_dir: &Path, runtime: &str) {
+    if !is_package_name(&plugin.name) {
+        return;
+    }
+    let Some(manifest) = read_manifest(&profile_dir.join("node_modules").join(&plugin.name)) else {
+        return;
+    };
+    plugin.compatibility = registry::compatibility_with_runtime(&manifest, runtime);
+    plugin.installed_version = manifest
+        .get("version")
+        .and_then(serde_json::Value::as_str)
+        .filter(|version| semver::Version::parse(version).is_ok())
+        .map(str::to_string);
 }
 
 pub(crate) fn read_manifest(profile_dir: &Path) -> Option<serde_json::Value> {
@@ -338,6 +350,7 @@ pub(crate) fn list(
                     builtin: false,
                     market_receipt: None,
                     compatibility: registry::Compatibility::Unknown,
+                    installed_version: None,
                 })
                 .collect()
         })
@@ -353,6 +366,7 @@ pub(crate) fn list(
                 builtin: true,
                 market_receipt: None,
                 compatibility: registry::Compatibility::Unknown,
+                installed_version: None,
             });
         }
     }
@@ -1219,6 +1233,41 @@ mod tests {
     /// The panel's list, for a profile where nothing was switched off.
     fn listed(manifest: &serde_json::Value) -> Vec<super::InstalledPlugin> {
         list(manifest, &BTreeSet::new())
+    }
+
+    #[test]
+    fn installed_metadata_keeps_resolved_version_separate_from_requested_range() {
+        let root = PreflightProject::create("dsh-diagram", "0.2.0").unwrap();
+        let path = root.path().join("node_modules/dsh-diagram");
+        std::fs::create_dir_all(&path).unwrap();
+        std::fs::write(
+            path.join("package.json"),
+            r#"{"version":"0.2.0","peerDependencies":{"@deepseek-ai/dsh-tools":"0.1.0-rc.6"}}"#,
+        )
+        .unwrap();
+        let mut plugin =
+            listed(&serde_json::json!({"dependencies":{"dsh-diagram":"^0.2.0"}})).remove(0);
+        super::inspect_installed(&mut plugin, root.path(), "0.1.7-rc.2");
+        assert_eq!(plugin.spec, "^0.2.0");
+        assert_eq!(plugin.installed_version.as_deref(), Some("0.2.0"));
+        assert!(matches!(
+            plugin.compatibility,
+            super::registry::Compatibility::Incompatible { .. }
+        ));
+    }
+
+    #[test]
+    fn missing_or_malformed_installed_versions_do_not_invent_a_current_version() {
+        let root = PreflightProject::create("example", "1.0.0").unwrap();
+        let mut plugin =
+            listed(&serde_json::json!({"dependencies":{"example":"file:../example"}})).remove(0);
+        super::inspect_installed(&mut plugin, root.path(), "0.1.7-rc.2");
+        assert!(plugin.installed_version.is_none());
+        let path = root.path().join("node_modules/example");
+        std::fs::create_dir_all(&path).unwrap();
+        std::fs::write(path.join("package.json"), r#"{"version":"not a version"}"#).unwrap();
+        super::inspect_installed(&mut plugin, root.path(), "0.1.7-rc.2");
+        assert!(plugin.installed_version.is_none());
     }
 
     #[test]

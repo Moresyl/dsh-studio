@@ -117,7 +117,12 @@ export function ContextMenu() {
     if (reachable.length === 0) return
 
     const cursor = reachable.findIndex((candidate) => candidate.index === active)
-    const next = reachable[(cursor + direction + reachable.length) % reachable.length]
+    const next =
+      cursor < 0
+        ? direction === 1
+          ? reachable[0]
+          : reachable.at(-1)
+        : reachable[(cursor + direction + reachable.length) % reachable.length]
     if (next) setActive(next.index)
   }
 
@@ -125,6 +130,19 @@ export function ContextMenu() {
     if (event.key === 'Escape') {
       event.stopPropagation()
       hide()
+      return
+    }
+    if (event.key === 'Tab') {
+      hide()
+      return
+    }
+    if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault()
+      const reachable = entries
+        .map((entry, index) => ({ entry, index }))
+        .filter(({ entry }) => entry !== SEPARATOR && !entry.disabled)
+      const next = event.key === 'Home' ? reachable[0] : reachable.at(-1)
+      if (next) setActive(next.index)
       return
     }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
@@ -169,9 +187,10 @@ export function ContextMenu() {
             aria-checked={entry.selected === undefined ? undefined : entry.selected}
             data-selected={entry.selected || undefined}
             disabled={entry.disabled}
-            // On the press, the way a system menu answers, rather than waiting
-            // for the release somewhere else to make it a click.
-            onMouseDown={() => {
+            // Standard activation supports assistive-technology clicks and
+            // never executes an action when the user right-clicks an item.
+            tabIndex={-1}
+            onClick={() => {
               if (!entry.disabled) choose(entry)
             }}
             onMouseEnter={() => setActive(index)}

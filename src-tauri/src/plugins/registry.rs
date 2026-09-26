@@ -495,7 +495,10 @@ pub(super) fn compatibility(manifest: &serde_json::Value) -> Compatibility {
     compatibility_with_runtime(manifest, &crate::harness::install::selected_version())
 }
 
-fn compatibility_with_runtime(manifest: &serde_json::Value, runtime: &str) -> Compatibility {
+pub(super) fn compatibility_with_runtime(
+    manifest: &serde_json::Value,
+    runtime: &str,
+) -> Compatibility {
     for field in ["dependencies", "peerDependencies", "optionalDependencies"] {
         let Some(dependencies) = manifest.get(field).and_then(serde_json::Value::as_object) else {
             continue;

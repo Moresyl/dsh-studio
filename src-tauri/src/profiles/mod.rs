@@ -1263,6 +1263,7 @@ mod tests {
             builtin,
             market_receipt: None,
             compatibility: crate::plugins::registry::Compatibility::Unknown,
+            installed_version: None,
         }
     }
 

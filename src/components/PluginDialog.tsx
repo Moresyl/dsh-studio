@@ -23,7 +23,7 @@ import { Button } from '@/components/Button'
 import { Switch } from '@/components/Switch'
 import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
-import { pluginDisplayName } from '@/lib/plugin-presentation'
+import { pluginDisplayName, pluginVersionAction } from '@/lib/plugin-presentation'
 import { normalizeExternalUrl, openExternalUrl } from '@/lib/external-url'
 import type { InstalledPlugin } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
@@ -101,6 +101,7 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
   if (selected === null) return null
 
   const here = installedPlugin(profile, selected)
+  const versionAction = pluginVersionAction(here, detail, selectedSource)
   const listing =
     results.find(
       (result) =>
@@ -314,7 +315,7 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                 </dl>
               </section>
 
-              {!here && reviewing && (
+              {(versionAction === 'install' || versionAction === 'replace') && reviewing && (
                 <section className="rounded-control border border-warn/35 bg-warn/7 p-3">
                   <div className="flex items-start gap-2">
                     <ShieldCheck
@@ -382,6 +383,13 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
               )}
 
               <dl className="flex flex-col gap-2 border-t border-line pt-3.5">
+                {here && selectedSource !== 'profile' && (
+                  <Row label={t('plugins.currentVersion')}>
+                    <span className="tabular-nums">
+                      {here.installedVersion || here.spec || t('common.unavailable')}
+                    </span>
+                  </Row>
+                )}
                 <Row label={t('plugins.source')}>
                   <span className="selectable break-all font-mono text-[10.5px]">
                     {detail.source}
@@ -465,7 +473,7 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
             {t('plugins.close')}
           </Button>
 
-          {here ? (
+          {versionAction === 'manage' && here ? (
             <Button
               ref={primary}
               variant="danger"
@@ -493,28 +501,41 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                     if (ready) setReviewing(true)
                   })
                 } else {
-                  void add().then((installed) => {
+                  void add().then(() => {
                     // A failed one-shot confirmation must not leave an Install
                     // button backed by a token the native side already used.
                     // The next click starts a fresh, visible review.
-                    if (!installed) setReviewing(false)
+                    setReviewing(false)
                   })
                 }
               }}
-              disabled={working !== null || previewing || installBlocked}
+              disabled={
+                working !== null ||
+                previewing ||
+                installBlocked ||
+                loading ||
+                !detail ||
+                versionAction === 'current'
+              }
             >
               {busy || previewing ? (
                 <Loader2 size={13} className="animate-spin" />
               ) : (
                 <Download size={13} strokeWidth={2.3} />
               )}
-              {busy
-                ? t('plugins.installing')
-                : previewing
-                  ? t('plugins.review.previewing')
-                  : reviewing
-                    ? t('plugins.review.installExact')
-                    : t('plugins.review.action')}
+              {versionAction === 'current'
+                ? t('plugins.currentVersionReady')
+                : busy
+                  ? t('plugins.installing')
+                  : previewing
+                    ? t('plugins.review.previewing')
+                    : reviewing
+                      ? t('plugins.review.installExact')
+                      : t(
+                          versionAction === 'replace'
+                            ? 'plugins.review.replace'
+                            : 'plugins.review.action',
+                        )}
             </Button>
           )}
         </footer>

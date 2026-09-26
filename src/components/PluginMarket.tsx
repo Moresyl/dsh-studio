@@ -445,6 +445,16 @@ export function PluginMarket() {
                 initialized={profile?.initialized ?? false}
                 working={working}
                 onOpen={selectInstalled}
+                onCheckVersion={async (name) => {
+                  if (activeSource?.id !== 'npm') await selectSource('npm')
+                  if (
+                    usePlugins
+                      .getState()
+                      .sources.some((source) => source.id === 'npm' && source.active)
+                  ) {
+                    await select(name, 'npm', 'latest')
+                  }
+                }}
                 onToggle={(name, on) => void toggle(name, on)}
                 onRemove={(name) => void confirmRemove(name)}
               />
@@ -675,11 +685,20 @@ interface InstalledProps {
   initialized: boolean
   working: string | null
   onOpen: (plugin: InstalledPlugin) => void
+  onCheckVersion: (name: string) => Promise<void>
   onToggle: (name: string, on: boolean) => void
   onRemove: (name: string) => void
 }
 
-function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }: InstalledProps) {
+function Installed({
+  plugins,
+  initialized,
+  working,
+  onOpen,
+  onCheckVersion,
+  onToggle,
+  onRemove,
+}: InstalledProps) {
   if (plugins.length === 0) {
     return (
       <Empty
@@ -721,9 +740,9 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
                 >
                   {pluginDisplayName(plugin.name)}
                 </span>
-                {plugin.spec && (
-                  <span className="shrink-0 font-mono text-[11px] text-faint tabular-nums">
-                    {plugin.spec}
+                {(plugin.installedVersion || plugin.spec) && (
+                  <span className="max-w-full truncate font-mono text-[11px] text-faint tabular-nums">
+                    {plugin.installedVersion || plugin.spec}
                   </span>
                 )}
               </button>
@@ -740,6 +759,16 @@ function Installed({ plugins, initialized, working, onOpen, onToggle, onRemove }
                   </Badge>
                 )}
                 {plugin.builtin && <Badge tone="faint">{t('plugins.builtin')}</Badge>}
+                {!plugin.builtin && (
+                  <button
+                    type="button"
+                    onClick={() => void onCheckVersion(plugin.name)}
+                    disabled={working !== null}
+                    className="ml-1 rounded-lg px-2 py-1 text-[12px] text-muted hover:bg-control-fill hover:text-text disabled:opacity-40"
+                  >
+                    {t('plugins.checkVersion')}
+                  </button>
+                )}
                 {plugin.marketReceipt && <Badge tone="ok">{t('plugins.marketManaged')}</Badge>}
               </div>
               {incompatible && !plugin.disabled && (

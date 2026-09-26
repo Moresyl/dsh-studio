@@ -243,6 +243,8 @@ export const workspaceWorktreeCreate = (branch: string): Promise<GitWorktree[]> 
 export interface InstalledPlugin {
   /** Manifest compatibility is distinct from both enablement and live activation. */
   compatibility?: PluginDetail['compatibility']
+  /** Actual version read from the installed package rather than its dependency range. */
+  installedVersion?: string | null
   name: string
   /** The range recorded in the profile manifest, empty for an in-box bundle. */
   spec: string

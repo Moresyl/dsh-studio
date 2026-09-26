@@ -48,6 +48,7 @@ export default defineConfig({
         'src/lib/fuzzy.ts',
         'src/lib/lifecycle.ts',
         'src/lib/log-tone.ts',
+        'src/lib/modal.ts',
         'src/lib/plugin-presentation.ts',
         'src/lib/runtime-notices.ts',
         'src/lib/renderer-recovery.ts',

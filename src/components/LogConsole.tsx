@@ -64,7 +64,7 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col bg-canvas">
+    <section data-log-expanded={open} className="flex min-h-0 flex-1 flex-col bg-canvas">
       {notices.length > 0 && (
         <div className="max-h-40 shrink-0 overflow-y-auto px-5 pt-4">
           {notices.map((notice) => (
@@ -96,7 +96,9 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
           {t('log.title')}
         </button>
         <span className="ml-auto text-[12px] tabular-nums text-muted">
-          {t('log.lines', { count: lines.length })}
+          {open && (filter !== 'all' || query.trim())
+            ? t('log.visibleLines', { count: visible.length, total: lines.length })
+            : t('log.lines', { count: lines.length })}
         </span>
         {issues.length > 0 && (
           <span
@@ -130,13 +132,19 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
                 placeholder={t('log.search')}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && query !== '') {
+                    event.stopPropagation()
+                    setQuery('')
+                  }
+                }}
                 className="h-8 min-w-0 bg-transparent text-[12px] text-text outline-none"
               />
             </label>
             <button
               type="button"
-              aria-label={t('menu.copyAll')}
-              title={t('menu.copyAll')}
+              aria-label={t('log.copyVisible')}
+              title={t('log.copyVisible')}
               disabled={visible.length === 0}
               onClick={() =>
                 void reportAction(() =>

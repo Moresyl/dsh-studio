@@ -22,9 +22,9 @@ import { contextMenu } from '@/state/menu'
  */
 export function ConsolePane() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col animate-rise">
+    <div className="group/console flex min-h-0 flex-1 flex-col animate-rise">
       <ConsoleRail />
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 has-[[data-log-expanded=false]]:max-h-[50%] has-[[data-log-expanded=false]]:flex-none">
         <HarnessLog />
       </div>
     </div>
@@ -60,7 +60,7 @@ function ConsoleRail() {
   const runtimes = environment?.allNodeRuntimes ?? []
 
   return (
-    <section className="@container max-h-[55%] shrink-0 overflow-y-auto border-b border-line bg-canvas">
+    <section className="@container max-h-[55%] shrink-0 overflow-y-auto border-b border-line bg-canvas group-has-[[data-log-expanded=false]]/console:max-h-none group-has-[[data-log-expanded=false]]/console:flex-1 group-has-[[data-log-expanded=false]]/console:shrink">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-7 pt-6 pb-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">

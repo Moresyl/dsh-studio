@@ -231,7 +231,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
 
   selectInstalled: (plugin) => {
     ++previewGeneration
-    const version = plugin.spec || 'bundled'
+    const version = plugin.installedVersion || plugin.spec || 'bundled'
     set({
       selected: plugin.name,
       selectedSource: 'profile',

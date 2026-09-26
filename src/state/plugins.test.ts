@@ -107,6 +107,12 @@ describe('plugin installation identity', () => {
 })
 
 describe('installed plugin details', () => {
+  it('shows the installed package version while retaining the requested source range', () => {
+    usePlugins
+      .getState()
+      .selectInstalled({ ...installed, spec: '^0.2.0', installedVersion: '0.2.4' })
+    expect(usePlugins.getState().detail).toMatchObject({ version: '0.2.4', source: '^0.2.0' })
+  })
   it('preserves an installed module compatibility failure in its detail review', () => {
     const compatibility = {
       state: 'incompatible' as const,
