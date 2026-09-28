@@ -16,6 +16,7 @@ const required = [
   'src/plugins/archive.rs',
   'src/plugins/receipts.rs',
   'src/plugins/switches.rs',
+  'src/preferences.rs',
   'src/remote/access.rs',
   'src/remote/gateway.rs',
   'src/remote/lan.rs',
@@ -27,6 +28,7 @@ const required = [
   'src/sessions/read.rs',
   'src/terminal/decoder.rs',
   'src/terminal/shell.rs',
+  'src/workspace/review.rs',
 ]
 const minimum = 80
 
