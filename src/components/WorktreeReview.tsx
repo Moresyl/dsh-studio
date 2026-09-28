@@ -62,6 +62,9 @@ export function WorktreeReview({
   }, [worktree.path, revision])
 
   const refresh = () => {
+    // Disabling the focused refresh button makes WebView move focus to body.
+    // Keep a live stop inside the modal while the native request runs or fails.
+    close.current?.focus()
     setLoading(true)
     setError(null)
     setReview(null)
