@@ -182,13 +182,13 @@ flowchart LR
 
 到 [Releases] 下载对应平台的安装包。每一个打了 tag 的版本都由 CI 构建五个目标：
 
-| 平台                | 产物                                          |
-| ------------------- | --------------------------------------------- |
-| Windows x64         | `.exe`（NSIS）、`.msi` 与独立 `-portable.exe` |
-| macOS Apple Silicon | `.dmg`                                        |
-| macOS Intel         | `.dmg`                                        |
-| macOS 通用版        | 一个 `.dmg` 同时支持 Intel 与 Apple 芯片      |
-| Linux x64           | `.AppImage`、`.deb`、`.rpm`                   |
+| 平台                | 产物                                                    |
+| ------------------- | ------------------------------------------------------- |
+| Windows x64         | `.exe`（NSIS）、`.msi` 与包含完整资源的 `-portable.zip` |
+| macOS Apple Silicon | `.dmg`                                                  |
+| macOS Intel         | `.dmg`                                                  |
+| macOS 通用版        | 一个 `.dmg` 同时支持 Intel 与 Apple 芯片                |
+| Linux x64           | `.AppImage`、`.deb`、`.rpm`                             |
 
 macOS 通用版为轻量版。完整离线版内含原生 Node runtime，因此继续按芯片架构分别提供。
 

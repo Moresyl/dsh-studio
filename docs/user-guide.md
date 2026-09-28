@@ -128,7 +128,7 @@ The app reads `latest.json` from GitHub Releases and falls back to the validated
 
 The updater follows the ordinary Lite channel. A runtime already installed from Full remains in app data across application updates.
 
-Windows also has a standalone Lite portable executable. The macOS Universal Lite image runs on Intel and Apple Silicon; Full / Offline images remain architecture-specific because their embedded Node runtime is native code.
+Windows also has a Lite portable ZIP. Extract the whole archive and launch `dsh-studio.exe`; keep its `dist/` folder beside the executable. Runtime data still uses Studio's normal application-data location, so this is an installation-free distribution, not a separate profile on a USB drive. The macOS Universal Lite image runs on Intel and Apple Silicon; Full / Offline images remain architecture-specific because their embedded Node runtime is native code.
 
 ## Remote access
 

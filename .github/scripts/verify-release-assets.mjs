@@ -15,7 +15,7 @@ for (const file of files) {
 const required = [
   ['Windows NSIS installer', (name) => lite(name) && name.endsWith('-setup.exe')],
   ['Windows MSI installer', (name) => lite(name) && name.endsWith('.msi')],
-  ['Windows portable executable', (name) => lite(name) && name.endsWith('_x64-portable.exe')],
+  ['Windows portable ZIP', (name) => lite(name) && name.endsWith('_x64-portable.zip')],
   ['Linux AppImage', (name) => lite(name) && name.endsWith('.AppImage')],
   ['Linux Debian package', (name) => lite(name) && name.endsWith('.deb')],
   ['Linux RPM package', (name) => lite(name) && name.endsWith('.rpm')],

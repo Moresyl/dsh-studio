@@ -202,13 +202,13 @@ pairing key appears in any of them.</sub>
 Grab an installer from [Releases]. Every tagged version is built by CI for five
 targets:
 
-| Platform            | Artifact                                                |
-| ------------------- | ------------------------------------------------------- |
-| Windows x64         | `.exe` (NSIS), `.msi`, and a standalone `-portable.exe` |
-| macOS Apple Silicon | `.dmg`                                                  |
-| macOS Intel         | `.dmg`                                                  |
-| macOS Universal     | One `.dmg` for both Intel and Apple Silicon             |
-| Linux x64           | `.AppImage`, `.deb`, `.rpm`                             |
+| Platform            | Artifact                                                     |
+| ------------------- | ------------------------------------------------------------ |
+| Windows x64         | `.exe` (NSIS), `.msi`, and a complete `-portable.zip` folder |
+| macOS Apple Silicon | `.dmg`                                                       |
+| macOS Intel         | `.dmg`                                                       |
+| macOS Universal     | One `.dmg` for both Intel and Apple Silicon                  |
+| Linux x64           | `.AppImage`, `.deb`, `.rpm`                                  |
 
 The Universal macOS image is the lightweight edition. Full / Offline images stay
 architecture-specific because their embedded Node runtime is native code.

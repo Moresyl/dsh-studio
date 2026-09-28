@@ -354,7 +354,7 @@ jobs:
         shell: bash
         run: node .github/scripts/verify-packaged-app.mjs "src-tauri/target/${{ matrix.target }}/release/bundle"
 
-      - name: Publish Windows portable executable
+      - name: Publish verified Windows portable ZIP
         if: runner.os == 'Windows'
         shell: bash
         env:
@@ -366,9 +366,8 @@ jobs:
             tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
           fi
           node .github/scripts/stage-portable.mjs "src-tauri/target/${{ matrix.target }}/release" portable-assets
-          portable="$(find portable-assets -maxdepth 1 -type f -name '*-portable.exe' -print -quit)"
+          portable="$(find portable-assets -maxdepth 1 -type f -name '*-portable.zip' -print -quit)"
           test -n "$portable"
-          "$portable" --smoke-test
           gh release upload "$tag" "$portable" --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Prepare verified Full / Offline runtime

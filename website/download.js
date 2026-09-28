@@ -19,7 +19,7 @@ const API_TIMEOUT_MS = 8_000
 const SUFFIXES = {
   'win-nsis': '_x64-setup.exe',
   'win-msi': '_x64_en-US.msi',
-  'win-portable': '_x64-portable.exe',
+  'win-portable': '_x64-portable.zip',
   'mac-arm': '_aarch64.dmg',
   'mac-intel': '_x64.dmg',
   'mac-universal': '_universal.dmg',

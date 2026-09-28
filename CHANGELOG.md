@@ -19,6 +19,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Ship the Windows portable build as a complete ZIP with `dist/`, fixing bare executables that cannot start the loopback shell. Extract and verify frontend resources before upload; update download links and installation instructions.
 - Correct Full/Offline resource mapping so clean installs carry `dist/` and expose their bundled runtime at the native `offline/` lookup path; verify the manifest beside the frontend instead of accepting an arbitrary nested match.
 - Boot the verified Full payload with its own packaged Node executable during installer acceptance, including authenticated Web Profile and desktop-host contract checks; reuse the result only for identical archive hashes within that packaging job.
 - Clean the legacy owned offline-resource subtree during Full upgrades and exercise both previous Lite and previous Full Windows installers before checking uninstall residue.
