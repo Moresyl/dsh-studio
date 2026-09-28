@@ -57,6 +57,8 @@ type Write = (partial: Partial<ProfileStore>) => void
 
 /** A profile mutation invalidates any comparison still being calculated. */
 let comparisonGeneration = 0
+/** A newer read or a write invalidates earlier roster snapshots and errors. */
+let rosterGeneration = 0
 
 /**
  * Run one change and take the roster it answers with.
@@ -76,6 +78,7 @@ const change = async (
   if (get().working !== null) return false
 
   comparisonGeneration += 1
+  rosterGeneration += 1
   const before = get().roster
   set({ working: subject, comparison: null, comparing: false, error: null, note: null })
 
@@ -109,10 +112,12 @@ export const useProfiles = create<ProfileStore>((set, get) => ({
 
   refresh: async () => {
     if (get().working !== null) return
+    const mine = ++rosterGeneration
     try {
-      set({ roster: await ipc.profileRoster() })
+      const roster = await ipc.profileRoster()
+      if (mine === rosterGeneration) set({ roster, error: null })
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === rosterGeneration) set({ error: describe(cause) })
     }
   },
 

@@ -86,6 +86,8 @@ interface PluginStore {
 
 /** Only the newest search may write results; older answers are dropped. */
 let generation = 0
+/** Even reopening the same package invalidates its earlier metadata request. */
+let detailGeneration = 0
 /** Invalidates an install preview when its catalog selection changes. */
 let previewGeneration = 0
 /** A source or profile mutation makes an older combined refresh stale. */
@@ -159,7 +161,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       const [profile, sources] = await Promise.all([ipc.pluginState(), ipc.pluginSources()])
       if (mine === stateGeneration) set({ profile, sources, error: null })
     } catch (cause) {
-      if (mine === stateGeneration) failed(set, cause)
+      if (mine === stateGeneration) set({ error: describe(cause) })
     }
   },
 
@@ -182,7 +184,8 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       }
     } catch (cause) {
       if (mine === generation && source === sourceGeneration) {
-        failed(set, cause)
+        if (refresh) failed(set, cause)
+        else set({ error: describe(cause) })
         set({ results: [], total: 0, hasMore: false })
       }
     } finally {
@@ -191,6 +194,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
   },
 
   select: async (name, sourceId = 'npm', version = 'latest') => {
+    const mine = ++detailGeneration
     ++previewGeneration
     if (name === null) {
       set({
@@ -198,6 +202,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
         selectedSource: null,
         selectedVersion: null,
         detail: null,
+        loadingDetail: false,
         previewing: false,
         previewToken: null,
         previewExpiresAt: null,
@@ -211,6 +216,7 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       selectedVersion: version,
       detail: null,
       loadingDetail: true,
+      error: null,
       previewing: false,
       previewToken: null,
       previewExpiresAt: null,
@@ -219,17 +225,19 @@ export const usePlugins = create<PluginStore>((set, get) => ({
       const detail = await ipc.pluginDetail(sourceId, name, version)
       // Still the selection this request was made for, or it belongs to a
       // package the user has already clicked away from.
-      if (isSelected(get(), name, sourceId, version)) set({ detail })
+      if (mine === detailGeneration && isSelected(get(), name, sourceId, version)) set({ detail })
     } catch (cause) {
-      if (isSelected(get(), name, sourceId, version)) {
+      if (mine === detailGeneration && isSelected(get(), name, sourceId, version)) {
         failed(set, cause)
       }
     } finally {
-      if (isSelected(get(), name, sourceId, version)) set({ loadingDetail: false })
+      if (mine === detailGeneration && isSelected(get(), name, sourceId, version))
+        set({ loadingDetail: false })
     }
   },
 
   selectInstalled: (plugin) => {
+    ++detailGeneration
     ++previewGeneration
     const version = plugin.installedVersion || plugin.spec || 'bundled'
     set({

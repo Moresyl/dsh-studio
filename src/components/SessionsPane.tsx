@@ -510,6 +510,7 @@ interface ReaderProps {
 /** One session, read back in full. */
 function Reader({ card, lines, anchor, onBack }: ReaderProps) {
   const error = useSessions((state) => state.error)
+  const archiving = useSessions((state) => state.archiving)
   const archived = useSessions((state) => state.archived)
   const archive = useSessions((state) => state.archive)
   const body = useRef<HTMLDivElement>(null)
@@ -546,11 +547,18 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
         {card && (
           <Button
             variant="secondary"
+            disabled={archiving !== null}
             onClick={() =>
               void archive(card.id, !archived.includes(card.id)).then((done) => done && onBack())
             }
           >
-            {archived.includes(card.id) ? <ArchiveRestore size={13} /> : <Archive size={13} />}
+            {archiving === card.id ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : archived.includes(card.id) ? (
+              <ArchiveRestore size={13} />
+            ) : (
+              <Archive size={13} />
+            )}
             {archived.includes(card.id) ? t('sessions.restore') : t('sessions.archive')}
           </Button>
         )}

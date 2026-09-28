@@ -17,6 +17,8 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Ignore obsolete plugin-detail, profile-roster and session-roster responses so delayed reads cannot overwrite newer selections, renames or archive results; serialize archive actions and expose their busy state.
+- Keep automatic catalog search/refresh errors inline, retain explicit-action error reporting, and offer an in-place retry for failed plugin details. Expand deterministic coverage to plugin, profile and session stores.
 - Persist desktop theme, presentation, sidebar, onboarding, usage pricing, dismissed update and terminal layout preferences in bounded atomic application storage, instead of losing them when the local page origin changes after restart.
 - Stop forwarding input and resize events to exited terminal processes while keeping their transcripts readable; suppress late IPC failures after an emulator retires or is disposed.
 - Clarify that hiding the main window in the tray keeps terminals running, while quitting the application ends them.

@@ -39,6 +39,8 @@ interface SessionStore {
   searchRequest: number
 
   scanning: boolean
+  /** One archive write at a time, including while its native reply is pending. */
+  archiving: string | null
   searching: boolean
   /** True while a session is being rendered out, which on a long one is not instant. */
   exporting: boolean
@@ -80,6 +82,8 @@ let generation = 0
 
 /** Opening the same id twice still produces two snapshots; only the last wins. */
 let openingGeneration = 0
+/** Completed archive writes must not be overwritten by older shelf reads. */
+let shelfGeneration = 0
 
 export const useSessions = create<SessionStore>((set, get) => ({
   cards: null,
@@ -92,18 +96,20 @@ export const useSessions = create<SessionStore>((set, get) => ({
   opening: null,
   searchRequest: 0,
   scanning: false,
+  archiving: null,
   searching: false,
   exporting: false,
   error: null,
 
   refresh: async () => {
     if (get().scanning) return
+    const mine = shelfGeneration
     set({ scanning: true, error: null })
     try {
       const { cards, archived } = await ipc.sessionRoster()
-      set({ cards, archived })
+      if (mine === shelfGeneration) set({ cards, archived })
     } catch (cause) {
-      set({ error: describe(cause) })
+      if (mine === shelfGeneration) set({ error: describe(cause) })
     } finally {
       set({ scanning: false })
     }
@@ -161,13 +167,18 @@ export const useSessions = create<SessionStore>((set, get) => ({
   requestSearch: () => set({ tab: 'list', searchRequest: get().searchRequest + 1 }),
 
   archive: async (id, archived) => {
+    if (get().archiving !== null) return false
+    set({ archiving: id, error: null })
     try {
       const shelf = await ipc.sessionArchive(id, archived)
+      ++shelfGeneration
       set({ cards: shelf.cards, archived: shelf.archived, error: null })
       return true
     } catch (cause) {
       set({ error: reportFailure(cause) })
       return false
+    } finally {
+      set({ archiving: null })
     }
   },
 

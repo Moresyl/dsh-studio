@@ -187,6 +187,14 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                 aria-hidden="true"
               />
               <p className="text-[12px] text-faint">{t('plugins.detailFailed')}</p>
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  void select(selected, selectedSource ?? 'npm', selectedVersion ?? 'latest')
+                }
+              >
+                {t('action.recheck')}
+              </Button>
             </div>
           ) : (
             <div className="flex flex-col gap-3.5">

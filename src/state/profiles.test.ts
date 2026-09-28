@@ -5,7 +5,13 @@ import * as ipc from '@/lib/ipc'
 import { useDialog } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
 import { usePlugins } from '@/state/plugins'
-import { isNewProfileName, switchProfile, useProfiles } from '@/state/profiles'
+import {
+  hostedProfile,
+  isNewProfileName,
+  subscribeToProfiles,
+  switchProfile,
+  useProfiles,
+} from '@/state/profiles'
 
 // The command surface only exists inside a real window, and every rule under
 // test is about what the store does with the answer rather than about the call.
@@ -46,7 +52,7 @@ const serving = () =>
   useHarness.setState({ status: { phase: 'ready', origin: 'http://127.0.0.1:8100', pid: 4242 } })
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   useDialog.setState({ pending: null })
   useProfiles.setState({
     roster: roster('web', 'web', 'lab'),
@@ -65,6 +71,50 @@ beforeEach(() => {
 })
 
 describe('a change to the profiles directory', () => {
+  it('does not restore an old roster after a mutation completes', async () => {
+    const pending = gate<Roster>()
+    vi.mocked(ipc.profileRoster).mockReturnValueOnce(pending.reply)
+    vi.mocked(ipc.profileRename).mockResolvedValueOnce(roster('web', 'web', 'renamed'))
+    const refreshing = useProfiles.getState().refresh()
+    await useProfiles.getState().rename('lab', 'renamed')
+    pending.settle(roster('web', 'web', 'lab'))
+    await refreshing
+    expect(useProfiles.getState().roster?.profiles.map((item) => item.name)).toEqual([
+      'web',
+      'renamed',
+    ])
+  })
+
+  it('keeps only the newest overlapping roster refresh', async () => {
+    const pending = gate<Roster>()
+    vi.mocked(ipc.profileRoster)
+      .mockReturnValueOnce(pending.reply)
+      .mockResolvedValueOnce(roster('lab', 'web', 'lab'))
+    const old = useProfiles.getState().refresh()
+    await useProfiles.getState().refresh()
+    pending.settle(roster('web', 'web', 'lab'))
+    await old
+    expect(useProfiles.getState().roster?.selected).toBe('lab')
+  })
+
+  it('drops stale refresh errors after a successful mutation and clears a recovered refresh', async () => {
+    let reject!: (cause: Error) => void
+    vi.mocked(ipc.profileRoster).mockReturnValueOnce(
+      new Promise((_, fail) => {
+        reject = fail
+      }),
+    )
+    vi.mocked(ipc.profileRename).mockResolvedValueOnce(roster('web', 'web', 'renamed'))
+    const old = useProfiles.getState().refresh()
+    await useProfiles.getState().rename('lab', 'renamed')
+    reject(new Error('obsolete read failed'))
+    await old
+    expect(useProfiles.getState().error).toBeNull()
+    useProfiles.setState({ error: 'previous failure' })
+    vi.mocked(ipc.profileRoster).mockResolvedValueOnce(roster('web', 'web', 'renamed'))
+    await useProfiles.getState().refresh()
+    expect(useProfiles.getState().error).toBeNull()
+  })
   it('refuses a second one while the first is still running', async () => {
     const first = gate<Roster>()
     vi.mocked(ipc.profileCreate).mockReturnValueOnce(first.reply)
@@ -246,5 +296,113 @@ describe('the name a profile may be created under', () => {
     ]) {
       expect(isNewProfileName(name), name).toBe(false)
     }
+  })
+})
+
+describe('profile import, export and shared reads', () => {
+  it('duplicates and imports using the native roster rather than optimistic entries', async () => {
+    vi.mocked(ipc.profileDuplicate).mockResolvedValueOnce(roster('web', 'web', 'copy'))
+    await expect(useProfiles.getState().duplicate('web', 'copy')).resolves.toBe(true)
+    expect(ipc.profileDuplicate).toHaveBeenCalledWith('web', 'copy')
+    expect(useProfiles.getState().roster?.profiles.map((item) => item.name)).toEqual([
+      'web',
+      'copy',
+    ])
+    vi.mocked(ipc.profileImport).mockResolvedValueOnce(roster('web', 'web', 'copy', 'imported'))
+    await expect(useProfiles.getState().load('D:/backup.json', 'imported')).resolves.toBe(true)
+    expect(ipc.profileImport).toHaveBeenCalledWith('D:/backup.json', 'imported')
+  })
+
+  it('exports only to the requested path and settles the success note', async () => {
+    await expect(useProfiles.getState().save('web', 'D:/backup.json')).resolves.toBe(true)
+    expect(ipc.profileExport).toHaveBeenCalledWith('web', 'D:/backup.json')
+    expect(useProfiles.getState().note).toContain('D:/backup.json')
+    useProfiles.getState().settle()
+    expect(useProfiles.getState()).toMatchObject({ note: null, error: null })
+  })
+
+  it('reports failed exports without claiming success', async () => {
+    vi.mocked(ipc.profileExport).mockRejectedValueOnce(new Error('write refused'))
+    await expect(useProfiles.getState().save('web', 'D:/backup.json')).resolves.toBe(false)
+    expect(useProfiles.getState()).toMatchObject({ note: null, error: 'write refused' })
+    expect(useDialog.getState().pending).toMatchObject({ kind: 'error', details: 'write refused' })
+  })
+
+  it('reads a verified declaration and rejects a damaged declaration', async () => {
+    const declaration: ipc.Declaration = {
+      kind: 'dsh-profile',
+      version: 1,
+      name: 'web',
+      plugins: {},
+      disabled: [],
+      patch: '[]',
+      verified: true,
+    }
+    vi.mocked(ipc.profileDeclaration).mockResolvedValueOnce(declaration)
+    await expect(useProfiles.getState().read('D:/backup.json')).resolves.toEqual(declaration)
+    vi.mocked(ipc.profileDeclaration).mockRejectedValueOnce(new Error('digest mismatch'))
+    await expect(useProfiles.getState().read('D:/damaged.json')).resolves.toBeNull()
+    expect(useProfiles.getState().error).toBe('digest mismatch')
+  })
+
+  it('keeps a current comparison, reports its failure and ignores stale failures', async () => {
+    const comparison: Comparison = { left: 'web', right: 'lab', rows: [], differences: 0 }
+    vi.mocked(ipc.profileCompare).mockResolvedValueOnce(comparison)
+    await useProfiles.getState().compare('web', 'lab')
+    expect(useProfiles.getState()).toMatchObject({ comparison, comparing: false })
+    vi.mocked(ipc.profileCompare).mockRejectedValueOnce(new Error('comparison failed'))
+    await useProfiles.getState().compare('web', 'missing')
+    expect(useProfiles.getState()).toMatchObject({
+      comparison: null,
+      comparing: false,
+      error: 'comparison failed',
+    })
+    let reject!: (cause: Error) => void
+    vi.mocked(ipc.profileCompare).mockReturnValueOnce(
+      new Promise((_, fail) => {
+        reject = fail
+      }),
+    )
+    const old = useProfiles.getState().compare('web', 'lab')
+    vi.mocked(ipc.profileCompare).mockResolvedValueOnce(comparison)
+    await useProfiles.getState().compare('web', 'lab')
+    reject(new Error('old comparison failed'))
+    await old
+    expect(useProfiles.getState()).toMatchObject({ comparison, error: null })
+  })
+
+  it('refreshes both dependent stores only for a profiles announcement', async () => {
+    let handler!: (subject: ipc.Shared) => void
+    const stop = vi.fn()
+    vi.mocked(ipc.onSharedChange).mockImplementationOnce(async (listen) => {
+      handler = listen
+      return stop
+    })
+    vi.mocked(ipc.profileRoster).mockResolvedValue(roster('web', 'web', 'lab'))
+    const unsubscribe = await subscribeToProfiles()
+    handler('theme')
+    expect(ipc.profileRoster).not.toHaveBeenCalled()
+    handler('profiles')
+    await vi.waitFor(() => expect(ipc.profileRoster).toHaveBeenCalledOnce())
+    expect(usePlugins.getState().refresh).toHaveBeenCalledOnce()
+    unsubscribe()
+    expect(stop).toHaveBeenCalledOnce()
+  })
+
+  it('finds the hosted profile or returns null when no matching profile exists', () => {
+    expect(hostedProfile(null)).toBeNull()
+    expect(hostedProfile(roster('missing', 'web'))).toBeNull()
+    expect(hostedProfile(roster('web', 'web'))?.name).toBe('web')
+  })
+
+  it('does not restart after a failed or already busy profile selection', async () => {
+    useProfiles.setState({ working: 'busy' })
+    await switchProfile('lab')
+    expect(ipc.profileSelect).not.toHaveBeenCalled()
+    useProfiles.setState({ working: null })
+    vi.mocked(ipc.profileSelect).mockRejectedValueOnce(new Error('profile missing'))
+    await switchProfile('lab')
+    expect(useHarness.getState().stop).not.toHaveBeenCalled()
+    expect(useHarness.getState().start).not.toHaveBeenCalled()
   })
 })
