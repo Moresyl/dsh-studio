@@ -969,6 +969,22 @@
    palette. Restore the boundaries and status meaning that colour mixing alone
    cannot carry once the operating system becomes the colour authority. */
 @media (forced-colors: active) {
+  /* Transparent rounded borders become hollow rings in Windows contrast
+     themes. Keep a solid, recognisable thumb using the system palette. */
+  ::-webkit-scrollbar-thumb,
+  ::-webkit-scrollbar-thumb:hover {
+    background: ButtonText;
+    background-clip: border-box;
+    border: 2px solid Canvas;
+    border-radius: 0;
+    forced-color-adjust: none;
+  }
+
+  [data-search-hit='true'] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
   :focus-visible {
     outline-color: Highlight;
   }

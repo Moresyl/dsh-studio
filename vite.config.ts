@@ -53,6 +53,7 @@ export default defineConfig({
         'src/lib/preferences.ts',
         'src/lib/runtime-notices.ts',
         'src/lib/renderer-recovery.ts',
+        'src/lib/session-page.ts',
         'src/lib/updater.ts',
         'src/lib/usage.ts',
         'src/lib/worktree-review.ts',

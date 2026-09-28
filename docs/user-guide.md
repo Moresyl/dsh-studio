@@ -37,6 +37,15 @@ for a `SameSite=Strict` session cookie. The Studio shell serves itself from the
 same loopback site (`http://127.0.0.1`), so the embedded window holds and sends
 that cookie exactly like a browser tab — no Harness patching is involved.
 
+## Session history
+
+Search saved conversations by their content, open a matching excerpt, and export
+the native transcript as Markdown, HTML or JSON. Long transcripts display up to
+120 messages per segment; the footer goes to earlier, later, first or latest
+messages. Search opens the segment containing the selected match. Pagination
+does not limit the exported transcript. Archiving hides a conversation from the
+active list without deleting its Harness log; restore it from the Archived tab.
+
 ## Plugins
 
 Discovery can use npm, DSH 1024Store, the rate-limited reviewed dshfind catalog, or a custom standard catalog. The Sources tab also opens [DSH Hub](https://dsh-hub.org/) for community discovery: copy a listed npm package name back into Studio search and the same native review applies. DSH Hub currently exposes a website directory rather than Studio's public catalog Schema 1.0.0 endpoint, so Studio does not scrape its HTML or treat the homepage as an install authority. Results are indexed for ten minutes and support category filters, sorting and 25-item pages. A catalog can only suggest an exact npm target. Before any mutation, Studio resolves that version again through npm and checks package syntax and the Harness peer range. A successful market install writes a receipt with the exact source, version and integrity; the managed badge is shown only while the installed version still matches that receipt. Plugin changes have a durable before-image; an interrupted operation is rolled back on the next launch and reported in the UI.

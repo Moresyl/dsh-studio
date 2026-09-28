@@ -7,6 +7,10 @@ import {
   Braces,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   ClipboardCopy,
   FileCode2,
   FileOutput,
@@ -29,6 +33,7 @@ import { TabButton } from '@/components/TabButton'
 import { UsageReport } from '@/components/UsageReport'
 import { count, day, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
+import { sessionPage } from '@/lib/session-page'
 import type { MessageKey } from '@/lib/i18n'
 import type {
   Role,
@@ -198,6 +203,7 @@ export function SessionsPane() {
   if (opened || opening) {
     return (
       <Reader
+        key={opened?.card.id ?? opening}
         card={opened?.card ?? null}
         lines={opened?.lines ?? null}
         anchor={anchor}
@@ -514,13 +520,17 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
   const archived = useSessions((state) => state.archived)
   const archive = useSessions((state) => state.archive)
   const body = useRef<HTMLDivElement>(null)
+  const [requestedPage, setRequestedPage] = useState<number | null>(null)
+  const page = sessionPage(lines ?? [], requestedPage, anchor)
 
   // The point of a search result is the moment inside the session, so arriving
   // at the top of a thousand-line transcript would be arriving nowhere.
   useEffect(() => {
-    if (!lines || anchor === null) return
-    body.current?.querySelector(`[data-seq="${anchor}"]`)?.scrollIntoView({ block: 'center' })
-  }, [lines, anchor])
+    if (!lines) return
+    if (requestedPage === null && anchor !== null)
+      body.current?.querySelector(`[data-seq="${anchor}"]`)?.scrollIntoView({ block: 'center' })
+    else body.current?.scrollTo({ top: 0 })
+  }, [lines, anchor, requestedPage])
 
   // Escape leaves a drilled-into view on every desktop platform. Skipped while
   // a modal is up, because then the key belongs to the thing in front.
@@ -588,13 +598,66 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
 
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto">
         {lines ? (
-          lines.map((line, index) => (
-            <Turn key={`${line.seq}-${index}`} line={line} lit={line.seq === anchor} />
-          ))
+          lines
+            .slice(page.start, page.end)
+            .map((line, index) => (
+              <Turn key={`${line.seq}-${index}`} line={line} lit={line.seq === anchor} />
+            ))
         ) : (
           <Empty icon={Loader2} spin message={t('sessions.opening')} />
         )}
       </div>
+      {lines && page.pages > 1 && (
+        <nav
+          aria-label={t('sessions.page.navigation')}
+          className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line px-4 py-2"
+        >
+          <span role="status" className="min-w-0 flex-1 text-ui-caption text-muted tabular-nums">
+            {t('sessions.page.range', {
+              start: page.start + 1,
+              end: page.end,
+              total: lines.length,
+            })}
+          </span>
+          {[
+            {
+              label: t('sessions.page.first'),
+              icon: ChevronsLeft,
+              target: 0,
+              disabled: page.page === 0,
+            },
+            {
+              label: t('sessions.page.previous'),
+              icon: ChevronLeft,
+              target: page.page - 1,
+              disabled: page.page === 0,
+            },
+            {
+              label: t('sessions.page.next'),
+              icon: ChevronRight,
+              target: page.page + 1,
+              disabled: page.page === page.pages - 1,
+            },
+            {
+              label: t('sessions.page.last'),
+              icon: ChevronsRight,
+              target: page.pages - 1,
+              disabled: page.page === page.pages - 1,
+            },
+          ].map(({ label, icon: Icon, target, disabled }) => (
+            <Button
+              key={label}
+              variant="secondary"
+              aria-label={label}
+              data-hint={label}
+              disabled={disabled}
+              onClick={() => setRequestedPage(target)}
+            >
+              <Icon size={14} aria-hidden="true" />
+            </Button>
+          ))}
+        </nav>
+      )}
     </section>
   )
 }
@@ -695,6 +758,7 @@ function Turn({ line, lit }: { line: SessionLine; lit: boolean }) {
   return (
     <article
       data-seq={line.seq}
+      data-search-hit={lit || undefined}
       className={[
         'border-b border-l-2 border-b-line/60 px-5 py-2.5',
         RAIL[line.role],
