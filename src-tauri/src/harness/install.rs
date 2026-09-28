@@ -724,26 +724,33 @@ pub fn ensure_runtime_resolver(target: &Path) -> Result<PathBuf> {
         ));
     }
     let resolver = integration.join("lib/runtime-resolver.cjs");
-    if let Ok(metadata) = std::fs::symlink_metadata(&resolver) {
+    refresh_integration_file(&integration.join("lib/client.js"), INTEGRATION_CLIENT)?;
+    refresh_integration_file(&resolver, INTEGRATION_RESOLVER)?;
+    Ok(resolver)
+}
+
+/// Replace only Studio-owned regular files, atomically, without reinstalling
+/// the upstream runtime or touching Profile packages during a Studio upgrade.
+fn refresh_integration_file(path: &Path, expected: &[u8]) -> Result<()> {
+    if let Ok(metadata) = std::fs::symlink_metadata(path) {
         if metadata.file_type().is_symlink() || !metadata.is_file() {
             return Err(Error::Install(format!(
-                "the managed runtime resolver has an unsafe file at {}",
-                resolver.display()
+                "the managed Studio integration has an unsafe file at {}",
+                path.display()
             )));
         }
-        if crate::bounded_file::read(&resolver, crate::bounded_file::CONTROL_BYTES)
-            .is_ok_and(|body| body == INTEGRATION_RESOLVER)
+        if crate::bounded_file::read(path, crate::bounded_file::CONTROL_BYTES)
+            .is_ok_and(|body| body == expected)
         {
-            return Ok(resolver);
+            return Ok(());
         }
     }
-    crate::atomic::write(&resolver, INTEGRATION_RESOLVER).map_err(|cause| {
+    crate::atomic::write(path, expected).map_err(|cause| {
         Error::Install(format!(
-            "the managed runtime resolver could not be updated at {}: {cause}",
-            resolver.display()
+            "the managed Studio integration could not be updated at {}: {cause}",
+            path.display()
         ))
-    })?;
-    Ok(resolver)
+    })
 }
 
 fn qualify_runtime(target: &Path) -> Result<()> {
@@ -1388,9 +1395,9 @@ mod tests {
     use super::{
         ensure_runtime_resolver, npm_cli_candidates, qualify_runtime, remove_dir_if_exists,
         replace_once, require_expected_runtime, run_command_with_limits, runtime_compatible,
-        runtime_version, InstallPlan, INTEGRATION_PACKAGE, INTEGRATION_RESOLVER, OFFICIAL_REGISTRY,
-        PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC,
-        VERSION,
+        runtime_version, InstallPlan, INTEGRATION_CLIENT, INTEGRATION_PACKAGE,
+        INTEGRATION_RESOLVER, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK,
+        RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -1612,6 +1619,18 @@ mod tests {
             fs::read(&resolver).expect("repaired body"),
             INTEGRATION_RESOLVER
         );
+
+        let client = root.join("node_modules/@moresyl/dsh-studio-integration/lib/client.js");
+        fs::write(&client, "stale client theme").expect("old integration client");
+        ensure_runtime_resolver(&root).expect("upgrade client even with current resolver");
+        assert!(fs::read(&client).expect("updated client") == INTEGRATION_CLIENT);
+        fs::remove_file(&client).expect("remove owned client fixture");
+        fs::create_dir(&client).expect("unsafe client directory");
+        assert!(ensure_runtime_resolver(&root)
+            .expect_err("unsafe client refused")
+            .to_string()
+            .contains("unsafe file"));
+        assert!(client.is_dir());
 
         fs::remove_dir_all(root).expect("cleanup");
     }

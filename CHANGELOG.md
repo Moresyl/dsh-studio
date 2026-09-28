@@ -17,6 +17,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Refresh Studio-owned runtime client integration on startup as well as its resolver, so in-place Studio upgrades receive current theme behavior without reinstalling Harness or changing user Profile packages. Reject unsafe target file types and update atomically.
 - Seed native presentation preferences once per application process so reloading a window cannot overwrite a newer choice with its creation-time snapshot; still refresh reused loopback origins after a full restart.
 - Keep keyboard focus inside worktree review while refresh is loading or fails. Add a real native missing-Git failure/retry regression with isolated fixture restoration.
 - Improve secondary-text and status-color contrast across both palettes, keep system/explicit light palettes synchronized, and make contrast-mode scrollbars and session search highlights visible. Add base-token contrast regression tests; remove extra dimming from session usage labels and timestamps.
