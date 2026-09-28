@@ -9,6 +9,8 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.19] — 2026-09-29
+
 ### Added
 
 - Add single, side-by-side, stacked and four-pane terminal layouts with a saved layout preference and stable tab groups. Switching layout does not launch shells or discard live transcripts.
