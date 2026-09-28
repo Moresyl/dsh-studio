@@ -35,13 +35,19 @@ the terminal, or installer flows passed physical-device acceptance.
 Build a debug QA app with a separate Tauri identifier, product name and deep-link
 scheme. Launch it with dedicated `DSH_STUDIO_DATA_DIR` and `DSH_HOME` directories
 and `DSH_STUDIO_WEBVIEW_DEBUG_PORT=9223`; do not reuse an everyday installation's
-data. The runtime must already be installed in that QA data directory. Both
+data. The runtime must already be installed in that QA data directory. The
 runners verify the live profile path before changing anything.
 
 ```powershell
 node .github/scripts/desktop-regression.mjs --port=9223 --minutes=20 --qa-home=D:/qa/home --output=D:/qa/ui-results
 node .github/scripts/desktop-ipc-regression.mjs D:/qa/home D:/qa/native-results 9223
 node .github/scripts/desktop-terminal-regression.mjs D:/qa/home D:/qa/terminal-results 9223
+node .github/scripts/desktop-runtime-regression.mjs D:/qa/home D:/qa/runtime-results 9223
+node .github/scripts/desktop-preferences-regression.mjs D:/qa/home D:/qa/preference-results 9223
+node .github/scripts/desktop-worktree-regression.mjs D:/qa/home D:/qa/worktree-results 9223
+node .github/scripts/desktop-worktree-failure-regression.mjs D:/qa/home D:/qa/worktree-failure-results 9223
+node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-results 9223 bounded
+node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-limit-results 9223 limited
 ```
 
 The UI runner checks seven shell pages, horizontal overflow, plugin-card
@@ -51,7 +57,7 @@ themselves prove the absence of leaks. The native runner exercises the actual
 WebView ACL, profile round trips, custom preset packages, session search/export/
 archive and a real PTY. It creates unique QA fixtures and removes its temporary
 profiles, fixtures and terminal afterward. Exports and the result report remain
-under the requested output directory. Run the two sequentially and do not
+under the requested output directory. Run all runners sequentially and do not
 operate the same QA window during the UI run.
 
 These checks complement the manual matrix; they do not cover model-provider
@@ -63,6 +69,19 @@ round trips, a failed shell transcript, resize safety and context-menu targeting
 then closes its own terminals. Run it separately from other UI runners. Its
 layout-preference check does not prove application-restart restoration; verify
 that separately and confirm that no shell is launched automatically.
+
+The runtime runner interleaves real start/stop transitions with visible re-checks,
+then compares supervisor state with the enabled UI action. It restores the initial
+running/stopped state and never sends a model request. The preference runner
+checks durable writes and same-window reloads, not full-process restart by itself.
+Worktree runners require Harness to be stopped, retain isolated Git evidence and
+restore the selected workspace. The failure runner temporarily makes only its
+own fixture's Git directory unavailable, then restores it and retries.
+
+Session runners create exclusive local fixtures, check 4,000-message pagination
+or a 33 MiB partial log, and remove those fixtures after checking exports and
+small-window/high-contrast presentation. Do not count an interrupted timed run
+as a completed soak; restart the full duration after changing the candidate.
 
 Verify viewport dimensions and capture reduced-motion or forced-colour mode in
 the same CDP connection, before its overrides expire. These browser simulations
