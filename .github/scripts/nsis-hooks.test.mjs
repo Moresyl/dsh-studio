@@ -21,6 +21,9 @@ test('Full upgrades replace every versioned package resource', () => {
   assert.match(fullHook, /!macro NSIS_HOOK_PREINSTALL/)
   assert.match(fullHook, /RMDir \/r "\$INSTDIR\\dist"/)
   assert.match(fullHook, /RMDir \/r "\$INSTDIR\\offline"/)
+  assert.match(fullHook, /RMDir \/r "\$INSTDIR\\runtime-cache\\offline"/)
+  assert.match(fullHook, /RMDir "\$INSTDIR\\runtime-cache"/)
+  assert.doesNotMatch(fullHook, /RMDir \/r "\$INSTDIR\\runtime-cache"/)
 })
 
 test('Full bundles retain the shell and place offline resources at their native lookup paths', () => {

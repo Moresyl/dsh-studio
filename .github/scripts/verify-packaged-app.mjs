@@ -75,6 +75,9 @@ async function verifyWindows(files) {
   if (process.env.DSH_PREVIOUS_INSTALLER) {
     await verifyWindowsUpgrade(process.env.DSH_PREVIOUS_INSTALLER, nsis)
   }
+  if (process.env.DSH_EXPECT_OFFLINE === '1' && process.env.DSH_PREVIOUS_FULL_INSTALLER) {
+    await verifyWindowsUpgrade(process.env.DSH_PREVIOUS_FULL_INSTALLER, nsis)
+  }
   console.log('verified MSI extraction and NSIS installation by executing both packaged binaries')
 }
 

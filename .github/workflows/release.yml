@@ -323,6 +323,13 @@ jobs:
           fi
           echo "DSH_PREVIOUS_INSTALLER=$PWD/$installer" >> "$GITHUB_ENV"
           echo "Will verify an in-place upgrade from $previous."
+          # Exercise the old Full layout too; a Lite predecessor cannot expose
+          # archives left behind under the legacy runtime-cache directory.
+          full_name="$(gh release view "$previous" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name | select(endswith("-full-x86_64-pc-windows-msvc.exe"))' | head -n 1)"
+          if [ -n "$full_name" ]; then
+            gh release download "$previous" --repo "$GITHUB_REPOSITORY" --pattern "$full_name" --dir previous-release
+            echo "DSH_PREVIOUS_FULL_INSTALLER=$PWD/previous-release/$full_name" >> "$GITHUB_ENV"
+          fi
 
       - uses: tauri-apps/tauri-action@v1
         env:

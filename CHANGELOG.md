@@ -21,6 +21,7 @@ pre-1.0 caveat that anything may still move.
 
 - Correct Full/Offline resource mapping so clean installs carry `dist/` and expose their bundled runtime at the native `offline/` lookup path; verify the manifest beside the frontend instead of accepting an arbitrary nested match.
 - Boot the verified Full payload with its own packaged Node executable during installer acceptance, including authenticated Web Profile and desktop-host contract checks; reuse the result only for identical archive hashes within that packaging job.
+- Clean the legacy owned offline-resource subtree during Full upgrades and exercise both previous Lite and previous Full Windows installers before checking uninstall residue.
 - Keep long category/version menus within a scrollable 360-pixel surface, reveal active keyboard options and truncate oversized labels. Add real-WebView selection-menu and command-palette keyboard acceptance.
 - Keep live Harness status/log events authoritative over older environment checks, including explicit log clearing. Add interleaved inspection/event regressions and extend core coverage to supervisor and remote-access stores.
 - Refresh bilingual README images from the actual isolated Windows candidate; blur local filesystem and LAN labels and describe static screenshots accurately.
