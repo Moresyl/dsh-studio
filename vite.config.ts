@@ -55,6 +55,7 @@ export default defineConfig({
         'src/lib/renderer-recovery.ts',
         'src/lib/updater.ts',
         'src/lib/usage.ts',
+        'src/lib/worktree-review.ts',
         'src/state/rates.ts',
         'src/state/terminals.ts',
         'src/state/terminal-layout.ts',

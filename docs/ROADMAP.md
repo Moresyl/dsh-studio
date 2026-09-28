@@ -9,27 +9,30 @@ or promises of zero defects.
 
 ## Implemented
 
-| Area | Current capability | Boundary |
-| --- | --- | --- |
-| Runtime | Supervised Harness, Node selection/provisioning, Lite and Full/Offline resources | Download success is not boot success; cold-runtime and packaged-resource gates remain required |
-| Startup | Renderer watchdog, static recovery, safe mode | Recovery must remain usable when the normal UI cannot mount |
-| Profiles | Create, copy, rename, compare, import/export and cross-window selection | Integrity-checked backups; selecting a configuration does not prove it boots |
-| Plugins | Responsive marketplace, sources, search/filter/pagination, archive import and installed versions | Exact-version review, compatibility checks, one-use intentions, receipts and recovery; installation is not activation |
-| Contracts | Protocol 3 desktop bridge and read-only Host Protocol 1 | No arbitrary desktop IPC, native handles or command runner in the public host service |
-| Sessions | Local search, project filters, transcripts, archive and Markdown/HTML/JSON export | Local data remains the source of truth |
-| Usage | Per-model pricing, monthly budget, daily trends and CSV export | User-supplied prices; unpriced models are not free |
-| Terminal | Real PTYs, Unicode, copy/paste, tabs and process ownership | Failed shells retain transcripts; application exit ends child processes |
-| Workspaces | Folder selection, disk admission, Git worktree discovery and creation | No automatic deletion of dirty or externally owned worktrees |
-| Remote | Separate LAN gateway, short-lived pairing and revocable device credentials | Harness remains on loopback; this is not a built-in public-internet tunnel |
-| Interface | Three presentations, multiple windows, command palette and light/dark/system themes | Keyboard/modal semantics, reduced motion and forced-colour styles |
-| Diagnostics | Bounded redacted reports, rotated logs, crash evidence and export | Troubleshooting reports do not imply automatic telemetry |
-| Updates | Signed updater payloads, reviewed-version confirmation and fallback metadata | Updater signatures are distinct from OS publisher signatures |
-| Distribution | Windows/macOS/Linux jobs and package-channel manifests | Generated manifests do not prove admission to every external repository |
+| Area         | Current capability                                                                               | Boundary                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Runtime      | Supervised Harness, Node selection/provisioning, Lite and Full/Offline resources                 | Download success is not boot success; cold-runtime and packaged-resource gates remain required                        |
+| Startup      | Renderer watchdog, static recovery, safe mode                                                    | Recovery must remain usable when the normal UI cannot mount                                                           |
+| Profiles     | Create, copy, rename, compare, import/export and cross-window selection                          | Integrity-checked backups; selecting a configuration does not prove it boots                                          |
+| Plugins      | Responsive marketplace, sources, search/filter/pagination, archive import and installed versions | Exact-version review, compatibility checks, one-use intentions, receipts and recovery; installation is not activation |
+| Contracts    | Protocol 3 desktop bridge and read-only Host Protocol 1                                          | No arbitrary desktop IPC, native handles or command runner in the public host service                                 |
+| Sessions     | Local search, project filters, transcripts, archive and Markdown/HTML/JSON export                | Local data remains the source of truth                                                                                |
+| Usage        | Per-model pricing, monthly budget, daily trends and CSV export                                   | User-supplied prices; unpriced models are not free                                                                    |
+| Terminal     | Real PTYs, Unicode, copy/paste, tabs and process ownership                                       | Failed shells retain transcripts; application exit ends child processes                                               |
+| Workspaces   | Folder selection, disk admission, Git worktree discovery and creation                            | No automatic deletion of dirty or externally owned worktrees                                                          |
+| Remote       | Separate LAN gateway, short-lived pairing and revocable device credentials                       | Harness remains on loopback; this is not a built-in public-internet tunnel                                            |
+| Interface    | Three presentations, multiple windows, command palette and light/dark/system themes              | Keyboard/modal semantics, reduced motion and forced-colour styles                                                     |
+| Diagnostics  | Bounded redacted reports, rotated logs, crash evidence and export                                | Troubleshooting reports do not imply automatic telemetry                                                              |
+| Updates      | Signed updater payloads, reviewed-version confirmation and fallback metadata                     | Updater signatures are distinct from OS publisher signatures                                                          |
+| Distribution | Windows/macOS/Linux jobs and package-channel manifests                                           | Generated manifests do not prove admission to every external repository                                               |
 
 Detailed contracts live in [architecture](architecture.md),
 [user guide](user-guide.md) and [plugin interoperability](plugin-interoperability.md).
 
 ## In development
+
+- Read-only registered-worktree review with staged/unstaged diffs, untracked paths, bounded output,
+  keyboard/focus regression and no destructive Git actions.
 
 - Single, side-by-side, stacked and four-pane terminal layouts; preserve existing
   process identities and scrollback when changing layout.

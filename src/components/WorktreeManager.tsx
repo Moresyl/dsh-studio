@@ -6,6 +6,7 @@ import { Button } from '@/components/Button'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
+import { reportAction } from '@/state/failure'
 import { switchWorkspace } from '@/state/workspace'
 
 const asWorktrees = (value: unknown): ipc.GitWorktree[] =>
@@ -13,7 +14,7 @@ const asWorktrees = (value: unknown): ipc.GitWorktree[] =>
 
 /** Git-native isolation for parallel agent tasks. No destructive remove action
  * is offered: dirty branches stay visible until reviewed in ordinary Git. */
-export function WorktreeManager() {
+export function WorktreeManager({ onReview }: { onReview: (worktree: ipc.GitWorktree) => void }) {
   const [items, setItems] = useState<ipc.GitWorktree[]>([])
   const [branch, setBranch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -132,11 +133,14 @@ export function WorktreeManager() {
                   {item.head} · {item.path}
                 </p>
               </div>
+              <Button variant="secondary" onClick={() => onReview(item)}>
+                {t('worktrees.review')}
+              </Button>
               <Button
                 variant="ghost"
                 data-hint={t('statusbar.reveal')}
                 aria-label={t('statusbar.reveal')}
-                onClick={() => void revealItemInDir(item.path)}
+                onClick={() => void reportAction(() => revealItemInDir(item.path))}
               >
                 <FolderOpen size={12} aria-hidden="true" />
               </Button>

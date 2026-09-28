@@ -13,12 +13,15 @@ pre-1.0 caveat that anything may still move.
 
 - Add single, side-by-side, stacked and four-pane terminal layouts with a saved layout preference and stable tab groups. Switching layout does not launch shells or discard live transcripts.
 - Add isolated real-WebView terminal regression for five PTYs, layout transitions, output retention, abnormal exit and context-menu targeting.
+- Add read-only Git worktree review with changed paths, staged/unstaged diffs, untracked-path visibility and explicit oversized-diff limits. Only registered worktree roots can be reviewed; external diff/text conversion and filesystem-monitor hooks are disabled.
 
 ### Fixes and polish
 
 - Persist desktop theme, presentation, sidebar, onboarding, usage pricing, dismissed update and terminal layout preferences in bounded atomic application storage, instead of losing them when the local page origin changes after restart.
 - Stop forwarding input and resize events to exited terminal processes while keeping their transcripts readable; suppress late IPC failures after an emulator retires or is disposed.
 - Clarify that hiding the main window in the tray keeps terminals running, while quitting the application ends them.
+- Count untracked files as dirty worktree state, bound Git subprocess output, and label the selected worktree as current rather than incorrectly calling every selected linked worktree primary.
+- Correct outdated installer-size claims in the README and download site; Lite and Full/Offline packages have different sizes.
 
 ## [0.9.18] — 2026-09-27
 

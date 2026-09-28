@@ -79,6 +79,21 @@ current Profile unchanged.
 
 Completion/failure notifications for user turns and background jobs can be enabled independently in Settings. Workspace selection uses the native folder picker and also accepts a dropped folder.
 
+## Worktree review
+
+Settings lists the current repository's Git worktrees and can create an isolated branch/directory.
+**Review changes** opens a read-only view of changed paths and separate staged/unstaged diffs.
+The two status columns distinguish index changes from working-copy changes; untracked paths are
+listed without reading their contents. The current-worktree label follows the selected workspace,
+including linked worktrees. Refresh after edits because this is not a live editor.
+
+Each diff is limited to 256 KiB and 5,000 lines. Oversized diffs are explicitly withheld, not silently
+shown as complete; the file list remains available. More than 5,000 changed paths or oversized Git
+status output requires review with Git directly. Binary changes use Git's binary-difference notice.
+Studio does not run external diff/text-conversion tools or filesystem-monitor hooks for these reads.
+Review never stages, resets, merges, deletes or cleans files, and does not display uncommitted work
+from unrelated repositories. Use your existing Git workflow for those actions.
+
 ## Logs and diagnostics
 
 About can copy a public-safe diagnostic summary or export a 50 MiB-bounded ZIP. The ZIP contains build, runtime, profile and recovery state, recent redacted logs, Rust/WebView crash evidence, and native minidumps written for Studio panics on Windows; safe, bounded system crash reports already present on Windows/macOS are included too. Nothing is uploaded automatically. Binary dumps may contain process memory, so inspect the archive before sharing it.

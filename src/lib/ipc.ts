@@ -240,6 +240,28 @@ export const workspaceWorktrees = (): Promise<GitWorktree[]> => invoke('workspac
 export const workspaceWorktreeCreate = (branch: string): Promise<GitWorktree[]> =>
   invoke('workspace_worktree_create', { branch })
 
+export interface GitChange {
+  path: string
+  previousPath: string | null
+  index: string
+  worktree: string
+}
+
+export interface GitPatch {
+  text: string
+  tooLarge: boolean
+}
+
+export interface GitReview {
+  path: string
+  changes: GitChange[]
+  staged: GitPatch
+  unstaged: GitPatch
+}
+
+export const workspaceWorktreeReview = (path: string): Promise<GitReview> =>
+  invoke('workspace_worktree_review', { path })
+
 /* -------------------------------------------------------------------------- */
 /* Plugins                                                                    */
 /* -------------------------------------------------------------------------- */

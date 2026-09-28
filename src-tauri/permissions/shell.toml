@@ -102,5 +102,6 @@ commands.allow = [
     "workspace_inspect",
     "workspace_select",
     "workspace_worktree_create",
+    "workspace_worktree_review",
     "workspace_worktrees",
 ]

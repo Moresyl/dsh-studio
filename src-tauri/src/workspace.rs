@@ -10,6 +10,8 @@ use tokio::process::Command;
 use crate::error::{Error, Result};
 use crate::paths;
 
+pub mod review;
+
 const SELECTION_FILE: &str = "workspace.json";
 const WORKTREE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
 
@@ -199,10 +201,14 @@ async fn worktrees_in(repository: &Path) -> Result<Vec<Worktree>> {
     let records = parse_worktrees(&output)?;
     let mut worktrees = Vec::with_capacity(records.len());
     for record in records {
-        let dirty = !git(&record.path, &["status", "--porcelain=v1", "-uno"], false)
-            .await?
-            .trim()
-            .is_empty();
+        let dirty = !git(
+            &record.path,
+            &["status", "--porcelain=v1", "--untracked-files=normal"],
+            false,
+        )
+        .await?
+        .trim()
+        .is_empty();
         worktrees.push(Worktree {
             primary: same_path(&record.path, repository),
             dirty,
@@ -313,8 +319,27 @@ fn same_path(left: &Path, right: &Path) -> bool {
 }
 
 async fn git(path: &Path, arguments: &[&str], writes: bool) -> Result<String> {
+    git_bounded(path, arguments, writes, 2 << 20)
+        .await?
+        .ok_or_else(|| Error::Workspace("Git output exceeds the safety limit".into()))
+}
+
+/// Keep both pipes bounded while draining them concurrently with the child.
+/// `None` is an oversized successful result, never a silently partial result.
+async fn git_bounded(
+    path: &Path,
+    arguments: &[&str],
+    writes: bool,
+    maximum: usize,
+) -> Result<Option<String>> {
     let mut command = Command::new("git");
     command
+        .args([
+            "--no-pager",
+            "--literal-pathspecs",
+            "-c",
+            "core.fsmonitor=false",
+        ])
         .arg("-C")
         .arg(path)
         .args(arguments)
@@ -328,16 +353,42 @@ async fn git(path: &Path, arguments: &[&str], writes: bool) -> Result<String> {
     {
         command.creation_flags(0x0800_0000);
     }
-    let output = tokio::time::timeout(WORKTREE_TIMEOUT, command.output())
-        .await
-        .map_err(|_| Error::Workspace("Git worktree operation timed out".into()))?
+    let mut child = command
+        .spawn()
         .map_err(|cause| Error::Workspace(format!("Git could not start: {cause}")))?;
-    let stdout = String::from_utf8(output.stdout)
-        .map_err(|_| Error::Workspace("Git returned non-UTF-8 worktree data".into()))?;
-    if output.status.success() {
-        return Ok(stdout);
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| Error::Workspace("Git provided no output pipe".into()))?;
+    let stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| Error::Workspace("Git provided no diagnostic pipe".into()))?;
+    let (stdout, stderr, status) = tokio::time::timeout(WORKTREE_TIMEOUT, async move {
+        tokio::join!(
+            crate::child_output::capture(stdout, maximum),
+            crate::child_output::capture(stderr, 16 << 10),
+            child.wait()
+        )
+    })
+    .await
+    .map_err(|_| Error::Workspace("Git worktree operation timed out".into()))?;
+    let status =
+        status.map_err(|cause| Error::Workspace(format!("Git could not finish: {cause}")))?;
+    if status.success() {
+        return match stdout {
+            Ok(bytes) => String::from_utf8(bytes)
+                .map(Some)
+                .map_err(|_| Error::Workspace("Git returned non-UTF-8 worktree data".into())),
+            Err(cause) if cause.kind() == std::io::ErrorKind::InvalidData => Ok(None),
+            Err(cause) => Err(Error::Workspace(format!(
+                "Git output could not be read: {cause}"
+            ))),
+        };
     }
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stderr = stderr
+        .map_err(|cause| Error::Workspace(format!("Git diagnostic could not be read: {cause}")))?;
+    let stderr = String::from_utf8_lossy(&stderr);
     let detail = stderr
         .lines()
         .next()

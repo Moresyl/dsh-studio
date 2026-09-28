@@ -20,6 +20,8 @@ import { SelectControl } from '@/components/SelectControl'
 import { Switch } from '@/components/Switch'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { WorktreeManager } from '@/components/WorktreeManager'
+import { WorktreeReview } from '@/components/WorktreeReview'
+import type { GitWorktree } from '@/lib/ipc'
 import { t } from '@/lib/i18n'
 import { readCombination, spellCombination } from '@/lib/keys'
 import { isMac } from '@/lib/platform'
@@ -65,193 +67,202 @@ export function SettingsPane() {
   // under the label, where there is room for a sentence — a button in the middle
   // of listening for a keystroke is the last place to explain itself.
   const [recording, setRecording] = useState(false)
+  const [review, setReview] = useState<GitWorktree | null>(null)
 
   const ready = state !== null
   const occupied = Boolean(state?.shortcut) && state?.held === false
 
   return (
-    <section className="flex min-h-0 flex-1 animate-rise flex-col">
-      <PaneHeader title={t('settings.title')} subtitle={t('settings.subtitle')} width="narrow" />
+    <>
+      <section className="flex min-h-0 flex-1 animate-rise flex-col">
+        <PaneHeader title={t('settings.title')} subtitle={t('settings.subtitle')} width="narrow" />
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
-        <div className="mx-auto flex max-w-[780px] flex-col gap-4">
-          <div className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
-            <Row icon={Power} label={t('settings.autostart')} hint={t('settings.autostartHint')}>
-              <Switch
-                on={state?.autostart ?? false}
-                busy={busy}
-                disabled={!ready}
-                label={t('settings.autostart')}
-                onChange={(on) => void setAutostart(on)}
-              />
-            </Row>
+        <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
+          <div className="mx-auto flex max-w-[780px] flex-col gap-4">
+            <div className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
+              <Row icon={Power} label={t('settings.autostart')} hint={t('settings.autostartHint')}>
+                <Switch
+                  on={state?.autostart ?? false}
+                  busy={busy}
+                  disabled={!ready}
+                  label={t('settings.autostart')}
+                  onChange={(on) => void setAutostart(on)}
+                />
+              </Row>
 
-            <Row
-              icon={Keyboard}
-              label={t('settings.shortcut')}
-              hint={t('settings.shortcutHint')}
-              note={
-                recording ? (
-                  <span className="text-brand">{t('settings.recordingHint')}</span>
-                ) : (
-                  occupied && (
-                    <span className="flex items-center gap-2 text-warn">
-                      <TriangleAlert size={12} strokeWidth={2.2} aria-hidden="true" />
-                      {t('settings.taken')}
-                      <button
-                        type="button"
-                        onClick={() => void retry()}
-                        disabled={busy}
-                        className="shrink-0 font-medium underline decoration-warn/40 underline-offset-2 transition-colors duration-100 enabled:hover:decoration-warn"
-                      >
-                        {t('settings.retake')}
-                      </button>
-                    </span>
+              <Row
+                icon={Keyboard}
+                label={t('settings.shortcut')}
+                hint={t('settings.shortcutHint')}
+                note={
+                  recording ? (
+                    <span className="text-brand">{t('settings.recordingHint')}</span>
+                  ) : (
+                    occupied && (
+                      <span className="flex items-center gap-2 text-warn">
+                        <TriangleAlert size={12} strokeWidth={2.2} aria-hidden="true" />
+                        {t('settings.taken')}
+                        <button
+                          type="button"
+                          onClick={() => void retry()}
+                          disabled={busy}
+                          className="shrink-0 font-medium underline decoration-warn/40 underline-offset-2 transition-colors duration-100 enabled:hover:decoration-warn"
+                        >
+                          {t('settings.retake')}
+                        </button>
+                      </span>
+                    )
                   )
-                )
-              }
-            >
-              <Recorder recording={recording} onRecording={setRecording} />
-            </Row>
-
-            <Row
-              icon={SunMoon}
-              label={t('settings.appearance')}
-              hint={t('settings.appearanceHint')}
-            >
-              <ThemeSwitch />
-            </Row>
-
-            <Row
-              icon={PanelsTopLeft}
-              label={t('settings.presentation')}
-              hint={t('settings.presentationHint')}
-            >
-              <SelectControl
-                value={presentation}
-                aria-label={t('settings.presentation')}
-                onValueChange={(value) =>
-                  choosePresentation(value as 'compatibility' | 'extended' | 'advanced')
                 }
-                density="compact"
               >
-                <option value="compatibility">{t('settings.presentation.compatibility')}</option>
-                <option value="extended">{t('settings.presentation.extended')}</option>
-                <option value="advanced">{t('settings.presentation.advanced')}</option>
-              </SelectControl>
-            </Row>
+                <Recorder recording={recording} onRecording={setRecording} />
+              </Row>
 
-            <Row icon={ScrollText} label={t('settings.logLevel')} hint={t('settings.logLevelHint')}>
-              <SelectControl
-                value={state?.logLevel ?? 'info'}
-                aria-label={t('settings.logLevel')}
-                disabled={!ready || busy}
-                onValueChange={(value) =>
-                  void setLogLevel(value as 'debug' | 'info' | 'warn' | 'error')
-                }
-                density="compact"
+              <Row
+                icon={SunMoon}
+                label={t('settings.appearance')}
+                hint={t('settings.appearanceHint')}
               >
-                <option value="debug">{t('settings.logLevel.debug')}</option>
-                <option value="info">{t('settings.logLevel.info')}</option>
-                <option value="warn">{t('settings.logLevel.warn')}</option>
-                <option value="error">{t('settings.logLevel.error')}</option>
-              </SelectControl>
-            </Row>
+                <ThemeSwitch />
+              </Row>
 
-            <Row
-              icon={Network}
-              label={t('settings.harnessPort')}
-              hint={t('settings.harnessPortHint')}
-            >
-              <PortField
-                key={state?.harnessPort ?? 'automatic'}
-                value={state?.harnessPort ?? null}
-                disabled={!ready || busy}
-                onSave={(port) => void setHarnessPort(port)}
-              />
-            </Row>
+              <Row
+                icon={PanelsTopLeft}
+                label={t('settings.presentation')}
+                hint={t('settings.presentationHint')}
+              >
+                <SelectControl
+                  value={presentation}
+                  aria-label={t('settings.presentation')}
+                  onValueChange={(value) =>
+                    choosePresentation(value as 'compatibility' | 'extended' | 'advanced')
+                  }
+                  density="compact"
+                >
+                  <option value="compatibility">{t('settings.presentation.compatibility')}</option>
+                  <option value="extended">{t('settings.presentation.extended')}</option>
+                  <option value="advanced">{t('settings.presentation.advanced')}</option>
+                </SelectControl>
+              </Row>
 
-            <Row
-              icon={BellRing}
-              label={t('settings.turnCompleted')}
-              hint={t('settings.turnCompletedHint')}
-            >
-              <Switch
-                on={state?.notifications.turnCompleted ?? true}
-                busy={busy}
-                disabled={!ready}
+              <Row
+                icon={ScrollText}
+                label={t('settings.logLevel')}
+                hint={t('settings.logLevelHint')}
+              >
+                <SelectControl
+                  value={state?.logLevel ?? 'info'}
+                  aria-label={t('settings.logLevel')}
+                  disabled={!ready || busy}
+                  onValueChange={(value) =>
+                    void setLogLevel(value as 'debug' | 'info' | 'warn' | 'error')
+                  }
+                  density="compact"
+                >
+                  <option value="debug">{t('settings.logLevel.debug')}</option>
+                  <option value="info">{t('settings.logLevel.info')}</option>
+                  <option value="warn">{t('settings.logLevel.warn')}</option>
+                  <option value="error">{t('settings.logLevel.error')}</option>
+                </SelectControl>
+              </Row>
+
+              <Row
+                icon={Network}
+                label={t('settings.harnessPort')}
+                hint={t('settings.harnessPortHint')}
+              >
+                <PortField
+                  key={state?.harnessPort ?? 'automatic'}
+                  value={state?.harnessPort ?? null}
+                  disabled={!ready || busy}
+                  onSave={(port) => void setHarnessPort(port)}
+                />
+              </Row>
+
+              <Row
+                icon={BellRing}
                 label={t('settings.turnCompleted')}
-                onChange={(on) => void setNotification('turn-completed', on)}
-              />
-            </Row>
-
-            <Row
-              icon={CircleX}
-              label={t('settings.turnFailed')}
-              hint={t('settings.turnFailedHint')}
-            >
-              <Switch
-                on={state?.notifications.turnFailed ?? true}
-                busy={busy}
-                disabled={!ready}
-                label={t('settings.turnFailed')}
-                onChange={(on) => void setNotification('turn-failed', on)}
-              />
-            </Row>
-
-            <Row
-              icon={CircleCheck}
-              label={t('settings.jobCompleted')}
-              hint={t('settings.jobCompletedHint')}
-            >
-              <Switch
-                on={state?.notifications.jobCompleted ?? true}
-                busy={busy}
-                disabled={!ready}
-                label={t('settings.jobCompleted')}
-                onChange={(on) => void setNotification('job-completed', on)}
-              />
-            </Row>
-
-            <Row
-              icon={TriangleAlert}
-              label={t('settings.jobFailed')}
-              hint={t('settings.jobFailedHint')}
-            >
-              <Switch
-                on={state?.notifications.jobFailed ?? true}
-                busy={busy}
-                disabled={!ready}
-                label={t('settings.jobFailed')}
-                onChange={(on) => void setNotification('job-failed', on)}
-              />
-            </Row>
-
-            <Row
-              icon={BellRing}
-              label={t('settings.notificationTest')}
-              hint={t('settings.notificationTestHint')}
-            >
-              <Button
-                variant="secondary"
-                disabled={!ready || busy}
-                onClick={() => void testNotification()}
+                hint={t('settings.turnCompletedHint')}
               >
-                {t('settings.notificationTestAction')}
-              </Button>
-            </Row>
+                <Switch
+                  on={state?.notifications.turnCompleted ?? true}
+                  busy={busy}
+                  disabled={!ready}
+                  label={t('settings.turnCompleted')}
+                  onChange={(on) => void setNotification('turn-completed', on)}
+                />
+              </Row>
+
+              <Row
+                icon={CircleX}
+                label={t('settings.turnFailed')}
+                hint={t('settings.turnFailedHint')}
+              >
+                <Switch
+                  on={state?.notifications.turnFailed ?? true}
+                  busy={busy}
+                  disabled={!ready}
+                  label={t('settings.turnFailed')}
+                  onChange={(on) => void setNotification('turn-failed', on)}
+                />
+              </Row>
+
+              <Row
+                icon={CircleCheck}
+                label={t('settings.jobCompleted')}
+                hint={t('settings.jobCompletedHint')}
+              >
+                <Switch
+                  on={state?.notifications.jobCompleted ?? true}
+                  busy={busy}
+                  disabled={!ready}
+                  label={t('settings.jobCompleted')}
+                  onChange={(on) => void setNotification('job-completed', on)}
+                />
+              </Row>
+
+              <Row
+                icon={TriangleAlert}
+                label={t('settings.jobFailed')}
+                hint={t('settings.jobFailedHint')}
+              >
+                <Switch
+                  on={state?.notifications.jobFailed ?? true}
+                  busy={busy}
+                  disabled={!ready}
+                  label={t('settings.jobFailed')}
+                  onChange={(on) => void setNotification('job-failed', on)}
+                />
+              </Row>
+
+              <Row
+                icon={BellRing}
+                label={t('settings.notificationTest')}
+                hint={t('settings.notificationTestHint')}
+              >
+                <Button
+                  variant="secondary"
+                  disabled={!ready || busy}
+                  onClick={() => void testNotification()}
+                >
+                  {t('settings.notificationTestAction')}
+                </Button>
+              </Row>
+            </div>
+
+            <WorktreeManager onReview={setReview} />
+
+            {error && (
+              <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
+                {error}
+              </p>
+            )}
           </div>
-
-          <WorktreeManager />
-
-          {error && (
-            <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
-              {error}
-            </p>
-          )}
         </div>
-      </div>
-    </section>
+      </section>
+      {/* Keep fixed dialogs outside the animated pane's containing block. */}
+      {review && <WorktreeReview worktree={review} onClose={() => setReview(null)} />}
+    </>
   )
 }
 

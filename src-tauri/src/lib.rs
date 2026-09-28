@@ -236,6 +236,7 @@ pub fn run() {
             workspace::workspace_inspect,
             workspace::workspace_worktrees,
             workspace::workspace_worktree_create,
+            workspace::review::workspace_worktree_review,
         ])
         .run(tauri::generate_context!())
         .expect("dsh-studio failed to start");
