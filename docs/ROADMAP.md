@@ -1,171 +1,93 @@
-# DSH Studio roadmap and current benchmark
+# DSH Studio capability and quality roadmap
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-09-13. The refreshed benchmark head is
-`dataelement/dsh-desktop` at
-`c52f450d61a0efd33e63a9e8efa629b3cfe3cd9e`, with the official Harness head at
-`b150a551b8d465e31e418e1b2eaf5e79bbb7d28e` (`dsh-v0.1.1-rc.2`). The benchmark
-package identifies itself as 0.1.1; commit identity remains the comparison key.
-The DSH Studio comparison started at `9d608e7245e74662a67fe754222fd1b845270092`.
+Updated 2026-09-28. The shipped baseline is v0.9.18. In-development work is not
+released until it appears in a published version's changelog. This document
+records product capabilities and acceptance boundaries, not relative rankings
+or promises of zero defects.
 
-The product-depth review also sampled `vastsa/PI-Desktop`,
-`jasonsuhari/gridbash`, `wess/sinclair`, `BraydenPB/agent-grid`,
-`limboo-ai/limboo`, and `jpdlr/hydra`. Those projects are used only as evidence
-for interaction and isolation patterns; README roadmap claims are not treated
-as shipped features without corresponding code or tests.
+## Implemented
 
-This document avoids volatile star/download counts and never treats pipeline
-support as proof that an external channel or platform signature is live.
+| Area | Current capability | Boundary |
+| --- | --- | --- |
+| Runtime | Supervised Harness, Node selection/provisioning, Lite and Full/Offline resources | Download success is not boot success; cold-runtime and packaged-resource gates remain required |
+| Startup | Renderer watchdog, static recovery, safe mode | Recovery must remain usable when the normal UI cannot mount |
+| Profiles | Create, copy, rename, compare, import/export and cross-window selection | Integrity-checked backups; selecting a configuration does not prove it boots |
+| Plugins | Responsive marketplace, sources, search/filter/pagination, archive import and installed versions | Exact-version review, compatibility checks, one-use intentions, receipts and recovery; installation is not activation |
+| Contracts | Protocol 3 desktop bridge and read-only Host Protocol 1 | No arbitrary desktop IPC, native handles or command runner in the public host service |
+| Sessions | Local search, project filters, transcripts, archive and Markdown/HTML/JSON export | Local data remains the source of truth |
+| Usage | Per-model pricing, monthly budget, daily trends and CSV export | User-supplied prices; unpriced models are not free |
+| Terminal | Real PTYs, Unicode, copy/paste, tabs and process ownership | Failed shells retain transcripts; application exit ends child processes |
+| Workspaces | Folder selection, disk admission, Git worktree discovery and creation | No automatic deletion of dirty or externally owned worktrees |
+| Remote | Separate LAN gateway, short-lived pairing and revocable device credentials | Harness remains on loopback; this is not a built-in public-internet tunnel |
+| Interface | Three presentations, multiple windows, command palette and light/dark/system themes | Keyboard/modal semantics, reduced motion and forced-colour styles |
+| Diagnostics | Bounded redacted reports, rotated logs, crash evidence and export | Troubleshooting reports do not imply automatic telemetry |
+| Updates | Signed updater payloads, reviewed-version confirmation and fallback metadata | Updater signatures are distinct from OS publisher signatures |
+| Distribution | Windows/macOS/Linux jobs and package-channel manifests | Generated manifests do not prove admission to every external repository |
 
-## Summary
+Detailed contracts live in [architecture](architecture.md),
+[user guide](user-guide.md) and [plugin interoperability](plugin-interoperability.md).
 
-DSH Studio is no longer catching up to a window wrapper. It covers
-Windows/macOS/Linux; Lite and verified Full/Offline packages; a plugin market;
-authenticated mobile remote access; Profiles; PTY terminal; multiple windows;
-session search, usage/cost and export; command palette; diagnostics; and bounded
-plugin contracts.
+## In development
 
-The remaining gaps are concentrated in:
+- Single, side-by-side, stacked and four-pane terminal layouts; preserve existing
+  process identities and scrollback when changing layout.
+- Native-backed theme, presentation, sidebar, onboarding, pricing, dismissed
+  update and terminal-layout preferences. Random loopback ports must not erase
+  choices after restart. Unknown keys and damaged files must fail safely.
+- Real-WebView terminal regression covering five actual PTYs, route transitions,
+  failed transcripts, resize safety and context-menu targeting.
 
-1. **Distribution trust and reach:** OS-signing credentials, initial external
-   package-manager submissions, a stable mirror, and community reach.
-2. **Physical-device acceptance:** cross-platform CI is not evidence for a real
-   signed macOS install, update, notification, login item, or terminal flow.
-3. **Packaged UI automation:** logic coverage and a real Harness boot gate exist,
-   but final installers still need repeatable WebView/window interaction smoke.
-4. **Parallel-agent workspace depth:** native worktree discovery and creation are
-   delivered; persistent split layouts and a guarded native review/merge surface
-   for several agents remain.
+These changes are recorded under **Unreleased** in the changelog. Unit tests,
+native command checks and Windows WebView acceptance are distinct evidence;
+none alone proves final-installer or physical macOS acceptance.
 
-## Current capability matrix
+## Next priorities
 
-| Capability               | Benchmark head `c52f450d`                 | DSH Studio now                                                                                                                         |
-| ------------------------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| No system Node required  | Bundled Electron/runtime                  | Lite downloads and verifies official Node; Full carries SHA-256-pinned Node, Harness and pnpm                                          |
-| Real runtime gate        | Profile boot smoke                        | Cold-installs the full 599-package graph and verifies authenticated app surfaces plus Profile, Loader, Web server and Host probe in CI |
-| Presentation             | Compatibility / Extended / Advanced       | All three; Extended preserves upstream UI with a compact native toolbar                                                                |
-| Stable Web origin        | Fixed port support                        | Random by default or persisted 1024–65535; occupied fixed ports fail before Node starts                                                |
-| Startup recovery         | Injected recovery resources               | 12-second native watchdog and a static recovery window independent of React, Harness, Node and network                                 |
-| Profiles                 | Management, switching, desktop service    | Create/copy/rename/delete/import/export/diff and cross-window switching                                                                |
-| Host plugin service      | Mutable Profile and managed pnpm services | Read-only Host Protocol 1; mutations stay behind visible Protocol 3 review, receipts and rollback                                      |
-| Plugin market            | Built-in Community Market                 | Multi-source catalogs, pagination/limits, exact npm revalidation, preview token, integrity receipt, transaction rollback and UI errors |
-| Catalog health           | Source management and tests               | Native contract/latency/installability health checks for npm, dshfind, 1024Store and custom sources                                    |
-| Terminal                 | Built in                                  | PTY, Unicode 11 and process-tree ownership; no external CMD flash                                                                      |
-| Parallel agent workspace | Upstream subagents                        | Harness subagents, tabbed PTYs and native Git worktree isolation; persistent splits and guarded orchestration review remain planned    |
-| Mobile remote            | Planned                                   | Delivered: loopback Harness plus separate LAN gateway, one-use QR and revocable per-device credentials                                 |
-| Sessions                 | Primarily upstream UI                     | Local full-text search, project filter, per-model token/cost reports and Markdown/HTML/JSON export                                     |
-| Usage controls           | Upstream session UI                       | Local monthly budget status, complete-price guard and spreadsheet-safe daily CSV trend export                                          |
-| Multiple windows         | Desktop window management                 | Parallel windows on one Harness with placement persistence                                                                             |
-| Platforms                | Windows x64 and macOS Universal           | Windows x64, Linux x64, macOS Intel/Apple Silicon, plus Universal Lite image                                                           |
-| Process lifetime         | Electron runtime ownership                | Windows Job Object / Unix process group owns the full Node, PTY and tool tree                                                          |
-| Diagnostics              | Logs/recovery                             | Redacted bounded ZIP, rotated logs, crash evidence, Windows minidump and headless export command                                       |
-| Durable writes           | File-backed recovery contracts            | Same-directory unique staging, full flush and atomic Windows/Unix replacement for exports and persistent state                         |
-| Accessibility            | Native-frame refinements                  | Keyboard/dialog/form semantics gate, reduced motion, forced colours and bilingual manual acceptance matrix                             |
-| Startup payload          | Bundled Electron surface                  | Terminal emulator is lazy; entry JavaScript is gated below 450 KiB and currently 364,959 bytes                                         |
-| Update                   | Desktop updater                           | Mandatory Tauri signature, GitHub + verified Pages manifest fallback, asset matrix and SHA256SUMS gates                                |
-| Package managers         | Website installers                        | Scoop live; winget/Homebrew/AUR/Flathub manifests generated and natively validated, but not all externally submitted                   |
+### Reliability and complete user flows
 
-## Delivered in this benchmark pass
+- Maintain a per-page checklist for loading, empty, success, failure, cancellation,
+  retry, keyboard operation, small windows and both themes.
+- Exercise fresh installation and upgrades retaining profiles, plugins,
+  preferences and sessions; include native pickers, tray and shutdown.
+- Check profile composition, backend loading, client discovery and mounted UI
+  separately. Never bypass incompatibility guards to hide a warning.
+- Verify long-session responsiveness and cleanup across repeated page, profile
+  and terminal transitions. Heap samples alone do not prove no leaks.
 
-- `2c0761f`: cold full-graph install and real Profile/Loader/Web gate on three OSes.
-- `895b167`: renderer handshake, watchdog, static recovery and redacted export.
-- `9fe39ab`: optional fixed loopback port, persistence, conflict preflight and UI error.
-- `026f3df`: Extended presentation and lazy-loaded heavy workspace surfaces.
-- `2de525a`: Host Protocol 1, SDK types, bounded roster, disposal and real Loader probe.
-- `ad588d9`: cancellation-safe Profile/plugin job ownership.
-- `fd193d3`: SHA-256 verified Profile backup and restore preview.
-- `472e520`: native catalog contract health checks.
-- `ae86fc5`: update confirmation bound to the exact reviewed release.
-- `f293373`: local budget status and spreadsheet-safe trend export.
-- `31a665a`: global copyable errors for explicit actions, with quiet background refresh.
-- `6ad66d5` and `4e62d62`: accessibility gates, forced colours and labelled controls.
-- `39bc348`: atomic export, settings, Profile and plugin-recovery writes.
-- `ff21525`: terminal-emulator code split and a release bundle-size budget.
+### Workspace and content depth
 
-These commits first shipped in the v0.9.2 formal release and remain carried
-forward through v0.9.7 (with the v0.9.4 compatibility baseline retained) after each pipeline, public-asset, updater-signature and
-checksum verification.
+- Add durable worktree ownership and interrupted-operation recovery before
+  removal or destructive merge/rollback actions.
+- Improve workspace/session association and file/diff/test review. A remembered
+  layout is neither a restored process nor a safe merge contract.
+- Evaluate document previews, editable presentations and image tools against
+  actual format, permission, dependency and packaged-runtime requirements.
+  A plugin listing is not evidence of integrated, tested workflows.
+- Evaluate optional internet access only with explicit enablement, authenticated
+  pairing, resource/rate limits and revocation. Never expose the raw Harness port.
 
-## Next phase
+### Distribution and physical-device proof
 
-### P0 — trust and physical-device proof
+- Verify Windows publisher signatures and macOS Developer ID/notarization on
+  actual artifacts when credentials are available.
+- Distinguish physical Intel/Apple Silicon acceptance from CI compilation.
+- Verify external package-channel status before advertising availability.
+- Mirrors must retain exact bytes and independently verifiable checksums and
+  signatures; temporary proxies are not official mirrors.
 
-- Run the existing Azure Artifact Signing and Apple Developer ID/notarization/
-  stapling paths with real credentials. Claim OS signatures only after artifact
-  verification proves them.
-- On real Intel and Apple Silicon Macs, cover first install, Gatekeeper, login
-  item, notifications, picker, terminal, Full/Offline and in-app update. No Apple
-  device is currently available, so CI remains build/headless evidence only.
-- Exercise Lite→Lite and Full→Lite upgrades from the previous two formal
-  releases, including damaged manifests, offline state and Profile/plugin/
-  credential retention.
+## Release gates
 
-### P0 — distribution
+1. Review the worktree, previous release, changelog and included commits. Stage
+   only task-owned files; keep unrelated local artifacts out of commits.
+2. Pass frontend/native tests and coverage, strict Clippy, lint, production build,
+   public-contract, accessibility and bilingual-document gates.
+3. Run multi-round actual UI/native checks against isolated data. Record failures,
+   fixes, reruns and flows untested because credentials or hardware are absent.
+4. Pass cross-platform cold-runtime and packaged-resource pipeline checks.
+5. Verify published assets, checksums, updater manifests and signature status.
+   Release notes must describe concrete verified changes and limits.
 
-- Submit and maintain winget, an independent Homebrew tap and AUR. Advertise
-  Flathub equivalence only after the host developer-tool boundary is solved.
-- Establish a byte-identical mainland mirror with independent checksum/signature
-  retrieval, lag/error monitoring and a named operator. Do not endorse temporary
-  GitHub proxies.
-- Make the website's channel/version/architecture/Lite-vs-Full status derive
-  from verified release assets instead of hand-edited claims.
-
-### P1 — final-package automation
-
-- Windows installer: install → onboarding → runtime → start → terminal → three
-  presentations → restart → uninstall.
-- Linux AppImage/deb/rpm: WebKit launch, PTY, picker, tray and process-tree cleanup.
-- Add the same macOS flow after physical hardware and credentials exist; until
-  then retain the explicit “built/tested in CI, not physically validated” label.
-- Upload screenshots, WebView console, Harness tail and diagnostics on failure,
-  not only an exit code.
-
-### P1 — isolated agent workspaces
-
-- Native worktree discovery, repository preflight, explicit safe branch identity
-  and collision-safe sibling creation are delivered. Durable ownership receipts,
-  interrupted-operation recovery and guarded removal remain; Studio still never
-  deletes a dirty or externally owned worktree.
-- Associate each managed terminal/session with one workspace identity. Restore
-  layout and launch intent after restart, but do not claim that killed child
-  processes survived application exit.
-- Add a persistent recursive split tree with keyboard navigation and an explicit
-  pane ceiling. Resource estimates and a confirmation step must precede large
-  multi-pane launches.
-- Make changes reviewable by workspace and agent before merge: file list, diff,
-  test evidence, conflict state and guarded rollback. A UI button is not a safe
-  rollback contract until preimage identity and dirty-tree checks are enforced.
-
-### P1 — plugin ecosystem
-
-- Publish the SDK and Host Protocol 1 documentation with the next formal release,
-  plus a third-party fixture and compatibility-test template.
-- Publish machine-readable catalog-health receipts for providers. Local native
-  contract/latency/installability checks are delivered; an HTML website remains
-  discovery, never an install authority.
-- Add narrow Host capabilities only for demonstrated use cases. Generic package
-  mutation, arbitrary commands and native handles stay outside the read-only
-  service and behind the visible Protocol 3 transaction boundary.
-
-### P2 — product depth
-
-- Date trends, local budget status and spreadsheet-safe CSV export are delivered.
-- Verified Profile snapshot/restore previews without credentials are delivered.
-- Structural keyboard/form/dialog gates, reduced motion, forced colours and the
-  screen-reader/200% zoom/manual acceptance matrix are delivered. Physical
-  assistive-technology runs remain a release-candidate task.
-- Consider opt-in, removable anonymous reliability metrics only after privacy and
-  retention rules exist; do not add a telemetry SDK first.
-- Expose a narrow, authenticated local orchestration control plane only after the
-  worktree and pane ownership contracts exist. It may spawn/inspect/stop bounded
-  sessions and deliver messages; arbitrary desktop IPC, secrets, and unreviewed
-  package mutation stay out of the protocol.
-
-## Release decision
-
-A future release requires an audited worktree/version diff; frontend and Rust
-coverage gates; Clippy; production build; packaging tests; a cold real runtime
-boot on all three CI operating systems; per-platform asset, updater-signature,
-SHA-256 and actual OS-signature verification; and release notes supported only by
-commits, tests and observed artifacts.
+Elapsed time, green unit tests and an uploaded installer are not interchangeable
+with completed acceptance. Do not publish while a known blocking regression remains.
