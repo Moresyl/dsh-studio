@@ -82,10 +82,12 @@ pub struct Tokens {
 
 impl Tokens {
     fn add(&mut self, other: &Tokens) {
-        self.input += other.input;
-        self.output += other.output;
-        self.cache_read += other.cache_read;
-        self.cache_write += other.cache_write;
+        // Logs are external data. Impossible provider totals must not panic in
+        // debug builds or wrap into plausible small numbers in release builds.
+        self.input = self.input.saturating_add(other.input);
+        self.output = self.output.saturating_add(other.output);
+        self.cache_read = self.cache_read.saturating_add(other.cache_read);
+        self.cache_write = self.cache_write.saturating_add(other.cache_write);
     }
 
     /// Take back a sample that a later one replaced.
@@ -634,6 +636,31 @@ mod tests {
         });
 
         assert_eq!(tokens.input, 0);
+    }
+
+    #[test]
+    fn malformed_extreme_usage_cannot_overflow_any_counter() {
+        let mut tokens = Tokens {
+            input: u64::MAX,
+            output: u64::MAX,
+            cache_read: u64::MAX,
+            cache_write: u64::MAX,
+        };
+        tokens.add(&Tokens {
+            input: 1,
+            output: 1,
+            cache_read: 1,
+            cache_write: 1,
+        });
+        assert_eq!(
+            tokens,
+            Tokens {
+                input: u64::MAX,
+                output: u64::MAX,
+                cache_read: u64::MAX,
+                cache_write: u64::MAX
+            }
+        );
     }
 
     /// Nowhere to look is an empty library, not an error and not a panic — a
