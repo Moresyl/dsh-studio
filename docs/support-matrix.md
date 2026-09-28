@@ -11,8 +11,22 @@ integrity-locked graph and boots a real authenticated Web Profile before release
 | Rust and frontend unit tests | CI + local | CI build target | CI build target |
 | Hidden child-process launch | `CREATE_NO_WINDOW` contract | native process path | native process path |
 | Harness supervision and readiness | automated | automated | automated |
-| Installer upgrade smoke | opt-in stateful Windows runner | requires signed macOS runner | requires distro runner |
+| Packaged frontend bytes | MSI/NSIS resource checks | Mounted DMG resource checks | AppImage/DEB/RPM extraction checks |
+| Full packaged runtime | Own Node and authenticated Profile boot in release CI | Own Node and authenticated Profile boot in release CI | Own Node and authenticated Profile boot in release CI |
+| Installer upgrade/uninstall | Automatic on ephemeral release CI; prior Lite and Full | Physical installer acceptance still required | System package-manager acceptance still required |
 | Real display, sleep/wake, firewall | requires device run | requires device run | requires device run |
+
+Local Windows packaging rehearsal extracts MSI resources without registering an
+installation. Stateful NSIS install/upgrade/uninstall runs automatically only on
+ephemeral GitHub Actions runners (or an explicit local opt-in). A headless
+`--smoke-test` alone proves executable loading, not GUI startup. Resource hashes,
+packaged offline boot, actual Windows WebView interaction and real-device checks
+are separate evidence.
+
+Release artifacts stay in a draft until the build matrix, packaged-app checks,
+complete artifact/updater inventory and checksums pass. OS publisher signatures
+and macOS notarization are verified only when their credentials are configured;
+the required updater signatures are a different mechanism.
 
 ## Reporting a failure
 
