@@ -20,6 +20,7 @@ const card = (title: string): SessionCard => ({
   tokens: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0 },
   byModel: [],
   delegated: false,
+  limited: false,
   bytes: 10,
 })
 

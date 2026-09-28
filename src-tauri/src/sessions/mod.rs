@@ -136,6 +136,8 @@ pub struct Card {
     pub delegated: bool,
     /// Size on disk, compressed as the harness stores it.
     pub bytes: u64,
+    /// The read budget omitted part of the log, including its usage samples.
+    pub limited: bool,
 }
 
 /// One thing said, in the order it was said.
@@ -496,8 +498,10 @@ impl Shelf {
 
 /// Read one log, or nothing when it is unreadable or is not a session.
 fn reread(path: &Path, stamp: Stamp) -> Option<read::Reading> {
-    let text = artifact::text(path).ok()?;
-    read::read(&text, stamp.bytes)
+    let document = artifact::read(path).ok()?;
+    let mut reading = read::read(&document.text, stamp.bytes)?;
+    reading.card.limited = document.limited;
+    Some(reading)
 }
 
 /// Every session log under a store, with what each looked like when found.
@@ -561,6 +565,7 @@ mod tests {
                 by_model: Vec::new(),
                 delegated: false,
                 bytes: 0,
+                limited: false,
             },
             weight: line.text.len() as u64,
             lines: Some(vec![line]),

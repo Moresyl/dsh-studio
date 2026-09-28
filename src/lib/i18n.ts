@@ -410,6 +410,11 @@ const en = {
   'sessions.subtitle': 'Every conversation the harness has had on this machine',
   'sessions.search': 'Search everything that was said',
   'sessions.refresh': 'Look for new sessions',
+  'sessions.limited':
+    'This large session reached the read limit. Messages, search, usage and exports cover only the loaded portion; the original Harness log is unchanged.',
+  'sessions.limitedBadge': 'Partial',
+  'sessions.limitedShelf':
+    'Some large sessions reached the read limit. Their messages, search results, usage and exports may be incomplete. Original logs are unchanged.',
   'sessions.page.navigation': 'Transcript pages',
   'sessions.page.range': 'Messages {start}–{end} of {total}',
   'sessions.page.first': 'First messages',
@@ -1166,6 +1171,11 @@ const zh: Record<MessageKey, string> = {
   'sessions.subtitle': '本机上 harness 的全部对话记录',
   'sessions.search': '搜索所有说过的内容',
   'sessions.refresh': '重新查找会话',
+  'sessions.limited':
+    '此会话达到读取上限。消息、搜索、用量与导出仅包含已读取部分，Harness 原始日志未修改。',
+  'sessions.limitedBadge': '部分记录',
+  'sessions.limitedShelf':
+    '部分大会话达到读取上限，其消息、搜索结果、用量与导出可能不完整。原始日志未修改。',
   'sessions.page.navigation': '会话内容分页',
   'sessions.page.range': '第 {start}–{end} 条，共 {total} 条消息',
   'sessions.page.first': '最早消息',

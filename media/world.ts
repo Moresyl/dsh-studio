@@ -92,6 +92,7 @@ const sampleSessions: SessionCard[] = sessionSummaries.map(([title, id, time]) =
   tokens: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
   byModel: [],
   delegated: false,
+  limited: false,
   bytes: 0,
 }))
 

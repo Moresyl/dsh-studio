@@ -257,6 +257,8 @@ export function SessionsPane() {
         </Button>
       </PaneHeader>
 
+      {listed.some((card) => card.limited) && <Warning message={t('sessions.limitedShelf')} />}
+
       {tab === 'usage' ? (
         <UsageReport cards={listed} onOpen={(id) => show(id, null)} />
       ) : (
@@ -454,6 +456,11 @@ function Entry({ card, matches, marks, onOpen }: EntryProps) {
               {t('sessions.delegated')}
             </span>
           )}
+          {card.limited && (
+            <span className="shrink-0 text-[11px] text-warn" data-hint={t('sessions.limited')}>
+              {t('sessions.limitedBadge')}
+            </span>
+          )}
           <span className="shrink-0 text-[11px] text-faint tabular-nums">{when(card.touched)}</span>
         </div>
 
@@ -595,6 +602,7 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
       )}
 
       {error && <Warning message={error} />}
+      {card?.limited && <Warning message={t('sessions.limited')} />}
 
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto">
         {lines ? (

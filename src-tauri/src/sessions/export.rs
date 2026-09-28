@@ -26,6 +26,7 @@ use super::{Card, Role, Tokens, Transcript};
 /// Short of any real limit, and deliberately: the name is a suggestion in a save
 /// dialog, and one that fills the field is one the user has to clear first.
 const NAME_CEILING: usize = 48;
+const LIMITED_NOTICE: &str = "Partial transcript: the session exceeded the read budget. Messages and usage below cover only the loaded prefix. The original Harness log was not modified.";
 
 /// What to write, chosen by where it is going.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -128,6 +129,10 @@ fn markdown(transcript: &Transcript) -> String {
     out.push_str(&summary(card).join(" · "));
     out.push_str("\n\n");
 
+    if card.limited {
+        out.push_str(&format!("> **Warning:** {LIMITED_NOTICE}\n\n"));
+    }
+
     if card.tokens != Tokens::default() {
         out.push_str("| Model | Input | Output | Cache read | Cache write |\n");
         out.push_str("| --- | ---: | ---: | ---: | ---: |\n");
@@ -207,6 +212,11 @@ fn html(transcript: &Transcript) -> String {
     out.push_str("</head>\n<body>\n<main>\n");
 
     out.push_str(&format!("<h1>{}</h1>\n", escape(&oneline(&card.title))));
+    if card.limited {
+        out.push_str(&format!(
+            "<p role=\"note\"><strong>{LIMITED_NOTICE}</strong></p>\n"
+        ));
+    }
     out.push_str(&format!(
         "<p class=\"meta\">{}</p>\n",
         summary(card)
@@ -435,8 +445,25 @@ mod tests {
                 }],
                 delegated: false,
                 bytes: 2048,
+                limited: false,
             },
             lines,
+        }
+    }
+
+    #[test]
+    fn partial_exports_cannot_be_mistaken_for_complete_transcripts() {
+        let mut transcript = sample("large session", Vec::new());
+        transcript.card.limited = true;
+        for format in [Format::Markdown, Format::Html] {
+            assert!(render(&transcript, format).contains(LIMITED_NOTICE));
+        }
+        let json: serde_json::Value =
+            serde_json::from_str(&render(&transcript, Format::Json)).unwrap();
+        assert_eq!(json["card"]["limited"], true);
+        transcript.card.limited = false;
+        for format in [Format::Markdown, Format::Html] {
+            assert!(!render(&transcript, format).contains(LIMITED_NOTICE));
         }
     }
 

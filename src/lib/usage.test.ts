@@ -25,6 +25,7 @@ const card = (fields: Partial<SessionCard> = {}): SessionCard => ({
   tokens: tokens(0),
   byModel: [],
   delegated: false,
+  limited: false,
   bytes: 0,
   ...fields,
 })

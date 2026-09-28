@@ -17,6 +17,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Mark session logs that exceed the bounded reader as partial in the shelf, reader, usage notice and all three export formats, instead of silently presenting a prefix as complete. Keep unfinished append frames distinct from size limits and preserve the original logs.
 - Bound long-session reading to 120 mounted messages per segment, with first/previous/next/latest navigation and direct search-hit positioning. Export still uses the complete native transcript; add a repeatable 4,000-message desktop regression.
 - Ignore obsolete plugin-detail, profile-roster and session-roster responses so delayed reads cannot overwrite newer selections, renames or archive results; serialize archive actions and expose their busy state.
 - Keep automatic catalog search/refresh errors inline, retain explicit-action error reporting, and offer an in-place retry for failed plugin details. Expand deterministic coverage to plugin, profile and session stores.

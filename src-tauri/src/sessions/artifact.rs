@@ -45,18 +45,49 @@ pub fn locate(dir: &Path) -> Option<PathBuf> {
 
 /// Read a log back as the JSONL text the harness wrote into it.
 pub fn text(path: &Path) -> std::io::Result<String> {
-    let bytes = read_prefix(path, MAX_STORED_BYTES)?;
+    read(path).map(|document| document.text)
+}
 
-    if path.extension().is_some_and(|suffix| suffix == "zstd") {
-        return Ok(unframe(&bytes));
+pub struct Document {
+    pub text: String,
+    /// A size ceiling was reached, not an ordinary unfinished append frame.
+    pub limited: bool,
+}
+
+pub fn read(path: &Path) -> std::io::Result<Document> {
+    read_with_limits(path, MAX_STORED_BYTES, MAX_TEXT_BYTES)
+}
+
+fn read_with_limits(
+    path: &Path,
+    stored_maximum: u64,
+    text_maximum: usize,
+) -> std::io::Result<Document> {
+    let compressed = path.extension().is_some_and(|suffix| suffix == "zstd");
+    let maximum = if compressed {
+        stored_maximum
+    } else {
+        text_maximum as u64
+    };
+    let mut bytes = read_prefix(path, maximum + 1)?;
+    let mut limited = bytes.len() as u64 > maximum;
+    bytes.truncate(maximum as usize);
+
+    if compressed {
+        let mut document = decode_with_limit(&bytes, text_maximum);
+        document.limited |= limited;
+        return Ok(document);
     }
 
-    let mut bytes = bytes;
-    bytes.truncate(MAX_TEXT_BYTES);
-    Ok(match String::from_utf8(bytes) {
+    let text = match String::from_utf8(bytes) {
         Ok(text) => text,
-        Err(broken) => lossy_prefix(broken.as_bytes(), MAX_TEXT_BYTES),
-    })
+        Err(broken) => {
+            let mut text = String::new();
+            limited |= push_lossy(&mut text, broken.as_bytes(), text_maximum);
+            text
+        }
+    };
+    Ok(Document { text, limited })
 }
 
 /// What one decode attempt found, and how much of the stream it used up.
@@ -73,13 +104,20 @@ enum Frame {
 }
 
 /// Join every complete frame's plaintext back into one document.
+#[cfg(test)]
 fn unframe(bytes: &[u8]) -> String {
     unframe_with_limit(bytes, MAX_TEXT_BYTES)
 }
 
+#[cfg(test)]
 fn unframe_with_limit(bytes: &[u8], maximum: usize) -> String {
+    decode_with_limit(bytes, maximum).text
+}
+
+fn decode_with_limit(bytes: &[u8], maximum: usize) -> Document {
     let mut text = String::new();
     let mut at = 0;
+    let mut limited = false;
 
     while at < bytes.len() && text.len() < maximum {
         let remaining = maximum - text.len();
@@ -87,11 +125,12 @@ fn unframe_with_limit(bytes: &[u8], maximum: usize) -> String {
             // A frame that reports no progress would otherwise be read forever.
             Frame::Content(_, 0) | Frame::Skipped(0) | Frame::End => break,
             Frame::Content(plain, used) => {
-                push_lossy(&mut text, &plain, maximum);
+                limited |= push_lossy(&mut text, &plain, maximum);
                 at += used;
             }
             Frame::Limit(plain) => {
                 push_lossy(&mut text, &plain, maximum);
+                limited = true;
                 break;
             }
             Frame::Skipped(used) => {
@@ -103,7 +142,10 @@ fn unframe_with_limit(bytes: &[u8], maximum: usize) -> String {
         }
     }
 
-    text
+    // Another frame remains after an exact budget-sized frame. Do not silently
+    // label this prefix as the complete conversation.
+    limited |= text.len() >= maximum && at < bytes.len();
+    Document { text, limited }
 }
 
 /// Decode the frame starting at the front of `bytes`.
@@ -148,25 +190,27 @@ fn read_prefix(path: &Path, maximum: u64) -> std::io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
+#[cfg(test)]
 fn lossy_prefix(bytes: &[u8], maximum: usize) -> String {
     let mut text = String::new();
     push_lossy(&mut text, bytes, maximum);
     text
 }
 
-fn push_lossy(text: &mut String, mut bytes: &[u8], maximum: usize) {
+fn push_lossy(text: &mut String, mut bytes: &[u8], maximum: usize) -> bool {
     while !bytes.is_empty() && text.len() < maximum {
         match std::str::from_utf8(bytes) {
             Ok(valid) => {
-                push_valid(text, valid, maximum);
-                return;
+                return push_valid(text, valid, maximum);
             }
             Err(broken) => {
                 if let Ok(valid) = std::str::from_utf8(&bytes[..broken.valid_up_to()]) {
-                    push_valid(text, valid, maximum);
+                    if push_valid(text, valid, maximum) {
+                        return true;
+                    }
                 }
                 if text.len().saturating_add('�'.len_utf8()) > maximum {
-                    return;
+                    return true;
                 }
                 text.push('�');
                 let skip = broken
@@ -176,15 +220,17 @@ fn push_lossy(text: &mut String, mut bytes: &[u8], maximum: usize) {
             }
         }
     }
+    !bytes.is_empty()
 }
 
-fn push_valid(text: &mut String, valid: &str, maximum: usize) {
+fn push_valid(text: &mut String, valid: &str, maximum: usize) -> bool {
     let room = maximum.saturating_sub(text.len());
     let mut end = valid.len().min(room);
     while !valid.is_char_boundary(end) {
         end -= 1;
     }
     text.push_str(&valid[..end]);
+    end < valid.len()
 }
 
 #[cfg(test)]
@@ -246,11 +292,107 @@ mod tests {
         );
 
         assert_eq!(unframe_with_limit(&bytes, 12), "abcdefghijkl");
+        assert!(decode_with_limit(&bytes, 12).limited);
+        assert!(!decode_with_limit(&bytes, 26).limited);
+        assert!(!decode_with_limit(&bytes, 100).limited);
+    }
+
+    #[test]
+    fn a_following_frame_at_the_exact_limit_is_reported() {
+        let bytes = framed();
+        let header = "{\"type\":\"session\"}\n";
+        let document = decode_with_limit(&bytes, header.len());
+        assert_eq!(document.text, header);
+        assert!(document.limited);
+        assert!(!decode_with_limit(&bytes, 1024).limited);
+    }
+
+    #[test]
+    fn an_unfinished_frame_is_not_a_size_limit() {
+        let mut bytes = framed();
+        bytes.truncate(bytes.len() - 4);
+        assert!(!decode_with_limit(&bytes, 1024).limited);
+    }
+
+    #[test]
+    fn plain_files_report_only_actual_budget_overflow() {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!(
+            "dsh-session-budget-{}-{}.jsonl",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        file.write_all(&vec![b'x'; MAX_TEXT_BYTES]).unwrap();
+        drop(file);
+        let exact = read(&path).unwrap();
+        assert!(!exact.limited);
+        assert_eq!(exact.text.len(), MAX_TEXT_BYTES);
+        fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap()
+            .write_all(b"x")
+            .unwrap();
+        let excess = read(&path).unwrap();
+        assert!(excess.limited);
+        assert_eq!(excess.text.len(), MAX_TEXT_BYTES);
+        fs::remove_file(path).unwrap();
     }
 
     #[test]
     fn invalid_utf8_replacement_cannot_expand_past_the_budget() {
         assert_eq!(lossy_prefix(&[b'a', 0xff, b'b'], 5), "a�b");
         assert_eq!(lossy_prefix(&[0xff; 100], 5), "�");
+        assert!(push_lossy(&mut String::new(), &[0xff; 100], 5));
+        assert!(!push_lossy(&mut String::new(), &[b'a', 0xff, b'b'], 5));
+        assert!(push_lossy(&mut String::new(), "你好吗".as_bytes(), 5));
+        let bytes = ruzstd::encoding::compress_to_vec(
+            &[0xff; 4][..],
+            ruzstd::encoding::CompressionLevel::Fastest,
+        );
+        assert!(decode_with_limit(&bytes, 5).limited);
+    }
+
+    #[test]
+    fn compressed_file_reports_either_stored_or_decoded_limits() {
+        use std::io::Write;
+        let path = std::env::temp_dir().join(format!(
+            "dsh-session-compressed-budget-{}-{}.zstd",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let bytes = framed();
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .unwrap();
+        file.write_all(&bytes).unwrap();
+        drop(file);
+        let complete = read_with_limits(&path, bytes.len() as u64, 1024).unwrap();
+        assert!(!complete.limited);
+        assert!(complete.text.contains("\"seq\":2"));
+        assert!(
+            read_with_limits(&path, bytes.len() as u64 - 1, 1024)
+                .unwrap()
+                .limited
+        );
+        assert!(
+            read_with_limits(&path, bytes.len() as u64, 20)
+                .unwrap()
+                .limited
+        );
+        fs::remove_file(path).unwrap();
     }
 }

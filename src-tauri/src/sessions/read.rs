@@ -60,6 +60,7 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
         // carry one and not always the other.
         delegated: head.get("parentSession").is_some() || str(head.get("origin")) == "subagent",
         bytes,
+        limited: false,
     };
 
     let mut lines = Vec::new();

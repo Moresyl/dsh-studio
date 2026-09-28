@@ -229,6 +229,7 @@ mod tests {
             by_model: Vec::new(),
             delegated: false,
             bytes: 0,
+            limited: false,
         }
     }
 

@@ -7,7 +7,11 @@ import { promisify } from 'node:util'
 
 const [qaHome, output, port = '9223', mode = 'bounded'] = process.argv.slice(2)
 if (!qaHome || !output)
-  throw new Error('usage: desktop-session-regression.mjs QA_HOME OUTPUT [PORT] [baseline|bounded]')
+  throw new Error(
+    'usage: desktop-session-regression.mjs QA_HOME OUTPUT [PORT] [baseline|bounded|limited]',
+  )
+if (!['baseline', 'bounded', 'limited'].includes(mode))
+  throw new Error('invalid session regression mode')
 const destination = resolve(output)
 const helper = join(dirname(fileURLToPath(import.meta.url)), 'desktop-ui-acceptance.mjs')
 const evaluate = async (expression) => {
@@ -31,7 +35,7 @@ const id = `qa-long-${Date.now().toString(36)}`
 const sessionDir = join(resolve(qaHome), 'sessions', 'qa-performance', id)
 await mkdir(dirname(sessionDir), { recursive: true })
 await mkdir(sessionDir)
-const lineCount = 4000
+const lineCount = mode === 'limited' ? 2 : 4000
 const now = Date.now()
 const rows = [{ type: 'session', version: 0, id, createdAt: now, cwd: destination }]
 for (let index = 1; index <= lineCount; index++) {
@@ -51,6 +55,9 @@ for (let index = 1; index <= lineCount; index++) {
     data: index % 2 ? message : { message },
   })
 }
+
+if (mode === 'limited')
+  rows.splice(2, 0, { type: 'qa/padding', data: 'x'.repeat(33 * 1024 * 1024) })
 
 async function checkSession({ id, lineCount, mode }) {
   const assert = (value, label) => {
@@ -73,7 +80,11 @@ async function checkSession({ id, lineCount, mode }) {
   }
   const nativeStarted = performance.now()
   const transcript = await window.__TAURI_INTERNALS__.invoke('session_read', { id })
-  assert(transcript.lines.length === lineCount, 'native transcript was incomplete')
+  assert(
+    transcript.lines.length === (mode === 'limited' ? 1 : lineCount),
+    'unexpected native transcript length',
+  )
+  assert(transcript.card.limited === (mode === 'limited'), 'incorrect native read-limit marker')
   const nativeReadMs = performance.now() - nativeStarted
   const back = [...document.querySelectorAll('button')].find(
     (button) => button.innerText.trim() === '返回全部会话',
@@ -103,7 +114,7 @@ async function checkSession({ id, lineCount, mode }) {
   const initialRows = document.querySelectorAll('[data-seq]').length
   const renderMs = performance.now() - started
   const domNodes = document.getElementsByTagName('*').length
-  if (mode !== 'baseline') {
+  if (mode === 'bounded') {
     assert(initialRows <= 120, `unbounded rendered transcript: ${initialRows}`)
     const action = (label) => {
       const button = document.querySelector(`button[aria-label="${label}"]`)
@@ -149,7 +160,28 @@ async function checkSession({ id, lineCount, mode }) {
     id,
     format: 'markdown',
   })
-  assert(exported.text.includes(`entry ${lineCount}\n`), 'export omitted the last message')
+  if (mode === 'limited') {
+    assert(document.body.innerText.includes('此会话达到读取上限'), 'reader limit warning missing')
+    assert(exported.text.includes('Partial transcript:'), 'Markdown limit warning missing')
+    const html = await window.__TAURI_INTERNALS__.invoke('session_export', { id, format: 'html' })
+    const json = await window.__TAURI_INTERNALS__.invoke('session_export', { id, format: 'json' })
+    assert(html.text.includes('Partial transcript:'), 'HTML limit warning missing')
+    assert(JSON.parse(json.text).card.limited === true, 'JSON limit marker missing')
+    click('返回全部会话')
+    await wait(
+      () => document.body.innerText.includes('部分大会话达到读取上限'),
+      'shelf limit warning',
+    )
+    assert(document.body.innerText.includes('部分记录'), 'limited card badge missing')
+    const entry = [...document.querySelectorAll('[role="button"]')].find((row) =>
+      row.innerText.includes(id),
+    )
+    entry.click()
+    await wait(
+      () => document.body.innerText.includes('此会话达到读取上限'),
+      'reopened limit warning',
+    )
+  } else assert(exported.text.includes(`entry ${lineCount}\n`), 'export omitted the last message')
   return {
     mode,
     lineCount,

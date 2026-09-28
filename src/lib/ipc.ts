@@ -798,6 +798,8 @@ export interface SessionCard {
   /** Opened by an agent for its own work rather than by a person. */
   delegated: boolean
   bytes: number
+  /** A read budget omitted part of the log and its usage samples. */
+  limited: boolean
 }
 
 export interface SessionLine {
