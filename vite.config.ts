@@ -58,6 +58,8 @@ export default defineConfig({
         'src/lib/usage.ts',
         'src/lib/worktree-review.ts',
         'src/state/rates.ts',
+        'src/state/harness.ts',
+        'src/state/remote.ts',
         'src/state/plugins.ts',
         'src/state/profiles.ts',
         'src/state/sessions.ts',

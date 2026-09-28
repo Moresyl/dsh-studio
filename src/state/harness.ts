@@ -33,6 +33,9 @@ const NPM_PACKAGE_LINE = /^npm http (?:fetch|cache) /
 
 /** Invalidates an older machine probe when a newer re-check finishes first. */
 let inspectionGeneration = 0
+/** Live events and explicit log clearing outrank older inspection snapshots. */
+let statusGeneration = 0
+let logGeneration = 0
 
 interface HarnessStore {
   environment: Environment | null
@@ -89,6 +92,8 @@ export const useHarness = create<HarnessStore>((set, get) => ({
 
   inspect: async () => {
     const generation = ++inspectionGeneration
+    const statusBefore = statusGeneration
+    const logBefore = logGeneration
     set({ error: null })
     try {
       const [environment, status, lines] = await Promise.all([
@@ -96,7 +101,13 @@ export const useHarness = create<HarnessStore>((set, get) => ({
         ipc.status(),
         ipc.log(),
       ])
-      if (generation === inspectionGeneration) set({ environment, status, lines })
+      if (generation === inspectionGeneration) {
+        set({
+          environment,
+          ...(statusBefore === statusGeneration ? { status } : {}),
+          ...(logBefore === logGeneration ? { lines } : {}),
+        })
+      }
     } catch (cause) {
       // Re-check is a visible action as well as the first startup probe. Keep a
       // reason beside the controls that requested it. Reject as well so a
@@ -187,10 +198,14 @@ export const useHarness = create<HarnessStore>((set, get) => ({
 
   // Only what is on screen: asking the supervisor to forget its buffer would
   // throw away the evidence of a crash for everyone, including a later report.
-  clear: () => set({ lines: [] }),
+  clear: () => {
+    logGeneration += 1
+    set({ lines: [] })
+  },
 
   apply: (event) => {
     if (event.kind === 'log') {
+      logGeneration += 1
       const { stream, line } = event
       set((state) => ({
         lines:
@@ -206,6 +221,7 @@ export const useHarness = create<HarnessStore>((set, get) => ({
     }
 
     const { kind: _kind, ...status } = event
+    statusGeneration += 1
     set({ status: status as Status })
   },
 

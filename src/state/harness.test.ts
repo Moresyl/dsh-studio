@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HarnessEvent } from '@/lib/ipc'
 import * as ipc from '@/lib/ipc'
 import { useDialog } from '@/state/dialog'
-import { useHarness } from '@/state/harness'
+import { subscribeToHarness, useHarness } from '@/state/harness'
 
 // The store only reaches for the command surface inside its async actions; the
 // reducer under test never does. Stubbing it keeps these tests off Tauri
@@ -35,7 +35,7 @@ const say = (line: string, stream: 'stdout' | 'stderr' = 'stdout'): HarnessEvent
 const apply = (event: HarnessEvent) => useHarness.getState().apply(event)
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   useHarness.setState({
     environment: null,
     status: { phase: 'stopped' },
@@ -56,6 +56,89 @@ beforeEach(() => {
 })
 
 describe('supervisor actions', () => {
+  it('does not replace a newer status event with an in-flight inspection snapshot', async () => {
+    let finish!: (value: ipc.Environment) => void
+    vi.mocked(ipc.environment).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    const inspection = useHarness.getState().inspect()
+    apply({ kind: 'status', phase: 'ready', origin: 'http://127.0.0.1:8100', pid: 123 })
+    finish({ workspace: 'D:/current' } as ipc.Environment)
+    await inspection
+    expect(useHarness.getState().environment?.workspace).toBe('D:/current')
+    expect(useHarness.getState().status).toMatchObject({ phase: 'ready', pid: 123 })
+  })
+
+  it('does not drop newer output while a machine inspection is in flight', async () => {
+    let finish!: (value: ipc.Environment) => void
+    vi.mocked(ipc.environment).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    const inspection = useHarness.getState().inspect()
+    apply(say('new startup evidence'))
+    finish({} as ipc.Environment)
+    await inspection
+    expect(useHarness.getState().lines).toEqual([
+      { stream: 'stdout', line: 'new startup evidence' },
+    ])
+  })
+
+  it('does not restore cleared output from an older inspection', async () => {
+    let finish!: (value: ipc.Environment) => void
+    vi.mocked(ipc.environment).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    vi.mocked(ipc.log).mockResolvedValueOnce([{ stream: 'stderr', line: 'old output' }])
+    const inspection = useHarness.getState().inspect()
+    useHarness.getState().clear()
+    finish({} as ipc.Environment)
+    await inspection
+    expect(useHarness.getState().lines).toEqual([])
+  })
+
+  it('keeps a refusal to stop visible and releases the operation slot', async () => {
+    vi.mocked(ipc.stop).mockRejectedValueOnce(new Error('stop refused'))
+    await useHarness.getState().stop()
+    expect(useHarness.getState()).toMatchObject({ busy: false, error: 'stop refused' })
+  })
+
+  it('reports an installation refusal without probing nonexistent results', async () => {
+    vi.mocked(ipc.install).mockRejectedValueOnce(new Error('package checksum mismatch'))
+    await useHarness.getState().install('0.1.7-rc.2')
+    expect(ipc.install).toHaveBeenCalledWith('0.1.7-rc.2')
+    expect(ipc.environment).not.toHaveBeenCalled()
+    expect(useHarness.getState()).toMatchObject({
+      installing: false,
+      error: 'package checksum mismatch',
+    })
+  })
+
+  it('rechecks after provisioning or selecting a Node runtime', async () => {
+    await useHarness.getState().provisionNode()
+    expect(ipc.nodeProvision).toHaveBeenCalledOnce()
+    expect(ipc.environment).toHaveBeenCalledOnce()
+    await useHarness.getState().selectNode('D:/node.exe')
+    expect(ipc.nodeSelect).toHaveBeenCalledWith('D:/node.exe')
+    expect(ipc.environment).toHaveBeenCalledTimes(2)
+    expect(useHarness.getState()).toMatchObject({
+      provisioningNode: false,
+      busy: false,
+      error: null,
+    })
+  })
+
+  it('reports a refused Node selection and does not refresh it as accepted', async () => {
+    vi.mocked(ipc.nodeSelect).mockRejectedValueOnce(new Error('unsupported Node'))
+    await useHarness.getState().selectNode('D:/old-node.exe')
+    expect(ipc.environment).not.toHaveBeenCalled()
+    expect(useHarness.getState()).toMatchObject({ busy: false, error: 'unsupported Node' })
+  })
   it('shows a catalog failure once, preserves the previous list and permits retry', async () => {
     const releases = [{ version: '0.1.1-rc.2', qualified: true, installed: true }]
     useHarness.setState({ harnessVersions: releases })
@@ -296,6 +379,31 @@ describe('install progress', () => {
 })
 
 describe('status events', () => {
+  it('subscribes both streams and releases both listeners', async () => {
+    let events!: (event: ipc.HarnessEvent) => void
+    let progress!: (value: ipc.NodeProgress) => void
+    const stopEvents = vi.fn()
+    const stopProgress = vi.fn()
+    vi.mocked(ipc.onHarnessEvent).mockImplementationOnce(async (handler) => {
+      events = handler
+      return stopEvents
+    })
+    vi.mocked(ipc.onNodeProgress).mockImplementationOnce(async (handler) => {
+      progress = handler
+      return stopProgress
+    })
+    const unsubscribe = await subscribeToHarness()
+    events({ kind: 'status', phase: 'starting' })
+    progress({ phase: 'downloading', version: '24.0.0', received: 10, total: 20 })
+    expect(useHarness.getState()).toMatchObject({
+      status: { phase: 'starting' },
+      nodeProgress: { received: 10, total: 20 },
+    })
+    unsubscribe()
+    expect(stopEvents).toHaveBeenCalledOnce()
+    expect(stopProgress).toHaveBeenCalledOnce()
+  })
+
   it('replaces the status and leaves the tag out of it', () => {
     apply({ kind: 'status', phase: 'ready', origin: 'http://127.0.0.1:57652', pid: 4242 })
 
