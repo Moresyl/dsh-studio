@@ -14,6 +14,7 @@ use crate::error::Result;
 pub async fn terminal_open(
     app: AppHandle,
     terminals: State<'_, Arc<Terminals>>,
+    updates: State<'_, crate::updates::UpdateState>,
     rows: u16,
     cols: u16,
 ) -> Result<Session> {
@@ -22,7 +23,7 @@ pub async fn terminal_open(
     // the Harness before the PTY starts, so zsh startup commands and user tools
     // such as starship or claude are reachable from the first prompt.
     let shell = crate::harness::shell_environment::resolve().await;
-    terminals.open(&app, rows, cols, &shell.updates)
+    updates.admit(|| terminals.open(&app, rows, cols, &shell.updates))
 }
 
 #[tauri::command]

@@ -36,6 +36,16 @@ impl Drop for InstallingGuard<'_> {
 }
 
 impl AppState {
+    /// An application replacement must not interrupt a runtime transaction or
+    /// race a new start after the existing child has been stopped.
+    pub(crate) fn application_update_gate(&self) -> Result<tokio::sync::MutexGuard<'_, ()>> {
+        self.lifecycle.try_lock().map_err(|_| {
+            Error::Desktop(
+                "a runtime operation is running; finish it before updating the application".into(),
+            )
+        })
+    }
+
     pub fn new(supervisor: Arc<Supervisor>) -> Self {
         Self {
             supervisor,

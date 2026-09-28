@@ -1,14 +1,13 @@
 //! The IPC surface for installing a Node runtime.
 
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use node_runtime::NodeInstallation;
 use tauri::{AppHandle, Emitter, State};
 
 use super::{provision, NodeJobs, Progress};
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::harness::commands::AppState;
 use crate::harness::supervisor::Stream;
 
@@ -41,9 +40,7 @@ pub(crate) async fn provision_managed(
     jobs: &NodeJobs,
     supervisor: &Arc<crate::harness::supervisor::Supervisor>,
 ) -> Result<NodeInstallation> {
-    if jobs.busy.swap(true, Ordering::SeqCst) {
-        return Err(Error::NodeProvisionBusy);
-    }
+    let _job = jobs.claim()?;
 
     let report = {
         let app = app.clone();
@@ -64,7 +61,6 @@ pub(crate) async fn provision_managed(
         Ok(None) => provision(report).await,
         Err(failure) => Err(failure),
     };
-    jobs.busy.store(false, Ordering::SeqCst);
 
     // Same treatment the harness install gets: a failure is said out loud in the
     // log as well as returned, because the log is where the lines leading up to

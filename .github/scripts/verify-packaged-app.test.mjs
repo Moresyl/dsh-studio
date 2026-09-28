@@ -10,6 +10,7 @@ import {
   rpmExtractArgs,
   shouldExerciseWindowsInstaller,
   windowsUninstallerArgs,
+  windowsUpdateArgs,
 } from './verify-packaged-app.mjs'
 
 test('resolves the bundle root before smoke tests change their working directory', () => {
@@ -53,6 +54,10 @@ test('keeps the NSIS uninstall root as the final unquoted argument', () => {
 
 test('rejects a missing Windows uninstall root', () => {
   assert.throws(() => windowsUninstallerArgs(), /root is required/)
+})
+
+test('updater-route installer acceptance relaunches only the headless smoke action', () => {
+  assert.deepEqual(windowsUpdateArgs(), ['/S', '/UPDATE', '/ARGS', '--smoke-test'])
 })
 
 test('removes the synchronous NSIS uninstaller and empty install tree', async () => {

@@ -30,7 +30,7 @@ pub(crate) mod http;
 pub(crate) use http::ensure_crypto_provider;
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use node_runtime::{NodeInstallation, Source};
 use serde::{Deserialize, Serialize};
@@ -58,6 +58,23 @@ const PROGRESS_STEP: u64 = 512 * 1024;
 #[derive(Debug, Default)]
 pub struct NodeJobs {
     pub busy: AtomicBool,
+}
+
+impl NodeJobs {
+    pub(crate) fn claim(&self) -> Result<NodeJob<'_>> {
+        if self.busy.swap(true, Ordering::SeqCst) {
+            return Err(Error::NodeProvisionBusy);
+        }
+        Ok(NodeJob(&self.busy))
+    }
+}
+
+pub(crate) struct NodeJob<'a>(&'a AtomicBool);
+
+impl Drop for NodeJob<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -423,6 +440,33 @@ mod tests {
     use node_runtime::{NodeInstallation, Source, Version};
 
     use super::{pick, Progress, PROGRESS_STEP};
+
+    #[test]
+    fn node_install_claim_is_exclusive_and_released_on_early_return() {
+        let jobs = super::NodeJobs::default();
+        let first = jobs.claim().unwrap();
+        assert!(jobs.claim().is_err());
+        drop(first);
+        assert!(jobs.claim().is_ok());
+    }
+
+    #[tokio::test]
+    async fn cancelling_a_node_install_releases_its_busy_claim() {
+        let jobs = std::sync::Arc::new(super::NodeJobs::default());
+        let ready = std::sync::Arc::new(tokio::sync::Notify::new());
+        let task_jobs = std::sync::Arc::clone(&jobs);
+        let task_ready = std::sync::Arc::clone(&ready);
+        let task = tokio::spawn(async move {
+            let _guard = task_jobs.claim().unwrap();
+            task_ready.notify_one();
+            std::future::pending::<()>().await;
+        });
+        ready.notified().await;
+        assert!(jobs.claim().is_err());
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert!(jobs.claim().is_ok());
+    }
 
     fn runtime(path: &str, version: Version) -> NodeInstallation {
         NodeInstallation {

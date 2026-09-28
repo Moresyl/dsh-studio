@@ -144,12 +144,15 @@ windows-sys = { version = "0.61", features = [
 windows-version = "0.1"
 
 [profile.dev]
-# Match CCHub: optimized dev builds have tripped intermittent MSVC linker
+# Optimized dev builds have tripped intermittent MSVC linker
 # failures (`anon.*.llvm.*` unresolved symbols), so the optimizer stays off here.
 # Everything else is left at cargo's dev defaults — a single codegen unit with
 # incremental compilation disabled bought nothing at `opt-level = 0` and cost
 # every rebuild a full one.
 opt-level = 0
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
 
 [profile.release]
 codegen-units = 1

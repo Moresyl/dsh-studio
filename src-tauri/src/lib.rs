@@ -28,6 +28,7 @@ mod shell;
 mod startup;
 mod terminal;
 mod tray;
+mod updates;
 mod window;
 mod workspace;
 
@@ -109,6 +110,7 @@ pub fn run() {
             app.manage(Arc::new(sessions::Library::default()));
             app.manage(recovery::RendererHealth::default());
             app.manage(terminal::Terminals::new()?);
+            app.manage(updates::UpdateState::default());
             // Serve the compiled shell from loopback so the harness iframe is
             // same-site with it: dsh 0.1.2+ issues a SameSite=Strict session
             // cookie that WKWebView only holds and sends inside a same-site
@@ -222,6 +224,11 @@ pub fn run() {
             desktop::commands::desktop_attention,
             desktop::commands::desktop_badge,
             about::app_about,
+            updates::application_versions,
+            updates::application_update_review,
+            updates::application_update_discard,
+            updates::application_update_cancel,
+            updates::application_update_install,
             diagnostics::report_build,
             diagnostics::report_save,
             diagnostics::report_archive,

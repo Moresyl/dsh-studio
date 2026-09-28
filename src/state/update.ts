@@ -2,7 +2,7 @@
  * Whether a newer build of this shell has been published.
  *
  * This is the one request the app makes without being asked, and it is worth
- * being precise about what that costs: a single GET to the release feed, no
+ * being precise about what that costs: public release metadata requests, no
  * account, no identifier, nothing sent about the machine. What it buys is the
  * only thing a version number is good for — knowing that the bug you are
  * working around was fixed last week.
@@ -12,7 +12,15 @@
  */
 import { create } from 'zustand'
 
-import { checkForUpdate, installUpdate, type DownloadProgress, type Release } from '@/lib/updater'
+import {
+  cancelUpdate,
+  checkForUpdate,
+  discardReview,
+  installUpdate,
+  UpdateCancelled,
+  type DownloadProgress,
+  type Release,
+} from '@/lib/updater'
 import { reportFailure } from '@/state/failure'
 import { readPreference, savePreference } from '@/lib/preferences'
 
@@ -28,6 +36,7 @@ const RECHECK_MS = 6 * 60 * 60 * 1000
  * launch-time check is running joins this promise, so its result or failure is
  * still visible instead of the click being silently discarded. */
 let activeCheck: Promise<void> | null = null
+let installationGeneration = 0
 
 interface UpdateState {
   release: Release | null
@@ -35,6 +44,9 @@ interface UpdateState {
   checked: boolean
   checking: boolean
   installing: boolean
+  targetRelease: Release | null
+  installation: Release | null
+  cancelling: boolean
   progress: DownloadProgress | null
   /** Only ever set by a check the user asked for. */
   error: string | null
@@ -42,6 +54,9 @@ interface UpdateState {
   dismissed: string | null
   check: (quiet?: boolean) => Promise<void>
   install: () => Promise<void>
+  installVersion: (release: Release) => Promise<void>
+  runInstall: (release: Release, target: 'latest' | 'selected') => Promise<void>
+  cancelInstall: () => Promise<void>
   dismiss: () => void
 }
 
@@ -50,6 +65,9 @@ export const useUpdate = create<UpdateState>((set, get) => ({
   checked: false,
   checking: false,
   installing: false,
+  targetRelease: null,
+  installation: null,
+  cancelling: false,
   progress: null,
   error: null,
   dismissed: readDismissed(),
@@ -64,7 +82,9 @@ export const useUpdate = create<UpdateState>((set, get) => ({
     if (operation === null) {
       set({ checking: true, error: null })
       operation = (async () => {
-        set({ release: await checkForUpdate(), checked: true })
+        const release = await checkForUpdate()
+        void discardReview(get().release)
+        set({ release, checked: true })
       })().finally(() => {
         activeCheck = null
         set({ checking: false })
@@ -78,24 +98,71 @@ export const useUpdate = create<UpdateState>((set, get) => ({
         // An earlier successful result is stale once a manual refresh fails.
         // Keeping it visible makes the user think the feed was checked now and
         // can offer an installer that may no longer exist.
+        void discardReview(get().release)
         set({ release: null, checked: false, error: reportFailure(cause) })
       }
     }
   },
 
   install: async () => {
+    const release = get().release
+    if (release) await get().runInstall(release, 'latest')
+  },
+
+  installVersion: async (release) => get().runInstall(release, 'selected'),
+
+  runInstall: async (release, target) => {
     if (get().installing || get().checking) return
-    const expectedVersion = get().release?.version
-    if (!expectedVersion) return
-    set({ installing: true, progress: { downloaded: 0, total: null }, error: null })
+    ++installationGeneration
+    set({
+      installing: true,
+      targetRelease: release,
+      installation: null,
+      cancelling: false,
+      progress: { downloaded: 0, total: null, phase: 'checking' },
+      error: null,
+    })
     try {
-      const installed = await installUpdate(expectedVersion, (progress) => set({ progress }))
+      const installed = await installUpdate(
+        release,
+        (progress) => set({ progress }),
+        target,
+        (review) => {
+          if (get().cancelling) throw new UpdateCancelled()
+          set({ installation: review })
+        },
+      )
       // The release can disappear between the first check and the install click.
-      if (!installed) set({ release: null, checked: true })
+      if (!installed) {
+        if (target === 'latest') set({ release: null, checked: true })
+        else
+          throw new Error(
+            'The selected release is no longer available. / 所选版本已不可用，请刷新版本列表。',
+          )
+      }
     } catch (cause) {
-      set({ error: reportFailure(cause) })
+      if (cause instanceof UpdateCancelled) set({ progress: null, error: null })
+      else set({ error: reportFailure(cause) })
     } finally {
-      set({ installing: false })
+      set({ installing: false, targetRelease: null, installation: null, cancelling: false })
+    }
+  },
+
+  cancelInstall: async () => {
+    if (!get().installing || get().cancelling || get().progress?.phase === 'installing') return
+    const generation = installationGeneration
+    set({ cancelling: true })
+    const review = get().installation
+    if (!review) return
+    try {
+      const accepted = await cancelUpdate(review)
+      if (generation === installationGeneration && get().installing && !accepted) {
+        set({ cancelling: false })
+      }
+    } catch (cause) {
+      if (generation === installationGeneration && get().installing) {
+        set({ cancelling: false, error: reportFailure(cause) })
+      }
     }
   },
 

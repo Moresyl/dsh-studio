@@ -65,7 +65,8 @@ export default defineConfig({
         'src/state/sessions.ts',
         'src/state/terminals.ts',
         'src/state/terminal-layout.ts',
-        'src/state/update.ts',
+          'src/state/update.ts',
+          'src/state/releases.ts',
         'src/state/workspace.ts',
       ],
       thresholds: {

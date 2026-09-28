@@ -28,6 +28,9 @@ const required = [
   'src/sessions/read.rs',
   'src/terminal/decoder.rs',
   'src/terminal/shell.rs',
+  'src/updates/catalog.rs',
+  'src/updates/intents.rs',
+  'src/updates/policy.rs',
   'src/workspace/review.rs',
 ]
 const minimum = 80

@@ -24,8 +24,6 @@
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "http://*" }, { "url": "https://*" }]
     },
-    "process:allow-restart",
-    "updater:allow-check",
-    "updater:allow-download-and-install"
+    "process:allow-restart"
   ]
 }

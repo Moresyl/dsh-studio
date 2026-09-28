@@ -1,6 +1,16 @@
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { access, chmod, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import {
+  access,
+  chmod,
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -83,18 +93,54 @@ async function verifyWindows(files) {
 
 async function verifyWindowsUpgrade(previous, current) {
   const root = join(scratch, 'upgrade')
-  await run(previous, ['/S', `/D=${root}`], { env: isolatedEnvironment('upgrade') })
-  await installedExecutable(root)
-  await run(current, ['/S', `/D=${root}`], { env: isolatedEnvironment('upgrade') })
+  const environment = isolatedEnvironment('upgrade')
+  await run(previous, ['/S', `/D=${root}`], { env: environment })
+  const previousHash = await sha256(await installedExecutable(root))
+  const snapshot = await mkdtemp(join(scratch, 'previous-frontend-'))
+  await cp(join(root, 'dist'), snapshot, { recursive: true })
+  const markers = await Promise.all(
+    Object.values(environment).map(async (directory) => {
+      const path = join(directory, 'application-transition-preserve.txt')
+      await writeFile(path, 'Preserve existing user data across application versions.\n')
+      return { path, hash: await sha256(path) }
+    }),
+  )
+  await run(current, ['/S', `/D=${root}`], { env: environment })
   await verifyResources(root)
   await smoke(await installedExecutable(root))
+  const currentHash = await sha256(await installedExecutable(root))
+  // Exercise the same NSIS /UPDATE route used by Tauri's updater. Its automatic
+  // relaunch receives --smoke-test so an ephemeral runner never leaves a GUI
+  // process using the installation while the next transition begins.
+  await run(previous, windowsUpdateArgs(), { env: environment })
+  if ((await sha256(await installedExecutable(root))) !== previousHash) {
+    throw new Error('Windows application downgrade did not restore the previous binary')
+  }
+  await verifyPackagedFrontend(root, snapshot)
+  await smoke(await installedExecutable(root))
+  await run(current, windowsUpdateArgs(), { env: environment })
+  if ((await sha256(await installedExecutable(root))) !== currentHash) {
+    throw new Error('Windows application re-upgrade did not restore the current binary')
+  }
+  await verifyResources(root)
+  await smoke(await installedExecutable(root))
+  for (const marker of markers) {
+    if ((await sha256(marker.path)) !== marker.hash)
+      throw new Error('Application version switching modified existing data')
+  }
   const uninstaller = (await walk(root)).find(
     (file) => basename(file).toLowerCase() === 'uninstall.exe',
   )
   if (!uninstaller) throw new Error('upgraded NSIS installation contains no uninstaller')
   await run(uninstaller, windowsUninstallerArgs(root))
   await finalizeWindowsUninstall(root, uninstaller)
-  console.log(`upgraded ${basename(previous)} in place and executed the new application binary`)
+  console.log(
+    `verified ${basename(previous)} upgrade, updater downgrade, re-upgrade, resource bytes and data preservation`,
+  )
+}
+
+export function windowsUpdateArgs() {
+  return ['/S', '/UPDATE', '/ARGS', '--smoke-test']
 }
 
 export function windowsUninstallerArgs(root) {

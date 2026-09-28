@@ -11,6 +11,11 @@ identifier = "shell-commands"
 description = "Every application command, for the loopback-served shell UI."
 commands.allow = [
     "app_about",
+    "application_versions",
+    "application_update_review",
+    "application_update_discard",
+    "application_update_cancel",
+    "application_update_install",
     "desktop_attention",
     "desktop_badge",
     "desktop_notify",

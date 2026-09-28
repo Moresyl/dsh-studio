@@ -19,8 +19,6 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
     'opener:allow-reveal-item-in-dir',
     { identifier: 'opener:allow-open-url', allow: [{ url: 'https://*' }] },
     'process:allow-restart',
-    'updater:allow-check',
-    'updater:allow-download-and-install',
     'shell-commands',
   ]
   assert.doesNotThrow(() => validateCapabilities({ permissions }))
@@ -28,6 +26,9 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
     () => validateCapabilities({ permissions: [...permissions, 'process:default'] }),
     /broad process:default/,
   )
+  for (const permission of ['updater:allow-download-and-install', 'updater:allow-install']) {
+    assert.throws(() => validateCapabilities({ permissions: [...permissions, permission] }), /broad updater:/)
+  }
   assert.throws(
     () =>
       validateCapabilities({
@@ -121,6 +122,6 @@ test('repository public contracts agree end to end', async () => {
     hostProtocol: 1,
     schema: '1.0.0',
     version: manifest.version,
-    commands: { invoked: 90, registered: 94, allowed: 94 },
+    commands: { invoked: 95, registered: 99, allowed: 99 },
   })
 })

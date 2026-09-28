@@ -4,8 +4,66 @@
  * These declarations mirror `src-tauri/src`; when a shape changes there it must
  * change here, because nothing else keeps the two sides honest.
  */
-import { invoke } from '@tauri-apps/api/core'
+import { Channel, invoke } from '@tauri-apps/api/core'
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
+
+export interface ApplicationReleaseSummary {
+  version: string
+  title: string
+  published: string
+  url: string
+  direction: 'older' | 'current' | 'newer'
+  hasUpdater: boolean
+}
+
+export interface ApplicationReleasePage {
+  releases: ApplicationReleaseSummary[]
+  page: number
+  hasMore: boolean
+}
+
+export const applicationVersions = (page: number): Promise<ApplicationReleasePage> =>
+  invoke('application_versions', { page })
+
+export interface ApplicationReleaseReview {
+  reviewId: string
+  fingerprint: string
+  version: string
+  currentVersion: string
+  notes: string
+  published: string
+  url: string
+  artifact: string
+  bytes: number
+  direction: 'older' | 'current' | 'newer'
+  canInstall: boolean
+  installBlock: 'development' | 'rpmDowngrade' | null
+}
+
+export interface ApplicationUpdateProgress {
+  phase: 'checking' | 'downloading' | 'verifying' | 'installing'
+  downloaded: number
+  total: number
+}
+
+export const applicationUpdateReview = (
+  version: string | null,
+): Promise<ApplicationReleaseReview | null> => invoke('application_update_review', { version })
+
+export const applicationUpdateDiscard = (reviewId: string): Promise<void> =>
+  invoke('application_update_discard', { reviewId })
+
+export const applicationUpdateCancel = (reviewId: string): Promise<boolean> =>
+  invoke('application_update_cancel', { reviewId })
+
+export const applicationUpdateInstall = (
+  reviewId: string,
+  report: (progress: ApplicationUpdateProgress) => void,
+): Promise<void> => {
+  const progress = new Channel<ApplicationUpdateProgress>()
+  progress.onmessage = report
+  return invoke('application_update_install', { reviewId, progress })
+}
 
 /** Persist one bounded, allowlisted desktop preference outside the Web origin. */
 export const preferenceSave = (key: string, value: string): Promise<void> =>

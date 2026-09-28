@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Scale,
   MessagesSquare,
+  History,
 } from 'lucide-react'
 import { save as pickPath } from '@tauri-apps/plugin-dialog'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
@@ -19,6 +20,8 @@ import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { BrandMark } from '@/components/BrandMark'
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
+import { UpdateProgress } from '@/components/UpdateProgress'
+import { VersionHistory } from '@/components/VersionHistory'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import { openExternalUrl } from '@/lib/external-url'
@@ -26,6 +29,7 @@ import * as ipc from '@/lib/ipc'
 import type { About } from '@/lib/ipc'
 import { notesForDisplay } from '@/lib/updater'
 import { contextMenu } from '@/state/menu'
+import { ask } from '@/state/dialog'
 import { reportAction, reportFailure } from '@/state/failure'
 import { useUpdate } from '@/state/update'
 
@@ -58,15 +62,16 @@ export function AboutPane() {
   const [error, setError] = useState<string | null>(null)
   const [building, setBuilding] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   const release = useUpdate((state) => state.release)
+  const targetRelease = useUpdate((state) => state.targetRelease)
   const checked = useUpdate((state) => state.checked)
   const checking = useUpdate((state) => state.checking)
   const installing = useUpdate((state) => state.installing)
-  const progress = useUpdate((state) => state.progress)
   const checkFailure = useUpdate((state) => state.error)
   const check = useUpdate((state) => state.check)
-  const install = useUpdate((state) => state.install)
+  const install = useUpdate((state) => state.runInstall)
 
   useEffect(() => {
     void ipc
@@ -137,180 +142,196 @@ export function AboutPane() {
     }
   }, [build, fail])
 
-  const notes = release ? notesForDisplay(release.notes) : ''
-  const percent =
-    progress?.total && progress.total > 0
-      ? Math.min(100, Math.round((progress.downloaded / progress.total) * 100))
-      : null
+  const shownRelease = installing ? targetRelease : release
+  const notes = shownRelease ? notesForDisplay(shownRelease.notes) : ''
 
   return (
-    <section className="flex min-h-0 flex-1 animate-rise flex-col">
-      <PaneHeader title={t('about.title')} subtitle={t('about.subtitle')} width="narrow">
-        <Button variant="secondary" onClick={() => void check()} disabled={checking || installing}>
-          {checking ? (
-            <>
-              <Loader2 size={13} className="animate-spin" />
-              {t('about.checking')}
-            </>
-          ) : (
-            <>
-              <RefreshCw size={13} strokeWidth={2.2} />
-              {t('about.check')}
-            </>
-          )}
-        </Button>
-      </PaneHeader>
+    <>
+      <section className="flex min-h-0 flex-1 animate-rise flex-col">
+        <PaneHeader title={t('about.title')} subtitle={t('about.subtitle')} width="narrow">
+          <Button variant="secondary" onClick={() => setHistoryOpen(true)} disabled={installing}>
+            <History size={13} aria-hidden="true" />
+            {t('versions.title')}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => void check()}
+            disabled={checking || installing}
+          >
+            {checking ? (
+              <>
+                <Loader2 size={13} className="animate-spin" />
+                {t('about.checking')}
+              </>
+            ) : (
+              <>
+                <RefreshCw size={13} strokeWidth={2.2} />
+                {t('about.check')}
+              </>
+            )}
+          </Button>
+        </PaneHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
-        <div className="mx-auto flex max-w-[780px] flex-col gap-4">
-          <div className="flex items-center gap-4 rounded-panel border border-line bg-canvas-deep/50 px-5 py-4">
-            <BrandMark size={52} className="shrink-0 rounded-[12px] shadow-lift" />
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <h3 className="text-[16px] leading-none font-semibold tracking-[-0.01em] text-text">
-                DSH Studio
-              </h3>
-              <p className="selectable font-mono text-[11.5px] text-muted tabular-nums">
-                {about
-                  ? `${about.version} · ${about.platform}-${about.arch} · ${t(`about.edition.${about.edition}`)}`
-                  : '—'}
-              </p>
+        <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
+          <div className="mx-auto flex max-w-[780px] flex-col gap-4">
+            <div className="flex items-center gap-4 rounded-panel border border-line bg-canvas-deep/50 px-5 py-4">
+              <BrandMark size={52} className="shrink-0 rounded-[12px] shadow-lift" />
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <h3 className="text-[16px] leading-none font-semibold tracking-[-0.01em] text-text">
+                  DSH Studio
+                </h3>
+                <p className="selectable font-mono text-[11.5px] text-muted tabular-nums">
+                  {about
+                    ? `${about.version} · ${about.platform}-${about.arch} · ${t(`about.edition.${about.edition}`)}`
+                    : '—'}
+                </p>
+              </div>
             </div>
-          </div>
 
-          {release ? (
-            <div className="flex flex-col gap-3 rounded-panel border border-brand/30 bg-brand/10 px-4 py-3 text-[12.5px] text-text">
-              <div className="flex flex-col gap-1.5">
-                <strong className="font-semibold">
-                  {t('about.available', { version: release.version })}
-                </strong>
-                {notes && (
-                  <p className="selectable max-h-[168px] overflow-y-auto whitespace-pre-line text-[12px] leading-relaxed text-muted">
-                    {notes}
+            {shownRelease ? (
+              <div className="flex flex-col gap-3 rounded-panel border border-brand/30 bg-brand/10 px-4 py-3 text-[12.5px] text-text">
+                <div className="flex flex-col gap-1.5">
+                  <strong className="font-semibold">
+                    {installing
+                      ? `${t('about.updating')} · ${shownRelease.version}`
+                      : t('about.available', { version: shownRelease.version })}
+                  </strong>
+                  {notes && (
+                    <p className="selectable max-h-[168px] overflow-y-auto whitespace-pre-line text-[12px] leading-relaxed text-muted">
+                      {notes}
+                    </p>
+                  )}
+                </div>
+
+                {installing && !historyOpen && <UpdateProgress />}
+                {!shownRelease.canInstall && (
+                  <p className="text-[11.5px] text-muted">
+                    {t(
+                      shownRelease.installBlock === 'rpmDowngrade'
+                        ? 'versions.rpmDowngrade'
+                        : 'versions.development',
+                    )}
                   </p>
                 )}
-              </div>
 
-              {installing && (
-                <div className="flex flex-col gap-1.5" aria-live="polite">
-                  <div className="flex items-center justify-between text-[11px] text-muted tabular-nums">
-                    <span>
-                      {percent === 100
-                        ? t('about.installing')
-                        : percent === null
-                          ? t('about.downloading')
-                          : t('about.downloadingPercent', { percent })}
-                    </span>
-                    {percent !== null && <span>{percent}%</span>}
-                  </div>
-                  <div className="h-1 overflow-hidden rounded-full bg-canvas-deep/70">
-                    <div
-                      className={[
-                        'h-full rounded-full bg-brand transition-[width] duration-150',
-                        percent === null ? 'w-1/3 animate-pulse' : '',
-                      ].join(' ')}
-                      style={percent === null ? undefined : { width: `${percent}%` }}
-                    />
-                  </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void reportAction(() => openExternalUrl(shownRelease.url))}
+                  >
+                    {t('about.release')}
+                    <ArrowUpRight size={13} strokeWidth={2.3} />
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={() =>
+                      void (async () => {
+                        if (
+                          await ask({
+                            title: t('versions.confirmInstall'),
+                            body: t('versions.installBody'),
+                            subject: `${shownRelease.currentVersion} → ${shownRelease.version}`,
+                            confirm: t('versions.installRestart'),
+                            tone: 'brand',
+                          })
+                        )
+                          await install(shownRelease, 'latest')
+                      })()
+                    }
+                    disabled={installing || checking || !shownRelease.canInstall}
+                  >
+                    {installing ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Download size={13} strokeWidth={2.3} />
+                    )}
+                    {installing ? t('about.updating') : t('about.install')}
+                  </Button>
                 </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => void reportAction(() => openExternalUrl(release.url))}
-                >
-                  {t('about.release')}
-                  <ArrowUpRight size={13} strokeWidth={2.3} />
-                </Button>
-                <Button variant="primary" onClick={() => void install()} disabled={installing}>
-                  {installing ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Download size={13} strokeWidth={2.3} />
-                  )}
-                  {installing ? t('about.updating') : t('about.install')}
-                </Button>
               </div>
-            </div>
-          ) : checked ? (
-            <div className="rounded-panel border border-line bg-canvas-deep/50 px-4 py-3 text-[12.5px] text-muted">
-              {t('about.current')}
-            </div>
-          ) : null}
-
-          {(error ?? checkFailure) && (
-            <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
-              {error ?? checkFailure}
-            </p>
-          )}
-
-          <section className="flex flex-col gap-2">
-            <h4 className="caption">{t('about.paths')}</h4>
-            <dl className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
-              <PathRow label={t('about.appData')} path={about?.appData} onReveal={reveal} />
-              <PathRow label={t('about.harnessDir')} path={about?.harnessDir} onReveal={reveal} />
-              <PathRow label={t('about.profileDir')} path={about?.profileDir} onReveal={reveal} />
-            </dl>
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h4 className="caption">{t('about.diagnostics')}</h4>
-            <div className="flex flex-col gap-3 rounded-panel border border-line bg-canvas-deep/50 px-4 py-3.5">
-              <p className="text-[12px] leading-relaxed text-muted">{t('about.diagnosticsBody')}</p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  onClick={() => void copyReport()}
-                  disabled={building}
-                  data-hint={t('about.reportHint')}
-                >
-                  {copied ? (
-                    <Check size={13} strokeWidth={2.6} className="text-ok" />
-                  ) : building ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Copy size={13} strokeWidth={2.1} />
-                  )}
-                  {copied ? t('statusbar.copied') : t('about.reportCopy')}
-                </Button>
-                <Button variant="secondary" onClick={() => void saveReport()} disabled={building}>
-                  <FileDown size={13} strokeWidth={2.2} aria-hidden="true" />
-                  {t('about.reportSave')}
-                </Button>
+            ) : checked ? (
+              <div className="rounded-panel border border-line bg-canvas-deep/50 px-4 py-3 text-[12.5px] text-muted">
+                {t('about.current')}
               </div>
-            </div>
-          </section>
+            ) : null}
 
-          <section className="flex flex-col gap-2">
-            <h4 className="caption">{t('about.community')}</h4>
-            <div className="grid grid-cols-3 gap-2">
-              <CommunityLink icon={Bug} label={t('about.reportBug')} url={BUGS} />
-              <CommunityLink icon={Lightbulb} label={t('about.requestFeature')} url={FEATURES} />
-              <CommunityLink
-                icon={MessagesSquare}
-                label={t('about.discussions')}
-                url={DISCUSSIONS}
-              />
-            </div>
-          </section>
+            {(error ?? checkFailure) && (
+              <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
+                {error ?? checkFailure}
+              </p>
+            )}
 
-          <div className="flex items-center gap-4 text-[11.5px] text-faint">
-            <button
-              type="button"
-              onClick={() => void reportAction(() => openExternalUrl(SOURCE))}
-              className="inline-flex items-center gap-1.5 transition-colors duration-100 hover:text-brand"
-            >
-              <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden="true" />
-              {t('about.source')}
-            </button>
-            <span className="inline-flex items-center gap-1.5">
-              <Scale size={12} strokeWidth={2} aria-hidden="true" />
-              {t('about.license')}
-            </span>
+            <section className="flex flex-col gap-2">
+              <h4 className="caption">{t('about.paths')}</h4>
+              <dl className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
+                <PathRow label={t('about.appData')} path={about?.appData} onReveal={reveal} />
+                <PathRow label={t('about.harnessDir')} path={about?.harnessDir} onReveal={reveal} />
+                <PathRow label={t('about.profileDir')} path={about?.profileDir} onReveal={reveal} />
+              </dl>
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <h4 className="caption">{t('about.diagnostics')}</h4>
+              <div className="flex flex-col gap-3 rounded-panel border border-line bg-canvas-deep/50 px-4 py-3.5">
+                <p className="text-[12px] leading-relaxed text-muted">
+                  {t('about.diagnosticsBody')}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => void copyReport()}
+                    disabled={building}
+                    data-hint={t('about.reportHint')}
+                  >
+                    {copied ? (
+                      <Check size={13} strokeWidth={2.6} className="text-ok" />
+                    ) : building ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Copy size={13} strokeWidth={2.1} />
+                    )}
+                    {copied ? t('statusbar.copied') : t('about.reportCopy')}
+                  </Button>
+                  <Button variant="secondary" onClick={() => void saveReport()} disabled={building}>
+                    <FileDown size={13} strokeWidth={2.2} aria-hidden="true" />
+                    {t('about.reportSave')}
+                  </Button>
+                </div>
+              </div>
+            </section>
+
+            <section className="flex flex-col gap-2">
+              <h4 className="caption">{t('about.community')}</h4>
+              <div className="grid grid-cols-3 gap-2">
+                <CommunityLink icon={Bug} label={t('about.reportBug')} url={BUGS} />
+                <CommunityLink icon={Lightbulb} label={t('about.requestFeature')} url={FEATURES} />
+                <CommunityLink
+                  icon={MessagesSquare}
+                  label={t('about.discussions')}
+                  url={DISCUSSIONS}
+                />
+              </div>
+            </section>
+
+            <div className="flex items-center gap-4 text-[11.5px] text-faint">
+              <button
+                type="button"
+                onClick={() => void reportAction(() => openExternalUrl(SOURCE))}
+                className="inline-flex items-center gap-1.5 transition-colors duration-100 hover:text-brand"
+              >
+                <ArrowUpRight size={12} strokeWidth={2.2} aria-hidden="true" />
+                {t('about.source')}
+              </button>
+              <span className="inline-flex items-center gap-1.5">
+                <Scale size={12} strokeWidth={2} aria-hidden="true" />
+                {t('about.license')}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+      {historyOpen && <VersionHistory onClose={() => setHistoryOpen(false)} />}
+    </>
   )
 }
 

@@ -50,6 +50,20 @@ none alone proves final-installer or physical macOS acceptance.
 
 The priorities below are future work, not capabilities claimed for v0.9.19.
 
+- Application version history, reviewed upgrades/reinstalls/downgrades and cancellable
+  signed downloads are under acceptance. A native, window-owned receipt binds the
+  version, notes, asset identity, byte count and signature; installation rechecks
+  that receipt and serializes changes across windows and runtime operations.
+- Public release inventory snapshots provide a website fallback when GitHub's API
+  is unavailable. A snapshot does not replace installer signature verification.
+- Local checks cover the actual published Windows download, signature tampering,
+  size mismatch, cancellation, version browsing and responsive keyboard navigation.
+  Cross-platform installer downgrade/upgrade acceptance remains a release gate.
+- Switching the application uses Lite updater payloads and preserves installed
+  Node, Harness, profiles and sessions. It does not roll those resources or their
+  data schemas back; older applications may not understand newer data.
+  RPM downgrades require the system package manager and are disabled in this UI.
+
 ## Next priorities
 
 ### Reliability and complete user flows

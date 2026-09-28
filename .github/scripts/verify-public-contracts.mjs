@@ -63,15 +63,20 @@ export function validateCapabilities(capabilities) {
     'opener:allow-reveal-item-in-dir',
     'opener:allow-open-url',
     'process:allow-restart',
-    'updater:allow-check',
-    'updater:allow-download-and-install',
   ]
   for (const identifier of exact) {
     if (!identifiers.includes(identifier)) {
       throw new Error(`desktop capabilities must retain ${identifier}`)
     }
   }
-  for (const broad of ['dialog:default', 'opener:default', 'process:default', 'updater:default']) {
+  for (const broad of [
+    'dialog:default',
+    'opener:default',
+    'process:default',
+    'updater:default',
+    'updater:allow-download-and-install',
+    'updater:allow-install',
+  ]) {
     if (identifiers.includes(broad)) {
       throw new Error(`desktop capabilities must not grant broad ${broad}`)
     }

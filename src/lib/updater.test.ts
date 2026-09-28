@@ -1,196 +1,214 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const close = vi.fn()
-const downloadAndInstall = vi.fn()
-const check = vi.fn()
-const relaunch = vi.fn()
+const ipc = vi.hoisted(() => ({
+  applicationUpdateReview: vi.fn(),
+  applicationUpdateInstall: vi.fn(),
+  applicationUpdateDiscard: vi.fn(),
+  applicationUpdateCancel: vi.fn(),
+}))
+vi.mock('@/lib/ipc', () => ipc)
 
-vi.mock('@tauri-apps/plugin-updater', () => ({ check }))
-vi.mock('@tauri-apps/plugin-process', () => ({ relaunch }))
+import {
+  cancelUpdate,
+  checkForUpdate,
+  discardReview,
+  installUpdate,
+  notesForDisplay,
+  reviewVersion,
+  UpdateCancelled,
+  type Release,
+} from '@/lib/updater'
 
-import { checkForUpdate, installUpdate, notesForDisplay } from '@/lib/updater'
+const release = (): Release => ({
+  version: '0.9.19',
+  currentVersion: '0.9.18',
+  reviewId: 'a'.repeat(32),
+  fingerprint: 'b'.repeat(64),
+  url: 'https://github.com/Moresyl/dsh-studio/releases/tag/v0.9.19',
+  notes: 'Fixed a bug',
+  published: '2026-09-29T00:00:00Z',
+  artifact: 'Studio.exe',
+  bytes: 100,
+  direction: 'newer',
+  canInstall: true,
+  installBlock: null,
+})
 
 beforeEach(() => {
   vi.resetAllMocks()
-  close.mockResolvedValue(undefined)
-  relaunch.mockResolvedValue(undefined)
+  ipc.applicationUpdateDiscard.mockResolvedValue(undefined)
+  ipc.applicationUpdateInstall.mockResolvedValue(undefined)
 })
 
-describe('checkForUpdate', () => {
-  it('returns null when the signed manifest has no newer version', async () => {
-    check.mockResolvedValue(null)
-
+describe('reviewed application updates', () => {
+  it('represents an up-to-date result without a fake release', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue(null)
     await expect(checkForUpdate()).resolves.toBeNull()
-    expect(check).toHaveBeenCalledOnce()
+    expect(ipc.applicationUpdateReview).toHaveBeenCalledWith(null)
   })
 
-  it('recovers from a first feed failure without retrying a successful check', async () => {
-    check.mockRejectedValueOnce(new Error('connection reset')).mockResolvedValueOnce(null)
+  it('preserves native identity and direction', async () => {
+    const review = release()
+    ipc.applicationUpdateReview.mockResolvedValue(review)
+    await expect(checkForUpdate()).resolves.toEqual(review)
+  })
 
+  it('retries one transient check failure', async () => {
+    ipc.applicationUpdateReview
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(null)
     await expect(checkForUpdate()).resolves.toBeNull()
-    expect(check).toHaveBeenCalledTimes(2)
-    expect(check).toHaveBeenNthCalledWith(1, { timeout: 15_000 })
-    expect(check).toHaveBeenNthCalledWith(2, { timeout: 15_000 })
+    expect(ipc.applicationUpdateReview).toHaveBeenCalledTimes(2)
   })
 
-  it('normalizes updater metadata and releases the native resource', async () => {
-    check.mockResolvedValue({
-      version: 'v0.4.0',
-      body: '  fixed it  ',
-      date: '2026-08-18T00:00:00Z',
-      close,
+  it.each([
+    '',
+    '../0.9.19',
+    '0.9',
+    'v0.9.19',
+    '00.9.19',
+    '0.9.19-rc.1',
+    '0.9.19+build',
+    '0.9.19/installer',
+  ])('rejects unsafe selected version %s before IPC', async (version) => {
+    await expect(reviewVersion(version)).rejects.toThrow(/invalid version/)
+    expect(ipc.applicationUpdateReview).not.toHaveBeenCalled()
+  })
+
+  it('rejects malformed native identities and discards their receipts', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue({ ...release(), fingerprint: 'invalid' })
+    await expect(checkForUpdate()).rejects.toThrow(/review is invalid/)
+    expect(ipc.applicationUpdateDiscard).toHaveBeenCalledTimes(2)
+  })
+
+  it('retains actionable bilingual network guidance', async () => {
+    ipc.applicationUpdateReview.mockRejectedValue(new Error('rate limited'))
+    await expect(checkForUpdate()).rejects.toThrow(/HTTPS_PROXY.*无法连接[^]*rate limited/)
+  })
+
+  it('provides guidance for an empty failure', async () => {
+    ipc.applicationUpdateReview.mockRejectedValue('')
+    await expect(checkForUpdate()).rejects.toThrow(/verified update feed/)
+  })
+
+  it('requires the explicit historical version, including missing releases', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue(release())
+    await expect(reviewVersion('0.9.18')).rejects.toThrow(/changed/)
+    expect(ipc.applicationUpdateDiscard).toHaveBeenCalledOnce()
+    ipc.applicationUpdateReview.mockResolvedValue(null)
+    await expect(reviewVersion('0.9.18')).rejects.toThrow(/changed/)
+  })
+
+  it('returns a matching historical review', async () => {
+    const review = release()
+    ipc.applicationUpdateReview.mockResolvedValue(review)
+    await expect(reviewVersion('0.9.19')).resolves.toEqual(review)
+  })
+})
+
+describe('installing exactly what was reviewed', () => {
+  it('renews the receipt, forwards progress and releases metadata', async () => {
+    const expected = release()
+    const current = { ...expected, reviewId: 'c'.repeat(32) }
+    ipc.applicationUpdateReview.mockResolvedValue(current)
+    ipc.applicationUpdateInstall.mockImplementation(async (_id, report) => {
+      report({ phase: 'downloading', downloaded: 40, total: 100 })
+      report({ phase: 'installing', downloaded: 100, total: 100 })
     })
-
-    await expect(checkForUpdate()).resolves.toEqual({
-      version: '0.4.0',
-      url: 'https://github.com/Moresyl/dsh-studio/releases/tag/v0.4.0',
-      notes: 'fixed it',
-      published: '2026-08-18T00:00:00Z',
-    })
-    expect(close).toHaveBeenCalledOnce()
+    const progress = vi.fn()
+    const reviewed = vi.fn()
+    await expect(installUpdate(expected, progress, 'latest', reviewed)).resolves.toBe(true)
+    expect(reviewed).toHaveBeenCalledWith(current)
+    expect(ipc.applicationUpdateInstall).toHaveBeenCalledWith(
+      current.reviewId,
+      expect.any(Function),
+    )
+    expect(progress).toHaveBeenLastCalledWith({ phase: 'installing', downloaded: 100, total: 100 })
+    expect(ipc.applicationUpdateDiscard).toHaveBeenCalledWith(current.reviewId)
   })
 
-  it('closes the updater resource even when metadata handling throws', async () => {
-    check.mockResolvedValue({ version: null, close })
-
-    await expect(checkForUpdate()).rejects.toThrow()
-    expect(close).toHaveBeenCalledOnce()
+  it('pins historical checks while normal updates still recheck latest', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue(release())
+    await installUpdate(release(), vi.fn(), 'selected')
+    expect(ipc.applicationUpdateReview).toHaveBeenCalledWith('0.9.19')
   })
 
-  it.each(['', '../0.4.0', '0.4', '0.4.0<script>', '0.4.0/installer'])(
-    'rejects unsafe release identity %s before building a link',
-    async (version) => {
-      check.mockResolvedValue({ version, close })
-      await expect(checkForUpdate()).rejects.toThrow(/invalid version/)
-      expect(close).toHaveBeenCalledOnce()
+  it.each(['version', 'fingerprint'] as const)(
+    'rejects changed %s before installation',
+    async (field) => {
+      const changed = { ...release(), [field]: field === 'version' ? '0.9.20' : 'c'.repeat(64) }
+      if (field === 'version')
+        changed.url = 'https://github.com/Moresyl/dsh-studio/releases/tag/v0.9.20'
+      ipc.applicationUpdateReview.mockResolvedValue(changed)
+      await expect(installUpdate(release(), vi.fn())).rejects.toThrow(/changed/)
+      expect(ipc.applicationUpdateInstall).not.toHaveBeenCalled()
+      expect(ipc.applicationUpdateDiscard).toHaveBeenCalled()
     },
   )
 
-  it('accepts prerelease/build identifiers and missing optional metadata', async () => {
-    check.mockResolvedValue({ version: '  v1.2.3-rc.10+build.2  ', close })
-    await expect(checkForUpdate()).resolves.toMatchObject({
-      version: '1.2.3-rc.10+build.2',
-      notes: '',
-      published: '',
+  it('does not install when the release disappeared', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue(null)
+    await expect(installUpdate(release(), vi.fn())).resolves.toBe(false)
+    expect(ipc.applicationUpdateInstall).not.toHaveBeenCalled()
+  })
+
+  it('never installs a development build', async () => {
+    await expect(installUpdate({ ...release(), canInstall: false }, vi.fn())).rejects.toThrow(
+      /development builds/,
+    )
+    expect(ipc.applicationUpdateReview).not.toHaveBeenCalled()
+  })
+
+  it('explains unsupported RPM downgrades before starting any request', async () => {
+    await expect(
+      installUpdate({ ...release(), canInstall: false, installBlock: 'rpmDowngrade' }, vi.fn()),
+    ).rejects.toThrow(/system package manager/)
+    expect(ipc.applicationUpdateReview).not.toHaveBeenCalled()
+    expect(ipc.applicationUpdateInstall).not.toHaveBeenCalled()
+  })
+
+  it('preserves the original signature failure if receipt cleanup fails', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue(release())
+    ipc.applicationUpdateInstall.mockRejectedValue(new Error('signature rejected'))
+    ipc.applicationUpdateDiscard.mockRejectedValue(new Error('window closed'))
+    await expect(installUpdate(release(), vi.fn())).rejects.toThrow('signature rejected')
+  })
+
+  it('recognizes native and pre-download cancellation', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue(release())
+    ipc.applicationUpdateInstall.mockRejectedValue('application update cancelled')
+    await expect(installUpdate(release(), vi.fn())).rejects.toBeInstanceOf(UpdateCancelled)
+    ipc.applicationUpdateInstall.mockClear()
+    await expect(
+      installUpdate(release(), vi.fn(), 'latest', () => {
+        throw new UpdateCancelled()
+      }),
+    ).rejects.toBeInstanceOf(UpdateCancelled)
+    expect(ipc.applicationUpdateInstall).not.toHaveBeenCalled()
+  })
+
+  it('bounds malformed progress without displaying negative or infinite amounts', async () => {
+    ipc.applicationUpdateReview.mockResolvedValue(release())
+    ipc.applicationUpdateInstall.mockImplementation(async (_id, report) => {
+      report({ phase: 'downloading', downloaded: 120, total: 100 })
+      report({ phase: 'downloading', downloaded: Number.NaN, total: 0 })
     })
-  })
-
-  it('reports resource cleanup errors even after a successful feed response', async () => {
-    check.mockResolvedValue({ version: '1.2.3', close })
-    close.mockRejectedValue(new Error('resource unavailable'))
-    await expect(checkForUpdate()).rejects.toThrow(/cleanup/)
-  })
-
-  it('keeps the fallback guidance when a failure has no detail', async () => {
-    check.mockRejectedValue('')
-    await expect(checkForUpdate()).rejects.toThrow(/signed update feed/)
-  })
-
-  it('turns a feed outage into an actionable bilingual error', async () => {
-    check.mockRejectedValue(new Error('error sending request for url'))
-
-    await expect(checkForUpdate()).rejects.toThrow(/HTTPS_PROXY.*无法连接/s)
-    expect(check).toHaveBeenCalledTimes(2)
-  })
-})
-
-describe('installUpdate', () => {
-  it('reports cumulative progress, installs, then relaunches', async () => {
-    downloadAndInstall.mockImplementation(async (report) => {
-      report({ event: 'Started', data: { contentLength: 10 } })
-      report({ event: 'Progress', data: { chunkLength: 4 } })
-      report({ event: 'Progress', data: { chunkLength: 6 } })
-      report({ event: 'Finished' })
-    })
-    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
     const progress = vi.fn()
-
-    await expect(installUpdate('0.4.0', progress)).resolves.toBe(true)
-
-    expect(progress).toHaveBeenLastCalledWith({ downloaded: 10, total: 10 })
-    expect(relaunch).toHaveBeenCalledOnce()
-    expect(close).toHaveBeenCalledOnce()
-  })
-
-  it('does not relaunch when the update disappeared before installation', async () => {
-    check.mockResolvedValue(null)
-
-    await expect(installUpdate('0.4.0', vi.fn())).resolves.toBe(false)
-    expect(relaunch).not.toHaveBeenCalled()
-  })
-
-  it('closes the native resource and leaves relaunch alone after a download failure', async () => {
-    downloadAndInstall.mockRejectedValue(new Error('network lost'))
-    close.mockRejectedValueOnce(new Error('cleanup lost'))
-    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
-
-    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/Full \/ Offline.*network lost/s)
-    expect(relaunch).not.toHaveBeenCalled()
-    expect(close).toHaveBeenCalledOnce()
-  })
-
-  it('reports cleanup failure after a successful update', async () => {
-    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
-    close.mockRejectedValueOnce(new Error('cleanup lost'))
-    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/更新器未能完成清理/)
-  })
-
-  it('requires a fresh review when latest changed after confirmation', async () => {
-    check.mockResolvedValue({ version: '0.5.0', downloadAndInstall, close })
-
-    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/changed.*review/s)
-    expect(downloadAndInstall).not.toHaveBeenCalled()
-    expect(relaunch).not.toHaveBeenCalled()
-    expect(close).toHaveBeenCalledOnce()
-  })
-
-  it('closes the native resource when install metadata has an invalid version', async () => {
-    check.mockResolvedValue({ version: null, downloadAndInstall, close })
-
-    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/valid version/)
-    expect(downloadAndInstall).not.toHaveBeenCalled()
-    expect(relaunch).not.toHaveBeenCalled()
-    expect(close).toHaveBeenCalledOnce()
-  })
-
-  it('never reports more than the signed artifact content length', async () => {
-    downloadAndInstall.mockImplementation(async (report) => {
-      report({ event: 'Started', data: { contentLength: 10 } })
-      report({ event: 'Progress', data: { chunkLength: 12 } })
+    await installUpdate(release(), progress)
+    expect(progress).toHaveBeenNthCalledWith(1, {
+      phase: 'downloading',
+      downloaded: 100,
+      total: 100,
     })
-    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
-    const progress = vi.fn()
-
-    await installUpdate('0.4.0', progress)
-
-    expect(progress).toHaveBeenLastCalledWith({ downloaded: 10, total: 10 })
+    expect(progress).toHaveBeenLastCalledWith({ phase: 'downloading', downloaded: 0, total: null })
   })
 
-  it('explains that a manual restart is required if relaunch fails after installation', async () => {
-    downloadAndInstall.mockResolvedValue(undefined)
-    relaunch.mockRejectedValue(new Error('process plugin unavailable'))
-    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
-
-    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/installed.*start.*again/s)
-    expect(close).toHaveBeenCalledOnce()
-  })
-
-  it('keeps download progress useful without a Content-Length', async () => {
-    downloadAndInstall.mockImplementation(async (report) => {
-      report({ event: 'Started', data: {} })
-      report({ event: 'Progress', data: { chunkLength: 8 } })
-      report({ event: 'Finished' })
-    })
-    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
-    const progress = vi.fn()
-    await installUpdate('0.4.0', progress)
-    expect(progress).toHaveBeenLastCalledWith({ downloaded: 8, total: null })
-  })
-
-  it('retains manual-restart guidance for an empty relaunch failure', async () => {
-    relaunch.mockRejectedValue('')
-    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
-    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/手动|重新启动/)
+  it('cancels only the active reviewed identity and safely discards an absent review', async () => {
+    ipc.applicationUpdateCancel.mockResolvedValue(true)
+    await expect(cancelUpdate(release())).resolves.toBe(true)
+    expect(ipc.applicationUpdateCancel).toHaveBeenCalledWith(release().reviewId)
+    await discardReview(null)
+    expect(ipc.applicationUpdateDiscard).not.toHaveBeenCalled()
   })
 })
 
@@ -202,21 +220,17 @@ describe('notesForDisplay', () => {
 ### Fixed
 - **Fixed** the path issue
 <!-- dsh-notes:end -->`
-
   it('selects and cleans Chinese notes for a Chinese locale', () => {
     expect(notesForDisplay(notes, 'zh-CN')).toBe('修复\n- 修好了路径问题')
   })
-
   it('selects English for other locales', () => {
     expect(notesForDisplay(notes, 'en-US')).toBe('Fixed\n- Fixed the path issue')
   })
-
   it('keeps ordinary release bodies that predate localized markers', () => {
     expect(notesForDisplay('### Fixed\n- [Issue](https://example.com)', 'zh-CN')).toBe(
       'Fixed\n- Issue',
     )
   })
-
   it('reads a final locale block without a closing marker', () => {
     expect(notesForDisplay('<!-- dsh-notes:en -->\n## Finished', 'en')).toBe('Finished')
   })
