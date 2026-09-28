@@ -19,13 +19,13 @@ Rust + Tauri 2 编写。它托管本地 `dsh` 服务、回收服务派生出的�
 [![macOS 下载](https://img.shields.io/badge/macOS-.dmg-1c1c1e?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
 [![Linux 下载](https://img.shields.io/badge/Linux-.AppImage%20%C2%B7%20.deb%20%C2%B7%20.rpm-0e9e74?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
 
-每个安装包不到 4 MB · [全部产物与校验和](#安装) · [English](README.md)
+提供轻量版与完整离线版 · [全部产物与校验和](#安装) · [English](README.md)
 
 平台与运行时边界请参阅[支持矩阵](docs/support-matrix.zh-CN.md)；启动或插件安装失败时，请先查看[故障排除指南](docs/troubleshooting.zh-CN.md)。
 
 <br>
 
-<img src="assets/plugin-install.zh.png" width="820" alt="安装一个插件：市场列表、清单、npm 输出，以及写进 harness profile 的那一层">
+<img src="assets/plugin-install.zh.png" width="820" alt="安装一个插件：市场卡片、清单、包管理器输出，以及写进 harness profile 的那一层">
 
 **从一条 registry 列表到 harness profile 里的一个层，只隔一次点击**
 ——先读清单，再走 harness 自己的插件命令装进去，想关掉也不必卸载。
@@ -36,7 +36,7 @@ Rust + Tauri 2 编写。它托管本地 `dsh` 服务、回收服务派生出的�
 
 |                                                                                                                                                                  |                                                                                                                                                                               |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **⟳ 是托管，不只是启动**<br>退出后按退避策略重启，并且每 10 秒发一次真正的 HTTP 探测，专门抓那种「活着但卡死」的 harness。重启会落到新端口上，窗口自动跟过去。   | **⛨ 没有东西能活过这个窗口**<br>每个子进程都被并入 Windows job object 或 POSIX 进程组，由内核回收整棵树——包括普通 kill 会漏掉的孙子进程，哪怕外壳自己是被强杀的。             |
+| **⟳ 是托管，不只是启动**<br>退出后按退避策略重启，并且每 10 秒发一次真正的 HTTP 探测，专门抓那种「活着但卡死」的 harness。重启会落到新端口上，窗口自动跟过去。   | **⛨ 按应用管理进程树**<br>每个子进程都被并入 Windows job object 或 POSIX 进程组，由内核回收整棵树——包括普通 kill 会漏掉的孙子进程，哪怕外壳自己是被强杀的。                   |
 | **⬗ 窗口里自带插件市场**<br>搜索 npm registry，在决定装之前先看清这个包声明了什么，然后走 harness 自己的命令装进它托管的 profile。装好的插件可以只停用、不卸载。 | **▣ 够得着你的手机，但不把 agent 放到网络上**<br>`dsh` 始终绑在回环上，而且这一点不可配置。打开的是另一扇门：一个只绑定单个局域网地址的网关，靠二维码配对，一台设备、两分钟。 |
 
 ## 为什么做这个
@@ -62,7 +62,7 @@ DSH Studio 把这件事变成一个窗口。设计目标是让外壳**足够无�
 harness 会派生工具进程，工具进程又会派生自己的子进程。
 Windows 上服务被放进带 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的 [Job Object]，
 就算外壳自己被强杀，内核也会把整棵树收掉；
-Unix 上则单独建进程组、按组发信号。关掉窗口不留任何残余。
+Unix 上则单独建进程组、按组发信号。退出应用时回收进程；主窗口隐藏到托盘后，应用及其受管进程继续运行。
 
 **端口自己挑。**
 `--port 0` 让操作系统给一个空闲端口，supervisor 再把服务实际绑定到的端口读回来。

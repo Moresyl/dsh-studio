@@ -19,14 +19,14 @@ spawns, and never forks the upstream project to do it.
 [![Download for macOS](https://img.shields.io/badge/macOS-.dmg-1c1c1e?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
 [![Download for Linux](https://img.shields.io/badge/Linux-.AppImage%20%C2%B7%20.deb%20%C2%B7%20.rpm-0e9e74?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Moresyl/dsh-studio/releases/latest)
 
-Under 4 MB per installer · [all artifacts and checksums](#install) · [简体中文](README.zh-CN.md)
+Lite and Full/Offline installers · [all artifacts and checksums](#install) · [简体中文](README.zh-CN.md)
 
 For a precise platform and runtime boundary, see the [support matrix](docs/support-matrix.md).
 If startup or plugin installation fails, begin with the [troubleshooting guide](docs/troubleshooting.md).
 
 <br>
 
-<img src="assets/plugin-install.png" width="820" alt="Installing a plugin: the marketplace row, the manifest, the npm output, and the layer written to the harness profile">
+<img src="assets/plugin-install.png" width="820" alt="Installing a plugin: marketplace cards, the manifest, package-manager output, and the layer written to the harness profile">
 
 **One click from a registry listing to a layer in the harness's profile** — read the
 manifest, install through the harness's own plugin command, switch it off again
@@ -36,10 +36,10 @@ without uninstalling it.
 
 ---
 
-|                                                                                                                                                                                                                                        |                                                                                                                                                                                                                                                |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **⟳ Supervised, not just launched**<br>Backoff restart when it exits, and a real HTTP probe every 10 seconds to catch the harness that is alive but wedged. A restart lands on a new port and the window follows it.                   | **⛨ Nothing outlives the window**<br>Every child joins a Windows job object or a POSIX process group, so the kernel reclaims the whole tree — including the grandchildren a plain kill would orphan, and even if the shell is killed outright. |
-| **⬗ A plugin marketplace in the window**<br>Search the npm registry, see what a package declares before you commit to it, install into the hosted profile through the harness's own command. Disable a plugin without uninstalling it. | **▣ Your phone, without putting the agent on the network**<br>`dsh` stays on loopback, and that is not configurable. What opens is a separate gateway on one LAN address, paired by a QR code good for one device and two minutes.             |
+|                                                                                                                                                                                                                                        |                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **⟳ Supervised, not just launched**<br>Backoff restart when it exits, and a real HTTP probe every 10 seconds to catch the harness that is alive but wedged. A restart lands on a new port and the window follows it.                   | **⛨ Managed process trees**<br>Every child joins a Windows job object or a POSIX process group, so the kernel reclaims the whole tree — including the grandchildren a plain kill would orphan, and even if the shell is killed outright. |
+| **⬗ A plugin marketplace in the window**<br>Search the npm registry, see what a package declares before you commit to it, install into the hosted profile through the harness's own command. Disable a plugin without uninstalling it. | **▣ Your phone, without putting the agent on the network**<br>`dsh` stays on loopback, and that is not configurable. What opens is a separate gateway on one LAN address, paired by a QR code good for one device and two minutes.       |
 
 ## Why this exists
 
@@ -69,8 +69,8 @@ recycled.
 The harness spawns tools, which spawn their own children. On Windows the service
 is launched into a [Job Object] with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, so the
 kernel tears the tree down even if the shell is killed outright. On Unix it gets
-its own process group and is signalled as a group. Closing the window leaves
-nothing behind.
+its own process group and is signalled as a group. Quitting the application leaves
+nothing behind. Hiding the main window in the tray keeps the application and its managed processes running.
 
 **Picks its own port.**
 `--port 0` asks the OS for an unused one and the supervisor reads back the port

@@ -6,7 +6,7 @@
     <title>DSH Studio — a desktop shell for DeepSeek Harness</title>
     <meta
       name="description"
-      content="A native desktop app that installs, supervises and contains DeepSeek Harness. Windows, macOS and Linux, under four megabytes, MIT licensed."
+      content="A native desktop app that installs, supervises and contains DeepSeek Harness. Windows, macOS and Linux, with Lite and Full/Offline installers, MIT licensed."
     />
     <link rel="icon" href="assets/brand/icon.svg" />
     <link rel="stylesheet" href="style.css" />
@@ -16,7 +16,7 @@
     <meta property="og:title" content="DSH Studio" />
     <meta
       property="og:description"
-      content="A native desktop shell for DeepSeek Harness. Installs it, keeps it alive, and takes every process with it when the window closes."
+      content="A native desktop shell for DeepSeek Harness. Installs it, keeps it alive, and takes every process with it when the application quits."
     />
     <meta property="og:type" content="website" />
   </head>
@@ -72,7 +72,7 @@
             <dl class="facts">
               <div>
                 <dt>Installer</dt>
-                <dd data-installer-size>under 4 MB</dd>
+                <dd data-installer-size>See release assets</dd>
               </div>
               <div>
                 <dt>Platforms</dt>
@@ -143,11 +143,12 @@
             </article>
 
             <article class="card">
-              <h3><span class="kicker">Containment</span>Nothing outlives the window</h3>
+              <h3><span class="kicker">Containment</span>Managed process trees</h3>
               <p>
-                Every child joins a Windows job object, or a POSIX process group. Closing the shell
-                reclaims the whole tree, including the grandchildren that a plain kill would orphan
-                and leave holding a port.
+                Every child joins a Windows job object, or a POSIX process group. Quitting the
+                application reclaims the whole tree, including the grandchildren that a plain kill
+                would orphan and leave holding a port. Hiding the main window in the tray keeps
+                those processes running.
               </p>
             </article>
 
@@ -193,8 +194,8 @@
             <h2>Download</h2>
             <p>
               Version <strong data-version>latest</strong>
-              <span data-published-wrap hidden>, released <span data-published></span></span>.
-              Sizes below are read from the release itself.
+              <span data-published-wrap hidden>, released <span data-published></span></span>. Sizes
+              below are read from the release itself.
             </p>
             <p>
               Lite downloads Node.js and DSH only when needed. Full / Offline carries both verified

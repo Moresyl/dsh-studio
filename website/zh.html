@@ -6,7 +6,7 @@
     <title>DSH Studio — DeepSeek Harness 的桌面外壳</title>
     <meta
       name="description"
-      content="一个原生桌面应用，负责安装、守护并隔离 DeepSeek Harness。支持 Windows、macOS 与 Linux，安装包不到 4 MB，MIT 许可。"
+      content="一个原生桌面应用，负责安装、守护并隔离 DeepSeek Harness。支持 Windows、macOS 与 Linux，提供轻量版与完整离线版，MIT 许可。"
     />
     <link rel="icon" href="assets/brand/icon.svg" />
     <link rel="stylesheet" href="style.css" />
@@ -51,7 +51,7 @@
 
             <p class="lede">
               原生桌面外壳 —— Rust 加系统自带的 WebView，不打包一整个浏览器。它替你把 harness
-              装好，进程挂了自动拉回来，窗口一关，它启动的每个进程都跟着走。
+              装好，进程挂了自动拉回来，退出应用时回收受管进程，隐藏到托盘后则继续运行。
             </p>
 
             <div class="actions">
@@ -71,7 +71,7 @@
             <dl class="facts">
               <div>
                 <dt>安装包</dt>
-                <dd data-installer-size>不到 4 MB</dd>
+                <dd data-installer-size>以发布资产为准</dd>
               </div>
               <div>
                 <dt>平台</dt>
@@ -139,11 +139,11 @@
             </article>
 
             <article class="card">
-              <h3><span class="kicker">进程隔离</span>没有任何进程能活过窗口</h3>
+              <h3><span class="kicker">进程隔离</span>按应用管理进程树</h3>
               <p>
                 每个子进程都会被加入 Windows 的 job object，或者 POSIX
-                的进程组。关掉外壳会把整棵树一起收走， 包括那些用普通 kill
-                会被丢成孤儿、还占着端口的孙子进程。
+                的进程组。退出应用时回收整棵进程树，包括那些用普通 kill
+                会被丢成孤儿、还占着端口的孙子进程。主窗口隐藏到托盘后，受管进程继续运行。
               </p>
             </article>
 
@@ -552,9 +552,7 @@ scoop install dsh-studio</pre>
           <a href="https://github.com/Moresyl/dsh-studio">源码</a>
           <a href="https://github.com/Moresyl/dsh-studio/releases">版本</a>
           <a href="https://github.com/Moresyl/dsh-studio/issues">反馈问题</a>
-          <a href="docs.zh.html"
-            >文档</a
-          >
+          <a href="docs.zh.html">文档</a>
           <a href="https://github.com/Moresyl/dsh-studio/blob/main/CONTRIBUTING.md">参与贡献</a>
           <a href="index.html" lang="en">English</a>
         </div>
