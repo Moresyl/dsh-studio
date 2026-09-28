@@ -6,6 +6,7 @@ import { basename, dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { verifyPackagedFrontend } from './verify-packaged-frontend.mjs'
 
 let scratch
 const invoked = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
@@ -29,8 +30,7 @@ export function resolveBundleRoot(root) {
 
 export function shouldExerciseWindowsInstaller(environment = process.env) {
   return (
-    environment.GITHUB_ACTIONS === 'true' ||
-    environment.DSH_ALLOW_LOCAL_INSTALLER_SMOKE === '1'
+    environment.GITHUB_ACTIONS === 'true' || environment.DSH_ALLOW_LOCAL_INSTALLER_SMOKE === '1'
   )
 }
 
@@ -44,7 +44,7 @@ async function verifyWindows(files) {
 
   const msiRoot = join(scratch, 'msi')
   await run('msiexec.exe', ['/a', msi, '/qn', `TARGETDIR=${msiRoot}`])
-  await verifyOffline(msiRoot)
+  await verifyResources(msiRoot)
   await smoke(await installedExecutable(msiRoot))
 
   // NSIS writes per-user installation and uninstall registration even when /D
@@ -52,7 +52,9 @@ async function verifyWindows(files) {
   // runner, but a local release rehearsal must never take over the developer's
   // real updater registration or leave a temp build as the primary app.
   if (!shouldExerciseWindowsInstaller()) {
-    console.log('verified MSI extraction and packaged binary; skipped stateful NSIS install outside GitHub Actions')
+    console.log(
+      'verified MSI extraction and packaged binary; skipped stateful NSIS install outside GitHub Actions',
+    )
     return
   }
 
@@ -60,7 +62,7 @@ async function verifyWindows(files) {
   // NSIS requires /D to be the final argument. spawn() passes it as one value,
   // so spaces in the temporary path are never interpreted by a shell.
   await run(nsis, ['/S', `/D=${nsisRoot}`], { env: isolatedEnvironment('nsis') })
-  await verifyOffline(nsisRoot)
+  await verifyResources(nsisRoot)
   await smoke(await installedExecutable(nsisRoot))
   const uninstaller = (await walk(nsisRoot)).find(
     (file) => basename(file).toLowerCase() === 'uninstall.exe',
@@ -79,6 +81,7 @@ async function verifyWindowsUpgrade(previous, current) {
   await run(previous, ['/S', `/D=${root}`], { env: isolatedEnvironment('upgrade') })
   await installedExecutable(root)
   await run(current, ['/S', `/D=${root}`], { env: isolatedEnvironment('upgrade') })
+  await verifyResources(root)
   await smoke(await installedExecutable(root))
   const uninstaller = (await walk(root)).find(
     (file) => basename(file).toLowerCase() === 'uninstall.exe',
@@ -128,7 +131,7 @@ async function verifyMac(files) {
       (file) => file.includes('.app/Contents/MacOS/') && basename(file) === 'dsh-studio',
     )
     if (!executable) throw new Error('DMG contains no DSH Studio application executable')
-    await verifyOffline(mount)
+    await verifyResources(mount)
     await smoke(executable)
   } finally {
     await run('hdiutil', ['detach', mount])
@@ -144,17 +147,17 @@ async function verifyLinux(files) {
   await chmod(appImage, 0o755)
   const appImageRoot = join(scratch, 'appimage')
   await run(appImage, ['--appimage-extract'], { cwd: appImageRoot, createCwd: true })
-  await verifyOffline(appImageRoot)
+  await verifyResources(appImageRoot)
   await smoke(await installedExecutable(appImageRoot))
 
   const debRoot = join(scratch, 'deb')
   await run('dpkg-deb', ['--extract', deb, debRoot])
-  await verifyOffline(debRoot)
+  await verifyResources(debRoot)
   await smoke(await installedExecutable(debRoot))
 
   const rpmRoot = join(scratch, 'rpm')
   await extractRpm(rpm, rpmRoot)
-  await verifyOffline(rpmRoot)
+  await verifyResources(rpmRoot)
   await smoke(await installedExecutable(rpmRoot))
   console.log('extracted AppImage, DEB and RPM and executed every packaged application binary')
 }
@@ -200,7 +203,9 @@ function isolatedEnvironment(name) {
   }
 }
 
-async function verifyOffline(directory) {
+async function verifyResources(directory) {
+  const frontend = await verifyPackagedFrontend(directory)
+  console.log(`verified ${frontend.files} packaged frontend files against the current build`)
   if (process.env.DSH_EXPECT_OFFLINE !== '1') return
   const files = await walk(directory)
   const manifestPath = files.find((file) =>
@@ -266,7 +271,8 @@ async function walk(directory) {
 
 async function run(command, args, { timeout = 120_000, cwd, createCwd = false, env } = {}) {
   if (createCwd) await mkdir(cwd, { recursive: true })
-  if (env) await Promise.all(Object.values(env).map((directory) => mkdir(directory, { recursive: true })))
+  if (env)
+    await Promise.all(Object.values(env).map((directory) => mkdir(directory, { recursive: true })))
   await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
