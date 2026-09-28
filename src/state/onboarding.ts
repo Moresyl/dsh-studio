@@ -16,6 +16,7 @@
 import { create } from 'zustand'
 
 import type { Environment } from '@/lib/ipc'
+import { readPreference, savePreference } from '@/lib/preferences'
 
 /** How many steps there are, which is also what the last index is measured from. */
 export const STEPS = 3
@@ -42,20 +43,11 @@ type Stage = 'unknown' | 'guiding' | 'done'
 
 /** Storage can throw rather than merely be empty, and a guide is not worth failing over. */
 function seen(): boolean {
-  try {
-    return window.localStorage.getItem(KEY) === VERSION
-  } catch {
-    return false
-  }
+  return readPreference(KEY) === VERSION
 }
 
 function remember(): void {
-  try {
-    window.localStorage.setItem(KEY, VERSION)
-  } catch {
-    // Costs one more guide at the next start, which is worth less than a window
-    // that refused to open because it could not write a flag.
-  }
+  savePreference(KEY, VERSION)
 }
 
 interface OnboardingState {

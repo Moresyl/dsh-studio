@@ -1,18 +1,15 @@
 import { create } from 'zustand'
 
 import { announce, onSharedChange } from '@/lib/ipc'
+import { readPreference, savePreference } from '@/lib/preferences'
 
 export type Presentation = 'compatibility' | 'extended' | 'advanced'
 
 const KEY = 'dsh-studio.presentation'
 
 function remembered(): Presentation {
-  try {
-    const saved = window.localStorage.getItem(KEY)
-    return saved === 'advanced' || saved === 'extended' ? saved : 'compatibility'
-  } catch {
-    return 'compatibility'
-  }
+  const saved = readPreference(KEY)
+  return saved === 'advanced' || saved === 'extended' ? saved : 'compatibility'
 }
 
 interface PresentationState {
@@ -23,11 +20,7 @@ interface PresentationState {
 export const usePresentation = create<PresentationState>((set) => ({
   mode: remembered(),
   choose: (mode) => {
-    try {
-      window.localStorage.setItem(KEY, mode)
-    } catch {
-      // The live choice remains useful even if this webview cannot persist it.
-    }
+    savePreference(KEY, mode)
     set({ mode })
     void announce('presentation')
   },

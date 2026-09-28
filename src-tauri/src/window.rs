@@ -203,10 +203,15 @@ fn shell<'a, R: Runtime, M: Manager<R>>(
         .try_state::<crate::shell::ShellOrigin>()
         .map(|origin| WebviewUrl::External(origin.0.parse().expect("shell origin is a URL")))
         .unwrap_or_default();
+    let preferences = manager
+        .try_state::<crate::shell::ShellOrigin>()
+        .map(|origin| crate::preferences::bootstrap(&origin.0))
+        .unwrap_or_default();
     let builder = WebviewWindowBuilder::new(manager, label, load)
         .min_inner_size(MIN_WIDTH, MIN_HEIGHT)
         .transparent(material.is_some())
         .initialization_script(announce(material, standby))
+        .initialization_script(preferences)
         // Every frame and not just the top one: the shell's own document is the
         // top frame, and everything the desktop interface exists for runs below
         // it — the harness, and the plugin pages the harness frames in turn.

@@ -43,6 +43,17 @@ Discovery can use npm, DSH 1024Store, the rate-limited reviewed dshfind catalog,
 
 ## Presentation and desktop integration
 
+The terminal layout selector offers a single pane, side-by-side panes, stacked
+panes and a four-pane grid. Open shells explicitly with **New terminal**; layout
+changes never start or restart a process. Tabs beyond the visible group remain
+available on the tab strip. Selecting a tab brings its group into view. Click a
+pane or its header to select it; the context menu acts on the clicked pane.
+Layout changes and navigation preserve live transcripts. A failed shell retains
+its transcript without sending input or resize commands to the exited process.
+Only the layout preference is saved across application restarts, not shell
+processes or transcripts. Hiding the main window in the tray keeps shells running;
+quitting the application ends them.
+
 **Compatibility** opens the upstream Harness interface directly. **Extended**
 keeps the full upstream interface and adds a compact native toolbar for terminal,
 sessions, plugins, Profile and workspace actions. **Advanced** opens Studio's

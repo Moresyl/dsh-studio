@@ -16,6 +16,7 @@
 import { create } from 'zustand'
 
 import type { Rate, Rates } from '@/lib/usage'
+import { readPreference, savePreference } from '@/lib/preferences'
 
 /** Versioned, so a later shape can be recognised rather than half-read. */
 const KEY = 'dsh-studio:usage:rates:v1'
@@ -85,13 +86,7 @@ export interface SavedPricing {
  * would turn every total into `NaN` silently.
  */
 function remembered(): SavedPricing {
-  try {
-    return decodePricing(window.localStorage.getItem(KEY))
-  } catch {
-    // Unreadable storage, or JSON that is not JSON. Either way there are no
-    // prices, which the statement already knows how to say.
-    return decodePricing(null)
-  }
+  return decodePricing(readPreference(KEY))
 }
 
 /** Decode untrusted local storage without allowing malformed money into totals. */
@@ -139,7 +134,7 @@ const validBudget = (value: unknown): value is number =>
 
 function save(saved: SavedPricing): void {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(saved))
+    savePreference(KEY, JSON.stringify(saved))
   } catch {
     // Then the prices last for this run, which is still what was typed.
   }

@@ -35,6 +35,7 @@ xterm 的流式正文属于第三方界面；外围 DSH Studio 原生壳仍受�
 ```powershell
 node .github/scripts/desktop-regression.mjs --port=9223 --minutes=20 --qa-home=D:/qa/home --output=D:/qa/ui-results
 node .github/scripts/desktop-ipc-regression.mjs D:/qa/home D:/qa/native-results 9223
+node .github/scripts/desktop-terminal-regression.mjs D:/qa/home D:/qa/terminal-results 9223
 ```
 
 界面脚本检查七个壳页面、横向溢出、插件卡片语义、弹窗焦点及 Escape 恢复，以及未捕获的
@@ -44,6 +45,11 @@ WebView 异常。定时运行保留截图和 DOM/堆内存数据；这些采样�
 文件与结果报告保留在指定输出目录。两个脚本按顺序运行，界面回归期间不要操作同一 QA 窗口。
 
 这些检查用于补充人工矩阵，不涵盖模型服务商凭据、真实外部 SSH 账户、Narrator 或 macOS 真机。
+
+终端脚本还会拒绝已有运行中 Shell 的 QA 窗口。它通过界面创建 5 个真实 PTY，检查布局
+分组、输出保留、页面往返、异常退出记录、尺寸更新安全性和右键菜单操作目标，然后关闭
+自己创建的终端。不要与其他界面脚本并行运行。布局偏好保存检查不代表应用重启恢复
+已经验证；应单独重启验收，并确认不会自动创建 Shell。
 
 可在同一次 CDP 连接中核对视口尺寸并捕获减少动画或强制颜色模式，避免连接关闭后覆盖失效。
 以下为浏览器模拟检查，不能代替 Windows 系统设置下的人工验收：

@@ -18,6 +18,7 @@ import * as ipc from '@/lib/ipc'
 import { ownAsync } from '@/lib/lifecycle'
 import { needsWorkbench, rendererDocument } from '@/lib/renderer-recovery'
 import { standby } from '@/lib/platform'
+import { readPreference, savePreference } from '@/lib/preferences'
 import { useDialog } from '@/state/dialog'
 import { reportAction, reportFailure } from '@/state/failure'
 import { subscribeToHarness, useHarness } from '@/state/harness'
@@ -71,20 +72,12 @@ export default function App() {
   // covers the window, and a modal inside a strip 36px tall would be positioned
   // against a strip 36px tall.
   const [managing, setManaging] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try {
-      return window.localStorage.getItem('dsh-studio.sidebar') === 'collapsed'
-    } catch {
-      return false
-    }
-  })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
+    readPreference('dsh-studio.sidebar') === 'collapsed',
+  )
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem('dsh-studio.sidebar', sidebarCollapsed ? 'collapsed' : 'open')
-    } catch {
-      // The current window still honors the choice when storage is unavailable.
-    }
+    savePreference('dsh-studio.sidebar', sidebarCollapsed ? 'collapsed' : 'open')
   }, [sidebarCollapsed])
 
   // Stable, because the palette rebuilds its command list from its props and

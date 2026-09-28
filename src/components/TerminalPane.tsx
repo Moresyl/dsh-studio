@@ -3,21 +3,23 @@ import { ClipboardPaste, Copy, Eraser, Plus, SquareTerminal, X } from 'lucide-re
 
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
+import { SelectControl } from '@/components/SelectControl'
 import { StatusDot } from '@/components/StatusDot'
 import { t } from '@/lib/i18n'
 import * as screens from '@/lib/screen'
 import { contextMenu, SEPARATOR } from '@/state/menu'
 import { useTerminals, type TerminalTab } from '@/state/terminals'
+import { useTerminalLayout, visibleTerminalIds } from '@/state/terminal-layout'
 
 /**
  * Shells, inside the window.
  *
  * The point of it being here rather than in a console the app shells out to is
  * that these processes belong to this application: they are in its job object,
- * so closing the window ends them, and the pane says so in its empty state
+ * so quitting the application ends them, and the pane says so in its empty state
  * rather than leaving it to be discovered.
  *
- * One host element, and the emulators move through it. The pane can unmount —
+ * Bounded host elements, and the emulators move through them. The pane can unmount —
  * the user goes to look at the plugin market — and the terminals keep running
  * and keep printing into scrollback that is still there on the way back. That is
  * why nothing in here holds a terminal in React state: this component draws the
@@ -32,43 +34,33 @@ export function TerminalPane() {
   const close = useTerminals((state) => state.close)
   const select = useTerminals((state) => state.select)
   const dismiss = useTerminals((state) => state.dismiss)
+  const layout = useTerminalLayout((state) => state.layout)
+  const chooseLayout = useTerminalLayout((state) => state.choose)
+  const visible = visibleTerminalIds(
+    tabs.map((tab) => tab.id),
+    active,
+    layout,
+  )
 
   const host = useRef<HTMLDivElement>(null)
-
-  // Put the selected terminal into the host, and keep it sized to it.
-  //
-  // The observer is here rather than on the window because the box changes for
-  // reasons a window resize never sees: this whole panel is hidden while the
-  // harness is in front, and a pane that comes back from `display: none` goes
-  // from no size to its real size without anything else happening.
-  useEffect(() => {
-    const box = host.current
-    if (!box || !active) return
-
-    // A shell can outlive the page that was drawing it — a reload in
-    // development rebuilds every emulator and kills nothing.
-    if (screens.has(active)) screens.attach(active, box)
-    else screens.restore(active, box)
-
-    const observer = new ResizeObserver(() => screens.measure(active))
-    observer.observe(box)
-
-    return () => {
-      observer.disconnect()
-      screens.detach(active)
-    }
-  }, [active])
 
   // The emulator is made before the shell, because a shell is told its size once
   // and only the emulator can measure the box it is about to fill.
   const start = () => {
-    const box = host.current
+    const box =
+      host.current?.querySelector<HTMLElement>(
+        '[data-terminal-active="true"] [data-terminal-host]',
+      ) ??
+      host.current?.querySelector<HTMLElement>('[data-terminal-host]') ??
+      host.current
     if (!box || opening) return
     const { screen, rows, cols } = screens.open(box)
     void open(screen, rows, cols)
   }
 
   const menu = contextMenu(() => {
+    // A right click selects its pane before this bubbling handler runs.
+    const active = useTerminals.getState().active
     if (!active) return []
     const selection = screens.selection(active)
 
@@ -94,6 +86,16 @@ export function TerminalPane() {
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col">
       <PaneHeader title={t('terminal.title')} subtitle={t('terminal.subtitle')}>
+        <SelectControl
+          aria-label={t('terminal.layout')}
+          value={layout}
+          onValueChange={chooseLayout}
+        >
+          <option value="single">{t('terminal.layout.single')}</option>
+          <option value="columns">{t('terminal.layout.columns')}</option>
+          <option value="rows">{t('terminal.layout.rows')}</option>
+          <option value="grid">{t('terminal.layout.grid')}</option>
+        </SelectControl>
         <Button variant="secondary" onClick={start} disabled={opening}>
           <Plus size={13} strokeWidth={2.3} />
           {t('terminal.new')}
@@ -158,10 +160,96 @@ export function TerminalPane() {
       {/* Positioned, because the emulators inside it are: switching tabs moves
           one out and another in, and for the frame in between the host holds
           both. */}
-      <div ref={host} onContextMenu={menu} className="relative min-h-0 flex-1 bg-canvas-deep">
+      <div
+        ref={host}
+        onContextMenu={menu}
+        className={[
+          'relative grid min-h-0 min-w-0 flex-1 gap-px overflow-hidden bg-line',
+          visible.length > 1 && layout === 'columns' ? 'grid-cols-2 grid-rows-1' : '',
+          visible.length > 1 && layout === 'rows' ? 'grid-cols-1 grid-rows-2' : '',
+          visible.length > 1 && layout === 'grid'
+            ? visible.length > 2
+              ? 'grid-cols-2 grid-rows-2'
+              : 'grid-cols-2 grid-rows-1'
+            : '',
+        ].join(' ')}
+      >
+        {visible.map((id) => {
+          const tab = tabs.find((candidate) => candidate.id === id)
+          return tab ? (
+            <TerminalSurface
+              key={id}
+              tab={tab}
+              active={id === active}
+              split={visible.length > 1}
+              onSelect={() => select(id)}
+            />
+          ) : null
+        })}
         {tabs.length === 0 && <Empty onStart={start} busy={opening} />}
       </div>
     </section>
+  )
+}
+
+/** Each emulator keeps its own resize lifecycle; changing layout never respawns it. */
+function TerminalSurface({
+  tab,
+  active,
+  split,
+  onSelect,
+}: {
+  tab: TerminalTab
+  active: boolean
+  split: boolean
+  onSelect: () => void
+}) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const box = host.current
+    if (!box) return
+    if (screens.has(tab.id)) screens.attach(tab.id, box, false)
+    else screens.restore(tab.id, box)
+    const observer = new ResizeObserver(() => screens.measure(tab.id))
+    observer.observe(box)
+    return () => {
+      observer.disconnect()
+      screens.detach(tab.id)
+    }
+  }, [tab.id])
+
+  useEffect(() => {
+    if (active) screens.focus(tab.id)
+  }, [active, tab.id])
+
+  return (
+    <div
+      data-terminal-active={active}
+      data-terminal-id={tab.id}
+      onFocusCapture={onSelect}
+      onPointerDown={onSelect}
+      onContextMenu={onSelect}
+      className="flex min-h-0 min-w-0 flex-col bg-canvas-deep"
+    >
+      {split && (
+        <button
+          type="button"
+          onClick={() => {
+            onSelect()
+            screens.focus(tab.id)
+          }}
+          aria-pressed={active}
+          title={tab.cwd}
+          className={`flex h-8 shrink-0 items-center gap-2 truncate border-b px-3 text-left text-[11px] ${active ? 'border-brand/40 bg-brand/8 text-text' : 'border-line text-faint'}`}
+        >
+          <SquareTerminal size={12} className="shrink-0" aria-hidden="true" />
+          <span className="truncate">
+            {tab.label} · {tab.cwd}
+          </span>
+        </button>
+      )}
+      <div ref={host} data-terminal-host className="relative min-h-0 min-w-0 flex-1" />
+    </div>
   )
 }
 
@@ -199,6 +287,7 @@ function Tab({ tab, active, onSelect, onClose }: TabProps) {
       <button
         type="button"
         aria-current={active ? 'true' : undefined}
+        data-terminal-tab={tab.id}
         data-hint={tab.cwd}
         onClick={onSelect}
         className={[

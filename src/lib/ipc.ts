@@ -7,6 +7,10 @@
 import { invoke } from '@tauri-apps/api/core'
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 
+/** Persist one bounded, allowlisted desktop preference outside the Web origin. */
+export const preferenceSave = (key: string, value: string): Promise<void> =>
+  invoke('preference_save', { key, value })
+
 export interface NodeVersion {
   major: number
   minor: number

@@ -45,6 +45,7 @@ commands.allow = [
     "plugin_state",
     "plugin_switch",
     "preset_choose",
+    "preference_save",
     "preset_export",
     "preset_import",
     "preset_package",

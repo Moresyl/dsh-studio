@@ -249,13 +249,19 @@ export function open(host: HTMLElement): { screen: Screen; rows: number; cols: n
 export function adopt(id: string, screen: Screen): void {
   screens.set(id, screen)
 
+  // Finished shells retain a resizable transcript, but no longer accept IPC.
+  const live = () => screens.get(id) === screen && !screen.terminal.options.disableStdin
+  const reportWhileLive = (cause: unknown) => {
+    if (live()) sink.report(cause)
+  }
+
   screen.terminal.onData((data) => {
-    ipc.terminalWrite(id, data).catch(sink.report)
+    if (live()) ipc.terminalWrite(id, data).catch(reportWhileLive)
   })
   // The one place a size change is reported. Every path that changes the size —
   // a fit, a pane that grew, a window that was maximised — ends up here.
   screen.terminal.onResize(({ rows, cols }) => {
-    ipc.terminalResize(id, rows, cols).catch(sink.report)
+    if (live()) ipc.terminalResize(id, rows, cols).catch(reportWhileLive)
   })
 
   if (early?.id === id) {
@@ -287,7 +293,7 @@ export function restore(id: string, host: HTMLElement): void {
 }
 
 /** Put a terminal back on screen, sized to the host it is going into. */
-export function attach(id: string, host: HTMLElement): void {
+export function attach(id: string, host: HTMLElement, focus = true): void {
   const screen = screens.get(id)
   if (!screen) return
 
@@ -296,7 +302,7 @@ export function attach(id: string, host: HTMLElement): void {
   // Written to while its element was out of the document, a terminal can hold
   // rows nothing ever painted. Cheap enough to do on every visit.
   screen.terminal.refresh(0, screen.terminal.rows - 1)
-  screen.terminal.focus()
+  if (focus) screen.terminal.focus()
 }
 
 /** Take a terminal off screen without ending it. */

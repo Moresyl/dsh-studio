@@ -41,6 +41,7 @@ runners verify the live profile path before changing anything.
 ```powershell
 node .github/scripts/desktop-regression.mjs --port=9223 --minutes=20 --qa-home=D:/qa/home --output=D:/qa/ui-results
 node .github/scripts/desktop-ipc-regression.mjs D:/qa/home D:/qa/native-results 9223
+node .github/scripts/desktop-terminal-regression.mjs D:/qa/home D:/qa/terminal-results 9223
 ```
 
 The UI runner checks seven shell pages, horizontal overflow, plugin-card
@@ -55,6 +56,13 @@ operate the same QA window during the UI run.
 
 These checks complement the manual matrix; they do not cover model-provider
 credentials, real external SSH accounts, Narrator or physical macOS hardware.
+
+The terminal runner also refuses a QA window with existing live shells. It opens
+five real PTYs through the UI, verifies layout groups, output retention, route
+round trips, a failed shell transcript, resize safety and context-menu targeting,
+then closes its own terminals. Run it separately from other UI runners. Its
+layout-preference check does not prove application-restart restoration; verify
+that separately and confirm that no shell is launched automatically.
 
 Verify viewport dimensions and capture reduced-motion or forced-colour mode in
 the same CDP connection, before its overrides expire. These browser simulations

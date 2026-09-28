@@ -9,6 +9,17 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Added
+
+- Add single, side-by-side, stacked and four-pane terminal layouts with a saved layout preference and stable tab groups. Switching layout does not launch shells or discard live transcripts.
+- Add isolated real-WebView terminal regression for five PTYs, layout transitions, output retention, abnormal exit and context-menu targeting.
+
+### Fixes and polish
+
+- Persist desktop theme, presentation, sidebar, onboarding, usage pricing, dismissed update and terminal layout preferences in bounded atomic application storage, instead of losing them when the local page origin changes after restart.
+- Stop forwarding input and resize events to exited terminal processes while keeping their transcripts readable; suppress late IPC failures after an emulator retires or is disposed.
+- Clarify that hiding the main window in the tray keeps terminals running, while quitting the application ends them.
+
 ## [0.9.18] — 2026-09-27
 
 ### Added

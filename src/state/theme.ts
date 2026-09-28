@@ -20,6 +20,7 @@ import { create } from 'zustand'
 
 import { announce, onSharedChange, windowMaterial } from '@/lib/ipc'
 import { material } from '@/lib/platform'
+import { readPreference, savePreference } from '@/lib/preferences'
 
 export type Theme = 'system' | 'light' | 'dark'
 
@@ -36,12 +37,8 @@ const isTheme = (value: unknown): value is Theme =>
  * disabled does exactly that — and a theme is not worth failing to start over.
  */
 function remembered(): Theme {
-  try {
-    const saved: unknown = window.localStorage.getItem(KEY)
-    return isTheme(saved) ? saved : 'system'
-  } catch {
-    return 'system'
-  }
+  const saved: unknown = readPreference(KEY)
+  return isTheme(saved) ? saved : 'system'
 }
 
 /**
@@ -89,12 +86,7 @@ export const useTheme = create<ThemeState>((set) => ({
 
   choose: (theme) => {
     apply(theme)
-    try {
-      window.localStorage.setItem(KEY, theme)
-    } catch {
-      // Unwritable storage costs the choice at the next start, which is worth
-      // less than the window that refused to change colour.
-    }
+    savePreference(KEY, theme)
     set({ theme })
     // Storage is shared between the windows and nothing watches it: the DOM's
     // own `storage` event does not reliably cross webviews on every platform

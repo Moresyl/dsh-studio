@@ -18,6 +18,7 @@ mod node;
 mod offline;
 mod paths;
 mod plugins;
+mod preferences;
 mod presets;
 mod profiles;
 mod recovery;
@@ -176,6 +177,7 @@ pub fn run() {
             plugins::commands::plugin_archive,
             plugins::commands::plugin_import,
             presets::preset_roster,
+            preferences::preference_save,
             presets::preset_choose,
             presets::preset_export,
             presets::preset_package,

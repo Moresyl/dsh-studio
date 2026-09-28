@@ -14,6 +14,7 @@ import { create } from 'zustand'
 
 import { checkForUpdate, installUpdate, type DownloadProgress, type Release } from '@/lib/updater'
 import { reportFailure } from '@/state/failure'
+import { readPreference, savePreference } from '@/lib/preferences'
 
 const DISMISSED_KEY = 'dsh-studio:update:dismissed'
 
@@ -131,17 +132,9 @@ export const watchForUpdates = (): (() => void) => {
 // of a dismissal: the notice comes back, which is the harmless direction to
 // fail in.
 function readDismissed(): string | null {
-  try {
-    return window.localStorage.getItem(DISMISSED_KEY)
-  } catch {
-    return null
-  }
+  return readPreference(DISMISSED_KEY)
 }
 
 function writeDismissed(version: string): void {
-  try {
-    window.localStorage.setItem(DISMISSED_KEY, version)
-  } catch {
-    // Then it is dismissed for this run only, which is still what was asked.
-  }
+  savePreference(DISMISSED_KEY, version)
 }
