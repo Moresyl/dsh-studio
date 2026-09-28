@@ -7,8 +7,10 @@ import process from 'node:process'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { verifyPackagedFrontend } from './verify-packaged-frontend.mjs'
+import { verifyOfflineProfile } from './verify-offline-profile.mjs'
 
 let scratch
+const bootedPayloads = new Set()
 const invoked = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 if (invoked) {
   const root = resolveBundleRoot(process.argv[2])
@@ -207,11 +209,12 @@ async function verifyResources(directory) {
   const frontend = await verifyPackagedFrontend(directory)
   console.log(`verified ${frontend.files} packaged frontend files against the current build`)
   if (process.env.DSH_EXPECT_OFFLINE !== '1') return
-  const files = await walk(directory)
-  const manifestPath = files.find((file) =>
-    file.replaceAll('\\', '/').endsWith('/offline/manifest.json'),
-  )
-  if (!manifestPath) throw new Error(`Full package has no offline/manifest.json under ${directory}`)
+  // The native loader resolves offline/ beside dist/, not an arbitrary nested
+  // directory with the same suffix. A misplaced archive is unusable offline.
+  const manifestPath = join(dirname(frontend.root), 'offline', 'manifest.json')
+  await access(manifestPath).catch(() => {
+    throw new Error('Full package has no offline/manifest.json beside its frontend resources')
+  })
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   const expectedOs = { win32: 'windows', darwin: 'macos', linux: 'linux' }[process.platform]
   if (manifest.schema !== 1 || manifest.os !== expectedOs) {
@@ -238,6 +241,14 @@ async function verifyResources(directory) {
     if (actual !== artifact.sha256.toLowerCase()) {
       throw new Error(`Full package ${name} artifact failed its SHA-256 check`)
     }
+  }
+  const identity = `${manifest.node.sha256}:${manifest.harness.sha256}`
+  if (!bootedPayloads.has(identity)) {
+    const boot = await verifyOfflineProfile(root)
+    bootedPayloads.add(identity)
+    console.log(
+      `booted the packaged offline Profile with Node ${boot.node} / Harness ${boot.harness}`,
+    )
   }
 }
 

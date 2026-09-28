@@ -22,3 +22,11 @@ test('Full upgrades replace every versioned package resource', () => {
   assert.match(fullHook, /RMDir \/r "\$INSTDIR\\dist"/)
   assert.match(fullHook, /RMDir \/r "\$INSTDIR\\offline"/)
 })
+
+test('Full bundles retain the shell and place offline resources at their native lookup paths', () => {
+  assert.deepEqual(fullConfig.bundle.resources, {
+    '../dist': 'dist/',
+    'runtime-cache/offline/': 'offline/',
+  })
+  assert.equal(baseConfig.bundle.resources['../dist'], 'dist/')
+})

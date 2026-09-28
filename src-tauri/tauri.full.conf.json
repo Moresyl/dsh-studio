@@ -2,7 +2,10 @@
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
     "createUpdaterArtifacts": false,
-    "resources": ["runtime-cache/offline/"],
+    "resources": {
+      "../dist": "dist/",
+      "runtime-cache/offline/": "offline/"
+    },
     "windows": {
       "nsis": {
         "installerHooks": "windows/installer-hooks-full.nsh"
