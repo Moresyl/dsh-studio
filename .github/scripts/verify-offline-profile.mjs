@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { access, mkdtemp, mkdir, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -55,6 +55,27 @@ export function validateOfflineManifest(
   }
 }
 
+export function nativeRuntimeTestArgs(os, arch, release = false) {
+  const target = {
+    'windows-x86_64': 'x86_64-pc-windows-msvc',
+    'linux-x86_64': 'x86_64-unknown-linux-gnu',
+    'macos-aarch64': 'aarch64-apple-darwin',
+    'macos-x86_64': 'x86_64-apple-darwin',
+  }[`${os}-${arch}`]
+  if (!target) throw new Error('unsupported native Full acceptance target')
+  return [
+    'test',
+    '--manifest-path',
+    join(HERE, '../../src-tauri/Cargo.toml'),
+    ...(release ? ['--release', '--target', target] : []),
+    '--lib',
+    'packaged_full_runtime_restores_native_contract',
+    '--',
+    '--ignored',
+    '--nocapture',
+  ]
+}
+
 /** Boot the already hash-verified packaged closure with its own Node executable. */
 export async function verifyOfflineProfile(offline) {
   const manifest = JSON.parse(await readFile(join(offline, 'manifest.json'), 'utf8'))
@@ -64,7 +85,6 @@ export async function verifyOfflineProfile(offline) {
   try {
     for (const [kind, artifact] of Object.entries({
       node: manifest.node,
-      harness: manifest.harness,
     })) {
       if (!artifact || basename(artifact.file) !== artifact.file || /[\\/]/.test(artifact.file)) {
         throw new Error(`invalid packaged ${kind} archive name`)
@@ -78,6 +98,22 @@ export async function verifyOfflineProfile(offline) {
         timeout: 180000,
       })
     }
+    console.log('verifying native Full install, rejected-archive recovery and reinstall')
+    await execute(
+      'cargo',
+      nativeRuntimeTestArgs(manifest.os, manifest.arch, process.env.GITHUB_ACTIONS === 'true'),
+      {
+        cwd: join(HERE, '../..'),
+        env: {
+          ...process.env,
+          DSH_TEST_OFFLINE_DIR: resolve(offline),
+          DSH_STUDIO_DATA_DIR: join(scratch, 'native'),
+        },
+        windowsHide: true,
+        timeout: 480000,
+        maxBuffer: 2 << 20,
+      },
+    )
     const nodeDirectory = manifest.node.file.replace(/(?:\.tar\.gz|\.zip)$/, '')
     const binary = join(
       scratch,
@@ -87,7 +123,13 @@ export async function verifyOfflineProfile(offline) {
     )
     const { stdout } = await execute(
       binary,
-      [fileURLToPath(import.meta.url), '--boot', join(scratch, 'harness'), scratch, version],
+      [
+        fileURLToPath(import.meta.url),
+        '--boot',
+        join(scratch, 'native', 'harness'),
+        scratch,
+        version,
+      ],
       { windowsHide: true, timeout: 180000, maxBuffer: 2 << 20 },
     )
     const result = JSON.parse(stdout)
@@ -108,11 +150,9 @@ if (invoked) {
   }
   if (process.version !== `v${NODE_VERSION}`) throw new Error('packaged Node version mismatch')
   const launcher = join(runtimeRoot, 'studio-cli.mjs')
-  await writeFile(
-    launcher,
-    "const cli = await import('./node_modules/@deepseek-ai/dsh/lib/bin.js');\n" +
-      "if (typeof cli.runCli === 'function') await cli.runCli();\n",
-  )
+  // Exercise the native installer's launcher, never synthesize a replacement
+  // here: doing so would hide missing launchers in an otherwise valid archive.
+  await access(launcher)
   await verifyProfileBoot({
     entry: launcher,
     runtimeRoot,

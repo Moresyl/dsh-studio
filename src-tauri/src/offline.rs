@@ -92,7 +92,7 @@ pub fn edition() -> &'static str {
     }
 }
 
-fn read(root: &Path) -> Result<Payload> {
+pub(crate) fn read(root: &Path) -> Result<Payload> {
     let raw = crate::bounded_file::read(
         &root.join("manifest.json"),
         crate::bounded_file::CONTROL_BYTES,

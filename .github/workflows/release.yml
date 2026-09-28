@@ -539,7 +539,8 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: publish updater fallback for v$(node -p 'require(\"./src-tauri/tauri.conf.json\").version')"
+          version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          git commit -m "chore: publish updater fallback for v$version"
           git push origin HEAD:main
       - name: Dispatch the protected-branch Website deployment
         env:

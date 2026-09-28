@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { validateOfflineManifest } from './verify-offline-profile.mjs'
+import { nativeRuntimeTestArgs, validateOfflineManifest } from './verify-offline-profile.mjs'
 
 const valid = () => ({
   schema: 1,
@@ -9,6 +9,23 @@ const valid = () => ({
   node: { file: 'node-v22.19.0-win-x64.zip', version: 'v22.19.0' },
   harness: { file: 'harness.tar.gz', package: '@deepseek-ai/dsh', version: '0.1.7-rc.2' },
   pnpm: { version: '11.7.0' },
+})
+
+test('native packaged-runtime acceptance reuses the exact release target on all Full platforms', () => {
+  for (const [os, arch, target] of [
+    ['windows', 'x86_64', 'x86_64-pc-windows-msvc'],
+    ['linux', 'x86_64', 'x86_64-unknown-linux-gnu'],
+    ['macos', 'aarch64', 'aarch64-apple-darwin'],
+    ['macos', 'x86_64', 'x86_64-apple-darwin'],
+  ]) {
+    const args = nativeRuntimeTestArgs(os, arch, true)
+    assert.equal(args[args.indexOf('--target') + 1], target)
+    assert(args.includes('--release'))
+    assert(args.includes('--ignored'))
+    assert(args.includes('packaged_full_runtime_restores_native_contract'))
+    assert(!nativeRuntimeTestArgs(os, arch).includes('--release'))
+  }
+  assert.throws(() => nativeRuntimeTestArgs('windows', 'aarch64', true), /unsupported/)
 })
 
 test('accepts only an offline closure matching its runner and pinned versions', () => {

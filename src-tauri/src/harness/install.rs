@@ -469,18 +469,26 @@ where
         }
         qualify_runtime(&plan.target)?;
     }
-    // New upstream CLIs use import.meta.main, absent in Node 24.0. Importing
-    // their exported entry explicitly also works on supported older Nodes.
-    std::fs::write(plan.target.join("studio-cli.mjs"),
-        "const cli = await import('./node_modules/@deepseek-ai/dsh/lib/bin.js');\nif (typeof cli.runCli === 'function') await cli.runCli();\n")
-        .map_err(|cause| Error::Install(format!("could not stage Harness launcher: {cause}")))?;
+    write_cli_launcher(&plan.target)?;
     verify_candidate_boot(plan, version, report).await?;
+    write_runtime_marker(&plan.target, version)?;
+    require_expected_runtime(&plan.target)
+}
+
+fn write_cli_launcher(target: &Path) -> Result<()> {
+    // New upstream CLIs use import.meta.main, absent in Node 24.0. Importing
+    // their exported entry explicitly also works on the bundled Node 22.
+    crate::atomic::write(&target.join("studio-cli.mjs"),
+        "const cli = await import('./node_modules/@deepseek-ai/dsh/lib/bin.js');\nif (typeof cli.runCli === 'function') await cli.runCli();\n")
+        .map_err(|cause| Error::Install(format!("could not stage Harness launcher: {cause}")))
+}
+
+fn write_runtime_marker(target: &Path, version: &str) -> Result<()> {
     crate::atomic::write(
-        &plan.target.join("dsh-studio-runtime.json"),
+        &target.join("dsh-studio-runtime.json"),
         serde_json::json!({"schema": RUNTIME_SCHEMA, "version": version}).to_string(),
     )
-    .map_err(|cause| Error::Install(format!("could not record verified runtime: {cause}")))?;
-    require_expected_runtime(&plan.target)
+    .map_err(|cause| Error::Install(format!("could not record verified runtime: {cause}")))
 }
 
 async fn verify_candidate_boot<R>(plan: &InstallPlan, version: &str, report: R) -> Result<()>
@@ -887,7 +895,7 @@ pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
                     "the offline Harness archive could not be unpacked: {cause}"
                 ))
             })?;
-        require_expected_runtime(&staging)
+        prepare_bundled_runtime(&staging)
     })();
     if let Err(failure) = prepared {
         let _ = remove_dir_if_exists(&staging);
@@ -896,6 +904,21 @@ pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
     }
 
     promote(&live, &staging, &backup, &journal)
+}
+
+fn prepare_bundled_runtime(target: &Path) -> Result<()> {
+    if runtime_version(target).as_deref() != Some(VERSION) {
+        return Err(Error::Install(
+            "the offline archive contains an unexpected Harness version".into(),
+        ));
+    }
+    // The archive is npm's resolved closure. Apply the same desktop adapter,
+    // Node-compatible launcher and durable contract as the online installer
+    // before accepting or promoting it. All changes stay inside staging.
+    qualify_runtime(target)?;
+    write_cli_launcher(target)?;
+    write_runtime_marker(target, VERSION)?;
+    require_expected_runtime(target)
 }
 
 fn promote(live: &Path, staging: &Path, backup: &Path, journal: &Path) -> Result<()> {
@@ -1302,6 +1325,95 @@ mod tests {
         } else {
             result.expect("candidate install and real startup");
         }
+    }
+
+    #[test]
+    fn shared_launcher_and_marker_preserve_the_selected_exact_runtime() {
+        let root = std::env::temp_dir().join(format!("dsh-shared-launcher-{}", std::process::id()));
+        assert!(!root.exists());
+        write_runtime(&root, "0.1.5-rc.2", true);
+        super::write_cli_launcher(&root).unwrap();
+        super::write_runtime_marker(&root, "0.1.5-rc.2").unwrap();
+        require_expected_runtime(&root).unwrap();
+        assert_eq!(super::expected_version(&root), "0.1.5-rc.2");
+        assert!(fs::read_to_string(root.join("studio-cli.mjs"))
+            .unwrap()
+            .contains("await cli.runCli()"));
+        remove_dir_if_exists(&root).unwrap();
+    }
+
+    #[test]
+    fn bundled_preparation_rejects_a_foreign_version_before_marking_it() {
+        let root = std::env::temp_dir().join(format!("dsh-bundled-version-{}", std::process::id()));
+        assert!(!root.exists());
+        write_runtime(&root, "0.1.5-rc.2", true);
+        let marker = fs::read(root.join("dsh-studio-runtime.json")).unwrap();
+        assert!(super::prepare_bundled_runtime(&root)
+            .unwrap_err()
+            .to_string()
+            .contains("unexpected Harness version"));
+        assert_eq!(
+            fs::read(root.join("dsh-studio-runtime.json")).unwrap(),
+            marker
+        );
+        assert!(!root.join("studio-cli.mjs").exists());
+        remove_dir_if_exists(&root).unwrap();
+    }
+
+    #[test]
+    fn bundled_preparation_does_not_mark_an_unknown_picker_as_qualified() {
+        let root = std::env::temp_dir().join(format!("dsh-bundled-picker-{}", std::process::id()));
+        assert!(!root.exists());
+        write_runtime(&root, VERSION, true);
+        fs::remove_file(root.join("dsh-studio-runtime.json")).unwrap();
+        let picker = root
+            .join("node_modules/@deepseek-ai/dsh-client-ui-directory-picker-browse/lib/client.js");
+        fs::write(&picker, "unknown upstream picker").unwrap();
+        assert!(super::prepare_bundled_runtime(&root).is_err());
+        assert_eq!(
+            fs::read_to_string(picker).unwrap(),
+            "unknown upstream picker"
+        );
+        assert!(!root.join("dsh-studio-runtime.json").exists());
+        assert!(!root.join("studio-cli.mjs").exists());
+        remove_dir_if_exists(&root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires a real Full package and an explicitly isolated data directory"]
+    fn packaged_full_runtime_restores_native_contract() {
+        let offline = std::env::var_os("DSH_TEST_OFFLINE_DIR").expect("packaged offline directory");
+        let isolated =
+            std::env::var_os("DSH_STUDIO_DATA_DIR").expect("isolated native install directory");
+        assert_eq!(
+            crate::paths::app_data_dir(),
+            std::path::PathBuf::from(isolated)
+        );
+        let payload =
+            crate::offline::read(Path::new(&offline)).expect("native Full manifest validation");
+        let live = crate::paths::harness_dir();
+        assert!(!live.exists(), "fresh native installation required");
+        super::run_bundled(&payload.harness).expect("restore the actual packaged archive");
+        require_expected_runtime(&live).expect("native contract after restore");
+        let launcher =
+            fs::read(live.join("studio-cli.mjs")).expect("bundled Node compatible launcher");
+        assert_eq!(super::expected_version(&live), VERSION);
+        assert!(super::qualified_picker(&live));
+        let mut corrupt = payload.harness.clone();
+        corrupt.sha256 = "0".repeat(64);
+        assert!(
+            super::run_bundled(&corrupt).is_err(),
+            "corrupt archive must be rejected"
+        );
+        require_expected_runtime(&live).expect("previous runtime survives rejected archive");
+        assert_eq!(fs::read(live.join("studio-cli.mjs")).unwrap(), launcher);
+        assert!(!crate::paths::harness_install_journal().exists());
+        super::run_bundled(&payload.harness)
+            .expect("replace an existing runtime from the Full archive");
+        require_expected_runtime(&live).unwrap();
+        assert!(!crate::paths::harness_backup_dir().exists());
+        assert!(!crate::paths::harness_install_journal().exists());
+        // The packaging gate boots this exact native-restored tree next.
     }
 
     #[test]
