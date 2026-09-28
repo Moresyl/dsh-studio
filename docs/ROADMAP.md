@@ -2,7 +2,7 @@
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-09-29. The shipped baseline is v0.9.18; v0.9.19 is the release candidate. In-development work is not
+Updated 2026-09-29. The shipped baseline is v0.9.19. In-development work is not
 released until it appears in a published version's changelog. This document
 records product capabilities and acceptance boundaries, not relative rankings
 or promises of zero defects.
@@ -29,9 +29,7 @@ or promises of zero defects.
 Detailed contracts live in [architecture](architecture.md),
 [user guide](user-guide.md) and [plugin interoperability](plugin-interoperability.md).
 
-## In development
-
-### v0.9.19 candidate
+## Included in v0.9.19
 
 - Read-only registered-worktree review with staged/unstaged diffs, untracked paths, bounded output,
   keyboard/focus regression and no destructive Git actions.
@@ -44,9 +42,13 @@ Detailed contracts live in [architecture](architecture.md),
 - Real-WebView terminal regression covering five actual PTYs, route transitions,
   failed transcripts, resize safety and context-menu targeting.
 
-These changes are recorded under **0.9.19** in the changelog and remain subject to release gates. Unit tests,
+These changes shipped in **0.9.19** after the cross-platform release gates passed. Unit tests,
 native command checks and Windows WebView acceptance are distinct evidence;
 none alone proves final-installer or physical macOS acceptance.
+
+## In development
+
+The priorities below are future work, not capabilities claimed for v0.9.19.
 
 ## Next priorities
 
