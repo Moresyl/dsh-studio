@@ -26,11 +26,14 @@ If startup or plugin installation fails, begin with the [troubleshooting guide](
 
 <br>
 
-<img src="assets/plugin-install.png" width="820" alt="Installing a plugin: marketplace cards, the manifest, package-manager output, and the layer written to the harness profile">
+<img src="assets/plugin-install.png" width="820" alt="Plugin marketplace in the actual Windows desktop: responsive cards, readable metadata and installed-state badges">
 
-**One click from a registry listing to a layer in the harness's profile** — read the
-manifest, install through the harness's own plugin command, switch it off again
-without uninstalling it.
+**Browse cards, review compatibility, then install** — inspect the exact package
+before installing through Harness's own plugin command. Installed layers can be
+disabled without uninstalling them.
+
+Screenshots show v0.9.19 in an isolated Windows QA environment. Local paths and
+LAN addresses are blurred; screenshots illustrate the interface, not test coverage.
 
 </div>
 
@@ -126,10 +129,10 @@ connection it already had. Close the door and all of them die with it.
 
 <div align="center">
 
-<img src="assets/remote-pairing.png" width="820" alt="Opening remote access: a QR code with a countdown on it, then a paired phone and a spent code">
+<img src="assets/remote-pairing.png" width="820" alt="Remote access controls with the gateway closed; local network address blurred">
 
-**Open the door, scan once, and the code is gone** — the phone that redeemed it
-keeps a key of its own, listed on the pane and revocable on its own.
+**Remote access stays closed until you enable it.** Once enabled, each redeemed
+pairing code creates a separate device credential that can be revoked individually.
 
 </div>
 

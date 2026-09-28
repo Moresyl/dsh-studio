@@ -25,10 +25,13 @@ Rust + Tauri 2 编写。它托管本地 `dsh` 服务、回收服务派生出的�
 
 <br>
 
-<img src="assets/plugin-install.zh.png" width="820" alt="安装一个插件：市场卡片、清单、包管理器输出，以及写进 harness profile 的那一层">
+<img src="assets/plugin-install.zh.png" width="820" alt="真实 Windows 桌面中的插件市场：响应式卡片、清晰的元数据和已安装状态">
 
-**从一条 registry 列表到 harness profile 里的一个层，只隔一次点击**
-——先读清单，再走 harness 自己的插件命令装进去，想关掉也不必卸载。
+**卡片浏览、兼容性审查，再安装**——先查看精确的软件包信息，再走 Harness 自己的插件
+命令安装。已安装的层可以禁用，不必卸载。
+
+截图来自隔离 Windows 测试环境中的 v0.9.19；本机路径和局域网地址已模糊处理。
+截图展示界面，不代替测试覆盖证据。
 
 </div>
 
@@ -111,10 +114,10 @@ Studio 不维护上游 fork，也不把 Harness 源码 vendor 进来。安装托
 
 <div align="center">
 
-<img src="assets/remote-pairing.zh.png" width="820" alt="开启远程访问：带倒计时的二维码，然后是一台已配对的手机和一个已用掉的配对码">
+<img src="assets/remote-pairing.zh.png" width="820" alt="尚未开启网关的远程访问页面，本机网络地址已模糊处理">
 
-**开门、扫一次，码就没了**——兑换它的那台手机留下一把属于自己的密钥，
-列在面板上，也能单独收回。
+**远程访问默认关闭，由你主动开启。** 开启后，每个兑换成功的配对码产生独立设备凭据，
+可在面板中逐个撤销。
 
 </div>
 
