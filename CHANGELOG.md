@@ -22,6 +22,7 @@ pre-1.0 caveat that anything may still move.
 - Keep live Harness status/log events authoritative over older environment checks, including explicit log clearing. Add interleaved inspection/event regressions and extend core coverage to supervisor and remote-access stores.
 - Refresh bilingual README images from the actual isolated Windows candidate; blur local filesystem and LAN labels and describe static screenshots accurately.
 - Verify every packaged frontend file against the current production build during installer extraction and upgrade checks, including lazy JavaScript and fonts; reject missing, altered, linked or stale resources.
+- Keep release uploads private as a draft until every build, packaged-app check, artifact inventory and checksum upload passes. Refuse rebuilding an already public release under the same version.
 - Refresh Studio-owned runtime client integration on startup as well as its resolver, so in-place Studio upgrades receive current theme behavior without reinstalling Harness or changing user Profile packages. Reject unsafe target file types and update atomically.
 - Seed native presentation preferences once per application process so reloading a window cannot overwrite a newer choice with its creation-time snapshot; still refresh reused loopback origins after a full restart.
 - Keep keyboard focus inside worktree review while refresh is loading or fails. Add a real native missing-Git failure/retry regression with isolated fixture restoration.

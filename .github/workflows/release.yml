@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       linux_only:
-        description: Only rebuild Linux and then refresh release checksums
+        description: Only rebuild Linux in an unpublished draft, then verify all release assets
         required: false
         type: boolean
         default: false
@@ -55,6 +55,11 @@ jobs:
             exit 1
           fi
           existing_target="$(gh release view "$expected" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
+          existing_draft="$(gh release view "$expected" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          if [ "$existing_draft" = false ]; then
+            echo "::error title=Published release is immutable::$expected is already public. Bump the version instead of replacing artifacts that users may already have downloaded."
+            exit 1
+          fi
           # A manually-created draft/release may retain `main` as targetCommitish
           # even when the tag is already pinned to this exact commit. For tag
           # builds, the immutable tag is the source of truth; keep the guard for
@@ -330,7 +335,9 @@ jobs:
           tagName: v__VERSION__
           releaseName: DSH Studio v__VERSION__
           releaseBody: ${{ steps.release_notes.outputs.body }}
-          releaseDraft: false
+          # Uploads remain private until every platform's packaged-app checks
+          # and the complete artifact/checksum inventory have passed.
+          releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
@@ -471,6 +478,17 @@ jobs:
           cat SHA256SUMS.txt
 
           gh release upload "$tag" SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          fi
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
 
   updater-fallback:
     name: Publish signed updater fallback
