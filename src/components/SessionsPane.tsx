@@ -414,7 +414,7 @@ function Totals({ cards, hits }: { cards: SessionCard[]; hits: SessionHit[] | nu
 function Figure({ label, value }: { label: string; value: number }) {
   return (
     <span>
-      <span className="text-faint/70">{label} </span>
+      <span className="text-faint">{label} </span>
       <span className="font-medium text-muted">{count(value)}</span>
     </span>
   )
@@ -789,7 +789,7 @@ function Turn({ line, lit }: { line: SessionLine; lit: boolean }) {
           {line.tool ?? t(ROLE[line.role])}
         </span>
         {line.time > 0 && (
-          <span className="ml-auto text-[10.5px] leading-none text-faint/70 tabular-nums">
+          <span className="ml-auto text-[10.5px] leading-none text-faint tabular-nums">
             {clock(line.time)}
           </span>
         )}

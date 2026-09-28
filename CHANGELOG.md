@@ -17,6 +17,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Improve secondary-text and status-color contrast across both palettes, keep system/explicit light palettes synchronized, and make contrast-mode scrollbars and session search highlights visible. Add base-token contrast regression tests; remove extra dimming from session usage labels and timestamps.
 - Saturate malformed extreme token totals rather than panicking or wrapping during session indexing.
 - Mark session logs that exceed the bounded reader as partial in the shelf, reader, usage notice and all three export formats, instead of silently presenting a prefix as complete. Keep unfinished append frames distinct from size limits and preserve the original logs.
 - Bound long-session reading to 120 mounted messages per segment, with first/previous/next/latest navigation and direct search-hit positioning. Export still uses the complete native transcript; add a repeatable 4,000-message desktop regression.

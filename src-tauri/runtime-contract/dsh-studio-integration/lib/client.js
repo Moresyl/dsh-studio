@@ -32,7 +32,7 @@ window.__ModuleLoader__.load({
         --dsw-alias-border-l3: #ffffff33 !important;
         --dsw-alias-label-primary: #ededed !important;
         --dsw-alias-label-secondary: #afafaf !important;
-        --dsw-alias-label-tertiary: #8f8f8f !important;
+        --dsw-alias-label-tertiary: #999999 !important;
         --dsw-alias-brand-primary: #ededed !important;
         --dsw-alias-brand-text: #ededed !important;
         --dsw-alias-button-primary-fill: #ededed !important;
@@ -51,7 +51,7 @@ window.__ModuleLoader__.load({
         --dsw-alias-border-l3: #00000033 !important;
         --dsw-alias-label-primary: #282828 !important;
         --dsw-alias-label-secondary: #5d5d5d !important;
-        --dsw-alias-label-tertiary: #8f8f8f !important;
+        --dsw-alias-label-tertiary: #6b6b6b !important;
         --dsw-alias-brand-primary: #0d0d0d !important;
         --dsw-alias-brand-text: #0d0d0d !important;
         --dsw-alias-button-primary-fill: #0d0d0d !important;

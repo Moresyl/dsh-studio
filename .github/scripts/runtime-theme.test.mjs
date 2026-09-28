@@ -62,6 +62,8 @@ test('managed Harness receives only parent light and dark themes', () => {
   assert.match(harness.styles[0].textContent, /--dsw-alias-bg-layer-1: #181818 !important/)
   assert.match(harness.styles[0].textContent, /--dsw-alias-border-l1: #ffffff1a !important/)
   assert.match(harness.styles[0].textContent, /--dsw-alias-label-secondary: #afafaf !important/)
+  assert.match(harness.styles[0].textContent, /--dsw-alias-label-tertiary: #999999 !important/)
+  assert.match(harness.styles[0].textContent, /--dsw-alias-label-tertiary: #6b6b6b !important/)
   assert.match(harness.styles[0].textContent, /--dsw-alias-bg-base: #ffffff !important/)
   assert.match(harness.styles[0].textContent, /--dsw-alias-bg-layer-1: #f9f9f9 !important/)
   assert.match(harness.styles[0].textContent, /--dsw-alias-border-l1: #00000014 !important/)
