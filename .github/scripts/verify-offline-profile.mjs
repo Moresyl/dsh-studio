@@ -110,7 +110,9 @@ export async function verifyOfflineProfile(offline) {
           DSH_STUDIO_DATA_DIR: join(scratch, 'native'),
         },
         windowsHide: true,
-        timeout: 480000,
+        // The release-profile native test may need its first optimized link
+        // on an ephemeral runner before restoring the large archive twice.
+        timeout: 900000,
         maxBuffer: 2 << 20,
       },
     )
