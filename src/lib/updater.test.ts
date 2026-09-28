@@ -57,6 +57,35 @@ describe('checkForUpdate', () => {
     expect(close).toHaveBeenCalledOnce()
   })
 
+  it.each(['', '../0.4.0', '0.4', '0.4.0<script>', '0.4.0/installer'])(
+    'rejects unsafe release identity %s before building a link',
+    async (version) => {
+      check.mockResolvedValue({ version, close })
+      await expect(checkForUpdate()).rejects.toThrow(/invalid version/)
+      expect(close).toHaveBeenCalledOnce()
+    },
+  )
+
+  it('accepts prerelease/build identifiers and missing optional metadata', async () => {
+    check.mockResolvedValue({ version: '  v1.2.3-rc.10+build.2  ', close })
+    await expect(checkForUpdate()).resolves.toMatchObject({
+      version: '1.2.3-rc.10+build.2',
+      notes: '',
+      published: '',
+    })
+  })
+
+  it('reports resource cleanup errors even after a successful feed response', async () => {
+    check.mockResolvedValue({ version: '1.2.3', close })
+    close.mockRejectedValue(new Error('resource unavailable'))
+    await expect(checkForUpdate()).rejects.toThrow(/cleanup/)
+  })
+
+  it('keeps the fallback guidance when a failure has no detail', async () => {
+    check.mockRejectedValue('')
+    await expect(checkForUpdate()).rejects.toThrow(/signed update feed/)
+  })
+
   it('turns a feed outage into an actionable bilingual error', async () => {
     check.mockRejectedValue(new Error('error sending request for url'))
 
@@ -145,6 +174,24 @@ describe('installUpdate', () => {
     await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/installed.*start.*again/s)
     expect(close).toHaveBeenCalledOnce()
   })
+
+  it('keeps download progress useful without a Content-Length', async () => {
+    downloadAndInstall.mockImplementation(async (report) => {
+      report({ event: 'Started', data: {} })
+      report({ event: 'Progress', data: { chunkLength: 8 } })
+      report({ event: 'Finished' })
+    })
+    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
+    const progress = vi.fn()
+    await installUpdate('0.4.0', progress)
+    expect(progress).toHaveBeenLastCalledWith({ downloaded: 8, total: null })
+  })
+
+  it('retains manual-restart guidance for an empty relaunch failure', async () => {
+    relaunch.mockRejectedValue('')
+    check.mockResolvedValue({ version: '0.4.0', downloadAndInstall, close })
+    await expect(installUpdate('0.4.0', vi.fn())).rejects.toThrow(/手动|重新启动/)
+  })
 })
 
 describe('notesForDisplay', () => {
@@ -168,5 +215,9 @@ describe('notesForDisplay', () => {
     expect(notesForDisplay('### Fixed\n- [Issue](https://example.com)', 'zh-CN')).toBe(
       'Fixed\n- Issue',
     )
+  })
+
+  it('reads a final locale block without a closing marker', () => {
+    expect(notesForDisplay('<!-- dsh-notes:en -->\n## Finished', 'en')).toBe('Finished')
   })
 })
