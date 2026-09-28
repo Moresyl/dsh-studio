@@ -44,6 +44,7 @@ node .github/scripts/desktop-ipc-regression.mjs D:/qa/home D:/qa/native-results 
 node .github/scripts/desktop-terminal-regression.mjs D:/qa/home D:/qa/terminal-results 9223
 node .github/scripts/desktop-runtime-regression.mjs D:/qa/home D:/qa/runtime-results 9223
 node .github/scripts/desktop-preferences-regression.mjs D:/qa/home D:/qa/preference-results 9223
+node .github/scripts/desktop-keyboard-regression.mjs D:/qa/home D:/qa/keyboard-results 9223
 node .github/scripts/desktop-worktree-regression.mjs D:/qa/home D:/qa/worktree-results 9223
 node .github/scripts/desktop-worktree-failure-regression.mjs D:/qa/home D:/qa/worktree-failure-results 9223
 node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-results 9223 bounded
@@ -62,6 +63,13 @@ operate the same QA window during the UI run.
 
 These checks complement the manual matrix; they do not cover model-provider
 credentials, real external SSH accounts, Narrator or physical macOS hardware.
+
+The keyboard runner requires one isolated QA window. It checks visible enabled
+selectors across the seven pages using actual CDP key events: arrow wrapping,
+Home/End, active-item visibility, viewport bounds, Escape focus return and Tab
+dismissal without changing selections. It also opens and dismisses the command
+palette. Its report records the actual option counts; run after catalog loading
+to exercise long categories rather than only the initial placeholder.
 
 The terminal runner also refuses a QA window with existing live shells. It opens
 five real PTYs through the UI, verifies layout groups, output retention, route

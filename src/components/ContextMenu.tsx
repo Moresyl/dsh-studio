@@ -52,7 +52,8 @@ export function ContextMenu() {
     // overrides this a moment later, which is the right outcome either way.
     const previous = document.activeElement
 
-    const { width, height } = element.getBoundingClientRect()
+    // Layout dimensions are stable while the opening scale animation runs.
+    const { offsetWidth: width, offsetHeight: height } = element
     setPosition({
       // Flipped rather than merely pushed: a menu that overlaps the pointer's
       // own column hides what was right-clicked.
@@ -68,6 +69,14 @@ export function ContextMenu() {
       if (previous instanceof HTMLElement) previous.focus()
     }
   }, [at, entries])
+
+  useLayoutEffect(() => {
+    if (active < 0) return
+    const item = surface.current?.querySelector<HTMLElement>(
+      `[id="${owner ?? 'context-menu'}-item-${active}"]`,
+    )
+    item?.scrollIntoView({ block: 'nearest' })
+  }, [active, owner])
 
   // Anything that is not this menu dismisses it, which is the rule every system
   // menu follows. In the capture phase, so the press is taken before anything
@@ -169,7 +178,12 @@ export function ContextMenu() {
       onKeyDown={onKeyDown}
       // The menu owns its own right-click too, or the one underneath reopens.
       onContextMenu={(event) => event.preventDefault()}
-      style={{ left: position.x, top: position.y, minWidth: minWidth ?? undefined }}
+      style={{
+        left: position.x,
+        top: position.y,
+        minWidth:
+          minWidth === null ? undefined : Math.min(minWidth, window.innerWidth - MARGIN * 2),
+      }}
       className={[
         'menu-surface fixed z-50 outline-none select-none',
         owner ? 'menu-surface--dropdown' : '',

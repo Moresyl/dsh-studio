@@ -471,6 +471,9 @@ jobs:
 
           gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir artifacts --clobber
           node .github/scripts/verify-release-assets.mjs artifacts
+          # List with write credentials so the still-private draft is included.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\")" > release-inventory.json
+          node .github/scripts/verify-updater-assets.mjs artifacts release-inventory.json "${tag#v}" "$GITHUB_REPOSITORY"
           # Not its own subject: a previous run may have left one up there, and
           # a file cannot state its own digest.
           rm -f artifacts/SHA256SUMS.txt

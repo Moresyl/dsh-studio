@@ -38,6 +38,7 @@ node .github/scripts/desktop-ipc-regression.mjs D:/qa/home D:/qa/native-results 
 node .github/scripts/desktop-terminal-regression.mjs D:/qa/home D:/qa/terminal-results 9223
 node .github/scripts/desktop-runtime-regression.mjs D:/qa/home D:/qa/runtime-results 9223
 node .github/scripts/desktop-preferences-regression.mjs D:/qa/home D:/qa/preference-results 9223
+node .github/scripts/desktop-keyboard-regression.mjs D:/qa/home D:/qa/keyboard-results 9223
 node .github/scripts/desktop-worktree-regression.mjs D:/qa/home D:/qa/worktree-results 9223
 node .github/scripts/desktop-worktree-failure-regression.mjs D:/qa/home D:/qa/worktree-failure-results 9223
 node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-results 9223 bounded
@@ -51,6 +52,11 @@ WebView 异常。定时运行保留截图和 DOM/堆内存数据；这些采样�
 文件与结果报告保留在指定输出目录。所有脚本按顺序运行，界面回归期间不要操作同一 QA 窗口。
 
 这些检查用于补充人工矩阵，不涵盖模型服务商凭据、真实外部 SSH 账户、Narrator 或 macOS 真机。
+
+键盘脚本要求只打开一个隔离 QA 窗口。它使用真实 CDP 按键事件，检查七个页面中可见且启用的
+选择框：方向键循环、Home/End、选中项可见性、菜单窗口边界、Escape 焦点归还，以及不改变
+选择的 Tab 关闭；同时检查命令面板的打开和关闭。报告记录实际选项数量，应在目录加载完成后
+运行，以覆盖长分类菜单，而不只是初始占位选项。
 
 终端脚本还会拒绝已有运行中 Shell 的 QA 窗口。它通过界面创建 5 个真实 PTY，检查布局
 分组、输出保留、页面往返、异常退出记录、尺寸更新安全性和右键菜单操作目标，然后关闭

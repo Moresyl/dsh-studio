@@ -801,6 +801,11 @@
 
   .menu-surface {
     min-width: 184px;
+    max-width: calc(100vw - 12px);
+    max-height: min(360px, calc(100vh - 12px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 6px;
     border: 1px solid var(--color-line-strong);
     border-radius: 16px;
@@ -889,6 +894,9 @@
   .menu-item__label {
     position: relative;
     z-index: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   @keyframes menu-scale-in {
