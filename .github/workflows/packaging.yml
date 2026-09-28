@@ -51,6 +51,7 @@ jobs:
             packaging/aur
             packaging/flathub
             website/latest.json
+            website/versions
 
   winget:
     name: Validate WinGet
@@ -140,7 +141,8 @@ jobs:
             packaging/homebrew \
             packaging/aur \
             packaging/flathub \
-            website/latest.json
+            website/latest.json \
+            website/versions
           if git diff --cached --quiet; then
             echo "Channel manifests already match the published release."
             exit 0

@@ -527,12 +527,15 @@ jobs:
           node packaging/generate.mjs "$tag"
       - name: Persist the fallback on main
         run: |
-          manifest="$(mktemp)"
-          cp website/latest.json "$manifest"
+          manifest="$(mktemp -d)"
+          cp website/latest.json "$manifest/latest.json"
+          cp -R website/versions "$manifest/versions"
           git fetch origin main
           git checkout --force -B publish-updater-manifest origin/main
-          cp "$manifest" website/latest.json
-          git add -- website/latest.json
+          cp "$manifest/latest.json" website/latest.json
+          mkdir -p website/versions
+          cp "$manifest/versions/"*.json website/versions/
+          git add -- website/latest.json website/versions
           if git diff --cached --quiet; then
             echo "The fallback manifest on main already matches this release."
             exit 0

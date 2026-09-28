@@ -1,0 +1,63 @@
+{
+  "tag_name": "v0.1.1",
+  "name": "DSH Studio v0.1.1",
+  "draft": false,
+  "prerelease": false,
+  "published_at": "2026-08-15T04:46:55Z",
+  "assets": [
+    {
+      "id": 515333472,
+      "name": "DSH.Studio-0.1.1-1.x86_64.rpm",
+      "size": 2822431,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio-0.1.1-1.x86_64.rpm"
+    },
+    {
+      "id": 515331339,
+      "name": "DSH.Studio_0.1.1_aarch64.dmg",
+      "size": 2797676,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_aarch64.dmg"
+    },
+    {
+      "id": 515333493,
+      "name": "DSH.Studio_0.1.1_amd64.AppImage",
+      "size": 80665080,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_amd64.AppImage"
+    },
+    {
+      "id": 515333440,
+      "name": "DSH.Studio_0.1.1_amd64.deb",
+      "size": 2821500,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_amd64.deb"
+    },
+    {
+      "id": 515333741,
+      "name": "DSH.Studio_0.1.1_x64-setup.exe",
+      "size": 1910172,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_x64-setup.exe"
+    },
+    {
+      "id": 515336466,
+      "name": "DSH.Studio_0.1.1_x64.dmg",
+      "size": 2884808,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_x64.dmg"
+    },
+    {
+      "id": 515333736,
+      "name": "DSH.Studio_0.1.1_x64_en-US.msi",
+      "size": 2793472,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_x64_en-US.msi"
+    },
+    {
+      "id": 515331346,
+      "name": "DSH.Studio_aarch64.app.tar.gz",
+      "size": 2479343,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_aarch64.app.tar.gz"
+    },
+    {
+      "id": 515336482,
+      "name": "DSH.Studio_x64.app.tar.gz",
+      "size": 2570563,
+      "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_x64.app.tar.gz"
+    }
+  ]
+}

@@ -24,6 +24,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { normalizeUpdaterManifest } from './updater-manifest.mjs'
+import { catalogFiles, readReleaseCatalog } from './release-catalog.mjs'
 
 const OWNER = 'Moresyl'
 const REPO = 'dsh-studio'
@@ -593,6 +594,10 @@ function metainfo({ version, date }) {
 /* ---------- main ---------- */
 
 const release = await resolve(process.argv[2])
+const catalog = catalogFiles(await readReleaseCatalog(github))
+if (!catalog.has(`website/versions/${release.tag}.json`)) {
+  throw new Error('The completed release is missing from the public catalog')
+}
 console.log(`\nWriting manifests for ${release.tag}\n`)
 
 await emit('bucket/dsh-studio.json', scoop(release))
@@ -605,6 +610,8 @@ await emit('packaging/aur/.SRCINFO', srcinfo(release))
 await emit(`packaging/flathub/${IDENTIFIER}.yml`, flatpak(release))
 await emit(`packaging/flathub/${IDENTIFIER}.metainfo.xml`, metainfo(release))
 await emit('website/latest.json', release.updaterManifest)
+await emit(`website/versions/${release.tag}.latest.json`, release.updaterManifest)
+for (const [path, contents] of catalog) await emit(path, contents)
 
 for (const path of written) console.log(`  ${path}`)
 console.log(`\n${written.length} files written for ${release.tag}.`)
