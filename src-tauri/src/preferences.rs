@@ -6,7 +6,7 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
 
 use crate::error::{Error, Result};
 
@@ -14,6 +14,7 @@ type Preferences = BTreeMap<String, String>;
 const FILE_LIMIT: usize = 512 * 1024;
 const VALUE_LIMIT: usize = 64 * 1024;
 static WRITES: Mutex<()> = Mutex::new(());
+static BOOT_ID: OnceLock<String> = OnceLock::new();
 
 fn valid(key: &str, value: &str) -> bool {
     if value.len() > VALUE_LIMIT {
@@ -115,18 +116,21 @@ pub fn bootstrap(origin: &str) -> String {
 }
 
 fn bootstrap_values(origin: &str, values: &Preferences) -> String {
+    let boot = BOOT_ID.get_or_init(|| {
+        format!(
+            "{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        )
+    });
     let origin = serde_json::to_string(origin).expect("string serializes");
     let values = serde_json::to_string(values).expect("string map serializes");
-    format!(
-        r#"(() => {{
-      if (window.top !== window.self || location.origin !== {origin}) return;
-      const saved = {values};
-      Object.defineProperty(window, '__DSH_SAVED_PREFERENCES__', {{ value: saved }});
-      for (const [key, value] of Object.entries(saved)) {{
-        try {{ localStorage.setItem(key, value); }} catch {{ /* Native snapshot remains readable. */ }}
-      }}
-    }})();"#
-    )
+    let boot = serde_json::to_string(boot).expect("string serializes");
+    let script = include_str!("preferences-bootstrap.js");
+    format!("({script})({origin}, {values}, {boot});")
 }
 
 #[cfg(test)]
@@ -236,7 +240,8 @@ mod tests {
     fn bootstrap_is_scoped_to_the_exact_top_level_origin() {
         let source = bootstrap_values("http://127.0.0.1:1234", &Preferences::new());
         assert!(source.contains("window.top !== window.self"));
-        assert!(source.contains("location.origin !== \"http://127.0.0.1:1234\""));
+        assert!(source.contains("location.origin !== origin"));
+        assert!(source.contains("\"http://127.0.0.1:1234\""));
         assert!(source.contains("__DSH_SAVED_PREFERENCES__"));
     }
 }
