@@ -15,6 +15,7 @@ import {
   FileCode2,
   FileOutput,
   FileText,
+  Image,
   Loader2,
   MessagesSquare,
   RefreshCw,
@@ -31,7 +32,7 @@ import { Empty } from '@/components/Empty'
 import { PaneHeader } from '@/components/PaneHeader'
 import { TabButton } from '@/components/TabButton'
 import { UsageReport } from '@/components/UsageReport'
-import { count, day, leaf, when } from '@/lib/format'
+import { count, day, filesize, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { sessionPage } from '@/lib/session-page'
 import type { MessageKey } from '@/lib/i18n'
@@ -816,6 +817,51 @@ function Turn({ line, lit }: { line: SessionLine; lit: boolean }) {
         >
           {shown ? t('sessions.collapse') : t('sessions.expand')}
         </button>
+      )}
+      {!!line.attachments?.length && (
+        <div className="mt-3 space-y-2">
+          <ul className="grid gap-2 sm:grid-cols-2" aria-label={t('sessions.attachments')}>
+            {line.attachments.map((item, index) => {
+              const AttachmentIcon = item.kind === 'image' ? Image : FileText
+              return (
+                <li
+                  key={index}
+                  className="flex min-w-0 items-start gap-3 rounded-xl border border-line bg-surface-2/50 px-3 py-2.5"
+                >
+                  <AttachmentIcon
+                    size={18}
+                    className="mt-0.5 shrink-0 text-muted"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0">
+                    <p className="selectable break-words text-[12px] font-medium text-text">
+                      {item.name || t(item.kind === 'image' ? 'sessions.image' : 'sessions.file')}
+                    </p>
+                    <p className="mt-0.5 break-words text-[11px] text-muted">
+                      {[
+                        item.bytes !== null
+                          ? item.bytes < 1000
+                            ? `${item.bytes} B`
+                            : filesize(item.bytes)
+                          : null,
+                        item.mediaType,
+                        item.width && item.height ? `${item.width} × ${item.height}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+          <p className="text-[11px] leading-relaxed text-muted">{t('sessions.attachmentNotice')}</p>
+          {!!line.attachmentsOmitted && (
+            <p className="text-[11px] text-muted">
+              {t('sessions.attachmentsOmitted', { n: line.attachmentsOmitted })}
+            </p>
+          )}
+        </div>
       )}
     </article>
   )

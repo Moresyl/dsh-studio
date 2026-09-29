@@ -88,10 +88,11 @@ pub fn hunt(card: &Card, lines: &[Line], terms: &[String]) -> Option<Hit> {
     }
 
     for line in lines {
+        let text = line.searchable();
         let mut hit: Option<(usize, usize)> = None;
 
         for (at, term) in terms.iter().enumerate() {
-            let Some(found) = seek(&line.text, term) else {
+            let Some(found) = seek(&text, term) else {
                 continue;
             };
             answered[at] = true;
@@ -106,7 +107,7 @@ pub fn hunt(card: &Card, lines: &[Line], terms: &[String]) -> Option<Hit> {
 
         matches += 1;
         if marks.len() < MARKS {
-            marks.push(quote(line, from, length));
+            marks.push(quote(line, &text, from, length));
         }
     }
 
@@ -134,8 +135,7 @@ pub fn rank(hits: &mut [Hit]) {
 }
 
 /// Cut a matching line down to what is worth reading of it.
-fn quote(line: &Line, from: usize, length: usize) -> Mark {
-    let text = &line.text;
+fn quote(line: &Line, text: &str, from: usize, length: usize) -> Mark {
     let to = from.saturating_add(length).min(text.len());
 
     Mark {
@@ -240,6 +240,8 @@ mod tests {
             role: Role::User,
             tool: None,
             text: text.into(),
+            attachments: Vec::new(),
+            attachments_omitted: 0,
         }
     }
 

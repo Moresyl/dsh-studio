@@ -165,6 +165,11 @@ fn markdown(transcript: &Transcript) -> String {
         } else {
             out.push_str(&format!("{}\n\n", line.text.trim_end()));
         }
+        if !line.attachments.is_empty() {
+            let records = attachment_records(line);
+            let rail = fence(&records);
+            out.push_str(&format!("Attachments (metadata only; files are not embedded):\n\n{rail}\n{records}{rail}\n\n"));
+        }
     }
 
     out
@@ -242,13 +247,47 @@ fn html(transcript: &Transcript) -> String {
             out.push_str(&format!(" <code>{}</code>", escape(&oneline(tool))));
         }
         out.push_str(&format!(
-            " <time>{}</time></h2>\n<pre>{}</pre>\n</section>\n",
+            " <time>{}</time></h2>\n<pre>{}</pre>\n",
             clock(line.time),
             escape(line.text.trim_end()),
         ));
+        if !line.attachments.is_empty() {
+            out.push_str(&format!(
+                "<p>Attachments (metadata only; files are not embedded):</p><pre>{}</pre>\n",
+                escape(&attachment_records(line))
+            ));
+        }
+        out.push_str("</section>\n");
     }
 
     out.push_str("</main>\n</body>\n</html>\n");
+    out
+}
+
+fn attachment_records(line: &super::Line) -> String {
+    let mut out = String::new();
+    for item in &line.attachments {
+        out.push_str(&format!("{}: {}", item.kind, item.label()));
+        if let Some(bytes) = item.bytes {
+            out.push_str(&format!(" · {bytes} bytes"));
+        }
+        if let Some(media) = &item.media_type {
+            out.push_str(&format!(" · {media}"));
+        }
+        if let (Some(width), Some(height)) = (item.width, item.height) {
+            out.push_str(&format!(" · {width} × {height}"));
+        }
+        if let Some(id) = &item.id {
+            out.push_str(&format!(" · id: {id}"));
+        }
+        out.push('\n');
+    }
+    if line.attachments_omitted > 0 {
+        out.push_str(&format!(
+            "{} additional attachment records omitted by the per-message limit.\n",
+            line.attachments_omitted
+        ));
+    }
     out
 }
 
@@ -415,6 +454,8 @@ mod tests {
             role,
             tool: tool.map(str::to_string),
             text: text.to_string(),
+            attachments: Vec::new(),
+            attachments_omitted: 0,
         }
     }
 

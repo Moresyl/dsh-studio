@@ -18,6 +18,7 @@
 //! a hole in it.
 
 pub mod artifact;
+mod attachments;
 pub mod attention;
 pub mod commands;
 pub mod export;
@@ -152,6 +153,31 @@ pub struct Line {
     /// What was run, on the lines that are a tool's doing.
     pub tool: Option<String>,
     pub text: String,
+    pub attachments: Vec<attachments::Attachment>,
+    pub attachments_omitted: usize,
+}
+
+impl Line {
+    fn searchable(&self) -> std::borrow::Cow<'_, str> {
+        if self.attachments.is_empty() {
+            return std::borrow::Cow::Borrowed(&self.text);
+        }
+        let mut text = self.text.clone();
+        for attachment in &self.attachments {
+            text.push('\n');
+            text.push_str(attachment.label());
+        }
+        std::borrow::Cow::Owned(text)
+    }
+
+    fn weight(&self) -> u64 {
+        self.text.len() as u64
+            + self
+                .attachments
+                .iter()
+                .map(attachments::Attachment::weight)
+                .sum::<u64>()
+    }
 }
 
 /// A session, whole.
@@ -478,11 +504,7 @@ impl Shelf {
         Shelf {
             stamp,
             card: reading.card,
-            weight: reading
-                .lines
-                .iter()
-                .map(|line| line.text.len() as u64)
-                .sum(),
+            weight: reading.lines.iter().map(Line::weight).sum(),
             lines: Some(reading.lines),
             used: at,
         }
@@ -549,6 +571,8 @@ mod tests {
             role: Role::User,
             tool: None,
             text: text.to_string(),
+            attachments: Vec::new(),
+            attachments_omitted: 0,
         };
         Shelf {
             stamp: Stamp {

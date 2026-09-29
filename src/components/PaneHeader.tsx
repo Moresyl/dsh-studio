@@ -32,12 +32,12 @@ export function PaneHeader({
     <header className="pane-header shrink-0 bg-canvas px-6 pt-6 pb-4">
       <div
         className={[
-          'mx-auto flex min-h-12 w-full min-w-0 items-center gap-5',
+          'mx-auto flex min-h-12 w-full min-w-0 flex-wrap items-center gap-x-5 gap-y-3',
           width === 'narrow' ? 'max-w-[780px]' : 'max-w-[1040px]',
         ].join(' ')}
       >
-        <div className="min-w-0 flex-1">
-          <h2 className="text-[20px] leading-tight font-semibold text-text">{title}</h2>
+        <div className="min-w-0 flex-[1_1_180px]">
+          <h2 className="break-words text-[20px] leading-tight font-semibold text-text">{title}</h2>
           {subtitle && (
             <p
               className="mt-1.5 truncate text-[12.5px] leading-relaxed text-muted"
@@ -49,7 +49,7 @@ export function PaneHeader({
         </div>
 
         {children && (
-          <div className="pane-header-actions ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className="pane-header-actions ml-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
             {children}
           </div>
         )}

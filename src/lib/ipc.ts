@@ -860,6 +860,16 @@ export interface SessionCard {
   limited: boolean
 }
 
+export interface SessionAttachment {
+  kind: 'file' | 'image'
+  id: string | null
+  name: string | null
+  bytes: number | null
+  mediaType: string | null
+  width: number | null
+  height: number | null
+}
+
 export interface SessionLine {
   seq: number
   time: number
@@ -867,6 +877,9 @@ export interface SessionLine {
   /** What was run, on the lines that are a tool's doing. */
   tool: string | null
   text: string
+  /** Display-only records; neither names nor ids authorize filesystem access. */
+  attachments?: SessionAttachment[]
+  attachmentsOmitted?: number
 }
 
 export interface SessionTranscript {

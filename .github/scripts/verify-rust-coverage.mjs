@@ -22,6 +22,7 @@ const required = [
   'src/remote/lan.rs',
   'src/remote/qr.rs',
   'src/sessions/artifact.rs',
+  'src/sessions/attachments.rs',
   'src/sessions/export.rs',
   'src/sessions/find.rs',
   'src/sessions/mod.rs',

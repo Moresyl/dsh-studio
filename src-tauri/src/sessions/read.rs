@@ -104,7 +104,14 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
                 if role == Role::User {
                     card.turns += 1;
                     if card.title.is_empty() {
-                        card.title = shorten(&said);
+                        card.title = shorten(&said.text);
+                        if card.title.is_empty() {
+                            card.title = said
+                                .attachments
+                                .first()
+                                .map(|item| shorten(item.label()))
+                                .unwrap_or_default();
+                        }
                     }
                 }
 
@@ -138,7 +145,17 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
                     // The arguments arrive as raw JSON text, which is what a
                     // person searching for the file they had open is searching.
                     let arguments = str(call.get("arguments")).to_string();
-                    push(&mut lines, seq, time, Role::Tool, Some(name), arguments);
+                    push(
+                        &mut lines,
+                        seq,
+                        time,
+                        Role::Tool,
+                        Some(name),
+                        Content {
+                            text: arguments,
+                            ..Content::default()
+                        },
+                    );
                 }
 
                 if let Some(usage) = data.get("usage") {
@@ -275,15 +292,22 @@ fn step(data: &Value) -> (u64, u64) {
 }
 
 /// Add a line, unless it would be a blank one.
+#[derive(Default)]
+struct Content {
+    text: String,
+    attachments: Vec<super::attachments::Attachment>,
+    omitted: usize,
+}
+
 fn push(
     lines: &mut Vec<Line>,
     seq: u64,
     time: i64,
     role: Role,
     tool: Option<String>,
-    text: String,
+    content: Content,
 ) {
-    if text.trim().is_empty() {
+    if content.text.trim().is_empty() && content.attachments.is_empty() {
         return;
     }
     lines.push(Line {
@@ -291,7 +315,9 @@ fn push(
         time,
         role,
         tool,
-        text,
+        text: content.text,
+        attachments: content.attachments,
+        attachments_omitted: content.omitted,
     });
 }
 
@@ -300,7 +326,7 @@ fn push(
 /// Reasoning is left out on purpose. It is the model thinking aloud, it is
 /// several times the size of the answer it leads to, and nobody goes looking for
 /// a session by what the model was weighing up on the way there.
-fn spoken(message: &Value) -> String {
+fn spoken(message: &Value) -> Content {
     let mut text = String::new();
 
     for block in blocks(message).filter(|block| str(block.get("type")) == "text") {
@@ -314,32 +340,17 @@ fn spoken(message: &Value) -> String {
         text.push_str(part);
     }
 
-    text
+    let (attachments, omitted) = super::attachments::collect(message);
+    Content {
+        text,
+        attachments,
+        omitted,
+    }
 }
 
 /// What a tool answered, which is itself a little pile of blocks.
-fn said(result: &Value) -> String {
-    let mut text = String::new();
-
-    let Some(content) = result.get("content").and_then(Value::as_array) else {
-        return text;
-    };
-
-    for block in content {
-        let part = match str(block.get("type")) {
-            "text" => str(block.get("text")),
-            _ => continue,
-        };
-        if part.is_empty() {
-            continue;
-        }
-        if !text.is_empty() {
-            text.push('\n');
-        }
-        text.push_str(part);
-    }
-
-    text
+fn said(result: &Value) -> Content {
+    spoken(result)
 }
 
 /// A message's content blocks, or none when it has none worth reading.
@@ -438,6 +449,81 @@ mod tests {
 
     fn header() -> &'static str {
         r#"{"type":"session","version":0,"id":"abc","createdAt":1000,"cwd":"D:\\work"}"#
+    }
+
+    #[test]
+    fn attachment_only_messages_survive_reading_search_and_all_exports() {
+        use super::super::{export, find, Transcript};
+        let text = log(&[
+            header(),
+            r#"{"type":"user/message","seq":1,"time":1,"data":{"source":{"kind":"user"},"content":[{"type":"file","attachment":{"attachmentId":"sha256:abc","name":"C:\\private\\季度报告.txt","bytes":0}}]}}"#,
+            r#"{"type":"assistant/message","seq":2,"time":2,"data":{"message":{"content":[{"type":"image","attachment":{"attachmentId":"sha256:def","name":"结果.png","mediaType":"image/png","bytes":12,"width":4,"height":3}}]}}}"#,
+            r#"{"type":"tool/result","seq":3,"time":3,"data":{"message":{"content":[{"type":"tool-result","content":[{"type":"text","text":"generated"},{"type":"file","attachment":{"attachmentId":"ghi","name":"<img onerror=alert(1)>.txt","bytes":1}}]}]}}}"#,
+        ]);
+        let reading = read(&text, text.len() as u64).unwrap();
+        assert_eq!(reading.card.title, "季度报告.txt");
+        assert_eq!(reading.card.turns, 1);
+        assert_eq!(reading.lines.len(), 3);
+        assert!(reading.lines[0].text.is_empty());
+        assert_eq!(reading.lines[1].role, Role::Assistant);
+        assert_eq!(reading.lines[2].role, Role::Tool);
+        assert_eq!(reading.lines[2].text, "generated");
+        let hit = find::hunt(
+            &reading.card,
+            &reading.lines,
+            &find::terms("generated onerror"),
+        )
+        .unwrap();
+        assert_eq!(hit.marks[0].seq, 3);
+        assert_eq!(hit.matches, 1);
+        let image_hit =
+            find::hunt(&reading.card, &reading.lines, &find::terms("结果.png")).unwrap();
+        assert_eq!(image_hit.marks[0].seq, 2);
+        let transcript = Transcript {
+            card: reading.card,
+            lines: reading.lines,
+        };
+        for format in [
+            export::Format::Markdown,
+            export::Format::Html,
+            export::Format::Json,
+        ] {
+            let output = export::render(&transcript, format);
+            assert!(output.contains("季度报告.txt"));
+            assert!(output.contains("sha256:abc"));
+            assert!(output.contains("结果.png"));
+            assert!(!output.contains("private"));
+            if format == export::Format::Html {
+                assert!(!output.contains("<img onerror"));
+                assert!(output.contains("&lt;img onerror"));
+            }
+        }
+        assert!(transcript.lines[0].weight() > transcript.lines[0].text.len() as u64);
+    }
+
+    #[test]
+    fn attachment_limits_remain_visible_in_exports() {
+        use super::super::{export, Transcript};
+        let event = serde_json::json!({"type":"user/message", "data": {
+            "source":{"kind":"user"}, "content":vec![serde_json::json!({"type":"file"}); 66]
+        }});
+        let reading = read(&format!("{}\n{event}\n", header()), 0).unwrap();
+        assert_eq!(reading.lines[0].attachments_omitted, 2);
+        let transcript = Transcript {
+            card: reading.card,
+            lines: reading.lines,
+        };
+        for format in [export::Format::Markdown, export::Format::Html] {
+            assert!(export::render(&transcript, format)
+                .contains("2 additional attachment records omitted"));
+        }
+        let json: Value =
+            serde_json::from_str(&export::render(&transcript, export::Format::Json)).unwrap();
+        assert_eq!(json["lines"][0]["attachmentsOmitted"], 2);
+        assert_eq!(
+            json["lines"][0]["attachments"].as_array().unwrap().len(),
+            64
+        );
     }
 
     #[test]
