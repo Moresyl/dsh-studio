@@ -51,7 +51,7 @@ node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-res
 node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-limit-results 9223 limited
 ```
 
-The UI runner checks seven shell pages, horizontal overflow, plugin-card
+The UI runner checks eight shell pages, horizontal overflow, plugin-card
 semantics, modal focus/Escape restoration and uncaught WebView exceptions. Timed
 runs retain screenshots and DOM/heap measurements; those samples do not by
 themselves prove the absence of leaks. The native runner exercises the actual
@@ -65,7 +65,7 @@ These checks complement the manual matrix; they do not cover model-provider
 credentials, real external SSH accounts, Narrator or physical macOS hardware.
 
 The keyboard runner requires one isolated QA window. It checks visible enabled
-selectors across the seven pages using actual CDP key events: arrow wrapping,
+selectors across the eight pages using actual CDP key events: arrow wrapping,
 Home/End, active-item visibility, viewport bounds, Escape focus return and Tab
 dismissal without changing selections. It also opens and dismisses the command
 palette. Its report records the actual option counts; run after catalog loading

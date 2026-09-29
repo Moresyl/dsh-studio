@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
+import { DESKTOP_ROUTES } from './desktop-route-contract.mjs'
+
 const [qaHome, output, port = '9223'] = process.argv.slice(2)
 assert(qaHome && output, 'QA_HOME OUTPUT [PORT] required')
 const targets = await fetch(`http://127.0.0.1:${port}/json`).then((r) => r.json())
@@ -69,7 +71,7 @@ const checks = []
 const visibleSelectors = `[...document.querySelectorAll('button.select-control__trigger:not(:disabled)')].filter(b=>b.getClientRects().length)`
 try {
   await command('Runtime.enable')
-  for (const route of ['运行状态', '终端', '会话', '插件', '远程', '关于', '设置']) {
+  for (const { label: route, heading } of DESKTOP_ROUTES) {
     await evaluate(
       `(()=>{const b=[...document.querySelectorAll('aside button')].find(b=>b.innerText.trim().split('\\n')[0]===${JSON.stringify(route)});if(!b)throw Error('route missing');b.focus();b.click();return true})()`,
     )
@@ -77,7 +79,7 @@ try {
       `document.querySelector('aside [aria-current="page"]')?.innerText.trim().split('\\n')[0]===${JSON.stringify(route)}`,
     )
     await wait(
-      `[...document.querySelectorAll('h1,h2')].some(h=>h.getClientRects().length&&h.innerText.trim()===${JSON.stringify(route === '插件' ? '插件市场' : route === '远程' ? '远程访问' : route)})`,
+      `[...document.querySelectorAll('h1,h2')].some(h=>h.getClientRects().length&&h.innerText.trim()===${JSON.stringify(heading)})`,
     )
     await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true))))')
     if (route === '插件') await wait(`${visibleSelectors}.length>=3`)

@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import { mkdir, appendFile, writeFile } from 'node:fs/promises'
 import { resolve, join } from 'node:path'
 
+import { DESKTOP_ROUTES } from './desktop-route-contract.mjs'
+
 const args = Object.fromEntries(
   process.argv.slice(2).map((arg) => {
     const at = arg.indexOf('=')
@@ -119,15 +121,7 @@ try {
     pass += 1
     // These routes perform local reads only. Remote access is never opened;
     // terminal sessions, installs, updates and removals are not triggered.
-    for (const [label, heading] of [
-      ['运行状态', '运行状态'],
-      ['终端', '终端'],
-      ['会话', '会话'],
-      ['插件', '插件市场'],
-      ['远程', '远程访问'],
-      ['关于', '关于'],
-      ['设置', '设置'],
-    ]) {
+    for (const { label, heading } of DESKTOP_ROUTES) {
       await clickText(label, "document.querySelector('aside')")
       await waitFor(
         `[...document.querySelectorAll('h1,h2')].some(h => h.getClientRects().length && h.innerText.trim() === ${JSON.stringify(heading)})`,

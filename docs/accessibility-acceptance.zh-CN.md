@@ -45,7 +45,7 @@ node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-res
 node .github/scripts/desktop-session-regression.mjs D:/qa/home D:/qa/session-limit-results 9223 limited
 ```
 
-界面脚本检查七个壳页面、横向溢出、插件卡片语义、弹窗焦点及 Escape 恢复，以及未捕获的
+界面脚本检查八个壳页面、横向溢出、插件卡片语义、弹窗焦点及 Escape 恢复，以及未捕获的
 WebView 异常。定时运行保留截图和 DOM/堆内存数据；这些采样本身不能证明不存在泄漏。
 原生命令脚本通过真实 WebView ACL 检查配置往返导入导出、自定义智能体包、会话搜索/
 导出/归档，以及真实 PTY。它创建唯一的 QA 样本，结束后清理临时配置、样本和终端；导出
@@ -53,7 +53,7 @@ WebView 异常。定时运行保留截图和 DOM/堆内存数据；这些采样�
 
 这些检查用于补充人工矩阵，不涵盖模型服务商凭据、真实外部 SSH 账户、Narrator 或 macOS 真机。
 
-键盘脚本要求只打开一个隔离 QA 窗口。它使用真实 CDP 按键事件，检查七个页面中可见且启用的
+键盘脚本要求只打开一个隔离 QA 窗口。它使用真实 CDP 按键事件，检查八个页面中可见且启用的
 选择框：方向键循环、Home/End、选中项可见性、菜单窗口边界、Escape 焦点归还，以及不改变
 选择的 Tab 关闭；同时检查命令面板的打开和关闭。报告记录实际选项数量，应在目录加载完成后
 运行，以覆盖长分类菜单，而不只是初始占位选项。

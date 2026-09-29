@@ -289,8 +289,8 @@ export default function App() {
     )
   }, [openPreset, origin, showPanel])
 
-  // Ctrl+K, Ctrl+1 through Ctrl+6 in rail order, Ctrl+comma for settings, and
-  // Ctrl+Shift+N for another window. Every application with a fixed set of views
+  // Ctrl+K, Ctrl+1 through Ctrl+7 in stable view order, Ctrl+comma for settings,
+  // and Ctrl+Shift+N for another window. Every application with a fixed set of views
   // has the numbers, and a user who tries one and gets nothing has just learned
   // that this is not one of those applications. The palette is the other half of
   // that: the keystroke for when someone knows the name of what they want and
@@ -329,8 +329,8 @@ export default function App() {
         return
       }
 
-      // The keystroke every desktop application answers with its preferences,
-      // and the reason settings is not the seventh number.
+      // The keystroke every desktop application answers with its preferences;
+      // settings deliberately remains outside the numbered views.
       if (event.key === ',') {
         event.preventDefault()
         show(SETTINGS.id)

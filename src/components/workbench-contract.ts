@@ -23,7 +23,7 @@ export type View =
   | 'settings'
   | 'presentations'
 
-/** Rail order, which is also the order the number accelerators follow. */
+/** Stable numbered accelerator order; About remains sixth for compatibility. */
 export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'console', icon: Gauge, label: 'nav.console' },
   { id: 'terminal', icon: SquareTerminal, label: 'nav.terminal' },
