@@ -151,6 +151,8 @@ struct InstallJournal {
     schema: u8,
     package: String,
     version: String,
+    #[serde(default)]
+    startup_verified: bool,
 }
 
 /// Everything needed to run one install.
@@ -285,9 +287,9 @@ where
 
 /// Install into an isolated sibling, verify it, then promote it in one rename.
 ///
-/// The journal deliberately has no changing phase field. Recovery derives the
-/// truth from the three directories, so a crash can never leave a phase that
-/// claims a rename happened when the filesystem says otherwise.
+/// Recovery derives rename state from the three directories. The journal only
+/// records whether this transaction passed boot verification; files copied from
+/// an archive are not evidence that startup succeeded on this machine.
 pub async fn run_transactional<R>(plan: &InstallPlan, report: R) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
@@ -309,7 +311,7 @@ where
 
     remove_dir_if_exists(&staging)?;
     remove_dir_if_exists(&backup)?;
-    write_journal(&journal)?;
+    write_journal(&journal, version, false)?;
 
     let staged_plan = InstallPlan {
         target: staging.clone(),
@@ -322,6 +324,7 @@ where
     }
 
     require_expected_runtime(&staging)?;
+    write_journal(&journal, version, true)?;
 
     promote(live, &staging, &backup, &journal)
 }
@@ -472,7 +475,8 @@ where
         qualify_runtime(&plan.target)?;
     }
     write_cli_launcher(&plan.target)?;
-    verify_candidate_boot(plan, version, report).await?;
+    clear_runtime_marker(&plan.target)?;
+    verify_candidate_boot(&plan.node, &plan.target, version, report).await?;
     write_runtime_marker(&plan.target, version)?;
     require_expected_runtime(&plan.target)
 }
@@ -493,13 +497,18 @@ fn write_runtime_marker(target: &Path, version: &str) -> Result<()> {
     .map_err(|cause| Error::Install(format!("could not record verified runtime: {cause}")))
 }
 
-async fn verify_candidate_boot<R>(plan: &InstallPlan, version: &str, report: R) -> Result<()>
+async fn verify_candidate_boot<R>(
+    node: &Path,
+    target: &Path,
+    version: &str,
+    report: R,
+) -> Result<()>
 where
     R: Fn(Stream, String) + Clone + Send + 'static,
 {
     // This uses a disposable official profile, never the user's profile or sessions.
-    let probe = plan.target.join("studio-runtime-probe.mjs");
-    let runner = plan.target.join("studio-runtime-check.mjs");
+    let probe = target.join("studio-runtime-probe.mjs");
+    let runner = target.join("studio-runtime-check.mjs");
     std::fs::write(&probe, include_bytes!("../../../.github/scripts/runtime-profile-smoke.mjs"))
         .and_then(|_| std::fs::write(&runner,
             "import { verifyProfileBoot } from './studio-runtime-probe.mjs';\nimport { join } from 'node:path';\nimport { writeFileSync } from 'node:fs';\nconst [root, version, studioVersion] = process.argv.slice(2);\ntry {\nawait verifyProfileBoot({runtimeRoot: root, entry: join(root, 'studio-cli.mjs'), dshHome: join(root, 'studio-probe-home'), harnessVersion: version, studioVersion, onProgress: (stream, line) => console.error(`[startup ${stream}] ${line}`)});\nconsole.log('Studio runtime startup verified');\n} catch (error) {\nwriteFileSync(join(root, 'studio-runtime-error.txt'), String(error.message).slice(0, 8192));\nconsole.error(error);\nprocess.exitCode = 1;\n}\n"))
@@ -508,14 +517,14 @@ where
         Stream::Stdout,
         format!("verifying Harness {version} in an isolated profile"),
     );
-    let mut command = Command::new(&plan.node);
+    let mut command = Command::new(node);
     command
         .arg(&runner)
-        .arg(&plan.target)
+        .arg(target)
         .arg(version)
         .arg(env!("CARGO_PKG_VERSION"))
-        .env("PATH", path_with_node(&plan.node))
-        .current_dir(&plan.target)
+        .env("PATH", path_with_node(node))
+        .current_dir(target)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
@@ -529,7 +538,7 @@ where
         PIPE_DRAIN_TIMEOUT,
     )
     .await;
-    let error_file = plan.target.join("studio-runtime-error.txt");
+    let error_file = target.join("studio-runtime-error.txt");
     let result = result.map_err(
         |failure| match crate::bounded_file::read(&error_file, 8192) {
             Ok(bytes) => Error::Install(crate::logging::redact_secrets(&String::from_utf8_lossy(
@@ -538,7 +547,7 @@ where
             Err(_) => failure,
         },
     );
-    remove_dir_if_exists(&plan.target.join("studio-probe-home"))?;
+    remove_dir_if_exists(&target.join("studio-probe-home"))?;
     let _ = std::fs::remove_file(error_file);
     let _ = std::fs::remove_file(probe);
     let _ = std::fs::remove_file(runner);
@@ -852,11 +861,7 @@ fn qualify_runtime(target: &Path) -> Result<()> {
             "the qualified directory picker could not be written: {cause}"
         ))
     })?;
-    std::fs::write(
-        target.join("dsh-studio-runtime.json"),
-        format!("{{\"schema\":{RUNTIME_SCHEMA}}}\n"),
-    )
-    .map_err(|cause| Error::Install(format!("could not mark the runtime contract: {cause}")))
+    Ok(())
 }
 
 fn replace_once(body: String, from: &str, to: &str, label: &str) -> Result<String> {
@@ -875,8 +880,31 @@ fn replace_once(body: String, from: &str, to: &str, label: &str) -> Result<Strin
     Ok(body.replacen(from, to, 1))
 }
 
-/// Restore a Full package's pre-resolved dependency closure without npm.
-pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
+/// Restore without npm, but prove startup on this machine before promotion.
+pub async fn run_bundled<R>(
+    artifact: crate::offline::Artifact,
+    node: PathBuf,
+    report: R,
+) -> Result<()>
+where
+    R: Fn(Stream, String) + Clone + Send + 'static,
+{
+    let runtime = tokio::runtime::Handle::current();
+    // Keep the transaction guard with extraction even if the caller goes away.
+    // Blocking filesystem work must not stall supervisor events or log forwarding.
+    tokio::task::spawn_blocking(move || {
+        run_bundled_with(&artifact, |target| {
+            runtime.block_on(verify_candidate_boot(&node, target, VERSION, report))
+        })
+    })
+    .await
+    .map_err(|cause| Error::Install(format!("offline installation did not finish: {cause}")))?
+}
+
+fn run_bundled_with(
+    artifact: &crate::offline::Artifact,
+    verify: impl FnOnce(&Path) -> Result<()>,
+) -> Result<()> {
     let _activity = ManagedInstallActivity::begin_install()?;
     recover_managed_install_inner()?;
 
@@ -886,7 +914,7 @@ pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
     let journal = crate::paths::harness_install_journal();
     remove_dir_if_exists(&staging)?;
     remove_dir_if_exists(&backup)?;
-    write_journal(&journal)?;
+    write_journal(&journal, VERSION, false)?;
 
     let prepared = (|| {
         let file = crate::offline::verified_file(artifact)?;
@@ -903,7 +931,10 @@ pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
                     "the offline Harness archive could not be unpacked: {cause}"
                 ))
             })?;
-        prepare_bundled_runtime(&staging)
+        prepare_bundled_runtime(&staging)?;
+        verify(&staging)?;
+        write_runtime_marker(&staging, VERSION)?;
+        require_expected_runtime(&staging)
     })();
     if let Err(failure) = prepared {
         let _ = remove_dir_if_exists(&staging);
@@ -911,6 +942,7 @@ pub fn run_bundled(artifact: &crate::offline::Artifact) -> Result<()> {
         return Err(failure);
     }
 
+    write_journal(&journal, VERSION, true)?;
     promote(&live, &staging, &backup, &journal)
 }
 
@@ -921,12 +953,24 @@ fn prepare_bundled_runtime(target: &Path) -> Result<()> {
         ));
     }
     // The archive is npm's resolved closure. Apply the same desktop adapter,
-    // Node-compatible launcher and durable contract as the online installer
-    // before accepting or promoting it. All changes stay inside staging.
+    // Node-compatible launcher as the online installer. Refresh our own
+    // integration before boot; the contract marker is written only afterwards.
+    // All changes stay inside staging.
+    clear_runtime_marker(target)?;
     qualify_runtime(target)?;
     write_cli_launcher(target)?;
-    write_runtime_marker(target, VERSION)?;
-    require_expected_runtime(target)
+    ensure_runtime_resolver(target)?;
+    Ok(())
+}
+
+fn clear_runtime_marker(target: &Path) -> Result<()> {
+    match std::fs::remove_file(target.join("dsh-studio-runtime.json")) {
+        Ok(()) => Ok(()),
+        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(cause) => Err(Error::Install(format!(
+            "could not clear unverified runtime marker: {cause}"
+        ))),
+    }
 }
 
 fn promote(live: &Path, staging: &Path, backup: &Path, journal: &Path) -> Result<()> {
@@ -980,7 +1024,7 @@ fn recover_managed_install_inner() -> Result<bool> {
     if !journal.exists() {
         return Ok(false);
     }
-    read_journal(&journal)?;
+    let receipt = read_journal(&journal)?;
 
     let live = crate::paths::harness_dir();
     let staging = crate::paths::harness_staging_dir();
@@ -997,7 +1041,7 @@ fn recover_managed_install_inner() -> Result<bool> {
             ))
         })?;
         remove_dir_if_exists(&staging)?;
-    } else if runtime_compatible(&staging) {
+    } else if verified_staging(&receipt, &staging) {
         remove_dir_if_exists(&live)?;
         std::fs::rename(&staging, &live).map_err(|cause| {
             Error::Install(format!(
@@ -1134,7 +1178,13 @@ fn runtime_contract_failures(target: &Path) -> Vec<&'static str> {
     failures
 }
 
-fn write_journal(path: &Path) -> Result<()> {
+fn verified_staging(receipt: &InstallJournal, staging: &Path) -> bool {
+    receipt.startup_verified
+        && expected_version(staging) == receipt.version
+        && runtime_compatible(staging)
+}
+
+fn write_journal(path: &Path, version: &str, startup_verified: bool) -> Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|cause| {
             Error::Install(format!(
@@ -1145,7 +1195,8 @@ fn write_journal(path: &Path) -> Result<()> {
     let journal = InstallJournal {
         schema: JOURNAL_VERSION,
         package: PACKAGE.to_string(),
-        version: VERSION.to_string(),
+        version: version.to_string(),
+        startup_verified,
     };
     let body = serde_json::to_vec_pretty(&journal)
         .map_err(|cause| Error::Install(format!("could not encode install state: {cause}")))?;
@@ -1351,6 +1402,44 @@ mod tests {
     }
 
     #[test]
+    fn recovery_requires_transaction_boot_proof_even_with_a_complete_staging_tree() {
+        let root = std::env::temp_dir().join(format!("dsh-boot-receipt-{}", std::process::id()));
+        assert!(!root.exists());
+        write_runtime(&root, VERSION, true);
+        super::write_cli_launcher(&root).unwrap();
+        super::write_runtime_marker(&root, VERSION).unwrap();
+        assert!(super::runtime_compatible(&root));
+        let journal = root.join("journal.json");
+        super::write_journal(&journal, VERSION, false).unwrap();
+        assert!(!super::verified_staging(
+            &super::read_journal(&journal).unwrap(),
+            &root
+        ));
+        super::write_journal(&journal, VERSION, true).unwrap();
+        assert!(super::verified_staging(
+            &super::read_journal(&journal).unwrap(),
+            &root
+        ));
+        super::write_journal(&journal, "0.1.1-rc.1", true).unwrap();
+        assert!(!super::verified_staging(
+            &super::read_journal(&journal).unwrap(),
+            &root
+        ));
+        // Old journals prove no boot: recover a valid live/backup tree, but do
+        // not silently activate their pending first installation.
+        fs::write(
+            &journal,
+            format!(r#"{{"schema":1,"package":"@deepseek-ai/dsh","version":"{VERSION}"}}"#),
+        )
+        .unwrap();
+        assert!(!super::verified_staging(
+            &super::read_journal(&journal).unwrap(),
+            &root
+        ));
+        remove_dir_if_exists(&root).unwrap();
+    }
+
+    #[test]
     fn bundled_preparation_rejects_a_foreign_version_before_marking_it() {
         let root = std::env::temp_dir().join(format!("dsh-bundled-version-{}", std::process::id()));
         assert!(!root.exists());
@@ -1387,9 +1476,9 @@ mod tests {
         remove_dir_if_exists(&root).unwrap();
     }
 
-    #[test]
+    #[tokio::test]
     #[ignore = "requires a real Full package and an explicitly isolated data directory"]
-    fn packaged_full_runtime_restores_native_contract() {
+    async fn packaged_full_runtime_restores_native_contract() {
         let offline = std::env::var_os("DSH_TEST_OFFLINE_DIR").expect("packaged offline directory");
         let isolated =
             std::env::var_os("DSH_STUDIO_DATA_DIR").expect("isolated native install directory");
@@ -1401,7 +1490,20 @@ mod tests {
             crate::offline::read(Path::new(&offline)).expect("native Full manifest validation");
         let live = crate::paths::harness_dir();
         assert!(!live.exists(), "fresh native installation required");
-        super::run_bundled(&payload.harness).expect("restore the actual packaged archive");
+        let node = std::env::var_os("DSH_TEST_NODE")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                node_runtime::discover_in(Some(&crate::paths::managed_node_dir()))
+                    .into_iter()
+                    .next()
+                    .expect("Node runtime for real offline verification")
+                    .path
+            });
+        super::run_bundled(payload.harness.clone(), node.clone(), |_, line| {
+            eprintln!("{line}")
+        })
+        .await
+        .expect("restore the actual packaged archive");
         require_expected_runtime(&live).expect("native contract after restore");
         let launcher =
             fs::read(live.join("studio-cli.mjs")).expect("bundled Node compatible launcher");
@@ -1410,13 +1512,32 @@ mod tests {
         let mut corrupt = payload.harness.clone();
         corrupt.sha256 = "0".repeat(64);
         assert!(
-            super::run_bundled(&corrupt).is_err(),
+            super::run_bundled(corrupt, node.clone(), |_, _| {})
+                .await
+                .is_err(),
             "corrupt archive must be rejected"
         );
         require_expected_runtime(&live).expect("previous runtime survives rejected archive");
         assert_eq!(fs::read(live.join("studio-cli.mjs")).unwrap(), launcher);
         assert!(!crate::paths::harness_install_journal().exists());
-        super::run_bundled(&payload.harness)
+        // A valid archive does not prove the chosen local Node can start it.
+        // Failed startup must neither activate staging nor touch the old tree.
+        let failed = super::run_bundled(
+            payload.harness.clone(),
+            live.join("missing-node"),
+            |_, _| {},
+        )
+        .await;
+        assert!(
+            failed.is_err(),
+            "startup failure must reject a valid archive"
+        );
+        assert_eq!(fs::read(live.join("studio-cli.mjs")).unwrap(), launcher);
+        require_expected_runtime(&live).expect("previous runtime survives failed boot");
+        assert!(!crate::paths::harness_staging_dir().exists());
+        assert!(!crate::paths::harness_install_journal().exists());
+        super::run_bundled(payload.harness, node, |_, line| eprintln!("{line}"))
+            .await
             .expect("replace an existing runtime from the Full archive");
         require_expected_runtime(&live).unwrap();
         assert!(!crate::paths::harness_backup_dir().exists());

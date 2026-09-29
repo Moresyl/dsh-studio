@@ -289,6 +289,9 @@ async fn perform_install(
     state.supervisor.wait_until_inactive().await?;
 
     if let Some(payload) = crate::offline::payload(app)?.filter(|_| version == install::VERSION) {
+        let node = super::environment().node.ok_or(Error::NoNodeRuntime {
+            minimum: node_runtime::MINIMUM_SUPPORTED,
+        })?;
         state.supervisor.note(
             Stream::Stdout,
             format!(
@@ -297,13 +300,11 @@ async fn perform_install(
                 install::VERSION
             ),
         );
-        return tauri::async_runtime::spawn_blocking(move || {
-            install::run_bundled(&payload.harness)
+        let reporter = Arc::clone(&state.supervisor);
+        return install::run_bundled(payload.harness, node.path, move |stream, line| {
+            reporter.note(stream, line)
         })
-        .await
-        .map_err(|cause| {
-            Error::Install(format!("offline installation did not finish: {cause}"))
-        })?;
+        .await;
     }
 
     let mut plan = match super::install_plan() {

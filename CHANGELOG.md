@@ -18,6 +18,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Verify Full/offline Harness startup with the selected Node before replacing the current runtime, refreshing Studio-owned launch support first. Failed verification keeps the existing runtime. Interrupted installs may activate staging only when their transaction records a successful boot of that exact version; legacy journals do not establish that proof.
 - Preserve composite option labels in select menus without extra commas or empty badge separators. Check that selected popup text matches the trigger during real keyboard regression.
 - Keep titlebar navigation on one line, use labelled icons in narrow layouts, and prevent page breadcrumbs from overlapping the centered view switch.
 - Stream isolated runtime startup progress into the installation log and include the Node startup phase in timeout diagnostics. Bound and redact forwarded lines, and clear the cleanup timer after the child exits. These diagnostics do not bypass startup verification.

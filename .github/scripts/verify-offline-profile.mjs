@@ -98,7 +98,14 @@ export async function verifyOfflineProfile(offline) {
         timeout: 180000,
       })
     }
-    console.log('verifying native Full install, rejected-archive recovery and reinstall')
+    const nodeDirectory = manifest.node.file.replace(/(?:\.tar\.gz|\.zip)$/, '')
+    const binary = join(
+      scratch,
+      'node',
+      nodeDirectory,
+      ...(process.platform === 'win32' ? ['node.exe'] : ['bin', 'node']),
+    )
+    console.log('verifying native Full install, rejected-archive/startup recovery and reinstall')
     await execute(
       'cargo',
       nativeRuntimeTestArgs(manifest.os, manifest.arch, process.env.GITHUB_ACTIONS === 'true'),
@@ -108,6 +115,7 @@ export async function verifyOfflineProfile(offline) {
           ...process.env,
           DSH_TEST_OFFLINE_DIR: resolve(offline),
           DSH_STUDIO_DATA_DIR: join(scratch, 'native'),
+          DSH_TEST_NODE: binary,
         },
         windowsHide: true,
         // The release-profile native test may need its first optimized link
@@ -115,13 +123,6 @@ export async function verifyOfflineProfile(offline) {
         timeout: 900000,
         maxBuffer: 2 << 20,
       },
-    )
-    const nodeDirectory = manifest.node.file.replace(/(?:\.tar\.gz|\.zip)$/, '')
-    const binary = join(
-      scratch,
-      'node',
-      nodeDirectory,
-      ...(process.platform === 'win32' ? ['node.exe'] : ['bin', 'node']),
     )
     const { stdout } = await execute(
       binary,
