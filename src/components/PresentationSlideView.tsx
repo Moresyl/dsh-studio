@@ -1,5 +1,7 @@
 import { memo, useRef, useState, type PointerEvent } from 'react'
 import { moveFrame } from '@/lib/presentation/movement'
+import { PresentationImage } from '@/components/PresentationImage'
+import { t } from '@/lib/i18n'
 import {
   presentationSize,
   type PresentationDocument,
@@ -74,7 +76,9 @@ export function PresentationSlideView({ slide, aspect, selected, onSelect, onMov
             onSelect
               ? element.kind === 'text'
                 ? element.text || element.id
-                : element.id
+                : element.kind === 'image'
+                  ? element.alt || t('deck.image')
+                  : element.id
               : undefined
           }
           aria-pressed={onSelect ? selected === element.id : undefined}
@@ -227,6 +231,7 @@ const ElementView = memo(function ElementView({ element }: { element: SlideEleme
     )
   }
   if (element.kind === 'chart') return <ChartView element={element} />
+  if (element.kind === 'image') return <PresentationImage element={element} />
   const style = {
     color: `#${element.color}`,
     fontFamily: element.fontFace,

@@ -1,5 +1,6 @@
 import * as ipc from '@/lib/ipc'
 import { parsePresentation, PresentationError, type PresentationDocument } from './document'
+import { documentImages } from './media'
 
 export interface SavedDocument {
   document: PresentationDocument
@@ -16,7 +17,10 @@ function checked(value: ipc.SavedPresentation, id: string): SavedDocument {
 /** Never promote unsupported or damaged sources into editable state. */
 export async function loadPresentation(id: string): Promise<SavedDocument | null> {
   const value = await ipc.presentationLoad(id)
-  return value === null ? null : checked(value, id)
+  if (value === null) return null
+  const saved = checked(value, id)
+  await documentImages(saved.document)
+  return saved
 }
 
 /** Null means create-only; an existing source always needs its last read revision. */

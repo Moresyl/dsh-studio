@@ -44,7 +44,7 @@ describe('presentation source boundary', () => {
   })
 
   const cases: [string, (string | number)[], unknown][] = [
-    ['unknown version', ['version'], 2],
+    ['unknown version', ['version'], 9],
     ['unknown field', ['script'], 'private content'],
     ['unknown format', ['format'], 'other'],
     ['empty title', ['title'], '  '],

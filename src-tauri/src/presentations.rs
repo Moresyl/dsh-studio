@@ -1,4 +1,5 @@
 //! Bounded local presentation sources. No imported paths or executable content.
+pub mod media;
 mod package;
 mod structure;
 mod xml;
@@ -93,7 +94,7 @@ fn list(root: &Path) -> Result<Vec<String>> {
 
 fn validate(document: &Value, id: &str) -> Result<()> {
     if document.get("format").and_then(Value::as_str) != Some("dsh-studio-presentation")
-        || document.get("version").and_then(Value::as_u64) != Some(1)
+        || !matches!(document.get("version").and_then(Value::as_u64), Some(1 | 2))
         || document.get("id").and_then(Value::as_str) != Some(id)
         || !document
             .get("title")
@@ -140,6 +141,7 @@ fn save(root: &Path, id: &str, source: &str, expected: Option<&str>) -> Result<S
     let _guard = WRITES
         .lock()
         .map_err(|_| failure("storage is unavailable"))?;
+    media::validate_references(root, &document)?;
     let current = load(root, id)?;
     if current.as_ref().map(|v| v.revision.as_str()) != expected {
         return Err(failure(
@@ -234,9 +236,9 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
-    struct Fixture(PathBuf);
+    pub(super) struct Fixture(pub(super) PathBuf);
     impl Fixture {
-        fn new() -> Self {
+        pub(super) fn new() -> Self {
             Self(std::env::temp_dir().join(format!(
                 "dsh-presentations-{}-{}",
                 std::process::id(),

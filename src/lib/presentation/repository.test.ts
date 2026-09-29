@@ -1,8 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest'
-const ipc = vi.hoisted(() => ({ presentationLoad: vi.fn(), presentationSave: vi.fn() }))
+const ipc = vi.hoisted(() => ({
+  presentationLoad: vi.fn(),
+  presentationSave: vi.fn(),
+  presentationImageRead: vi.fn(),
+}))
 vi.mock('@/lib/ipc', () => ipc)
 import { loadPresentation, savePresentation } from './repository'
 import { fixture } from './fixtures.test-support'
+import { imageElement } from './image.test-support'
 const revision = 'a'.repeat(64)
 
 beforeEach(() => vi.resetAllMocks())
@@ -25,6 +30,18 @@ it('rejects damaged or mismatched saved sources before editing', async () => {
     ipc.presentationLoad.mockResolvedValueOnce(value)
     await expect(loadPresentation('fixture')).rejects.toThrow()
   }
+})
+
+it('refuses a source with missing image bytes before returning it to the editor', async () => {
+  const document = fixture()
+  document.version = 2
+  document.slides[0]!.elements = [imageElement()]
+  const before = structuredClone(document)
+  ipc.presentationLoad.mockResolvedValue({ document, revision })
+  ipc.presentationImageRead.mockRejectedValue(new Error('image resource is missing'))
+  await expect(loadPresentation('fixture')).rejects.toThrow('image resource is missing')
+  expect(document).toEqual(before)
+  expect(ipc.presentationSave).not.toHaveBeenCalled()
 })
 
 it('validates before writing and carries the exact revision to native storage', async () => {

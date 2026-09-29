@@ -11,6 +11,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Added
 
+- Add local static PNG, JPEG and WebP images to presentations, with contain, crop and stretch sizing, descriptions, undo/redo and embedded editable PPTX pictures. Normalize resources to bounded PNG files, share immutable assets across copies, and reject missing or damaged image references before opening, saving or exporting a document.
 - Add application version history with reviewed upgrades, reinstalls and supported downgrades, cancellable signed downloads, and a website fallback for release metadata. Recheck the selected artifact before installation and serialize replacement with runtime and terminal activity; RPM downgrades remain unavailable in the built-in updater.
 - Preserve file and image attachment records in offline conversations, including attachment-only messages, filename search, and Markdown/HTML/JSON exports. Show names, recorded sizes and image dimensions in responsive cards. These are metadata records, not embedded files or authorized file previews.
 - Preview recorded images through the running Harness session-authorized API, with bounded raster replies, cancellation, timeout handling, retry and keyboard focus restoration. Transcript exports still contain metadata only.
@@ -23,6 +24,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Run the recursive XML tree parser on a bounded dedicated stack while retaining input depth limits, protecting callers with small thread stacks; add a 512 KiB caller-stack regression.
 - Validate XML encoding, namespaces, content types and slide relationships before saving PPTX exports, preserving declared slide order. Reject duplicate or missing slides, external document parts, DTDs and oversized XML. Structural parsing does not yet provide editable PPTX import.
 - Validate PPTX package directory counts and names before building the ZIP index, reject duplicate/overlapping or encrypted parts, bound expanded sizes, and verify part checksums before atomically saving an export. Package validation does not yet provide PPTX content import.
 - Show update-check progress and completion time, surface failures from manual checks that join an existing background request, and bound each complete native check to 30 seconds.

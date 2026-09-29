@@ -4,6 +4,8 @@ import { copyPresentation, retainHistory } from '@/lib/presentation/authoring'
 import { loadPresentation, savePresentation } from '@/lib/presentation/repository'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
+import { choosePresentationImage, documentImages } from '@/lib/presentation/media'
+import { presentationSize } from '@/lib/presentation/document'
 
 interface PendingInput {
   value: string
@@ -17,7 +19,7 @@ interface EditorState {
   saved: string | null
   past: string[]
   future: string[]
-  busy: 'load' | 'save' | 'copy' | 'update' | 'synchronizing' | null
+  busy: 'load' | 'save' | 'copy' | 'image' | 'update' | 'synchronizing' | null
   lockForUpdate: () => boolean
   unlockUpdate: () => void
   error: string | null
@@ -33,6 +35,7 @@ interface EditorState {
   open: (id: string, discard?: boolean) => Promise<boolean>
   save: () => Promise<boolean>
   saveCopy: (suffix: string) => Promise<boolean>
+  insertImage: (slide: string) => Promise<string | null>
 }
 
 export const isPresentationDirty = (
@@ -202,6 +205,58 @@ export function createPresentationEditor(synchronizing = false) {
       } catch (cause) {
         set({ error: describe(cause) })
         return false
+      } finally {
+        set({ busy: null })
+      }
+    },
+    insertImage: async (slideId) => {
+      if (!get().flushInputs()) return null
+      const state = get()
+      if (
+        state.busy ||
+        !state.document ||
+        !state.document.slides.some((slide) => slide.id === slideId)
+      )
+        return null
+      set({ busy: 'image', error: null })
+      try {
+        const image = await choosePresentationImage()
+        if (!image) return null
+        const document = parsePresentation(state.document)
+        const slide = document.slides.find((page) => page.id === slideId)!
+        const size = presentationSize(document.aspect)
+        const scale = Math.min(
+          (size.width - 160) / image.width,
+          (size.height - 160) / image.height,
+          1,
+        )
+        const width = Math.max(1, image.width * scale),
+          height = Math.max(1, image.height * scale)
+        const id = crypto.randomUUID()
+        document.version = 2
+        slide.elements.push({
+          id,
+          kind: 'image',
+          asset: image.id,
+          alt: '',
+          fit: 'contain',
+          x: (size.width - width) / 2,
+          y: (size.height - height) / 2,
+          width,
+          height,
+          rotation: 0,
+        })
+        const checked = parsePresentation(document)
+        await documentImages(checked)
+        set({
+          document: checked,
+          past: retainHistory(state.past, JSON.stringify(state.document)),
+          future: [],
+        })
+        return id
+      } catch (cause) {
+        set({ error: describe(cause) })
+        return null
       } finally {
         set({ busy: null })
       }

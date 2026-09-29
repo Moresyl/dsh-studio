@@ -1245,3 +1245,15 @@ export const presentationSave = (
 
 export const presentationExportSave = (path: string, data: string): Promise<void> =>
   invoke('presentation_export_save', { path, data })
+
+export interface PresentationImage {
+  id: string
+  width: number
+  height: number
+  bytes: number
+  dataUrl: string
+}
+export const presentationImageImport = (path: string): Promise<PresentationImage> =>
+  invoke('presentation_image_import', { path })
+export const presentationImageRead = (id: string): Promise<PresentationImage> =>
+  invoke('presentation_image_read', { id })

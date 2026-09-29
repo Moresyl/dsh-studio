@@ -106,7 +106,7 @@ export function PresentationsPane() {
       const target = draft.elements.find((item) => item.id === selected)
       if (target) change(target)
     })
-  const insert = (kind: SlideElement['kind']) => {
+  const insert = (kind: Exclude<SlideElement['kind'], 'image'>) => {
     const frame = { id: crypto.randomUUID(), x: 80, y: 80, width: 480, height: 160, rotation: 0 }
     const item: SlideElement =
       kind === 'text'
@@ -353,6 +353,18 @@ export function PresentationsPane() {
                         {t(`deck.${kind}`)}
                       </Button>
                     ))}
+                    <Button
+                      variant="secondary"
+                      disabled={editor.busy !== null || slide.elements.length >= 200}
+                      onClick={() =>
+                        void editor.insertImage(slide.id).then((id) => {
+                          if (id) setSelected(id)
+                        })
+                      }
+                    >
+                      <Plus size={12} />
+                      {t('deck.image')}
+                    </Button>
                   </div>
                   <PresentationSlideView
                     slide={slide}
@@ -460,6 +472,40 @@ export function PresentationsPane() {
                             })
                           }
                         />
+                      )}
+                      {element.kind === 'image' && (
+                        <>
+                          <ValueField
+                            fieldKey={`${document.id}/${slide.id}/${element.id}/alt`}
+                            label={t('deck.imageAlt')}
+                            value={element.alt}
+                            commit={(value) =>
+                              editElement((draft) => {
+                                if (draft.kind === 'image') draft.alt = value
+                              })
+                            }
+                          />
+                          <div
+                            className="flex flex-wrap gap-1"
+                            role="group"
+                            aria-label={t('deck.imageFit')}
+                          >
+                            {(['contain', 'cover', 'stretch'] as const).map((fit) => (
+                              <Button
+                                key={fit}
+                                variant="secondary"
+                                aria-pressed={element.fit === fit}
+                                onClick={() =>
+                                  editElement((draft) => {
+                                    if (draft.kind === 'image') draft.fit = fit
+                                  })
+                                }
+                              >
+                                {t(`deck.imageFit.${fit}`)}
+                              </Button>
+                            ))}
+                          </div>
+                        </>
                       )}
                       {(element.kind === 'text' || element.kind === 'table') && (
                         <>

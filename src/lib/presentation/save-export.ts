@@ -4,6 +4,7 @@ import { t } from '@/lib/i18n'
 import { attachmentFilename } from '@/lib/attachment-save'
 import { parsePresentation } from './document'
 import { exportPresentationBackground } from './export-background'
+import { documentImages } from './media'
 
 export type ExportPhase = 'choosing' | 'generating' | 'saving'
 
@@ -24,7 +25,8 @@ export async function savePresentationExport(
   if (!path || signal.aborted) return false
   if (!/\.pptx$/i.test(path)) throw new Error(t('deck.exportExtension'))
   progress('generating')
-  const bytes = await exportPresentationBackground(document, signal)
+  const images = await documentImages(document, signal)
+  const bytes = await exportPresentationBackground(document, signal, images)
   signal.throwIfAborted()
   const chunks: string[] = []
   for (let offset = 0; offset < bytes.length; offset += 8192) {

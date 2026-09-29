@@ -109,6 +109,8 @@ export default defineConfig({
         'src/lib/attachment-kind.ts',
         'src/lib/pdf-preview.ts',
         'src/lib/presentation/document.ts',
+        'src/lib/presentation/image.ts',
+        'src/lib/presentation/media.ts',
         'src/lib/presentation/export.ts',
         'src/lib/presentation/export-background.ts',
         'src/lib/presentation/repository.ts',

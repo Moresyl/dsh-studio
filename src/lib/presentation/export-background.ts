@@ -1,9 +1,11 @@
 import { parsePresentation, PresentationError } from './document'
+import type { PresentationImage } from '@/lib/ipc'
 
 /** Keep document generation off the UI thread, with a worker owned by this operation. */
 export async function exportPresentationBackground(
   source: unknown,
   signal: AbortSignal,
+  images: Record<string, PresentationImage> = {},
 ): Promise<Uint8Array> {
   signal.throwIfAborted()
   const document = parsePresentation(source)
@@ -54,7 +56,7 @@ export async function exportPresentationBackground(
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) return abort()
     try {
-      worker.postMessage(document)
+      worker.postMessage({ document, images })
     } catch {
       finish(new PresentationError('export', 'could not start background export'))
     }

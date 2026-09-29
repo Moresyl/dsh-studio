@@ -27,8 +27,8 @@ afterEach(() => {
 it('exports a detached document and terminates after receiving bounded bytes', async () => {
   const source = fixture()
   const operation = exportPresentationBackground(source, new AbortController().signal)
-  expect(latest().postMessage).toHaveBeenCalledWith(source)
-  expect(latest().postMessage.mock.calls[0]![0]).not.toBe(source)
+  expect(latest().postMessage).toHaveBeenCalledWith({ document: source, images: {} })
+  expect(latest().postMessage.mock.calls[0]![0].document).not.toBe(source)
   latest().onmessage!({ data: { bytes: new Uint8Array([80, 75, 3, 4]).buffer } })
   expect(await operation).toEqual(new Uint8Array([80, 75, 3, 4]))
   expect(latest().terminate).toHaveBeenCalledOnce()

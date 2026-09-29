@@ -47,7 +47,14 @@ export interface ChartElement extends Frame {
   showLegend: boolean
 }
 
-export type SlideElement = TextElement | ShapeElement | TableElement | ChartElement
+export interface ImageElement extends Frame {
+  kind: 'image'
+  asset: string
+  alt: string
+  fit: 'contain' | 'cover' | 'stretch'
+}
+
+export type SlideElement = TextElement | ShapeElement | TableElement | ChartElement | ImageElement
 
 export interface PresentationSlide {
   id: string
@@ -59,7 +66,7 @@ export interface PresentationSlide {
 
 export interface PresentationDocument {
   format: 'dsh-studio-presentation'
-  version: 1
+  version: 1 | 2
   id: string
   title: string
   aspect: 'wide' | 'standard'
@@ -150,7 +157,7 @@ export function parsePresentation(value: unknown): PresentationDocument {
     'document',
   )
   choice(doc.format, ['dsh-studio-presentation'], 'document.format')
-  choice(doc.version, [1], 'document.version')
+  choice(doc.version, [1, 2], 'document.version')
   choice(doc.aspect, ['wide', 'standard'], 'document.aspect')
   identity(doc.id, new Set(), 'document.id')
   text(doc.title, PRESENTATION_TITLE_LIMIT, 'document.title', true)
@@ -158,6 +165,7 @@ export function parsePresentation(value: unknown): PresentationDocument {
   const size = presentationSize(doc.aspect as PresentationDocument['aspect'])
   const slideIds = new Set<string>()
   let elementCount = 0
+  const images = new Set<string>()
   for (const [index, value] of doc.slides.entries()) {
     const path = `slides[${index}]`
     const slide = record(value, ['id', 'title', 'notes', 'background', 'elements'], path)
@@ -169,9 +177,16 @@ export function parsePresentation(value: unknown): PresentationDocument {
     elementCount += slide.elements.length
     if (elementCount > 2_000) reject('document', 'element count limit exceeded')
     const ids = new Set<string>()
-    slide.elements.forEach((element, index) =>
-      validateElement(element, ids, size, `${path}.elements[${index}]`),
-    )
+    slide.elements.forEach((element, index) => {
+      validateElement(element, ids, size, `${path}.elements[${index}]`)
+      const checked = element as SlideElement
+      if (checked.kind === 'image') {
+        if (doc.version !== 2)
+          reject(`${path}.elements[${index}]`, 'images require document version 2')
+        images.add(checked.asset)
+        if (images.size > 100) reject('document', 'image count limit exceeded')
+      }
+    })
   }
   return doc as unknown as PresentationDocument
 }
@@ -193,7 +208,9 @@ function validateElement(
           ? ['rows', 'fontFace', 'fontSize', 'color', 'fill', 'border']
           : kind === 'chart'
             ? ['chart', 'categories', 'series', 'colors', 'showLegend']
-            : reject(`${path}.kind`, 'unsupported element')
+            : kind === 'image'
+              ? ['asset', 'alt', 'fit']
+              : reject(`${path}.kind`, 'unsupported element')
   const item = record(value, [...FRAME_KEYS, ...fields], path)
   identity(item.id, ids, `${path}.id`)
   number(item.x, 0, size.width, `${path}.x`)
@@ -203,6 +220,13 @@ function validateElement(
   number(item.height, minimum, size.height - item.y, `${path}.height`)
   if (item.width + item.height === 0) reject(path, 'empty frame')
   number(item.rotation, 0, 360, `${path}.rotation`)
+  if (kind === 'image') {
+    if (typeof item.asset !== 'string' || !/^[a-f0-9]{64}$/.test(item.asset))
+      reject(`${path}.asset`, 'invalid image resource identity')
+    text(item.alt, 1000, `${path}.alt`)
+    choice(item.fit, ['contain', 'cover', 'stretch'], `${path}.fit`)
+    return
+  }
   if (kind === 'text' || kind === 'table') {
     text(item.fontFace, 80, `${path}.fontFace`, true)
     number(item.fontSize, 6, 144, `${path}.fontSize`)

@@ -3,14 +3,19 @@ const mocks = vi.hoisted(() => ({
   save: vi.fn(),
   exportPresentationBackground: vi.fn(),
   presentationExportSave: vi.fn(),
+  presentationImageRead: vi.fn(),
 }))
 vi.mock('@tauri-apps/plugin-dialog', () => ({ save: mocks.save }))
 vi.mock('./export-background', () => ({
   exportPresentationBackground: mocks.exportPresentationBackground,
 }))
-vi.mock('@/lib/ipc', () => ({ presentationExportSave: mocks.presentationExportSave }))
+vi.mock('@/lib/ipc', () => ({
+  presentationExportSave: mocks.presentationExportSave,
+  presentationImageRead: mocks.presentationImageRead,
+}))
 import { savePresentationExport } from './save-export'
 import { fixture } from './fixtures.test-support'
+import { imageElement } from './image.test-support'
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -27,7 +32,7 @@ it('exports a click-time snapshot through a filtered save dialog and native atom
   const operation = savePresentationExport(source, controller.signal, progress)
   source.title = 'Changed during export'
   expect(await operation).toBe(true)
-  expect(mocks.exportPresentationBackground).toHaveBeenCalledWith(before, controller.signal)
+  expect(mocks.exportPresentationBackground).toHaveBeenCalledWith(before, controller.signal, {})
   expect(mocks.presentationExportSave).toHaveBeenCalledWith('C:/chosen/report.pptx', 'UEsDBA==')
   expect(mocks.save.mock.calls[0]![0].filters[0].extensions).toEqual(['pptx'])
   expect(progress.mock.calls.map(([phase]) => phase)).toEqual(['choosing', 'generating', 'saving'])
@@ -77,4 +82,16 @@ it('never writes a cancelled or failed generation and propagates disk errors', a
   await expect(
     savePresentationExport(fixture(), new AbortController().signal, vi.fn()),
   ).rejects.toThrow('disk failed')
+})
+
+it('preserves the destination when a referenced image is damaged', async () => {
+  const source = fixture()
+  source.version = 2
+  source.slides[0]!.elements = [imageElement()]
+  mocks.presentationImageRead.mockRejectedValue(new Error('image resource is damaged'))
+  await expect(
+    savePresentationExport(source, new AbortController().signal, vi.fn()),
+  ).rejects.toThrow('image resource is damaged')
+  expect(mocks.exportPresentationBackground).not.toHaveBeenCalled()
+  expect(mocks.presentationExportSave).not.toHaveBeenCalled()
 })

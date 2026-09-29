@@ -1,5 +1,7 @@
 import PptxGenJS from 'pptxgenjs'
 import { parsePresentation, presentationSize, PresentationError, type Frame } from './document'
+import { validateImage } from './image'
+import type { PresentationImage } from '@/lib/ipc'
 
 const position = (element: Frame) => ({
   x: element.x / 96,
@@ -22,10 +24,13 @@ const fontAttribute = (font: string) =>
     .replaceAll('\r', '&#13;')
 
 /** Compile data to native Office objects. No HTML, executable source or remote resource loading. */
-export async function exportPresentation(source: unknown): Promise<Uint8Array> {
+export async function exportPresentation(
+  source: unknown,
+  images: Record<string, PresentationImage> = {},
+): Promise<Uint8Array> {
   const document = parsePresentation(source)
   try {
-    return await compilePresentation(document)
+    return await compilePresentation(document, images)
   } catch (cause) {
     if (cause instanceof PresentationError) throw cause
     throw new PresentationError('export', 'could not create the presentation')
@@ -34,6 +39,7 @@ export async function exportPresentation(source: unknown): Promise<Uint8Array> {
 
 async function compilePresentation(
   document: ReturnType<typeof parsePresentation>,
+  images: Record<string, PresentationImage>,
 ): Promise<Uint8Array> {
   const size = presentationSize(document.aspect)
   const output = new PptxGenJS()
@@ -90,6 +96,31 @@ async function compilePresentation(
             margin: 4,
           },
         )
+      } else if (element.kind === 'image') {
+        const image = validateImage(images[element.asset]!, element.asset)
+        const scale = Math.min(frame.w / image.width, frame.h / image.height)
+        const sizing: PptxGenJS.ImageProps =
+          element.fit === 'contain'
+            ? {
+                x: frame.x + (frame.w - image.width * scale) / 2,
+                y: frame.y + (frame.h - image.height * scale) / 2,
+                w: image.width * scale,
+                h: image.height * scale,
+              }
+            : element.fit === 'cover'
+              ? {
+                  w: image.width / 96,
+                  h: image.height / 96,
+                  sizing: { type: 'cover', w: frame.w, h: frame.h },
+                }
+              : frame
+        slide.addImage({
+          ...frame,
+          ...sizing,
+          data: image.dataUrl,
+          rotate: element.rotation,
+          altText: element.alt,
+        })
       } else {
         slide.addChart(
           output.ChartType[element.chart],
