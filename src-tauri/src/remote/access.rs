@@ -198,7 +198,9 @@ impl Access {
             Err(poisoned) => {
                 let mut state = PoisonError::into_inner(poisoned);
                 state.code = None;
-                state.devices.clear();
+                for device in state.devices.drain(..) {
+                    let _ = self.revoked.send(device.id);
+                }
                 self.state.clear_poison();
                 state
             }
@@ -358,7 +360,9 @@ mod tests {
     fn poisoned_authentication_state_fails_closed_and_can_be_renewed() {
         let access = open();
         let code = code_of(&access);
-        assert!(access.pair(&code, "").is_some());
+        let cookie = access.pair(&code, "").expect("paired");
+        let device = access.admit(&cookie).expect("admitted");
+        let mut revocations = access.watch_revocations();
 
         let _ = panic::catch_unwind(AssertUnwindSafe(|| {
             let _held = access.state.lock().expect("initial lock");
@@ -366,6 +370,11 @@ mod tests {
         }));
 
         assert!(access.devices().is_empty());
+        assert_eq!(
+            revocations.try_recv().expect("live relays are revoked"),
+            device
+        );
+        assert!(access.admit(&cookie).is_none());
         assert!(access.pairing().is_none());
         access.renew().expect("renew after recovery");
         assert!(access.pairing().is_some());

@@ -18,6 +18,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Revoke live remote streams when recovering poisoned authentication state, rather than only clearing the displayed device list and refusing later requests.
 - Authenticate the remote gateway with current Harness before accepting devices, fixing successful pairing followed by unauthorized pages and APIs. Keep upstream credentials in memory, refresh them after Harness restarts, reject cross-origin browser requests before rewriting headers, and preserve authenticated WebSocket streams while closing ordinary HTTP connections between requests.
 - Subscribe to remote-device revocation before admission and cancel upstream setup as well as established streams. Closing remote access also drops incomplete requests, with active connection counts cleaned up on cancellation.
 - Read current tool-role result bodies and their attachments, retain legacy nested results, and resolve tool names from recorded calls. Keep append-origin human history while excluding model-only surface replacement copies from transcript text, turn counts and duplicated usage.
