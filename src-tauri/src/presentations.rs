@@ -1,4 +1,5 @@
 //! Bounded local presentation sources. No imported paths or executable content.
+mod package;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -212,15 +213,10 @@ fn export_file(path: &Path, data: &str) -> Result<()> {
     if bytes.len() > MAXIMUM {
         return Err(failure("presentation export size limit exceeded"));
     }
-    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes))
-        .map_err(|_| failure("invalid presentation export archive"))?;
-    if archive.len() > 20_000
-        || archive.by_name("[Content_Types].xml").is_err()
-        || archive.by_name("ppt/presentation.xml").is_err()
-    {
-        return Err(failure("unsupported presentation export archive"));
-    }
-    drop(archive);
+    let mut archive = package::Package::open(&bytes)?;
+    archive.read_part("[Content_Types].xml", 8 * 1024 * 1024)?;
+    archive.read_part("ppt/presentation.xml", 8 * 1024 * 1024)?;
+    archive.verify_contents()?;
     crate::atomic::write(path, bytes)
         .map_err(|_| failure("could not save export at the selected location"))
 }
