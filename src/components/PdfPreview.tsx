@@ -235,12 +235,21 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
           )}
           <div
             ref={canvasHost}
+            tabIndex={0}
+            role="region"
+            aria-label={t('sessions.previewPdf')}
             className="max-h-[calc(100dvh-260px)] min-h-32 overflow-auto rounded-lg bg-canvas-deep p-3"
           />
           {text && (
             <details className="text-[12px] text-muted">
-              <summary className="cursor-pointer">{t('sessions.pdfText')}</summary>
-              <pre className="selectable max-h-52 overflow-auto whitespace-pre-wrap break-words p-3">
+              <summary tabIndex={0} className="cursor-pointer">
+                {t('sessions.pdfText')}
+              </summary>
+              <pre
+                tabIndex={0}
+                aria-label={t('sessions.pdfText')}
+                className="selectable max-h-52 overflow-auto whitespace-pre-wrap break-words p-3"
+              >
                 {text}
               </pre>
             </details>

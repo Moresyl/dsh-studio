@@ -35,13 +35,17 @@ export function holdFocus(
     card.querySelectorAll<HTMLElement>(
       'button, input, textarea, select, a[href], [tabindex], [contenteditable="true"]',
     ),
-  ).filter(
-    (stop) =>
+  ).filter((stop) => {
+    const closedDisclosure = stop.closest('details:not([open])')
+    return (
       stop.tabIndex >= 0 &&
       !stop.matches(':disabled') &&
       !stop.closest('[hidden], [inert]') &&
-      stop.getClientRects().length > 0,
-  )
+      stop.getClientRects().length > 0 &&
+      // Some WebViews retain layout boxes for collapsed details content.
+      (!closedDisclosure || closedDisclosure.querySelector(':scope > summary')?.contains(stop))
+    )
+  })
   const first = stops.at(0)
   const last = stops.at(-1)
   if (!first || !last) {

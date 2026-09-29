@@ -67,6 +67,26 @@ describe('modal keyboard boundaries', () => {
     expect(event.preventDefault).toHaveBeenCalledOnce()
   })
 
+  it('excludes collapsed disclosure contents even when the WebView retains their layout boxes', () => {
+    const first = control()
+    const summary = control()
+    const text = control()
+    const disclosure = {
+      querySelector: () => ({ contains: (value: HTMLElement) => value === summary }),
+    }
+    for (const stop of [summary, text]) {
+      stop.closest = vi.fn((selector: string) =>
+        selector === 'details:not([open])' ? (disclosure as unknown as Element) : null,
+      ) as typeof stop.closest
+    }
+    vi.stubGlobal('document', { activeElement: summary })
+    const forward = key('Tab')
+    holdFocus(card([first, summary, text]), forward, vi.fn())
+    expect(first.focus).toHaveBeenCalledOnce()
+    expect(forward.preventDefault).toHaveBeenCalledOnce()
+    expect(text.focus).not.toHaveBeenCalled()
+  })
+
   it('leaves ordinary tab movement alone and isolates Escape from the underlying pane', () => {
     const first = control()
     const middle = control()
