@@ -186,6 +186,18 @@ async fn checked_candidate<R: Runtime>(
     app: &AppHandle<R>,
     version: Option<&str>,
 ) -> Result<Option<(Update, Candidate)>> {
+    // Bound the entire review, including catalog and signature requests.
+    tokio::time::timeout(CHECK_TIMEOUT, fetch_candidate(app, version))
+        .await
+        .map_err(|_| {
+            failure("application update check timed out; retry or check the Releases page")
+        })?
+}
+
+async fn fetch_candidate<R: Runtime>(
+    app: &AppHandle<R>,
+    version: Option<&str>,
+) -> Result<Option<(Update, Candidate)>> {
     let mut builder = app
         .updater_builder()
         .timeout(Duration::from_secs(12))

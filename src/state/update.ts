@@ -43,6 +43,8 @@ interface UpdateState {
   /** A successful check has completed, including the up-to-date result. */
   checked: boolean
   checking: boolean
+  manualChecking: boolean
+  checkedAt: number | null
   installing: boolean
   targetRelease: Release | null
   installation: Release | null
@@ -64,6 +66,8 @@ export const useUpdate = create<UpdateState>((set, get) => ({
   release: null,
   checked: false,
   checking: false,
+  manualChecking: false,
+  checkedAt: null,
   installing: false,
   targetRelease: null,
   installation: null,
@@ -78,13 +82,15 @@ export const useUpdate = create<UpdateState>((set, get) => ({
    */
   check: async (quiet = false) => {
     if (get().installing) return
+    if (!quiet && get().manualChecking) return
+    if (!quiet) set({ manualChecking: true })
     let operation = activeCheck
     if (operation === null) {
       set({ checking: true, error: null })
       operation = (async () => {
         const release = await checkForUpdate()
         void discardReview(get().release)
-        set({ release, checked: true })
+        set({ release, checked: true, checkedAt: Date.now() })
       })().finally(() => {
         activeCheck = null
         set({ checking: false })
@@ -101,6 +107,8 @@ export const useUpdate = create<UpdateState>((set, get) => ({
         void discardReview(get().release)
         set({ release: null, checked: false, error: reportFailure(cause) })
       }
+    } finally {
+      if (!quiet) set({ manualChecking: false })
     }
   },
 

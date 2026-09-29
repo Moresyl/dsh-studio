@@ -58,6 +58,8 @@ beforeEach(() => {
     release: null,
     checked: false,
     checking: false,
+    manualChecking: false,
+    checkedAt: null,
     installing: false,
     targetRelease: null,
     installation: null,
@@ -103,6 +105,18 @@ describe('checking', () => {
     expect(updater.checkForUpdate).toHaveBeenCalledOnce()
   })
 
+  it('records a fresh completion even when repeated checks find no update', async () => {
+    vi.useFakeTimers()
+    updater.checkForUpdate.mockResolvedValue(null)
+    vi.setSystemTime(new Date('2026-09-29T01:00:00Z'))
+    await useUpdate.getState().check()
+    const first = useUpdate.getState().checkedAt
+    vi.advanceTimersByTime(1000)
+    await useUpdate.getState().check()
+    expect(useUpdate.getState().checkedAt).toBe(first! + 1000)
+    expect(useUpdate.getState().manualChecking).toBe(false)
+  })
+
   it('makes a manual check observe an already-running quiet failure', async () => {
     let fail!: (cause: Error) => void
     updater.checkForUpdate.mockReturnValue(
@@ -112,12 +126,18 @@ describe('checking', () => {
     )
 
     const quiet = useUpdate.getState().check(true)
+    expect(useUpdate.getState().manualChecking).toBe(false)
     const manual = useUpdate.getState().check(false)
+    expect(useUpdate.getState().manualChecking).toBe(true)
     fail(new Error('feed unavailable'))
     await Promise.all([quiet, manual])
 
     expect(updater.checkForUpdate).toHaveBeenCalledOnce()
-    expect(useUpdate.getState()).toMatchObject({ checking: false, error: 'feed unavailable' })
+    expect(useUpdate.getState()).toMatchObject({
+      checking: false,
+      manualChecking: false,
+      error: 'feed unavailable',
+    })
     expect(useDialog.getState().pending).toMatchObject({
       kind: 'error',
       details: 'feed unavailable',

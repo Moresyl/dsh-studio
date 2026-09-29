@@ -68,6 +68,8 @@ export function AboutPane() {
   const targetRelease = useUpdate((state) => state.targetRelease)
   const checked = useUpdate((state) => state.checked)
   const checking = useUpdate((state) => state.checking)
+  const manualChecking = useUpdate((state) => state.manualChecking)
+  const checkedAt = useUpdate((state) => state.checkedAt)
   const installing = useUpdate((state) => state.installing)
   const checkFailure = useUpdate((state) => state.error)
   const check = useUpdate((state) => state.check)
@@ -156,7 +158,7 @@ export function AboutPane() {
           <Button
             variant="secondary"
             onClick={() => void check()}
-            disabled={checking || installing}
+            disabled={manualChecking || installing}
           >
             {checking ? (
               <>
@@ -174,6 +176,13 @@ export function AboutPane() {
 
         <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
           <div className="mx-auto flex max-w-[780px] flex-col gap-4">
+            <p role="status" aria-live="polite" className="text-[12px] text-muted">
+              {checking
+                ? t('about.checkingDetail')
+                : checked && checkedAt !== null
+                  ? t('about.checkedAt', { time: new Date(checkedAt).toLocaleTimeString() })
+                  : null}
+            </p>
             <div className="flex items-center gap-4 rounded-panel border border-line bg-canvas-deep/50 px-5 py-4">
               <BrandMark size={52} className="shrink-0 rounded-[12px] shadow-lift" />
               <div className="flex min-w-0 flex-col gap-1.5">
