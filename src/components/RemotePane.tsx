@@ -70,6 +70,7 @@ export function RemotePane() {
   const phase = useHarness((state) => state.status.phase)
   const status = useRemote((state) => state.status)
   const busy = useRemote((state) => state.busy)
+  const operation = useRemote((state) => state.operation)
   const error = useRemote((state) => state.error)
   const refresh = useRemote((state) => state.refresh)
   const open = useRemote((state) => state.open)
@@ -100,14 +101,28 @@ export function RemotePane() {
             }}
             size={6}
           />
-          {isOpen
-            ? t('remote.state.open')
-            : suspended
-              ? t('remote.state.reconnecting')
-              : t('remote.state.closed')}
+          {operation === 'open'
+            ? t('remote.opening')
+            : operation === 'close'
+              ? t('remote.closing')
+              : isOpen
+                ? t('remote.state.open')
+                : suspended
+                  ? t('remote.state.reconnecting')
+                  : t('remote.state.closed')}
         </span>
 
-        {isOpen ? (
+        {operation === 'open' ? (
+          <Button variant="secondary" onClick={() => void close()}>
+            <Loader2 size={13} className="animate-spin" />
+            {t('remote.cancelOpening')}
+          </Button>
+        ) : operation === 'close' ? (
+          <Button variant="secondary" disabled>
+            <Loader2 size={13} className="animate-spin" />
+            {t('remote.closing')}
+          </Button>
+        ) : isOpen ? (
           <Button variant="secondary" onClick={() => void close()} disabled={busy}>
             {t('remote.close')}
           </Button>

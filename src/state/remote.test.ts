@@ -25,10 +25,62 @@ const status = (open: boolean): RemoteStatus => ({
 beforeEach(() => {
   vi.resetAllMocks()
   useDialog.setState({ pending: null })
-  useRemote.setState({ status: status(false), busy: false, error: null })
+  useRemote.setState({ status: status(false), busy: false, operation: null, error: null })
 })
 
 describe('remote access state', () => {
+  it('cancels an opening request and ignores its late success', async () => {
+    let finish!: (answer: RemoteStatus) => void
+    vi.mocked(ipc.remoteOpen).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    vi.mocked(ipc.remoteClose).mockResolvedValueOnce(status(false))
+    const opening = useRemote.getState().open()
+    expect(useRemote.getState().operation).toBe('open')
+    await useRemote.getState().close()
+    expect(ipc.remoteClose).toHaveBeenCalledOnce()
+    finish(status(true))
+    await opening
+    expect(useRemote.getState()).toMatchObject({
+      status: { open: false },
+      busy: false,
+      operation: null,
+    })
+  })
+
+  it('does not let a cancelled open clear a newer operation or show its error', async () => {
+    let fail!: (cause: Error) => void
+    let finish!: (answer: RemoteStatus) => void
+    vi.mocked(ipc.remoteOpen)
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          fail = reject
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finish = resolve
+        }),
+      )
+    vi.mocked(ipc.remoteClose).mockResolvedValueOnce(status(false))
+    const old = useRemote.getState().open()
+    await useRemote.getState().close()
+    const newer = useRemote.getState().open()
+    fail(new Error('obsolete timeout'))
+    await old
+    expect(useRemote.getState()).toMatchObject({ busy: true, operation: 'open', error: null })
+    expect(useDialog.getState().pending).toBeNull()
+    finish(status(true))
+    await newer
+    expect(useRemote.getState()).toMatchObject({
+      status: { open: true },
+      busy: false,
+      operation: null,
+    })
+  })
+
   it('deduplicates open while a native request is pending', async () => {
     let finish!: (answer: RemoteStatus) => void
     vi.mocked(ipc.remoteOpen).mockReturnValueOnce(

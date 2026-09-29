@@ -10,6 +10,7 @@ import {
   parseReadyOrigin,
   prepareSmokeProfile,
   REQUIRED_APPLICATION_MODULES,
+  verifyProfileBoot,
 } from './runtime-profile-smoke.mjs'
 
 test('readiness accepts only an explicit loopback HTTP port', () => {
@@ -113,6 +114,77 @@ test('smoke profile mirrors the product bootstrap and materializes integration',
     )
     assert.match(probe, /inject = \['dshStudioHost'\]/)
     assert.match(await readFile(made.probePatch, 'utf8'), /dsh-studio-host-contract-probe/)
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('a silent startup identifies the entered Node phase and times out without claiming readiness', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-silent-startup-test-'))
+  try {
+    const runtime = join(root, 'runtime')
+    const integration = join(runtime, 'node_modules', '@moresyl', 'dsh-studio-integration')
+    await mkdir(join(integration, 'lib'), { recursive: true })
+    for (const relative of [
+      'package.json',
+      'cordis.patch.yml',
+      'lib/index.js',
+      'lib/file-preview.js',
+      'lib/client.js',
+      'lib/runtime-resolver.cjs',
+    ]) {
+      await writeFile(join(integration, relative), relative === 'package.json' ? '{}' : '')
+    }
+    const entry = join(runtime, 'silent.mjs')
+    await writeFile(entry, 'setInterval(() => {}, 1000)\n')
+    const progress = []
+    await assert.rejects(
+      verifyProfileBoot({
+        entry,
+        runtimeRoot: runtime,
+        dshHome: join(root, 'home'),
+        studioVersion: 'test',
+        harnessVersion: 'test',
+        timeout: 1500,
+        onProgress: (stream, line) => progress.push({ stream, line }),
+      }),
+      (error) => {
+        assert.match(error.message, /did not announce a port within 1500 ms/)
+        assert.match(error.message, /entered Node; waiting for Harness readiness/)
+        assert.match(error.message, /Node v\d+/)
+        assert(!error.message.includes(root))
+        return true
+      },
+    )
+    assert(progress.some((entry) => entry.line.includes('Node entered managed startup')))
+    assert(progress.some((entry) => entry.stream === 'status'))
+    await writeFile(
+      entry,
+      "console.error('http://127.0.0.1:1234/?token=private-test-secret'); console.error('x'.repeat(10000)); process.exitCode=5\n",
+    )
+    const failedProgress = []
+    await assert.rejects(
+      verifyProfileBoot({
+        entry,
+        runtimeRoot: runtime,
+        dshHome: join(root, 'failed-home'),
+        studioVersion: 'test',
+        harnessVersion: 'test',
+        timeout: 1500,
+        onProgress: (stream, line) => failedProgress.push({ stream, line }),
+      }),
+      (error) => {
+        assert.match(error.message, /closed before readiness with 5/)
+        assert(!error.message.includes('private-test-secret'))
+        return true
+      },
+    )
+    assert(failedProgress.some((entry) => entry.line.includes('[redacted]')))
+    assert(
+      failedProgress.every(
+        (entry) => entry.line.length <= 4096 && !entry.line.includes('private-test-secret'),
+      ),
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }

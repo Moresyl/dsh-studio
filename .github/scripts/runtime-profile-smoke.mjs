@@ -170,14 +170,24 @@ export async function verifyProfileBoot({
   studioVersion,
   harnessVersion,
   timeout = 120_000,
+  onProgress = () => {},
 }) {
   const { marker, patch, probePatch, profile } = await prepareSmokeProfile(runtimeRoot, dshHome)
   const workspace = join(dshHome, 'workspace')
   await mkdir(workspace, { recursive: true })
+  // Runs before the managed resolver and the CLI's module graph. A silent
+  // timeout can then distinguish Node startup from Harness initialization.
+  const startupTrace = join(dshHome, 'studio-startup-trace.cjs')
+  await writeFile(
+    startupTrace,
+    "process.stderr.write('[studio-startup] Node entered managed startup\\n')\n",
+  )
 
   const child = spawn(
     process.execPath,
     [
+      '--require',
+      startupTrace,
       '--require',
       join(
         runtimeRoot,
@@ -217,10 +227,25 @@ export async function verifyProfileBoot({
   )
 
   const output = []
+  const started = Date.now()
+  let enteredNode = false
   const remember = (stream, line) => {
-    output.push(`[${stream}] ${line.replace(/([?&]token=)[^\s&#]+/gu, '$1[redacted]')}`)
+    if (line === '[studio-startup] Node entered managed startup') enteredNode = true
+    const safe = line.replace(/([?&]token=)[^\s&#]+/gu, '$1[redacted]').slice(0, 4096)
+    output.push(`[${stream}] ${safe}`)
     if (output.length > 200) output.shift()
+    onProgress(stream, safe)
   }
+  const diagnostic = () =>
+    `Node ${process.version} ${process.platform}/${process.arch}; child ${child.pid ? 'spawned' : 'not spawned'}; ${enteredNode ? 'entered Node; waiting for Harness readiness' : 'no Node startup marker received'}; NODE_OPTIONS ${process.env.NODE_OPTIONS ? 'set' : 'unset'}`
+  onProgress(
+    'status',
+    `Starting isolated Harness verification (${process.version}, ${process.platform}/${process.arch})`,
+  )
+  const progressTimer = setInterval(() => {
+    onProgress('status', `Waiting ${Math.floor((Date.now() - started) / 1000)}s: ${diagnostic()}`)
+  }, 10_000)
+  progressTimer.unref()
   const stdout = createInterface({ input: child.stdout })
   const stderr = createInterface({ input: child.stderr })
   stderr.on('line', (line) => remember('stderr', line))
@@ -236,7 +261,11 @@ export async function verifyProfileBoot({
       }
       const timer = setTimeout(
         () =>
-          finish(() => reject(bootFailure(`did not announce a port within ${timeout} ms`, output))),
+          finish(() =>
+            reject(
+              bootFailure(`did not announce a port within ${timeout} ms\n${diagnostic()}`, output),
+            ),
+          ),
         timeout,
       )
       stdout.on('line', (line) => {
@@ -335,6 +364,7 @@ export async function verifyProfileBoot({
     }
     return origin
   } finally {
+    clearInterval(progressTimer)
     stdout.close()
     stderr.close()
     await stop(child)
@@ -366,9 +396,16 @@ function bootFailure(message, output) {
 async function stop(child) {
   if (child.exitCode !== null || child.signalCode !== null) return
   child.kill('SIGTERM')
-  await Promise.race([
-    new Promise((resolve) => child.once('exit', resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5_000)),
-  ])
+  let timer
+  try {
+    await Promise.race([
+      new Promise((resolve) => child.once('exit', resolve)),
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, 5_000)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
   if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
 }

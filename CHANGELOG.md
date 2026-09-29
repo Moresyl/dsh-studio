@@ -18,6 +18,8 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Stream isolated runtime startup progress into the installation log and include the Node startup phase in timeout diagnostics. Bound and redact forwarded lines, and clear the cleanup timer after the child exits. These diagnostics do not bypass startup verification.
+- Allow cancelling a pending remote connection, interrupting unanswered runtime authentication and queued opens. Ignore obsolete replies so a cancelled attempt cannot reopen the panel or clear a newer operation's busy state.
 - Revoke live remote streams when recovering poisoned authentication state, rather than only clearing the displayed device list and refusing later requests.
 - Authenticate the remote gateway with current Harness before accepting devices, fixing successful pairing followed by unauthorized pages and APIs. Keep upstream credentials in memory, refresh them after Harness restarts, reject cross-origin browser requests before rewriting headers, and preserve authenticated WebSocket streams while closing ordinary HTTP connections between requests.
 - Subscribe to remote-device revocation before admission and cancel upstream setup as well as established streams. Closing remote access also drops incomplete requests, with active connection counts cleaned up on cancellation.

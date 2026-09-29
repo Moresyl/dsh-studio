@@ -35,8 +35,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use serde::Serialize;
 use tokio::net::TcpListener;
-use tokio::sync::broadcast;
 use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::{broadcast, watch};
 
 use crate::error::{Error, Result};
 use access::{Access, DeviceView, CODE_LIFETIME};
@@ -99,6 +99,7 @@ pub struct Remote {
     suspended: Mutex<Option<Suspended>>,
     opening: AsyncMutex<()>,
     requested: AtomicBool,
+    cancelled: watch::Sender<u64>,
     changed: broadcast::Sender<()>,
 }
 
@@ -115,6 +116,7 @@ impl Remote {
             suspended: Mutex::new(None),
             opening: AsyncMutex::new(()),
             requested: AtomicBool::new(false),
+            cancelled: watch::channel(0).0,
             changed: broadcast::channel(16).0,
         }
     }
@@ -144,7 +146,13 @@ impl Remote {
     }
 
     async fn connect(&self, origin: &str) -> Result<RemoteStatus> {
-        let _opening = self.opening.lock().await;
+        let mut cancelled = self.cancelled.subscribe();
+        let generation = *cancelled.borrow();
+        let _opening = tokio::select! {
+            biased;
+            _ = cancelled.changed() => return Ok(self.status()),
+            opening = self.opening.lock() => opening,
+        };
         if !self.requested.load(Ordering::Acquire) {
             return Ok(self.status());
         }
@@ -153,7 +161,11 @@ impl Remote {
         }
 
         let suspended = self.suspended().take();
-        let status = self.open_listener(origin, suspended.as_ref()).await;
+        let status = tokio::select! {
+            biased;
+            _ = cancelled.changed() => return Ok(self.status()),
+            status = self.open_listener(origin, suspended.as_ref(), generation) => status,
+        };
         if status.is_err() {
             // A failed rebind must not throw away the phone credentials.
             if self.requested.load(Ordering::Acquire) {
@@ -198,6 +210,7 @@ impl Remote {
         &self,
         origin: &str,
         suspended: Option<&Suspended>,
+        generation: u64,
     ) -> Result<RemoteStatus> {
         let upstream = upstream::Upstream::authenticate(origin).await?;
         let host = suspended
@@ -231,13 +244,19 @@ impl Remote {
         // Storing replaces whatever was there, and dropping the old session
         // shuts its tasks down — so even the race two simultaneous callers could
         // win leaves exactly one door open.
-        *self.session() = Some(Session {
+        let mut session = self.session();
+        if *self.cancelled.borrow() != generation || !self.requested.load(Ordering::Acquire) {
+            drop(session);
+            return Ok(self.status());
+        }
+        *session = Some(Session {
             access,
             host,
             port,
             counters,
             _shutdown: shutdown,
         });
+        drop(session);
         if !self.requested.load(Ordering::Acquire) {
             self.session().take();
             return Ok(self.status());
@@ -250,6 +269,8 @@ impl Remote {
     /// Close the door. Safe to call when it is already closed.
     pub fn close(&self) {
         self.requested.store(false, Ordering::Release);
+        self.cancelled
+            .send_modify(|generation| *generation = generation.wrapping_add(1));
         let previous = self.session().take();
         let suspended = self.suspended().take();
         if previous.is_some() || suspended.is_some() {
@@ -616,5 +637,53 @@ mod tests {
         let remote = Remote::new();
         assert!(remote.open("http://192.168.1.5:3000").await.is_err());
         assert!(!remote.is_open());
+    }
+
+    #[tokio::test]
+    async fn close_cancels_an_unanswered_bootstrap_without_waiting_for_timeout() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}/?token=fixture", listener.local_addr().unwrap());
+        let remote = Arc::new(Remote::new());
+        let opening = tokio::spawn({
+            let remote = Arc::clone(&remote);
+            async move { remote.open(&origin).await }
+        });
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut request = [0; 2048];
+        assert!(socket.read(&mut request).await.unwrap() > 0);
+        remote.close();
+        let status = tokio::time::timeout(std::time::Duration::from_secs(2), opening)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(!status.open);
+        assert!(status.devices.is_empty());
+        assert!(!remote.requested.load(Ordering::Acquire));
+        let closed =
+            tokio::time::timeout(std::time::Duration::from_secs(2), socket.read(&mut request))
+                .await
+                .unwrap();
+        assert!(matches!(closed, Ok(0) | Err(_)));
+    }
+
+    #[tokio::test]
+    async fn close_cancels_queued_opens_even_if_a_new_open_is_requested() {
+        let remote = Remote::new();
+        let held = remote.opening.lock().await;
+        let first = remote.open("http://127.0.0.1:9/");
+        tokio::pin!(first);
+        tokio::select! {
+            _ = &mut first => panic!("open must wait for serialization"),
+            _ = tokio::task::yield_now() => {}
+        }
+        remote.close();
+        // Model a newer request while the obsolete one remains queued.
+        remote.requested.store(true, Ordering::Release);
+        drop(held);
+        let old = first.await.unwrap();
+        assert!(!old.open);
+        assert!(!remote.is_open());
+        remote.close();
     }
 }

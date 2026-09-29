@@ -18,6 +18,7 @@ interface RemoteStore {
   status: RemoteStatus | null
   /** An open or close request is in flight. */
   busy: boolean
+  operation: 'open' | 'close' | null
   error: string | null
 
   refresh: () => Promise<void>
@@ -32,10 +33,12 @@ interface RemoteStore {
 /** A mutation invalidates older reads; overlapping reads keep only the newest. */
 let mutationGeneration = 0
 let refreshGeneration = 0
+let operationGeneration = 0
 
 export const useRemote = create<RemoteStore>((set, get) => ({
   status: null,
   busy: false,
+  operation: null,
   error: null,
 
   refresh: async () => {
@@ -56,28 +59,30 @@ export const useRemote = create<RemoteStore>((set, get) => ({
   open: async () => {
     if (get().busy) return
     const mine = ++mutationGeneration
-    set({ busy: true, error: null })
+    const operation = ++operationGeneration
+    set({ busy: true, operation: 'open', error: null })
     try {
       const status = await ipc.remoteOpen()
       if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
       if (mine === mutationGeneration) set({ error: reportFailure(cause) })
     } finally {
-      set({ busy: false })
+      if (operation === operationGeneration) set({ busy: false, operation: null })
     }
   },
 
   close: async () => {
-    if (get().busy) return
+    if (get().operation === 'close') return
     const mine = ++mutationGeneration
-    set({ busy: true, error: null })
+    const operation = ++operationGeneration
+    set({ busy: true, operation: 'close', error: null })
     try {
       const status = await ipc.remoteClose()
       if (mine === mutationGeneration) set({ status, error: null })
     } catch (cause) {
       if (mine === mutationGeneration) set({ error: reportFailure(cause) })
     } finally {
-      set({ busy: false })
+      if (operation === operationGeneration) set({ busy: false, operation: null })
     }
   },
 

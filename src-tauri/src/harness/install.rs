@@ -502,7 +502,7 @@ where
     let runner = plan.target.join("studio-runtime-check.mjs");
     std::fs::write(&probe, include_bytes!("../../../.github/scripts/runtime-profile-smoke.mjs"))
         .and_then(|_| std::fs::write(&runner,
-            "import { verifyProfileBoot } from './studio-runtime-probe.mjs';\nimport { join } from 'node:path';\nimport { writeFileSync } from 'node:fs';\nconst [root, version, studioVersion] = process.argv.slice(2);\ntry {\nawait verifyProfileBoot({runtimeRoot: root, entry: join(root, 'studio-cli.mjs'), dshHome: join(root, 'studio-probe-home'), harnessVersion: version, studioVersion});\nconsole.log('Studio runtime startup verified');\n} catch (error) {\nwriteFileSync(join(root, 'studio-runtime-error.txt'), String(error.message).slice(0, 8192));\nconsole.error(error);\nprocess.exitCode = 1;\n}\n"))
+            "import { verifyProfileBoot } from './studio-runtime-probe.mjs';\nimport { join } from 'node:path';\nimport { writeFileSync } from 'node:fs';\nconst [root, version, studioVersion] = process.argv.slice(2);\ntry {\nawait verifyProfileBoot({runtimeRoot: root, entry: join(root, 'studio-cli.mjs'), dshHome: join(root, 'studio-probe-home'), harnessVersion: version, studioVersion, onProgress: (stream, line) => console.error(`[startup ${stream}] ${line}`)});\nconsole.log('Studio runtime startup verified');\n} catch (error) {\nwriteFileSync(join(root, 'studio-runtime-error.txt'), String(error.message).slice(0, 8192));\nconsole.error(error);\nprocess.exitCode = 1;\n}\n"))
         .map_err(|cause| Error::Install(format!("could not stage startup check: {cause}")))?;
     report(
         Stream::Stdout,
