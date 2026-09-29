@@ -126,70 +126,6 @@ async fn probe_command(
     Version::parse(std::str::from_utf8(&bytes).ok()?)
 }
 
-#[cfg(test)]
-mod probe_tests {
-    use super::*;
-    use std::time::{Duration, Instant};
-
-    fn shell(windows: &str, unix: &str) -> tokio::process::Command {
-        let mut command;
-        if cfg!(windows) {
-            command = tokio::process::Command::new("cmd.exe");
-            command.args(["/D", "/C", windows]);
-        } else {
-            command = tokio::process::Command::new("/bin/sh");
-            command.args(["-c", unix]);
-        }
-        command
-    }
-
-    #[tokio::test]
-    async fn accepts_a_successful_version_and_rejects_failures() {
-        let budget = Duration::from_secs(5);
-        assert_eq!(
-            probe_command(shell("echo v24.0.0", "printf 'v24.0.0\\n'"), budget).await,
-            Some(Version {
-                major: 24,
-                minor: 0,
-                patch: 0
-            })
-        );
-        for command in [
-            shell("echo broken", "printf broken"),
-            shell("echo v24.0.0 & exit /b 1", "printf v24.0.0; exit 1"),
-            tokio::process::Command::new("dsh-studio-missing-node-fixture"),
-        ] {
-            assert!(probe_command(command, budget).await.is_none());
-        }
-    }
-
-    #[tokio::test]
-    async fn bounds_silent_and_excessive_output_processes() {
-        for command in [
-            shell("ping -n 30 127.0.0.1 >nul", "sleep 30"),
-            shell(
-                "for /L %i in (1,1,5000) do @echo noise",
-                "while :; do printf noise; done",
-            ),
-            shell(
-                "echo v24.0.0 & ping -n 30 127.0.0.1 >nul",
-                "printf 'v24.0.0\\n'; sleep 30",
-            ),
-        ] {
-            let started = Instant::now();
-            assert!(probe_command(command, Duration::from_millis(200))
-                .await
-                .is_none());
-            assert!(started.elapsed() < Duration::from_secs(5));
-        }
-    }
-
-    #[tokio::test]
-    async fn public_probe_can_be_called_from_an_existing_runtime() {
-        assert!(probe(std::path::Path::new("dsh-studio-missing-node-fixture")).is_none());
-    }
-}
-
 /// Where `node` sits inside a release directory unpacked from an official
 /// archive, so a downloader and this scanner cannot disagree about the layout.
 pub fn release_executable(release_dir: &Path) -> PathBuf {
@@ -482,5 +418,69 @@ mod tests {
             plainly(r"\\build\tools\node.exe"),
             r"\\build\tools\node.exe"
         );
+    }
+}
+
+#[cfg(test)]
+mod probe_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    fn shell(windows: &str, unix: &str) -> tokio::process::Command {
+        let mut command;
+        if cfg!(windows) {
+            command = tokio::process::Command::new("cmd.exe");
+            command.args(["/D", "/C", windows]);
+        } else {
+            command = tokio::process::Command::new("/bin/sh");
+            command.args(["-c", unix]);
+        }
+        command
+    }
+
+    #[tokio::test]
+    async fn accepts_a_successful_version_and_rejects_failures() {
+        let budget = Duration::from_secs(5);
+        assert_eq!(
+            probe_command(shell("echo v24.0.0", "printf 'v24.0.0\\n'"), budget).await,
+            Some(Version {
+                major: 24,
+                minor: 0,
+                patch: 0
+            })
+        );
+        for command in [
+            shell("echo broken", "printf broken"),
+            shell("echo v24.0.0 & exit /b 1", "printf v24.0.0; exit 1"),
+            tokio::process::Command::new("dsh-studio-missing-node-fixture"),
+        ] {
+            assert!(probe_command(command, budget).await.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn bounds_silent_and_excessive_output_processes() {
+        for command in [
+            shell("ping -n 30 127.0.0.1 >nul", "sleep 30"),
+            shell(
+                "for /L %i in (1,1,5000) do @echo noise",
+                "while :; do printf noise; done",
+            ),
+            shell(
+                "echo v24.0.0 & ping -n 30 127.0.0.1 >nul",
+                "printf 'v24.0.0\\n'; sleep 30",
+            ),
+        ] {
+            let started = Instant::now();
+            assert!(probe_command(command, Duration::from_millis(200))
+                .await
+                .is_none());
+            assert!(started.elapsed() < Duration::from_secs(5));
+        }
+    }
+
+    #[tokio::test]
+    async fn public_probe_can_be_called_from_an_existing_runtime() {
+        assert!(probe(std::path::Path::new("dsh-studio-missing-node-fixture")).is_none());
     }
 }
