@@ -117,6 +117,7 @@ export default defineConfig({
         'src/lib/presentation/templates.ts',
         'src/lib/presentation/close-guard.ts',
         'src/lib/presentation/lifecycle-guard.ts',
+        'src/lib/presentation/renderer-recovery.ts',
         'src/lib/presentation/save-export.ts',
         'src/state/presentation-editor.ts',
         'src/lib/attachment-save.ts',

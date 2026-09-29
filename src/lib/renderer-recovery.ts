@@ -1,5 +1,10 @@
 import type { Presentation } from '@/state/presentation'
 import { rendererReloading } from '@/lib/ipc'
+import {
+  canAutomaticallyReload,
+  reloadPreservingPresentation,
+} from '@/lib/presentation/renderer-recovery'
+import { reportFailure } from '@/state/failure'
 
 const PRELOAD_EVENT = 'vite:preloadError'
 const PRELOAD_RELOAD_KEY = 'dsh-studio.renderer.preload-reload:v1'
@@ -47,8 +52,12 @@ export function installPreloadRecovery(
   rearm: Rearm = async () => await rendererReloading(rendererDocument),
 ): () => void {
   const timers = new Set<number>()
+  let disposed = false
 
   const onPreloadError = (event: Event) => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
+      document.activeElement.blur()
+    if (!canAutomaticallyReload()) return
     try {
       if (target.sessionStorage.getItem(PRELOAD_RELOAD_KEY) === '1') return
       // If this cannot be persisted, do not risk an endless reload. The lazy
@@ -61,11 +70,20 @@ export function installPreloadRecovery(
     event.preventDefault()
     let finished = false
     const reload = () => {
-      if (finished) return
+      if (finished || disposed) return
       finished = true
       for (const timer of timers) target.clearTimeout(timer)
       timers.clear()
-      target.location.reload()
+      void reloadPreservingPresentation(() => target.location.reload(), false)
+        .then((reloaded) => {
+          if (!reloaded)
+            reportFailure(
+              new Error(
+                'Reload paused to protect your presentation. / 为保护文稿，已暂停重新加载。请先保存文稿。',
+              ),
+            )
+        })
+        .catch(reportFailure)
     }
     const timer = target.setTimeout(reload, REARM_DEADLINE_MS)
     timers.add(timer)
@@ -80,6 +98,7 @@ export function installPreloadRecovery(
 
   target.addEventListener(PRELOAD_EVENT, onPreloadError)
   return () => {
+    disposed = true
     target.removeEventListener(PRELOAD_EVENT, onPreloadError)
     for (const timer of timers) target.clearTimeout(timer)
     timers.clear()

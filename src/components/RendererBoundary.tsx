@@ -2,6 +2,8 @@ import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 import { crashPayload } from '@/lib/crash'
 import { frontendCrash } from '@/lib/ipc'
+import { reloadPreservingPresentation } from '@/lib/presentation/renderer-recovery'
+import { describe } from '@/lib/errors'
 
 interface Props {
   children: ReactNode
@@ -9,14 +11,26 @@ interface Props {
 
 interface State {
   failed: boolean
+  recovering: boolean
+  error: string | null
 }
 
 /** The root-level last resort for a committed renderer that later fails. */
 export class RendererBoundary extends Component<Props, State> {
-  state: State = { failed: false }
+  state: State = { failed: false, recovering: false, error: null }
 
-  static getDerivedStateFromError(): State {
+  static getDerivedStateFromError(): Partial<State> {
     return { failed: true }
+  }
+
+  recover = async () => {
+    if (this.state.recovering) return
+    this.setState({ recovering: true, error: null })
+    try {
+      await reloadPreservingPresentation(() => window.location.reload())
+    } catch (cause) {
+      this.setState({ recovering: false, error: describe(cause) })
+    }
   }
 
   componentDidCatch(cause: unknown, _info: ErrorInfo) {
@@ -37,12 +51,14 @@ export class RendererBoundary extends Component<Props, State> {
           </div>
           <h1 className="text-lg font-semibold">{copy.title}</h1>
           <p className="mt-2 text-sm leading-6 text-muted">{copy.body}</p>
+          {this.state.error && <p className="mt-3 text-sm text-danger">{this.state.error}</p>}
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={() => void this.recover()}
+            disabled={this.state.recovering}
             className="mt-5 min-h-9 rounded-control bg-brand px-4 text-sm font-medium text-on-brand enabled:hover:brightness-[1.08] enabled:active:brightness-95"
           >
-            {copy.retry}
+            {this.state.recovering ? copy.working : copy.retry}
           </button>
         </section>
       </main>
@@ -54,13 +70,15 @@ export function rendererFailureCopy(language: string) {
   if (language.toLowerCase().startsWith('zh')) {
     return {
       title: '界面未能完成加载',
-      body: 'DSH Studio 已保留本地诊断信息。你可以安全地重新加载界面；Profile、会话和 Harness 数据不会被删除。',
-      retry: '重新加载',
+      body: '重新加载前会尝试保存当前文稿；保存失败会停止重载。输入框中尚未提交的文字可能无法恢复。已保存的 Profile、会话和 Harness 数据不会被删除。',
+      retry: '保存文稿并重新加载',
+      working: '正在准备重新加载…',
     }
   }
   return {
     title: 'The interface could not finish loading',
-    body: 'DSH Studio kept local diagnostic evidence. You can safely reload the interface; Profiles, sessions and Harness data will not be deleted.',
-    retry: 'Reload interface',
+    body: 'The current presentation will be saved before reloading; a failed save stops the reload. Uncommitted input may not be recoverable. Saved Profiles, sessions and Harness data will not be deleted.',
+    retry: 'Save presentation and reload',
+    working: 'Preparing to reload…',
   }
 }

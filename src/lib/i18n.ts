@@ -145,6 +145,10 @@ const en = {
   'deck.template.series': 'Sample data',
   'deck.untitled': 'Untitled presentation',
   'deck.save': 'Save',
+  'deck.recoverySaveFailed':
+    'The presentation could not be saved. The interface has not been reloaded.',
+  'deck.recoveryChanged':
+    'The presentation changed or another operation started while saving. Retry after it finishes.',
   'deck.saveBeforeExit':
     'Save unfinished presentations in every window, then retry. A window that is still loading or unavailable also prevents exit or update installation.',
   'deck.saveBeforeUpdate':
@@ -1064,6 +1068,8 @@ const zh: Record<MessageKey, string> = {
   'deck.template.series': '示例数据',
   'deck.untitled': '未命名文稿',
   'deck.save': '保存',
+  'deck.recoverySaveFailed': '文稿保存失败，界面尚未重新加载。',
+  'deck.recoveryChanged': '保存期间文稿发生了变化或开始了其他操作，请等待完成后重试。',
   'deck.saveBeforeExit':
     '请先保存所有窗口中未完成的文稿再重试。仍在加载或没有响应的窗口也会阻止退出和安装更新。',
   'deck.saveBeforeUpdate': '请先保存文稿，并等待文稿操作完成，再安装应用更新。',
