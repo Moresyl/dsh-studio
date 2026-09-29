@@ -4,6 +4,7 @@ import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PresentationSlideView } from '@/components/PresentationSlideView'
 import { PresentationTemplates } from '@/components/PresentationTemplates'
+import { PresentationPendingInputs } from '@/components/PresentationPendingInputs'
 import { t } from '@/lib/i18n'
 import { describe } from '@/lib/errors'
 import { presentationList, type PresentationSummary } from '@/lib/ipc'
@@ -33,6 +34,7 @@ export function PresentationsPane() {
 
   useEffect(() => () => exportJob.current?.abort(), [])
   const exportPptx = async () => {
+    if (!usePresentationEditor.getState().flushInputs()) return
     const source = usePresentationEditor.getState().document
     if (!source || exportJob.current) return
     const controller = new AbortController()
@@ -312,6 +314,7 @@ export function PresentationsPane() {
               {editor.error ?? libraryError}
             </p>
           )}
+          {editor.error && <PresentationPendingInputs />}
           {!document || !slide ? (
             <p className="p-8 text-[13px] text-muted">{t('deck.empty')}</p>
           ) : (
@@ -350,6 +353,7 @@ export function PresentationsPane() {
                     }
                   />
                   <ValueField
+                    fieldKey={`${document.id}/${slide.id}/notes`}
                     key={`${slide.id}-notes`}
                     label={t('deck.notes')}
                     value={slide.notes}
@@ -367,6 +371,7 @@ export function PresentationsPane() {
                 >
                   <legend className="px-1 text-[12px] text-muted">{t('deck.properties')}</legend>
                   <ValueField
+                    fieldKey={`${document.id}/title`}
                     label={t('deck.title')}
                     value={document.title}
                     commit={(value) =>
@@ -376,6 +381,7 @@ export function PresentationsPane() {
                     }
                   />
                   <ValueField
+                    fieldKey={`${document.id}/${slide.id}/title`}
                     label={t('deck.slideTitle')}
                     value={slide.title}
                     commit={(value) =>
@@ -413,6 +419,7 @@ export function PresentationsPane() {
                     <div key={element.id} className="space-y-3 border-t border-line pt-3">
                       {(['x', 'y', 'width', 'height'] as const).map((key) => (
                         <ValueField
+                          fieldKey={`${document.id}/${slide.id}/${element.id}/${key}`}
                           key={key}
                           label={t(`deck.${key}`)}
                           value={String(element[key])}
@@ -426,6 +433,7 @@ export function PresentationsPane() {
                       ))}
                       {element.kind === 'text' && (
                         <ValueField
+                          fieldKey={`${document.id}/${slide.id}/${element.id}/text`}
                           label={t('deck.text')}
                           value={element.text}
                           multiline
@@ -439,6 +447,7 @@ export function PresentationsPane() {
                       {(element.kind === 'text' || element.kind === 'table') && (
                         <>
                           <ValueField
+                            fieldKey={`${document.id}/${slide.id}/${element.id}/fontSize`}
                             label={t('deck.fontSize')}
                             value={String(element.fontSize)}
                             numeric
@@ -477,6 +486,7 @@ export function PresentationsPane() {
                           <div key={rowIndex} className="flex gap-1">
                             {row.map((cell, column) => (
                               <ValueField
+                                fieldKey={`${document.id}/${slide.id}/${element.id}/cell/${rowIndex}/${column}`}
                                 key={column}
                                 label={`${rowIndex + 1} · ${column + 1}`}
                                 value={cell}
@@ -494,6 +504,7 @@ export function PresentationsPane() {
                         element.categories.map((category, index) => (
                           <div key={index} className="space-y-1">
                             <ValueField
+                              fieldKey={`${document.id}/${slide.id}/${element.id}/category/${index}`}
                               label={`${t('deck.chart')} ${index + 1}`}
                               value={category}
                               commit={(value) =>
@@ -504,6 +515,7 @@ export function PresentationsPane() {
                             />
                             {element.series.map((series, seriesIndex) => (
                               <ValueField
+                                fieldKey={`${document.id}/${slide.id}/${element.id}/series/${seriesIndex}/${index}`}
                                 key={seriesIndex}
                                 label={series.name}
                                 numeric
@@ -552,29 +564,48 @@ export function PresentationsPane() {
 }
 
 function ValueField({
+  fieldKey,
   label,
   value,
   multiline,
   numeric,
   commit,
 }: {
+  fieldKey: string
   label: string
   value: string
   multiline?: boolean
   numeric?: boolean
   commit: (value: string) => boolean
 }) {
-  const [pending, setPending] = useState<string | null>(null)
-  const apply = () => {
-    if (pending !== null && pending !== value) commit(pending)
-    setPending(null)
-  }
+  const pending = usePresentationEditor((state) => state.inputs[fieldKey])
+  const apply = () => usePresentationEditor.getState().commitInput(fieldKey)
   const common = {
     className: 'field-control w-full min-w-0',
-    value: pending ?? value,
-    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setPending(event.target.value),
+    value: pending?.value ?? value,
+    onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const next = event.target.value
+      const editor = usePresentationEditor.getState()
+      if (next === value) editor.discardInput(fieldKey)
+      else
+        editor.stageInput(fieldKey, {
+          value: next,
+          label,
+          commit: (input) => (!numeric || input.trim() !== '') && commit(input),
+        })
+    },
     onBlur: apply,
+    onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (event.nativeEvent.isComposing) return
+      if (event.key === 'Enter' && !multiline) {
+        event.preventDefault()
+        event.currentTarget.blur()
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        usePresentationEditor.getState().discardInput(fieldKey)
+      }
+    },
   }
   return (
     <label className="block min-w-0 flex-1 space-y-1 text-[11px] text-muted">
@@ -582,21 +613,7 @@ function ValueField({
       {multiline ? (
         <textarea {...common} aria-label={label} rows={3} />
       ) : (
-        <input
-          {...common}
-          aria-label={label}
-          type={numeric ? 'number' : 'text'}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              event.currentTarget.blur()
-            }
-            if (event.key === 'Escape') {
-              event.preventDefault()
-              setPending(null)
-            }
-          }}
-        />
+        <input {...common} aria-label={label} type={numeric ? 'number' : 'text'} />
       )}
     </label>
   )

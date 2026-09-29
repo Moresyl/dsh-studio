@@ -16,9 +16,42 @@ beforeEach(() => {
     future: [],
     busy: null,
     error: null,
+    inputs: {},
   })
 })
 afterEach(() => vi.unstubAllGlobals())
+
+it('saves unfinished input retained after the editor component unmounts', async () => {
+  const document = fixture()
+  editor.setState({ document, saved: JSON.stringify(document) })
+  editor.getState().stageInput('title', {
+    label: 'Title',
+    value: 'Uncommitted title',
+    commit: (value) =>
+      editor.getState().edit((draft) => {
+        draft.title = value
+      }),
+  })
+  expect(canAutomaticallyReload()).toBe(false)
+  repository.savePresentation.mockImplementation(async (document) => ({
+    document,
+    revision: 'a'.repeat(64),
+  }))
+  const reload = vi.fn()
+  expect(await reloadPreservingPresentation(reload)).toBe(true)
+  expect(repository.savePresentation.mock.calls[0]![0].title).toBe('Uncommitted title')
+  expect(reload).toHaveBeenCalledOnce()
+})
+
+it('refuses to reload invalid unfinished input and retains its editable value', async () => {
+  editor.getState().replace(fixture())
+  editor.getState().stageInput('invalid', { label: 'Width', value: '-', commit: () => false })
+  const reload = vi.fn()
+  await expect(reloadPreservingPresentation(reload)).rejects.toThrow()
+  expect(reload).not.toHaveBeenCalled()
+  expect(repository.savePresentation).not.toHaveBeenCalled()
+  expect(editor.getState().inputs.invalid!.value).toBe('-')
+})
 
 it('locks a clean editor before navigation and releases it if navigation throws', async () => {
   const reload = vi.fn(() => {

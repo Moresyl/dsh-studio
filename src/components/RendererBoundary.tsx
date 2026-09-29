@@ -4,6 +4,7 @@ import { crashPayload } from '@/lib/crash'
 import { frontendCrash } from '@/lib/ipc'
 import { reloadPreservingPresentation } from '@/lib/presentation/renderer-recovery'
 import { describe } from '@/lib/errors'
+import { PresentationPendingInputs } from '@/components/PresentationPendingInputs'
 
 interface Props {
   children: ReactNode
@@ -51,6 +52,7 @@ export class RendererBoundary extends Component<Props, State> {
           </div>
           <h1 className="text-lg font-semibold">{copy.title}</h1>
           <p className="mt-2 text-sm leading-6 text-muted">{copy.body}</p>
+          <PresentationPendingInputs />
           {this.state.error && <p className="mt-3 text-sm text-danger">{this.state.error}</p>}
           <button
             type="button"
@@ -70,14 +72,14 @@ export function rendererFailureCopy(language: string) {
   if (language.toLowerCase().startsWith('zh')) {
     return {
       title: '界面未能完成加载',
-      body: '重新加载前会尝试保存当前文稿；保存失败会停止重载。输入框中尚未提交的文字可能无法恢复。已保存的 Profile、会话和 Harness 数据不会被删除。',
+      body: '重新加载前会尝试保存当前文稿，包括尚未提交的输入。输入无效或保存失败会停止重载；你可以在下方修正或放弃相应输入。已保存的 Profile、会话和 Harness 数据不会被删除。',
       retry: '保存文稿并重新加载',
       working: '正在准备重新加载…',
     }
   }
   return {
     title: 'The interface could not finish loading',
-    body: 'The current presentation will be saved before reloading; a failed save stops the reload. Uncommitted input may not be recoverable. Saved Profiles, sessions and Harness data will not be deleted.',
+    body: 'The current presentation, including unfinished input, will be saved before reloading. Invalid input or a failed save stops the reload; correct or discard unfinished fields below. Saved Profiles, sessions and Harness data will not be deleted.',
     retry: 'Save presentation and reload',
     working: 'Preparing to reload…',
   }

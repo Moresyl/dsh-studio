@@ -145,6 +145,10 @@ const en = {
   'deck.template.series': 'Sample data',
   'deck.untitled': 'Untitled presentation',
   'deck.save': 'Save',
+  'deck.invalidInput':
+    'Correct the unfinished field or press Escape to discard its input before continuing.',
+  'deck.pendingInputs': 'Unfinished fields',
+  'deck.discardInput': 'Discard input',
   'deck.recoverySaveFailed':
     'The presentation could not be saved. The interface has not been reloaded.',
   'deck.recoveryChanged':
@@ -1068,6 +1072,9 @@ const zh: Record<MessageKey, string> = {
   'deck.template.series': '示例数据',
   'deck.untitled': '未命名文稿',
   'deck.save': '保存',
+  'deck.invalidInput': '请先修正尚未完成的输入，或按 Escape 放弃该输入后再继续。',
+  'deck.pendingInputs': '尚未完成的输入',
+  'deck.discardInput': '放弃该输入',
   'deck.recoverySaveFailed': '文稿保存失败，界面尚未重新加载。',
   'deck.recoveryChanged': '保存期间文稿发生了变化或开始了其他操作，请等待完成后重试。',
   'deck.saveBeforeExit':

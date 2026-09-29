@@ -3,6 +3,13 @@ import { parsePresentation, type PresentationDocument } from '@/lib/presentation
 import { retainHistory } from '@/lib/presentation/authoring'
 import { loadPresentation, savePresentation } from '@/lib/presentation/repository'
 import { describe } from '@/lib/errors'
+import { t } from '@/lib/i18n'
+
+interface PendingInput {
+  value: string
+  label: string
+  commit: (value: string) => boolean
+}
 
 interface EditorState {
   document: PresentationDocument | null
@@ -14,6 +21,11 @@ interface EditorState {
   lockForUpdate: () => boolean
   unlockUpdate: () => void
   error: string | null
+  inputs: Record<string, PendingInput>
+  stageInput: (key: string, input: PendingInput) => void
+  discardInput: (key: string) => void
+  commitInput: (key: string) => boolean
+  flushInputs: () => boolean
   replace: (source: unknown, discard?: boolean) => boolean
   edit: (change: (draft: PresentationDocument) => void) => boolean
   undo: () => void
@@ -22,11 +34,15 @@ interface EditorState {
   save: () => Promise<boolean>
 }
 
-export const isPresentationDirty = (state: Pick<EditorState, 'document' | 'saved'>): boolean =>
-  state.document !== null && JSON.stringify(state.document) !== state.saved
+export const isPresentationDirty = (
+  state: Pick<EditorState, 'document' | 'saved' | 'inputs'>,
+): boolean =>
+  Object.keys(state.inputs).length > 0 ||
+  (state.document !== null && JSON.stringify(state.document) !== state.saved)
 
 /** One editor owns its draft; switching panes does not discard pending changes. */
 export function createPresentationEditor(synchronizing = false) {
+  let committingInput = false
   return create<EditorState>((set, get) => ({
     document: null,
     revision: null,
@@ -35,6 +51,42 @@ export function createPresentationEditor(synchronizing = false) {
     future: [],
     busy: synchronizing ? 'synchronizing' : null,
     error: null,
+    inputs: {},
+    stageInput: (key, input) => {
+      if (!get().document || (get().busy !== null && get().busy !== 'save')) return
+      set({ inputs: { ...get().inputs, [key]: input } })
+    },
+    discardInput: (key) => {
+      if (get().busy !== null && get().busy !== 'save') return
+      const inputs = { ...get().inputs }
+      delete inputs[key]
+      set({ inputs, error: null })
+    },
+    commitInput: (key) => {
+      const input = get().inputs[key]
+      if (!input) return true
+      if (get().busy !== null && get().busy !== 'save') return false
+      committingInput = true
+      try {
+        if (!input.commit(input.value)) {
+          set({ error: get().error ?? t('deck.invalidInput') })
+          return false
+        }
+        get().discardInput(key)
+        return true
+      } catch (cause) {
+        set({ error: describe(cause) })
+        return false
+      } finally {
+        committingInput = false
+      }
+    },
+    flushInputs: () => {
+      for (const key of Object.keys(get().inputs)) {
+        if (!get().commitInput(key)) return false
+      }
+      return true
+    },
     lockForUpdate: () => {
       const state = get()
       if (state.busy || isPresentationDirty(state)) return false
@@ -48,7 +100,15 @@ export function createPresentationEditor(synchronizing = false) {
       if (get().busy || (!discard && isPresentationDirty(get()))) return false
       try {
         const document = parsePresentation(source)
-        set({ document, revision: null, saved: null, past: [], future: [], error: null })
+        set({
+          document,
+          revision: null,
+          saved: null,
+          past: [],
+          future: [],
+          error: null,
+          inputs: {},
+        })
         return true
       } catch (cause) {
         set({ error: describe(cause) })
@@ -58,6 +118,10 @@ export function createPresentationEditor(synchronizing = false) {
     edit: (change) => {
       const state = get()
       if (!state.document || (state.busy !== null && state.busy !== 'save')) return false
+      if (!committingInput && Object.keys(state.inputs).length > 0) {
+        set({ error: t('deck.invalidInput') })
+        return false
+      }
       try {
         const before = JSON.stringify(state.document)
         const draft = parsePresentation(state.document)
@@ -73,6 +137,7 @@ export function createPresentationEditor(synchronizing = false) {
       }
     },
     undo: () => {
+      if (!get().flushInputs()) return
       const state = get()
       if (!state.document || (state.busy !== null && state.busy !== 'save') || !state.past.length)
         return
@@ -84,6 +149,7 @@ export function createPresentationEditor(synchronizing = false) {
       })
     },
     redo: () => {
+      if (!get().flushInputs()) return
       const state = get()
       if (!state.document || (state.busy !== null && state.busy !== 'save') || !state.future.length)
         return
@@ -106,6 +172,7 @@ export function createPresentationEditor(synchronizing = false) {
           saved: JSON.stringify(saved.document),
           past: [],
           future: [],
+          inputs: {},
         })
         return true
       } catch (cause) {
@@ -116,6 +183,7 @@ export function createPresentationEditor(synchronizing = false) {
       }
     },
     save: async () => {
+      if (!get().flushInputs()) return false
       const state = get()
       if (state.busy || !state.document) return false
       const snapshot = parsePresentation(state.document)

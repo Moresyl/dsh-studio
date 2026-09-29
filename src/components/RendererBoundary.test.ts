@@ -6,7 +6,7 @@ describe('renderer failure fallback', () => {
   it('provides a self-contained Chinese recovery action', () => {
     expect(rendererFailureCopy('zh-CN')).toEqual({
       title: '界面未能完成加载',
-      body: '重新加载前会尝试保存当前文稿；保存失败会停止重载。输入框中尚未提交的文字可能无法恢复。已保存的 Profile、会话和 Harness 数据不会被删除。',
+      body: '重新加载前会尝试保存当前文稿，包括尚未提交的输入。输入无效或保存失败会停止重载；你可以在下方修正或放弃相应输入。已保存的 Profile、会话和 Harness 数据不会被删除。',
       retry: '保存文稿并重新加载',
       working: '正在准备重新加载…',
     })
