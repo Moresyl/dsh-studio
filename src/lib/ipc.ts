@@ -1211,3 +1211,17 @@ const APPLICATION_CHECK_UPDATE = 'application://check-update'
 /** The native macOS application menu asked for an interactive update check. */
 export const onApplicationCheckUpdate = (handler: () => void): Promise<UnlistenFn> =>
   listen(APPLICATION_CHECK_UPDATE, handler)
+
+export interface SavedPresentation {
+  document: unknown
+  revision: string
+}
+
+export const presentationList = (): Promise<string[]> => invoke('presentation_list')
+export const presentationLoad = (id: string): Promise<SavedPresentation | null> =>
+  invoke('presentation_load', { id })
+export const presentationSave = (
+  id: string,
+  source: string,
+  revision: string | null,
+): Promise<SavedPresentation> => invoke('presentation_save', { id, source, revision })

@@ -89,6 +89,7 @@ export default defineConfig({
         'src/lib/presentation/document.ts',
         'src/lib/presentation/export.ts',
         'src/lib/presentation/export-background.ts',
+        'src/lib/presentation/repository.ts',
         'src/lib/attachment-save.ts',
         'src/lib/bridge.ts',
         'src/lib/crash.ts',

@@ -27,7 +27,10 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
     /broad process:default/,
   )
   for (const permission of ['updater:allow-download-and-install', 'updater:allow-install']) {
-    assert.throws(() => validateCapabilities({ permissions: [...permissions, permission] }), /broad updater:/)
+    assert.throws(
+      () => validateCapabilities({ permissions: [...permissions, permission] }),
+      /broad updater:/,
+    )
   }
   assert.throws(
     () =>
@@ -122,6 +125,6 @@ test('repository public contracts agree end to end', async () => {
     hostProtocol: 1,
     schema: '1.0.0',
     version: manifest.version,
-    commands: { invoked: 96, registered: 100, allowed: 100 },
+    commands: { invoked: 99, registered: 103, allowed: 103 },
   })
 })
