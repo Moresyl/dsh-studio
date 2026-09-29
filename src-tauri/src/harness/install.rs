@@ -649,6 +649,21 @@ where
                     Error::Install(format!("{label} could not be waited on: {cause}"))
                 })?;
             }
+            // A noisy child must not postpone the absolute deadline by keeping
+            // the activity branch ready on every biased poll.
+            _ = &mut total => {
+                let _ = guard.terminate_all();
+                let _ = child.wait().await;
+                if let Some(pid) = pid {
+                    let _ = guard.finish(pid);
+                }
+                out.abort();
+                err.abort();
+                return Err(Error::Install(format!(
+                    "{label} exceeded its {} ms total time limit and was stopped; review the preceding output before retrying",
+                    total_timeout.as_millis()
+                )));
+            }
             activity = observed.recv(), if observing => {
                 match activity {
                     Some(()) => idle.as_mut().reset(Instant::now() + idle_timeout),
@@ -664,19 +679,8 @@ where
                 out.abort();
                 err.abort();
                 return Err(Error::Install(format!(
-                    "{label} produced no output for 120 seconds and was stopped; retry on a working connection or use Full / Offline"
-                )));
-            }
-            _ = &mut total => {
-                let _ = guard.terminate_all();
-                let _ = child.wait().await;
-                if let Some(pid) = pid {
-                    let _ = guard.finish(pid);
-                }
-                out.abort();
-                err.abort();
-                return Err(Error::Install(format!(
-                    "{label} exceeded the 20 minute safety limit and was stopped; retry on a working connection or use Full / Offline"
+                    "{label} produced no output for {} ms and was stopped; review the preceding output before retrying",
+                    idle_timeout.as_millis()
                 )));
             }
         }
@@ -1776,7 +1780,51 @@ mod tests {
         )
         .await
         .expect_err("silent fixture should time out");
-        assert!(failure.to_string().contains("produced no output"));
+        assert!(failure
+            .to_string()
+            .contains("produced no output for 500 ms"));
+    }
+
+    #[test]
+    fn noisy_install_fixture() {
+        if std::env::var_os("DSH_STUDIO_NOISY_INSTALL_FIXTURE").is_some() {
+            let started = std::time::Instant::now();
+            while started.elapsed() < Duration::from_secs(10) {
+                println!("installation still working");
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn output_activity_cannot_extend_the_total_install_deadline() {
+        let mut command = Command::new(std::env::current_exe().expect("test executable"));
+        command
+            .arg("--exact")
+            .arg("harness::install::tests::noisy_install_fixture")
+            .arg("--nocapture")
+            .env("DSH_STUDIO_NOISY_INSTALL_FIXTURE", "1")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+        let lines = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let received = lines.clone();
+        let failure = run_command_with_limits(
+            command,
+            move |_, line| {
+                if line.contains("installation still working") {
+                    received.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+            },
+            "startup verification",
+            Duration::from_secs(5),
+            Duration::from_secs(1),
+            Duration::from_millis(100),
+        )
+        .await
+        .expect_err("output cannot bypass the deadline");
+        assert!(failure.to_string().contains("1000 ms total time limit"));
+        assert!(lines.load(std::sync::atomic::Ordering::Relaxed) > 0);
     }
 
     #[test]
