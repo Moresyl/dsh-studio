@@ -18,6 +18,7 @@ const required = [
   'src/plugins/switches.rs',
   'src/preferences.rs',
   'src/presentations/package.rs',
+  'src/presentations/media.rs',
   'src/presentations/structure.rs',
   'src/presentations/xml.rs',
   'src/remote/access.rs',

@@ -20,14 +20,14 @@ export function PresentationsPane() {
   const [templatesOpen, setTemplatesOpen] = useState(false)
   const [libraryError, setLibraryError] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
-  const [page, setPage] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [exportPhase, setExportPhase] = useState<ExportPhase | null>(null)
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const exportJob = useRef<AbortController | null>(null)
   const document = editor.document
-  const slide = document?.slides.find((item) => item.id === page) ?? document?.slides[0]
+  const slide =
+    document?.slides.find((item) => item.id === editor.activeSlide) ?? document?.slides[0]
   const element = slide?.elements.find((item) => item.id === selected)
   const dirty = isPresentationDirty(editor)
   const readOnly = editor.busy !== null && editor.busy !== 'save'
@@ -84,7 +84,6 @@ export function PresentationsPane() {
     if (exportJob.current) return
     if (!(await canDiscard())) return
     if (editor.replace(source, true)) {
-      setPage(null)
       setSelected(null)
     }
   }
@@ -92,7 +91,6 @@ export function PresentationsPane() {
     if (exportJob.current) return
     if (!(await canDiscard())) return
     if (await editor.open(id, true)) {
-      setPage(null)
       setSelected(null)
     }
   }
@@ -234,7 +232,6 @@ export function PresentationsPane() {
           onClick={() =>
             void editor.saveCopy(t('deck.copySuffix')).then((saved) => {
               if (saved) {
-                setPage(null)
                 setSelected(null)
                 setRefresh((n) => n + 1)
               }
@@ -277,7 +274,7 @@ export function PresentationsPane() {
                   key={item.id}
                   type="button"
                   onClick={() => {
-                    setPage(item.id)
+                    editor.selectSlide(item.id)
                     setSelected(null)
                   }}
                   aria-pressed={slide?.id === item.id}
@@ -299,7 +296,7 @@ export function PresentationsPane() {
                       draft.slides.push(next)
                     })
                   ) {
-                    setPage(next.id)
+                    editor.selectSlide(next.id)
                     setSelected(null)
                   }
                 }}
@@ -437,7 +434,6 @@ export function PresentationsPane() {
                           draft.slides = draft.slides.filter((item) => item.id !== slide.id)
                         })
                       ) {
-                        setPage(null)
                         setSelected(null)
                       }
                     }}

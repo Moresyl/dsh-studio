@@ -560,6 +560,13 @@ const en = {
     'This PDF could not be rendered. Retry or save the original file to view it in another app.',
   'sessions.fileContent': 'File content',
   'sessions.saveAttachment': 'Save original file',
+  'sessions.addToPresentation': 'Add to presentation',
+  'sessions.addingToPresentation': 'Adding',
+  'sessions.addedToPresentation': 'Added',
+  'sessions.addToPresentationFailed':
+    'Could not add this image. Check the presentation limits and image format, then retry.',
+  'sessions.presentationImageTooLarge': 'Presentation images must be at most 16 MiB.',
+  'sessions.presentationImageUnsupported': 'Presentations accept static PNG, JPEG and WebP images.',
   'sessions.attachmentSaved': 'Original file saved.',
   'sessions.attachmentSaveFailed':
     'Could not save the attachment. Keep Harness running, check the destination and retry. Files must be at most 20 MiB.',
@@ -1472,6 +1479,12 @@ const zh: Record<MessageKey, string> = {
   'sessions.pdfFailed': '无法渲染此 PDF。可以重试，或保存原文件后使用其他应用查看。',
   'sessions.fileContent': '文件内容',
   'sessions.saveAttachment': '保存原文件',
+  'sessions.addToPresentation': '添加到演示文稿',
+  'sessions.addingToPresentation': '正在添加',
+  'sessions.addedToPresentation': '已添加',
+  'sessions.addToPresentationFailed': '图片添加失败。请检查演示文稿限制和图片格式后重试。',
+  'sessions.presentationImageTooLarge': '演示文稿图片不能超过 16 MiB。',
+  'sessions.presentationImageUnsupported': '演示文稿仅支持静态 PNG、JPEG 和 WebP 图片。',
   'sessions.attachmentSaved': '原文件已保存。',
   'sessions.attachmentSaveFailed':
     '附件保存失败。请保持 Harness 运行、检查保存位置后重试；文件不能超过 20 MiB。',

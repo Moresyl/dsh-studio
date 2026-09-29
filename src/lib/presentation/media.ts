@@ -1,5 +1,10 @@
 import { open } from '@tauri-apps/plugin-dialog'
-import { presentationImageImport, presentationImageRead, type PresentationImage } from '@/lib/ipc'
+import {
+  presentationImageImport,
+  presentationImageImportAttachment,
+  presentationImageRead,
+  type PresentationImage,
+} from '@/lib/ipc'
 import { t } from '@/lib/i18n'
 import { PresentationError, type PresentationDocument } from './document'
 import { validateImage } from './image'
@@ -83,7 +88,9 @@ export async function documentImages(document: PresentationDocument, signal?: Ab
 }
 
 /** Selecting a file does not alter the document; the editor promotes it after validation. */
-export async function choosePresentationImage(): Promise<PresentationImage | null> {
+export async function choosePresentationImage(
+  document: PresentationDocument,
+): Promise<PresentationImage | null> {
   const path = await open({
     multiple: false,
     directory: false,
@@ -92,5 +99,33 @@ export async function choosePresentationImage(): Promise<PresentationImage | nul
   })
   if (path === null) return null
   if (typeof path !== 'string') throw new PresentationError('image', 'choose one image')
-  return remember(validateImage(await bounded(presentationImageImport(path))))
+  return remember(validateImage(await bounded(presentationImageImport(path, document))))
+}
+
+function base64(bytes: Uint8Array): string {
+  const chunks: string[] = [],
+    size = 3 * 8192
+  for (let offset = 0; offset < bytes.length; offset += size)
+    chunks.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + size))))
+  return chunks.join('')
+}
+
+/** Admit one already session-authorized attachment without exposing a host path. */
+export async function importPresentationAttachment(
+  attachmentId: string,
+  blob: Blob,
+  document: PresentationDocument,
+): Promise<PresentationImage> {
+  if (!/^sha256:[a-f0-9]{64}$/.test(attachmentId))
+    throw new PresentationError('image', 'invalid attachment identity')
+  if (blob.size < 1 || blob.size > 16 * 1024 * 1024)
+    throw new PresentationError('image', 'attachment image exceeds 16 MiB')
+  const bytes = new Uint8Array(await bounded(blob.arrayBuffer()))
+  if (bytes.byteLength !== blob.size)
+    throw new PresentationError('image', 'attachment image size changed while reading')
+  return remember(
+    validateImage(
+      await bounded(presentationImageImportAttachment(attachmentId, base64(bytes), document)),
+    ),
+  )
 }

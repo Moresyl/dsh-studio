@@ -2,6 +2,7 @@
 use std::collections::HashSet;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader};
@@ -13,11 +14,30 @@ use super::{directory, failure, WRITES};
 use crate::error::Result;
 
 const INPUT_LIMIT: usize = 16 * 1024 * 1024;
+const ENCODED_INPUT_LIMIT: usize = INPUT_LIMIT.div_ceil(3) * 4;
 const ASSET_LIMIT: usize = 8 * 1024 * 1024;
 const DOCUMENT_LIMIT: usize = 16 * 1024 * 1024;
 const LIBRARY_LIMIT: u64 = 256 * 1024 * 1024;
 const DIMENSION: u32 = 8192;
 const PIXELS: u64 = 16 * 1024 * 1024;
+static IMPORTING: AtomicBool = AtomicBool::new(false);
+
+struct ImportGuard;
+
+impl ImportGuard {
+    fn acquire() -> Result<Self> {
+        IMPORTING
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .map(|_| Self)
+            .map_err(|_| failure("another image import is already running"))
+    }
+}
+
+impl Drop for ImportGuard {
+    fn drop(&mut self) {
+        IMPORTING.store(false, Ordering::SeqCst);
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -139,11 +159,16 @@ fn read(root: &Path, id: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn payload(id: String, bytes: &[u8]) -> Result<Asset> {
+fn resource_dimensions(bytes: &[u8]) -> Result<(u32, u32)> {
     let (width, height) = ImageReader::with_format(Cursor::new(bytes), ImageFormat::Png)
         .into_dimensions()
         .map_err(|_| failure("invalid image resource header"))?;
     dimensions(width, height)?;
+    Ok((width, height))
+}
+
+fn payload(id: String, bytes: &[u8]) -> Result<Asset> {
+    let (width, height) = resource_dimensions(bytes)?;
     Ok(Asset {
         id,
         width,
@@ -153,8 +178,7 @@ fn payload(id: String, bytes: &[u8]) -> Result<Asset> {
     })
 }
 
-fn store(root: &Path, input: &[u8]) -> Result<Asset> {
-    let bytes = normalize(input)?;
+fn store_normalized(root: &Path, bytes: Vec<u8>) -> Result<Asset> {
     let id = format!("{:x}", Sha256::digest(&bytes));
     let _guard = WRITES
         .lock()
@@ -186,8 +210,34 @@ fn store(root: &Path, input: &[u8]) -> Result<Asset> {
     payload(id, &bytes)
 }
 
-/// Only referenced resources count toward the per-document export budget.
-pub(super) fn validate_references(root: &Path, document: &Value) -> Result<()> {
+#[cfg(test)]
+fn store(root: &Path, input: &[u8]) -> Result<Asset> {
+    store_normalized(root, normalize(input)?)
+}
+
+fn attachment_bytes(attachment_id: &str, data: &str) -> Result<Vec<u8>> {
+    let id = attachment_id
+        .strip_prefix("sha256:")
+        .filter(|id| valid_id(id))
+        .ok_or_else(|| failure("invalid attachment identity"))?;
+    if data.len() > ENCODED_INPUT_LIMIT {
+        return Err(failure("attachment image exceeds 16 MiB"));
+    }
+    let bytes = STANDARD
+        .decode(data)
+        .map_err(|_| failure("invalid attachment image encoding"))?;
+    if bytes.is_empty() || bytes.len() > INPUT_LIMIT {
+        return Err(failure("invalid attachment image encoding"));
+    }
+    if format!("{:x}", Sha256::digest(&bytes)) != id {
+        return Err(failure(
+            "attachment image digest does not match its identity",
+        ));
+    }
+    Ok(bytes)
+}
+
+fn reference_summary(root: &Path, document: &Value) -> Result<(HashSet<String>, usize)> {
     let mut ids = HashSet::new();
     let mut total = 0;
     for page in document["slides"].as_array().into_iter().flatten() {
@@ -200,26 +250,54 @@ pub(super) fn validate_references(root: &Path, document: &Value) -> Result<()> {
             }
             let id = element["asset"]
                 .as_str()
-                .ok_or_else(|| failure("missing image resource identity"))?;
-            if !ids.insert(id) {
+                .ok_or_else(|| failure("missing image resource identity"))?
+                .to_owned();
+            if !ids.insert(id.clone()) {
                 continue;
             }
             if ids.len() > 100 {
                 return Err(failure("document image count exceeds 100"));
             }
-            let bytes = read(root, id)?;
+            let bytes = read(root, &id)?;
             total += bytes.len();
             if total > DOCUMENT_LIMIT {
                 return Err(failure("document images exceed 16 MiB"));
             }
-            payload(id.to_owned(), &bytes)?;
+            resource_dimensions(&bytes)?;
         }
     }
-    Ok(())
+    Ok((ids, total))
+}
+
+fn store_for_document(root: &Path, input: Vec<u8>, document: &Value) -> Result<Asset> {
+    let document_id = document
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(|| failure("unsupported document source"))?;
+    super::validate(document, document_id)?;
+    let (ids, total) = reference_summary(root, document)?;
+    let bytes = normalize(&input)?;
+    drop(input);
+    let id = format!("{:x}", Sha256::digest(&bytes));
+    if !ids.contains(&id) {
+        if ids.len() >= 100 {
+            return Err(failure("document image count exceeds 100"));
+        }
+        if total.saturating_add(bytes.len()) > DOCUMENT_LIMIT {
+            return Err(failure("document images exceed 16 MiB"));
+        }
+    }
+    store_normalized(root, bytes)
+}
+
+/// Only referenced resources count toward the per-document export budget.
+pub(super) fn validate_references(root: &Path, document: &Value) -> Result<()> {
+    reference_summary(root, document).map(|_| ())
 }
 
 #[tauri::command]
-pub async fn presentation_image_import(path: String) -> Result<Asset> {
+pub async fn presentation_image_import(path: String, document: Value) -> Result<Asset> {
+    let _import = ImportGuard::acquire()?;
     tokio::task::spawn_blocking(move || {
         let metadata = std::fs::symlink_metadata(&path)
             .map_err(|_| failure("could not inspect selected image"))?;
@@ -228,10 +306,26 @@ pub async fn presentation_image_import(path: String) -> Result<Asset> {
         }
         let bytes = crate::bounded_file::read(Path::new(&path), INPUT_LIMIT)
             .map_err(|_| failure("could not read selected image within 16 MiB"))?;
-        store(&super::root(), &bytes)
+        store_for_document(&super::root(), bytes, &document)
     })
     .await
     .map_err(|_| failure("image import task failed"))?
+}
+
+#[tauri::command]
+pub async fn presentation_image_import_attachment(
+    attachment_id: String,
+    data: String,
+    document: Value,
+) -> Result<Asset> {
+    let _import = ImportGuard::acquire()?;
+    tokio::task::spawn_blocking(move || {
+        let bytes = attachment_bytes(&attachment_id, &data)?;
+        drop(data);
+        store_for_document(&super::root(), bytes, &document)
+    })
+    .await
+    .map_err(|_| failure("attachment image import task failed"))?
 }
 
 #[tauri::command]
@@ -376,5 +470,77 @@ mod tests {
             std::fs::read_to_string(root.0.join("report.json")).unwrap(),
             original
         );
+    }
+
+    #[test]
+    fn imports_only_canonical_digest_bound_attachment_images() {
+        let root = Fixture::new();
+        let input = png();
+        let digest = format!("sha256:{:x}", Sha256::digest(&input));
+        let wrong_digest = format!("sha256:{}", "a".repeat(64));
+        let encoded = STANDARD.encode(&input);
+        assert_eq!(
+            store(&root.0, &attachment_bytes(&digest, &encoded).unwrap())
+                .unwrap()
+                .width,
+            3
+        );
+        for (id, data) in [
+            ("invalid", encoded.as_str()),
+            (wrong_digest.as_str(), encoded.as_str()),
+            (digest.as_str(), "%%%"),
+            (digest.as_str(), ""),
+        ] {
+            assert!(attachment_bytes(id, data).is_err());
+        }
+        assert!(attachment_bytes(&digest, &"A".repeat(ENCODED_INPUT_LIMIT + 1)).is_err());
+    }
+
+    #[test]
+    fn accepts_the_exact_attachment_limit_and_serializes_native_imports() {
+        let input = vec![7; INPUT_LIMIT];
+        let digest = format!("sha256:{:x}", Sha256::digest(&input));
+        let encoded = STANDARD.encode(&input);
+        assert_eq!(
+            attachment_bytes(&digest, &encoded).unwrap().len(),
+            INPUT_LIMIT
+        );
+        let guard = ImportGuard::acquire().unwrap();
+        assert!(ImportGuard::acquire().is_err());
+        drop(guard);
+        assert!(ImportGuard::acquire().is_ok());
+    }
+
+    #[test]
+    fn document_budget_is_checked_before_a_new_asset_is_stored() {
+        let root = Fixture::new();
+        let mut ids = Vec::new();
+        for marker in [1, 2] {
+            let mut bytes = png();
+            bytes.resize(ASSET_LIMIT, marker);
+            let id = format!("{:x}", Sha256::digest(&bytes));
+            crate::atomic::write(&asset_path(&root.0, &id).unwrap(), &bytes).unwrap();
+            payload(id.clone(), &bytes).unwrap();
+            ids.push(id);
+        }
+        let document = serde_json::json!({
+            "format": "dsh-studio-presentation",
+            "version": 2,
+            "id": "budget",
+            "title": "Budget",
+            "slides": [{
+                "elements": ids.iter().map(|id| serde_json::json!({
+                    "kind": "image",
+                    "asset": id,
+                })).collect::<Vec<_>>(),
+            }],
+        });
+        let input = png();
+        let normalized = normalize(&input).unwrap();
+        let candidate = format!("{:x}", Sha256::digest(&normalized));
+        let path = asset_path(&root.0, &candidate).unwrap();
+        assert!(!path.exists());
+        assert!(store_for_document(&root.0, input, &document).is_err());
+        assert!(!path.exists());
     }
 }

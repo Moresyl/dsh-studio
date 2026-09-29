@@ -1253,7 +1253,15 @@ export interface PresentationImage {
   bytes: number
   dataUrl: string
 }
-export const presentationImageImport = (path: string): Promise<PresentationImage> =>
-  invoke('presentation_image_import', { path })
+export const presentationImageImport = (
+  path: string,
+  document: unknown,
+): Promise<PresentationImage> => invoke('presentation_image_import', { path, document })
+export const presentationImageImportAttachment = (
+  attachmentId: string,
+  data: string,
+  document: unknown,
+): Promise<PresentationImage> =>
+  invoke('presentation_image_import_attachment', { attachmentId, data, document })
 export const presentationImageRead = (id: string): Promise<PresentationImage> =>
   invoke('presentation_image_read', { id })

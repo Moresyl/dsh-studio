@@ -4,8 +4,13 @@ import { copyPresentation, retainHistory } from '@/lib/presentation/authoring'
 import { loadPresentation, savePresentation } from '@/lib/presentation/repository'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
-import { choosePresentationImage, documentImages } from '@/lib/presentation/media'
+import {
+  choosePresentationImage,
+  documentImages,
+  importPresentationAttachment,
+} from '@/lib/presentation/media'
 import { presentationSize } from '@/lib/presentation/document'
+import type { PresentationImage } from '@/lib/ipc'
 
 interface PendingInput {
   value: string
@@ -15,6 +20,7 @@ interface PendingInput {
 
 interface EditorState {
   document: PresentationDocument | null
+  activeSlide: string | null
   revision: string | null
   saved: string | null
   past: string[]
@@ -28,6 +34,7 @@ interface EditorState {
   discardInput: (key: string) => void
   commitInput: (key: string) => boolean
   flushInputs: () => boolean
+  selectSlide: (id: string) => boolean
   replace: (source: unknown, discard?: boolean) => boolean
   edit: (change: (draft: PresentationDocument) => void) => boolean
   undo: () => void
@@ -36,6 +43,7 @@ interface EditorState {
   save: () => Promise<boolean>
   saveCopy: (suffix: string) => Promise<boolean>
   insertImage: (slide: string) => Promise<string | null>
+  insertImageAttachment: (attachmentId: string, blob: Blob) => Promise<string | null>
 }
 
 export const isPresentationDirty = (
@@ -44,11 +52,43 @@ export const isPresentationDirty = (
   Object.keys(state.inputs).length > 0 ||
   (state.document !== null && JSON.stringify(state.document) !== state.saved)
 
+async function appendImage(
+  source: PresentationDocument,
+  slideId: string,
+  image: PresentationImage,
+) {
+  const document = parsePresentation(source)
+  const slide = document.slides.find((page) => page.id === slideId)
+  if (!slide) throw new Error('The selected slide no longer exists')
+  const size = presentationSize(document.aspect)
+  const scale = Math.min((size.width - 160) / image.width, (size.height - 160) / image.height, 1)
+  const width = Math.max(1, image.width * scale),
+    height = Math.max(1, image.height * scale),
+    id = crypto.randomUUID()
+  document.version = 2
+  slide.elements.push({
+    id,
+    kind: 'image',
+    asset: image.id,
+    alt: '',
+    fit: 'contain',
+    x: (size.width - width) / 2,
+    y: (size.height - height) / 2,
+    width,
+    height,
+    rotation: 0,
+  })
+  const checked = parsePresentation(document)
+  await documentImages(checked)
+  return { document: checked, id }
+}
+
 /** One editor owns its draft; switching panes does not discard pending changes. */
 export function createPresentationEditor(synchronizing = false) {
   let committingInput = false
   return create<EditorState>((set, get) => ({
     document: null,
+    activeSlide: null,
     revision: null,
     saved: null,
     past: [],
@@ -91,6 +131,11 @@ export function createPresentationEditor(synchronizing = false) {
       }
       return true
     },
+    selectSlide: (id) => {
+      if (!get().document?.slides.some((slide) => slide.id === id)) return false
+      set({ activeSlide: id })
+      return true
+    },
     lockForUpdate: () => {
       const state = get()
       if (state.busy || isPresentationDirty(state)) return false
@@ -106,6 +151,7 @@ export function createPresentationEditor(synchronizing = false) {
         const document = parsePresentation(source)
         set({
           document,
+          activeSlide: document.slides[0]!.id,
           revision: null,
           saved: null,
           past: [],
@@ -133,7 +179,15 @@ export function createPresentationEditor(synchronizing = false) {
         const document = parsePresentation(draft)
         if (document.id !== state.document.id) throw new Error('Document identity cannot be edited')
         if (JSON.stringify(document) === before) return true
-        set({ document, past: retainHistory(state.past, before), future: [], error: null })
+        set({
+          document,
+          activeSlide: document.slides.some((slide) => slide.id === state.activeSlide)
+            ? state.activeSlide
+            : document.slides[0]!.id,
+          past: retainHistory(state.past, before),
+          future: [],
+          error: null,
+        })
         return true
       } catch (cause) {
         set({ error: describe(cause) })
@@ -145,8 +199,12 @@ export function createPresentationEditor(synchronizing = false) {
       const state = get()
       if (!state.document || (state.busy !== null && state.busy !== 'save') || !state.past.length)
         return
+      const document = parsePresentation(JSON.parse(state.past.at(-1)!))
       set({
-        document: parsePresentation(JSON.parse(state.past.at(-1)!)),
+        document,
+        activeSlide: document.slides.some((slide) => slide.id === state.activeSlide)
+          ? state.activeSlide
+          : document.slides[0]!.id,
         past: state.past.slice(0, -1),
         future: retainHistory(state.future, JSON.stringify(state.document)),
         error: null,
@@ -157,8 +215,12 @@ export function createPresentationEditor(synchronizing = false) {
       const state = get()
       if (!state.document || (state.busy !== null && state.busy !== 'save') || !state.future.length)
         return
+      const document = parsePresentation(JSON.parse(state.future.at(-1)!))
       set({
-        document: parsePresentation(JSON.parse(state.future.at(-1)!)),
+        document,
+        activeSlide: document.slides.some((slide) => slide.id === state.activeSlide)
+          ? state.activeSlide
+          : document.slides[0]!.id,
         future: state.future.slice(0, -1),
         past: retainHistory(state.past, JSON.stringify(state.document)),
         error: null,
@@ -172,6 +234,7 @@ export function createPresentationEditor(synchronizing = false) {
         if (!saved) throw new Error('The presentation no longer exists')
         set({
           document: saved.document,
+          activeSlide: saved.document.slides[0]!.id,
           revision: saved.revision,
           saved: JSON.stringify(saved.document),
           past: [],
@@ -195,6 +258,7 @@ export function createPresentationEditor(synchronizing = false) {
         const saved = await savePresentation(copyPresentation(state.document, suffix), null)
         set({
           document: saved.document,
+          activeSlide: saved.document.slides[0]!.id,
           revision: saved.revision,
           saved: JSON.stringify(saved.document),
           past: [],
@@ -220,40 +284,43 @@ export function createPresentationEditor(synchronizing = false) {
         return null
       set({ busy: 'image', error: null })
       try {
-        const image = await choosePresentationImage()
+        const image = await choosePresentationImage(state.document)
         if (!image) return null
-        const document = parsePresentation(state.document)
-        const slide = document.slides.find((page) => page.id === slideId)!
-        const size = presentationSize(document.aspect)
-        const scale = Math.min(
-          (size.width - 160) / image.width,
-          (size.height - 160) / image.height,
-          1,
-        )
-        const width = Math.max(1, image.width * scale),
-          height = Math.max(1, image.height * scale)
-        const id = crypto.randomUUID()
-        document.version = 2
-        slide.elements.push({
-          id,
-          kind: 'image',
-          asset: image.id,
-          alt: '',
-          fit: 'contain',
-          x: (size.width - width) / 2,
-          y: (size.height - height) / 2,
-          width,
-          height,
-          rotation: 0,
-        })
-        const checked = parsePresentation(document)
-        await documentImages(checked)
-        set({
-          document: checked,
+        const placed = await appendImage(state.document, slideId, image)
+        set((current) => ({
+          document: placed.document,
+          activeSlide: placed.document.slides.some((slide) => slide.id === current.activeSlide)
+            ? current.activeSlide
+            : slideId,
           past: retainHistory(state.past, JSON.stringify(state.document)),
           future: [],
-        })
-        return id
+        }))
+        return placed.id
+      } catch (cause) {
+        set({ error: describe(cause) })
+        return null
+      } finally {
+        set({ busy: null })
+      }
+    },
+    insertImageAttachment: async (attachmentId, blob) => {
+      if (!get().flushInputs()) return null
+      const state = get()
+      const slideId = state.activeSlide ?? state.document?.slides[0]?.id ?? null
+      if (state.busy || !state.document || !slideId) return null
+      set({ busy: 'image', error: null })
+      try {
+        const image = await importPresentationAttachment(attachmentId, blob, state.document)
+        const placed = await appendImage(state.document, slideId, image)
+        set((current) => ({
+          document: placed.document,
+          activeSlide: placed.document.slides.some((slide) => slide.id === current.activeSlide)
+            ? current.activeSlide
+            : slideId,
+          past: retainHistory(state.past, JSON.stringify(state.document)),
+          future: [],
+        }))
+        return placed.id
       } catch (cause) {
         set({ error: describe(cause) })
         return null
