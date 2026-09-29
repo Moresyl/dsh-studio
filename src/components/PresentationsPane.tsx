@@ -29,6 +29,7 @@ export function PresentationsPane() {
   const slide = document?.slides.find((item) => item.id === page) ?? document?.slides[0]
   const element = slide?.elements.find((item) => item.id === selected)
   const dirty = isPresentationDirty(editor)
+  const readOnly = editor.busy === 'load' || editor.busy === 'update'
 
   useEffect(() => () => exportJob.current?.abort(), [])
   const exportPptx = async () => {
@@ -163,6 +164,7 @@ export function PresentationsPane() {
   return (
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col"
+      inert={editor.busy === 'update'}
       onKeyDown={(event) => {
         if (templatesOpen) return
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
@@ -199,7 +201,7 @@ export function PresentationsPane() {
         <Button
           variant="secondary"
           onClick={editor.undo}
-          disabled={!editor.past.length || editor.busy === 'load'}
+          disabled={!editor.past.length || readOnly}
           aria-label={t('deck.undo')}
         >
           <Undo2 size={13} />
@@ -207,7 +209,7 @@ export function PresentationsPane() {
         <Button
           variant="secondary"
           onClick={editor.redo}
-          disabled={!editor.future.length || editor.busy === 'load'}
+          disabled={!editor.future.length || readOnly}
           aria-label={t('deck.redo')}
         >
           <Redo2 size={13} />
@@ -270,7 +272,7 @@ export function PresentationsPane() {
               ))}
               <Button
                 variant="secondary"
-                disabled={document.slides.length >= 100 || editor.busy === 'load'}
+                disabled={document.slides.length >= 100 || readOnly}
                 onClick={() => {
                   const next = blankSlide(t('deck.slide', { number: document.slides.length + 1 }))
                   if (
@@ -324,7 +326,7 @@ export function PresentationsPane() {
                       <Button
                         key={kind}
                         variant="secondary"
-                        disabled={editor.busy === 'load' || slide.elements.length >= 200}
+                        disabled={readOnly || slide.elements.length >= 200}
                         onClick={() => insert(kind)}
                       >
                         <Plus size={12} />
@@ -338,7 +340,7 @@ export function PresentationsPane() {
                     selected={selected}
                     onSelect={setSelected}
                     onMove={
-                      editor.busy === 'load'
+                      readOnly
                         ? undefined
                         : (id, position) =>
                             editSlide((draft) => {
@@ -360,7 +362,7 @@ export function PresentationsPane() {
                   />
                 </div>
                 <fieldset
-                  disabled={editor.busy === 'load'}
+                  disabled={readOnly}
                   className="max-h-[calc(100vh-180px)] min-w-0 flex-[1_1_220px] space-y-3 overflow-y-auto rounded-panel border border-line p-3"
                 >
                   <legend className="px-1 text-[12px] text-muted">{t('deck.properties')}</legend>

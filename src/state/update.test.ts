@@ -12,6 +12,8 @@ vi.mock('@/lib/updater', () => updater)
 
 import type { Release } from '@/lib/updater'
 import { useDialog } from '@/state/dialog'
+import { usePresentationEditor } from '@/state/presentation-editor'
+import { fixture } from '@/lib/presentation/fixtures.test-support'
 import { isAnnounceable, useUpdate, watchForUpdates } from '@/state/update'
 
 const release: Release = {
@@ -69,6 +71,7 @@ beforeEach(() => {
     dismissed: null,
   })
   useDialog.setState({ pending: null })
+  usePresentationEditor.setState({ document: null, saved: null, busy: null, past: [], future: [] })
 })
 
 afterEach(() => {
@@ -195,6 +198,49 @@ describe('dismissal', () => {
 })
 
 describe('installation', () => {
+  it('refuses to restart over a dirty or busy presentation', async () => {
+    usePresentationEditor.getState().replace(fixture(), true)
+    await useUpdate.getState().installVersion(release)
+    expect(updater.installUpdate).not.toHaveBeenCalled()
+    expect(useUpdate.getState().error).toBeTruthy()
+    expect(usePresentationEditor.getState().document).toEqual(fixture())
+    usePresentationEditor.setState({ document: null, busy: 'save' })
+    await useUpdate.getState().installVersion(release)
+    expect(updater.installUpdate).not.toHaveBeenCalled()
+    expect(usePresentationEditor.getState().busy).toBe('save')
+  })
+
+  it('locks editing during installation and unlocks after failure', async () => {
+    const document = fixture()
+    usePresentationEditor.setState({ document, saved: JSON.stringify(document) })
+    const operation = deferred<boolean>()
+    updater.installUpdate.mockReturnValue(operation.promise)
+    const pending = useUpdate.getState().installVersion(release)
+    expect(usePresentationEditor.getState().busy).toBe('update')
+    expect(
+      usePresentationEditor.getState().edit((draft) => {
+        draft.title = 'Lost edit'
+      }),
+    ).toBe(false)
+    operation.reject(new Error('network unavailable'))
+    await pending
+    expect(usePresentationEditor.getState().busy).toBeNull()
+    expect(usePresentationEditor.getState().document).toEqual(document)
+  })
+
+  it('commits pending input before checking for unsaved work', async () => {
+    class Input {
+      blur() {
+        usePresentationEditor.getState().replace(fixture(), true)
+      }
+    }
+    vi.stubGlobal('HTMLElement', Input)
+    vi.stubGlobal('document', { activeElement: new Input() })
+    await useUpdate.getState().installVersion(release)
+    expect(updater.installUpdate).not.toHaveBeenCalled()
+    expect(usePresentationEditor.getState().document).toEqual(fixture())
+  })
+
   it('does not start an install while a check is running', async () => {
     useUpdate.setState({ checking: true })
 

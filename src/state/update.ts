@@ -23,6 +23,8 @@ import {
 } from '@/lib/updater'
 import { reportFailure } from '@/state/failure'
 import { readPreference, savePreference } from '@/lib/preferences'
+import { usePresentationEditor } from '@/state/presentation-editor'
+import { t } from '@/lib/i18n'
 
 const DISMISSED_KEY = 'dsh-studio:update:dismissed'
 
@@ -121,6 +123,13 @@ export const useUpdate = create<UpdateState>((set, get) => ({
 
   runInstall: async (release, target) => {
     if (get().installing || get().checking) return
+    // Commit an input's pending value before deciding whether restarting is safe.
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
+      document.activeElement.blur()
+    if (!usePresentationEditor.getState().lockForUpdate()) {
+      set({ error: reportFailure(new Error(t('deck.saveBeforeUpdate'))) })
+      return
+    }
     ++installationGeneration
     set({
       installing: true,
@@ -152,6 +161,7 @@ export const useUpdate = create<UpdateState>((set, get) => ({
       if (cause instanceof UpdateCancelled) set({ progress: null, error: null })
       else set({ error: reportFailure(cause) })
     } finally {
+      usePresentationEditor.getState().unlockUpdate()
       set({ installing: false, targetRelease: null, installation: null, cancelling: false })
     }
   },

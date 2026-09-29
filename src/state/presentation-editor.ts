@@ -10,7 +10,9 @@ interface EditorState {
   saved: string | null
   past: string[]
   future: string[]
-  busy: 'load' | 'save' | null
+  busy: 'load' | 'save' | 'update' | null
+  lockForUpdate: () => boolean
+  unlockUpdate: () => void
   error: string | null
   replace: (source: unknown, discard?: boolean) => boolean
   edit: (change: (draft: PresentationDocument) => void) => boolean
@@ -33,6 +35,15 @@ export function createPresentationEditor() {
     future: [],
     busy: null,
     error: null,
+    lockForUpdate: () => {
+      const state = get()
+      if (state.busy || isPresentationDirty(state)) return false
+      set({ busy: 'update' })
+      return true
+    },
+    unlockUpdate: () => {
+      if (get().busy === 'update') set({ busy: null })
+    },
     replace: (source, discard = false) => {
       if (get().busy || (!discard && isPresentationDirty(get()))) return false
       try {
@@ -46,7 +57,7 @@ export function createPresentationEditor() {
     },
     edit: (change) => {
       const state = get()
-      if (!state.document || state.busy === 'load') return false
+      if (!state.document || (state.busy !== null && state.busy !== 'save')) return false
       try {
         const before = JSON.stringify(state.document)
         const draft = parsePresentation(state.document)
@@ -63,7 +74,8 @@ export function createPresentationEditor() {
     },
     undo: () => {
       const state = get()
-      if (!state.document || state.busy === 'load' || !state.past.length) return
+      if (!state.document || (state.busy !== null && state.busy !== 'save') || !state.past.length)
+        return
       set({
         document: parsePresentation(JSON.parse(state.past.at(-1)!)),
         past: state.past.slice(0, -1),
@@ -73,7 +85,8 @@ export function createPresentationEditor() {
     },
     redo: () => {
       const state = get()
-      if (!state.document || state.busy === 'load' || !state.future.length) return
+      if (!state.document || (state.busy !== null && state.busy !== 'save') || !state.future.length)
+        return
       set({
         document: parsePresentation(JSON.parse(state.future.at(-1)!)),
         future: state.future.slice(0, -1),

@@ -145,6 +145,8 @@ const en = {
   'deck.template.series': 'Sample data',
   'deck.untitled': 'Untitled presentation',
   'deck.save': 'Save',
+  'deck.saveBeforeUpdate':
+    'Save your presentation and wait for any document operation to finish before installing an application update.',
   'deck.export': 'Export PPTX',
   'deck.exported': 'PPTX exported',
   'deck.exportCancelled': 'Export cancelled',
@@ -1060,6 +1062,7 @@ const zh: Record<MessageKey, string> = {
   'deck.template.series': '示例数据',
   'deck.untitled': '未命名文稿',
   'deck.save': '保存',
+  'deck.saveBeforeUpdate': '请先保存文稿，并等待文稿操作完成，再安装应用更新。',
   'deck.export': '导出 PPTX',
   'deck.exported': 'PPTX 已导出',
   'deck.exportCancelled': '已取消导出',

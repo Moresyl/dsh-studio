@@ -3,6 +3,38 @@ const repository = vi.hoisted(() => ({ loadPresentation: vi.fn(), savePresentati
 vi.mock('@/lib/presentation/repository', () => repository)
 import { createPresentationEditor, isPresentationDirty } from './presentation-editor'
 import { fixture } from '@/lib/presentation/fixtures.test-support'
+
+it('locks all mutation paths for an update without clearing existing history', async () => {
+  const store = createPresentationEditor()
+  store.getState().replace(fixture(), true)
+  expect(store.getState().lockForUpdate()).toBe(false)
+  const document = store.getState().document!
+  store.setState({
+    saved: JSON.stringify(document),
+    past: [JSON.stringify(document)],
+    future: [JSON.stringify(document)],
+  })
+  expect(store.getState().lockForUpdate()).toBe(true)
+  expect(store.getState().lockForUpdate()).toBe(false)
+  expect(store.getState().replace(fixture(), true)).toBe(false)
+  expect(
+    store.getState().edit((draft) => {
+      draft.title = 'Changed'
+    }),
+  ).toBe(false)
+  expect(await store.getState().save()).toBe(false)
+  expect(await store.getState().open(document.id, true)).toBe(false)
+  store.getState().undo()
+  store.getState().redo()
+  expect(store.getState().past).toHaveLength(1)
+  expect(store.getState().future).toHaveLength(1)
+  expect(store.getState().document).toEqual(document)
+  store.getState().unlockUpdate()
+  expect(store.getState().busy).toBeNull()
+  store.setState({ busy: 'save' })
+  store.getState().unlockUpdate()
+  expect(store.getState().busy).toBe('save')
+})
 import { newPresentation, blankSlide, retainHistory } from '@/lib/presentation/authoring'
 
 beforeEach(() => vi.resetAllMocks())
