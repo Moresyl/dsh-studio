@@ -114,6 +114,7 @@ export default defineConfig({
         'src/lib/presentation/repository.ts',
         'src/lib/presentation/authoring.ts',
         'src/lib/presentation/movement.ts',
+        'src/lib/presentation/templates.ts',
         'src/lib/presentation/close-guard.ts',
         'src/lib/presentation/save-export.ts',
         'src/state/presentation-editor.ts',

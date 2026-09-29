@@ -3,11 +3,12 @@ import { Plus, Save, Undo2, Redo2, RefreshCw, FileDown } from 'lucide-react'
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PresentationSlideView } from '@/components/PresentationSlideView'
+import { PresentationTemplates } from '@/components/PresentationTemplates'
 import { t } from '@/lib/i18n'
 import { describe } from '@/lib/errors'
 import { presentationList, type PresentationSummary } from '@/lib/ipc'
-import { blankSlide, newPresentation } from '@/lib/presentation/authoring'
-import type { SlideElement } from '@/lib/presentation/document'
+import { blankSlide } from '@/lib/presentation/authoring'
+import type { PresentationDocument, SlideElement } from '@/lib/presentation/document'
 import { savePresentationExport, type ExportPhase } from '@/lib/presentation/save-export'
 import { ask } from '@/state/dialog'
 import { isPresentationDirty, usePresentationEditor } from '@/state/presentation-editor'
@@ -15,6 +16,7 @@ import { isPresentationDirty, usePresentationEditor } from '@/state/presentation
 export function PresentationsPane() {
   const editor = usePresentationEditor()
   const [library, setLibrary] = useState<PresentationSummary[]>([])
+  const [templatesOpen, setTemplatesOpen] = useState(false)
   const [libraryError, setLibraryError] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState<string | null>(null)
@@ -74,10 +76,11 @@ export function PresentationsPane() {
       confirm: t('deck.discard'),
       tone: 'danger',
     }))
-  const create = async () => {
+  const create = async (source: PresentationDocument) => {
+    setTemplatesOpen(false)
     if (exportJob.current) return
     if (!(await canDiscard())) return
-    if (editor.replace(newPresentation(t('deck.untitled')), true)) {
+    if (editor.replace(source, true)) {
       setPage(null)
       setSelected(null)
     }
@@ -161,6 +164,7 @@ export function PresentationsPane() {
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col"
       onKeyDown={(event) => {
+        if (templatesOpen) return
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
           event.preventDefault()
           if (event.target instanceof HTMLElement) event.target.blur()
@@ -186,7 +190,7 @@ export function PresentationsPane() {
         )}
         <Button
           variant="secondary"
-          onClick={() => void create()}
+          onClick={() => setTemplatesOpen(true)}
           disabled={editor.busy !== null || exportPhase !== null}
         >
           <Plus size={13} />
@@ -535,6 +539,12 @@ export function PresentationsPane() {
           )}
         </div>
       </div>
+      {templatesOpen && (
+        <PresentationTemplates
+          onClose={() => setTemplatesOpen(false)}
+          onCreate={(source) => void create(source)}
+        />
+      )}
     </section>
   )
 }
