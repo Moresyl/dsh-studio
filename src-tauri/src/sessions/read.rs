@@ -45,6 +45,7 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
     }
 
     let started = int(head.get("createdAt"));
+    let explicit_surface = head.get("version").and_then(Value::as_u64).unwrap_or(0) >= 4;
     let mut card = Card {
         id: some(head.get("id"))?.to_string(),
         project: str(head.get("cwd")).to_string(),
@@ -86,6 +87,24 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
         let Some(data) = event.get("data") else {
             continue;
         };
+
+        // Human history retains the original append-origin messages. A surface
+        // replacement is a model-context copy, not another thing the user said.
+        // Legacy logs may predate the explicit surface marker entirely.
+        if matches!(
+            str(event.get("type")),
+            "user/message" | "assistant/message" | "tool/result"
+        ) {
+            let operation = event.get("surfaceOp");
+            if (explicit_surface && str(operation) != "append")
+                || operation
+                    .and_then(|op| op.get("op"))
+                    .and_then(Value::as_str)
+                    == Some("replace")
+            {
+                continue;
+            }
+        }
 
         match str(event.get("type")) {
             // The event's data is the message itself here, unlike every other
@@ -169,12 +188,27 @@ pub fn read(text: &str, bytes: u64) -> Option<Reading> {
                     continue;
                 };
 
+                // Current tool-role messages own their content directly. Older
+                // logs wrapped the same content in nested tool-result blocks.
+                if str(message.get("role")) == "tool" {
+                    let call = some(message.get("toolCallId"))
+                        .or_else(|| some(source(message).and_then(|value| value.get("callId"))));
+                    let name = call.and_then(|id| called.get(id)).cloned();
+                    push(&mut lines, seq, time, Role::Tool, name, spoken(message));
+                }
+
                 for block in blocks(message).filter(|block| str(block.get("type")) == "tool-result")
                 {
                     let name = some(block.get("toolCallId"))
                         .and_then(|id| called.get(id))
                         .cloned();
                     push(&mut lines, seq, time, Role::Tool, name, said(block));
+                }
+            }
+
+            "tool/call" => {
+                if let (Some(id), Some(name)) = (some(data.get("callId")), some(data.get("name"))) {
+                    called.insert(id.to_string(), name.to_string());
                 }
             }
 
@@ -452,6 +486,82 @@ mod tests {
     }
 
     #[test]
+    fn current_tool_messages_keep_direct_text_and_attachment_records() {
+        use super::super::{export, find, Transcript};
+        let text = log(&[
+            &header().replace("\"version\":0", "\"version\":4"),
+            r#"{"type":"tool/call","seq":1,"data":{"callId":"report","name":"write_report"}}"#,
+            r#"{"type":"tool/result","seq":2,"surfaceOp":"append","data":{"message":{"role":"tool","toolCallId":"report","content":[{"type":"text","text":"Report ready"},{"type":"file","attachment":{"attachmentId":"sha256:abc","name":"报告.txt","bytes":12}}]}}}"#,
+            r#"{"type":"tool/result","seq":3,"surfaceOp":"append","data":{"message":{"role":"tool","source":{"kind":"tool","callId":"report"},"content":[{"type":"image","attachment":{"attachmentId":"sha256:def","name":"图.png"}}]}}}"#,
+        ]);
+        let reading = read(&text, 0).unwrap();
+        assert_eq!(reading.lines.len(), 2);
+        assert_eq!(reading.lines[0].tool.as_deref(), Some("write_report"));
+        assert_eq!(reading.lines[0].text, "Report ready");
+        assert_eq!(reading.lines[1].tool.as_deref(), Some("write_report"));
+        assert!(reading.lines[1].text.is_empty());
+        let hit = find::hunt(&reading.card, &reading.lines, &find::terms("报告.txt")).unwrap();
+        assert_eq!(hit.marks[0].seq, 2);
+        let transcript = Transcript {
+            card: reading.card,
+            lines: reading.lines,
+        };
+        for format in [
+            export::Format::Markdown,
+            export::Format::Html,
+            export::Format::Json,
+        ] {
+            let output = export::render(&transcript, format);
+            assert!(
+                output.contains("Report ready")
+                    && output.contains("报告.txt")
+                    && output.contains("图.png")
+            );
+        }
+    }
+
+    #[test]
+    fn human_history_preserves_originals_and_omits_model_replacement_copies() {
+        let text = log(&[
+            &header().replace("\"version\":0", "\"version\":4"),
+            r#"{"type":"user/message","seq":1,"surfaceOp":"append","data":{"source":{"kind":"user"},"content":[{"type":"text","text":"Original prompt"}]}}"#,
+            r#"{"type":"assistant/message","seq":2,"surfaceOp":"append","data":{"turn":1,"step":1,"message":{"content":[{"type":"text","text":"Original answer"}]},"usage":{"inputTokens":10,"outputTokens":5}}}"#,
+            r#"{"type":"user/message","seq":3,"time":3000,"surfaceOp":{"op":"replace","startSeq":1,"endSeq":2},"data":{"source":{"kind":"user"},"content":[{"type":"text","text":"Model-only compacted copy"}]}}"#,
+            r#"{"type":"assistant/message","seq":4,"surfaceOp":{"op":"replace","startSeq":3,"endSeq":3},"data":{"turn":2,"step":1,"message":{"content":[{"type":"text","text":"Model-only answer copy"}]},"usage":{"inputTokens":999,"outputTokens":999}}}"#,
+            r#"{"type":"user/message","seq":5,"data":{"source":{"kind":"user"},"content":[{"type":"text","text":"Unmarked v4 message"}]}}"#,
+        ]);
+        let reading = read(&text, 0).unwrap();
+        assert_eq!(reading.card.turns, 1);
+        assert_eq!(reading.card.title, "Original prompt");
+        assert_eq!(reading.card.touched, 3000);
+        assert_eq!(
+            reading
+                .lines
+                .iter()
+                .map(|line| line.text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["Original prompt", "Original answer"]
+        );
+        assert!(!reading.lines.iter().any(|line| line.seq >= 3));
+        assert_eq!(reading.card.tokens.input, 10);
+        assert_eq!(reading.card.tokens.output, 5);
+    }
+
+    #[test]
+    fn legacy_messages_need_no_surface_marker_but_replacement_copies_stay_hidden() {
+        let text = log(&[
+            header(),
+            r#"{"type":"user/message","seq":1,"data":{"source":{"kind":"user"},"content":[{"type":"text","text":"Legacy original"}]}}"#,
+            r#"{"type":"user/message","seq":2,"surfaceOp":{"op":"replace","startSeq":1,"endSeq":1},"data":{"source":{"kind":"user"},"content":[{"type":"text","text":"Replacement"}]}}"#,
+            r#"{"type":"tool/call","seq":3,"data":{"callId":"missing-name"}}"#,
+        ]);
+        let reading = read(&text, 0).unwrap();
+        assert_eq!(reading.card.turns, 1);
+        assert_eq!(reading.lines.len(), 1);
+        assert_eq!(reading.lines[0].text, "Legacy original");
+    }
+
+    #[test]
     fn attachment_only_messages_survive_reading_search_and_all_exports() {
         use super::super::{export, find, Transcript};
         let text = log(&[
@@ -666,7 +776,7 @@ mod tests {
             &log(&[
                 header(),
                 r#"{"type":"assistant/message","seq":1,"time":1,"data":{"turn":1,"step":0,"message":{"source":{"kind":"model","model":"deepseek-chat"},"content":[{"type":"text","text":"looking"},{"type":"tool-call","id":"c1","name":"Grep","arguments":"{\"pattern\":\"parse\"}"}]}}}"#,
-                r#"{"type":"tool/result","seq":2,"time":2,"data":{"message":{"source":{"kind":"tool"},"content":[{"type":"tool-result","toolCallId":"c1","content":[{"type":"text","text":"3 matches"}]}]}}}"#,
+                r#"{"type":"tool/result","seq":2,"time":2,"data":{"message":{"role":"tool","source":{"kind":"tool"},"content":[{"type":"tool-result","toolCallId":"c1","content":[{"type":"text","text":"3 matches"}]}]}}}"#,
             ]),
             0,
         )
