@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { imageBlob, IMAGE_LIMIT, previewImage, serveImagePreview } from './attachment-preview'
+import {
+  imageBlob,
+  textBlob,
+  IMAGE_LIMIT,
+  previewImage,
+  previewText,
+  serveImagePreview,
+} from './attachment-preview'
 
 const id = `sha256:${'a'.repeat(64)}`
 const origin = 'http://127.0.0.1:12345'
@@ -158,4 +165,51 @@ it('releases a request when postMessage fails', async () => {
   })
   await expect(previewImage('s', id, signal())).rejects.toThrow('unavailable')
   expect(vi.getTimerCount()).toBe(0)
+})
+
+it('validates plain text replies including empty files, Unicode and BOM', async () => {
+  for (const text of ['', '中文 <script>alert(1)</script>', '\ufefftext']) {
+    const blob = textBlob(
+      { attachmentId: id, bytes: new TextEncoder().encode(text).length, text },
+      id,
+    )
+    expect(blob.type).toBe('text/plain;charset=utf-8')
+    expect(blob.size).toBe(new TextEncoder().encode(text).length)
+  }
+  for (const reply of [
+    null,
+    {},
+    { attachmentId: id, bytes: 0, text: 1 },
+    { attachmentId: id, bytes: -1, text: '' },
+    { attachmentId: id, bytes: 1048577, text: '' },
+    { attachmentId: id, bytes: 1, text: 'abc' },
+    { attachmentId: id, bytes: 1, text: '\0' },
+    { attachmentId: id, bytes: 1, text: 'x'.repeat(1048577) },
+  ])
+    expect(() => textBlob(reply, id)).toThrow()
+})
+
+it('routes file previews separately and enforces the text reply contract', async () => {
+  await expect(previewText('s', id, signal())).rejects.toThrow('Start Harness')
+  const c = connection()
+  const result = previewText('s', id, signal())
+  expect(c.postMessage.mock.calls.at(-1)?.[0].kind).toBe('file')
+  c.reply({ value: { attachmentId: id, bytes: 3, text: 'abc' } })
+  expect(await (await result).text()).toBe('abc')
+  const wrong = previewText('s', id, signal())
+  c.reply()
+  await expect(wrong).rejects.toThrow('Invalid text')
+})
+
+it('cancels the matching host file read when the caller closes its preview', async () => {
+  const c = connection(),
+    controller = new AbortController()
+  const result = previewText('s', id, controller.signal)
+  const request = c.postMessage.mock.calls[0]?.[0]
+  controller.abort()
+  await expect(result).rejects.toThrow('cancelled')
+  expect(c.postMessage.mock.calls.at(-1)).toEqual([
+    { type: 'dsh-studio:preview-cancel', id: request.id },
+    origin,
+  ])
 })

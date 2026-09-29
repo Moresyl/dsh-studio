@@ -455,13 +455,18 @@ const en = {
   'sessions.file': 'Unnamed file',
   'sessions.image': 'Unnamed image',
   'sessions.previewImage': 'Preview image',
-  'sessions.closePreview': 'Close image preview',
-  'sessions.previewLoading': 'Reading the image from Harness…',
+  'sessions.previewFile': 'Preview text',
+  'sessions.fileContent': 'File content',
+  'sessions.emptyFile': 'This file is empty.',
+  'sessions.filePreviewFailed':
+    'The file could not be previewed. Start Harness and check access to the original attachment. Text preview supports UTF-8 files up to 1 MiB; binary files and other encodings are not supported.',
+  'sessions.closePreview': 'Close attachment preview',
+  'sessions.previewLoading': 'Reading the attachment from Harness…',
   'sessions.previewRetry': 'Retry',
   'sessions.previewFailed':
     'The image could not be read. Start a compatible Harness profile and check that this session still has access to the original attachment.',
   'sessions.attachmentNotice':
-    'Image previews require Harness. Transcript exports contain attachment records, not the original files.',
+    'Previews require Harness. Text preview supports UTF-8 files up to 1 MiB. Transcript exports contain attachment records, not the original files.',
   'sessions.attachmentsOmitted':
     '{n} more attachment records exceed the per-message display limit.',
   'sessions.collapse': 'Show less',
@@ -1262,12 +1267,18 @@ const zh: Record<MessageKey, string> = {
   'sessions.file': '未命名文件',
   'sessions.image': '未命名图片',
   'sessions.previewImage': '预览图片',
-  'sessions.closePreview': '关闭图片预览',
-  'sessions.previewLoading': '正在从 Harness 读取图片…',
+  'sessions.previewFile': '预览文本',
+  'sessions.fileContent': '文件内容',
+  'sessions.emptyFile': '这是一个空文件。',
+  'sessions.filePreviewFailed':
+    '无法预览文件。请启动 Harness 并确认原始附件仍可访问。文本预览支持 1 MiB 以内的 UTF-8 文件，暂不支持二进制文件或其他编码。',
+  'sessions.closePreview': '关闭附件预览',
+  'sessions.previewLoading': '正在从 Harness 读取附件…',
   'sessions.previewRetry': '重试',
   'sessions.previewFailed':
     '无法读取图片。请启动兼容的 Harness 配置，并确认此会话仍可访问原始附件。',
-  'sessions.attachmentNotice': '图片预览需要运行 Harness；会话导出保留附件记录，不包含原始文件。',
+  'sessions.attachmentNotice':
+    '预览需要运行 Harness，文本支持 1 MiB 以内的 UTF-8 文件；会话导出保留附件记录，不包含原始文件。',
   'sessions.attachmentsOmitted': '另有 {n} 条附件记录超出单条消息的显示上限。',
   'sessions.collapse': '收起',
   'sessions.untitled': '什么都没说',

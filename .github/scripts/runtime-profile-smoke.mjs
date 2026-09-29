@@ -147,6 +147,7 @@ export async function prepareSmokeProfile(runtimeRoot, dshHome) {
       'package.json',
       'cordis.patch.yml',
       'lib/index.js',
+      'lib/file-preview.js',
       'lib/client.js',
       'lib/runtime-resolver.cjs',
     ].map((relative) =>

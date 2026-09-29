@@ -2,6 +2,7 @@
 
 import { lstatSync, readFileSync, readdirSync } from 'node:fs'
 import { basename, dirname, isAbsolute, resolve } from 'node:path'
+import { registerFilePreview } from './file-preview.js'
 
 export const name = 'dsh-studio-integration'
 export const inject = []
@@ -74,6 +75,7 @@ export function createStudioHostService(environment = process.env) {
 
 /** Publish the service through Cordis and bind retained references to this fiber. */
 export function apply(ctx) {
+  ctx.inject(['connection', 'sessionQuery', 'attachments'], registerFilePreview)
   const lifetime = createStudioHostService()
   ctx.provide('dshStudioHost', lifetime.service)
   ctx.effect(

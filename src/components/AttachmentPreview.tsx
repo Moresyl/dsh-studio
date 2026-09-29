@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Loader2, RefreshCw, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
-import { previewImage } from '@/lib/attachment-preview'
+import { previewImage, previewText } from '@/lib/attachment-preview'
 import { t } from '@/lib/i18n'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import type { SessionAttachment } from '@/lib/ipc'
@@ -20,6 +20,7 @@ export function AttachmentPreview({
   const card = useRef<HTMLDivElement>(null)
   const close = useRef<HTMLButtonElement>(null)
   const [url, setUrl] = useState<string | null>(null)
+  const [text, setText] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [revision, setRevision] = useState(0)
 
@@ -34,8 +35,14 @@ export function AttachmentPreview({
   useEffect(() => {
     const controller = new AbortController()
     let resource: string | null = null
-    void previewImage(sessionId, attachment.id ?? '', controller.signal)
-      .then((blob) => {
+    const read = attachment.kind === 'file' ? previewText : previewImage
+    void read(sessionId, attachment.id ?? '', controller.signal)
+      .then(async (blob) => {
+        if (attachment.kind === 'file') {
+          const content = await blob.text()
+          if (!controller.signal.aborted) setText(content)
+          return
+        }
         if (controller.signal.aborted) return
         resource = URL.createObjectURL(blob)
         setUrl(resource)
@@ -47,12 +54,13 @@ export function AttachmentPreview({
       controller.abort()
       if (resource) URL.revokeObjectURL(resource)
     }
-  }, [sessionId, attachment.id, revision])
+  }, [sessionId, attachment.id, attachment.kind, revision])
 
   const retry = () => {
     close.current?.focus()
     setFailed(false)
     setUrl(null)
+    setText(null)
     setRevision((value) => value + 1)
   }
   return createPortal(
@@ -74,7 +82,7 @@ export function AttachmentPreview({
             id="attachment-preview-title"
             className="min-w-0 flex-1 break-words text-[15px] font-semibold"
           >
-            {attachment.name || t('sessions.image')}
+            {attachment.name || t(attachment.kind === 'file' ? 'sessions.file' : 'sessions.image')}
           </h2>
           <button
             ref={close}
@@ -89,12 +97,26 @@ export function AttachmentPreview({
         <div className="grid min-h-40 min-w-0 place-items-center overflow-auto p-4">
           {failed ? (
             <div role="status" className="space-y-4 text-center text-[13px] text-muted">
-              <p>{t('sessions.previewFailed')}</p>
+              <p>
+                {t(
+                  attachment.kind === 'file'
+                    ? 'sessions.filePreviewFailed'
+                    : 'sessions.previewFailed',
+                )}
+              </p>
               <Button variant="secondary" onClick={retry}>
                 <RefreshCw size={14} aria-hidden="true" />
                 {t('sessions.previewRetry')}
               </Button>
             </div>
+          ) : text !== null ? (
+            <pre
+              tabIndex={0}
+              aria-label={t('sessions.fileContent')}
+              className="selectable max-h-[calc(100dvh-160px)] w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-canvas-deep p-4 font-mono text-[12px] leading-relaxed text-text"
+            >
+              {text || t('sessions.emptyFile')}
+            </pre>
           ) : url ? (
             <img
               src={url}

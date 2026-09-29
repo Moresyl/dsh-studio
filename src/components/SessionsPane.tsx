@@ -845,13 +845,13 @@ function Turn({ line, lit, sessionId }: { line: SessionLine; lit: boolean; sessi
                     <p className="selectable break-words text-[12px] font-medium text-text">
                       {item.name || t(item.kind === 'image' ? 'sessions.image' : 'sessions.file')}
                     </p>
-                    {item.kind === 'image' && item.id && (
+                    {item.id && (
                       <button
                         type="button"
                         onClick={() => setPreview(item)}
                         className="mt-2 rounded-control px-1 py-0.5 text-[11px] font-medium text-text hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-text"
                       >
-                        {t('sessions.previewImage')}
+                        {t(item.kind === 'file' ? 'sessions.previewFile' : 'sessions.previewImage')}
                       </button>
                     )}
                     <p className="mt-0.5 break-words text-[11px] text-muted">

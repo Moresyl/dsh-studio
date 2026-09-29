@@ -147,6 +147,9 @@ test('Cordis adapter publishes once and closes retained references with its fibe
     let host
     let close
     const ctx = {
+      inject(names) {
+        assert.deepEqual(names, ['connection', 'sessionQuery', 'attachments'])
+      },
       provide(name, value) {
         assert.equal(name, 'dshStudioHost')
         host = value

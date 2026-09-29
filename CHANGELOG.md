@@ -13,10 +13,12 @@ pre-1.0 caveat that anything may still move.
 
 - Add application version history with reviewed upgrades, reinstalls and supported downgrades, cancellable signed downloads, and a website fallback for release metadata. Recheck the selected artifact before installation and serialize replacement with runtime and terminal activity; RPM downgrades remain unavailable in the built-in updater.
 - Preserve file and image attachment records in offline conversations, including attachment-only messages, filename search, and Markdown/HTML/JSON exports. Show names, recorded sizes and image dimensions in responsive cards. These are metadata records, not embedded files or authorized file previews.
-- Preview recorded images through the running Harness session-authorized API, with bounded raster replies, cancellation, timeout handling, retry and keyboard focus restoration. Transcript exports still contain metadata only; ordinary file previews are not included.
+- Preview recorded images through the running Harness session-authorized API, with bounded raster replies, cancellation, timeout handling, retry and keyboard focus restoration. Transcript exports still contain metadata only.
+- Preview UTF-8 text attachments up to 1 MiB through an authenticated, session-scoped route. Verify the full recorded size and SHA-256 digest before showing literal text, including HTML as text; reject binary data, unsupported encodings and oversized files. Closing a preview cancels its file request. Document/PDF rendering and opening original files in external applications are not included.
 
 ### Fixes and polish
 
+- Refresh the Studio-owned host entry and file-preview module during startup and materialize the complete integration in profile and cold-install checks, so existing compatible environments gain the preview route without reinstalling Harness.
 - Bound attachment metadata and per-message counts, report omitted records, strip local paths and display control characters from attachment names, escape attachment records in HTML exports, and include metadata in session cache accounting.
 - Wrap pane actions onto a separate row when space is limited so long session titles remain readable beside the controls.
 - Discover canonical generation-addressed session logs, selecting the highest numeric format generation instead of overlooking current `session.v4.jsonl.zstd` files or reading stale pre-migration logs.

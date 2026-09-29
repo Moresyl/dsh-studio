@@ -8,7 +8,7 @@ const source = await readFile(
   'utf8',
 )
 const attachmentId = `sha256:${'a'.repeat(64)}`
-function mount(read) {
+function mount(read, fetch) {
   const messages = [],
     effects = [],
     listeners = new Set()
@@ -31,7 +31,16 @@ function mount(read) {
     body: { dataset: {}, hasAttribute: () => false, toggleAttribute() {} },
     documentElement: { style: {} },
   }
-  runInNewContext(source, { window, document, Symbol })
+  runInNewContext(source, {
+    window,
+    document,
+    Symbol,
+    fetch,
+    URLSearchParams,
+    AbortController,
+    setTimeout,
+    clearTimeout,
+  })
   plugin.apply({
     inject: (names, setup) => {
       assert.equal(JSON.stringify(names), JSON.stringify(['remote', 'remote.session']))
@@ -113,4 +122,71 @@ test('pending reads are bounded and disposed clients never send late image bytes
   finish.forEach((resolve) => resolve({ ok: true, value: { data: 'YWJj' } }))
   await Promise.all(waiting)
   assert.equal(h.messages.length, before)
+})
+
+test('file previews use one same-origin authenticated route and abort on disposal', async () => {
+  const calls = []
+  const value = { attachmentId, bytes: 3, text: 'abc' }
+  const h = mount(undefined, async (url, options) => {
+    calls.push({ url, options })
+    return { ok: true, json: async () => value }
+  })
+  await h.send({ kind: 'file' })
+  assert.equal(calls.length, 1)
+  const url = new URL(calls[0].url, 'http://localhost')
+  assert.equal(url.pathname, '/api/studio/file-preview')
+  assert.equal(url.searchParams.get('sessionId'), 'session')
+  assert.equal(calls[0].options.credentials, 'same-origin')
+  assert.equal(h.messages.at(-1).data.value, value)
+  await h.send({ kind: 'unknown' })
+  assert.equal(calls.length, 1)
+  h.dispose()
+  let aborted = false
+  const waiting = mount(
+    undefined,
+    (_, options) =>
+      new Promise((_, reject) =>
+        options.signal.addEventListener('abort', () => {
+          aborted = true
+          reject(Error('stopped'))
+        }),
+      ),
+  )
+  const pending = waiting.send({ kind: 'file' })
+  waiting.dispose()
+  await pending
+  assert(aborted)
+})
+
+test('file bridge rejects denied and oversized text without forwarding backend errors', async () => {
+  for (const response of [
+    { ok: false },
+    { ok: true, json: async () => ({ text: 'x'.repeat(1048577) }) },
+  ]) {
+    const h = mount(undefined, async () => response)
+    await h.send({ kind: 'file' })
+    assert.equal(h.messages.at(-1).data.ok, false)
+    h.dispose()
+  }
+})
+
+test('only the initiating parent can cancel its pending file request', async () => {
+  let aborted = false
+  const h = mount(
+    undefined,
+    (_, options) =>
+      new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => {
+          aborted = true
+          reject(Error('cancelled'))
+        })
+      }),
+  )
+  const pending = h.send({ kind: 'file' })
+  await h.send({ type: 'dsh-studio:preview-cancel' }, {})
+  assert(!aborted)
+  await h.send({ type: 'dsh-studio:preview-cancel' })
+  await pending
+  assert(aborted)
+  h.dispose()
 })

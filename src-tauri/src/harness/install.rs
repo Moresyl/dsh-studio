@@ -139,6 +139,8 @@ const INTEGRATION_PATCH: &[u8] =
     include_bytes!("../../runtime-contract/dsh-studio-integration/cordis.patch.yml");
 const INTEGRATION_NODE: &[u8] =
     include_bytes!("../../runtime-contract/dsh-studio-integration/lib/index.js");
+const INTEGRATION_FILE_PREVIEW: &[u8] =
+    include_bytes!("../../runtime-contract/dsh-studio-integration/lib/file-preview.js");
 const INTEGRATION_CLIENT: &[u8] =
     include_bytes!("../../runtime-contract/dsh-studio-integration/lib/client.js");
 const INTEGRATION_RESOLVER: &[u8] =
@@ -696,6 +698,7 @@ fn stage_integration(target: &Path) -> Result<()> {
         .and_then(|_| std::fs::write(root.join("package.json"), INTEGRATION_MANIFEST))
         .and_then(|_| std::fs::write(root.join("cordis.patch.yml"), INTEGRATION_PATCH))
         .and_then(|_| std::fs::write(root.join("lib/index.js"), INTEGRATION_NODE))
+        .and_then(|_| std::fs::write(root.join("lib/file-preview.js"), INTEGRATION_FILE_PREVIEW))
         .and_then(|_| std::fs::write(root.join("lib/client.js"), INTEGRATION_CLIENT))
         .and_then(|_| std::fs::write(root.join("lib/runtime-resolver.cjs"), INTEGRATION_RESOLVER))
         .map_err(|cause| Error::Install(format!("could not stage the Studio integration: {cause}")))
@@ -732,6 +735,11 @@ pub fn ensure_runtime_resolver(target: &Path) -> Result<PathBuf> {
         ));
     }
     let resolver = integration.join("lib/runtime-resolver.cjs");
+    refresh_integration_file(
+        &integration.join("lib/file-preview.js"),
+        INTEGRATION_FILE_PREVIEW,
+    )?;
+    refresh_integration_file(&entry, INTEGRATION_NODE)?;
     refresh_integration_file(&integration.join("lib/client.js"), INTEGRATION_CLIENT)?;
     refresh_integration_file(&resolver, INTEGRATION_RESOLVER)?;
     Ok(resolver)
@@ -1507,9 +1515,9 @@ mod tests {
     use super::{
         ensure_runtime_resolver, npm_cli_candidates, qualify_runtime, remove_dir_if_exists,
         replace_once, require_expected_runtime, run_command_with_limits, runtime_compatible,
-        runtime_version, InstallPlan, INTEGRATION_CLIENT, INTEGRATION_PACKAGE,
-        INTEGRATION_RESOLVER, OFFICIAL_REGISTRY, PACKAGE, PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK,
-        RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
+        runtime_version, InstallPlan, INTEGRATION_CLIENT, INTEGRATION_FILE_PREVIEW,
+        INTEGRATION_NODE, INTEGRATION_PACKAGE, INTEGRATION_RESOLVER, OFFICIAL_REGISTRY, PACKAGE,
+        PNPM_SPEC, PNPM_VERSION, RUNTIME_LOCK, RUNTIME_PACKAGE, RUNTIME_SCHEMA, SPEC, VERSION,
     };
 
     fn write_runtime(root: &Path, version: &str, entry: bool) {
@@ -1736,6 +1744,21 @@ mod tests {
         fs::write(&client, "stale client theme").expect("old integration client");
         ensure_runtime_resolver(&root).expect("upgrade client even with current resolver");
         assert!(fs::read(&client).expect("updated client") == INTEGRATION_CLIENT);
+        let node = root.join("node_modules/@moresyl/dsh-studio-integration/lib/index.js");
+        let preview = root.join("node_modules/@moresyl/dsh-studio-integration/lib/file-preview.js");
+        assert_eq!(fs::read(&node).expect("updated host"), INTEGRATION_NODE);
+        assert_eq!(
+            fs::read(&preview).expect("added preview"),
+            INTEGRATION_FILE_PREVIEW
+        );
+        fs::write(&node, "stale host").expect("old host");
+        fs::write(&preview, "stale preview").expect("old preview");
+        ensure_runtime_resolver(&root).expect("upgrade host and preview");
+        assert_eq!(fs::read(&node).expect("repaired host"), INTEGRATION_NODE);
+        assert_eq!(
+            fs::read(&preview).expect("repaired preview"),
+            INTEGRATION_FILE_PREVIEW
+        );
         fs::remove_file(&client).expect("remove owned client fixture");
         fs::create_dir(&client).expect("unsafe client directory");
         assert!(ensure_runtime_resolver(&root)

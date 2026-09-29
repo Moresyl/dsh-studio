@@ -86,6 +86,7 @@ try {
     throw new Error('Studio integration was linked instead of materialized')
   }
   await stat(join(integrationRoot, 'lib', 'client.js'))
+  await stat(join(integrationRoot, 'lib', 'file-preview.js'))
   const picker = await readFile(
     join(
       directory,

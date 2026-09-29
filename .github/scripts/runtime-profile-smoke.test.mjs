@@ -69,6 +69,7 @@ test('smoke profile mirrors the product bootstrap and materializes integration',
         'package.json',
         'cordis.patch.yml',
         'lib/index.js',
+        'lib/file-preview.js',
         'lib/client.js',
         'lib/runtime-resolver.cjs',
       ].map(async (relative) => {

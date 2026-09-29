@@ -72,10 +72,11 @@ const WEB_APP_BUNDLE: &str = "@deepseek-ai/dsh-web-app";
 const WEB_PROFILE_BUNDLES: [&str; 2] = ["@deepseek-ai/dsh-base", WEB_APP_BUNDLE];
 const PROFILE_WORKSPACE: &str =
     "packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n";
-const STUDIO_MODULE_FILES: [&str; 5] = [
+const STUDIO_MODULE_FILES: [&str; 6] = [
     "package.json",
     "cordis.patch.yml",
     "lib/index.js",
+    "lib/file-preview.js",
     "lib/client.js",
     "lib/runtime-resolver.cjs",
 ];

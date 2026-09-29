@@ -68,6 +68,7 @@ window.__ModuleLoader__.load({
       if (window.parent !== window) {
         let active = true
         let reading = 0
+        const fileReads = new Map()
         let readImage = null
         // Keep theme/workspace integration active on generations without this API.
         ctx.inject(['remote', 'remote.session'], (client) => {
@@ -76,16 +77,35 @@ window.__ModuleLoader__.load({
         })
         const onImage = async (event) => {
           const request = event.data
+          if (event.source === window.parent && request?.type === 'dsh-studio:preview-cancel') {
+            fileReads.get(request.id)?.abort()
+            return
+          }
           if (event.source !== window.parent || request?.type !== 'dsh-studio:image-read') return
+          if (request.kind !== undefined && !['image', 'file'].includes(request.kind)) return
           if (typeof request.id !== 'string' || request.id.length > 64
             || typeof request.sessionId !== 'string' || !request.sessionId || request.sessionId.length > 512
             || typeof request.attachmentId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(request.attachmentId)) return
           const reply = (ok, value) => {
             if (active) window.parent.postMessage({ type: 'dsh-studio:image-result', id: request.id, ok, value }, event.origin)
           }
-          if (reading >= 4 || !readImage) { reply(false); return }
+          if (reading >= 4 || fileReads.has(request.id) || (request.kind !== 'file' && !readImage)) { reply(false); return }
           reading += 1
           try {
+            if (request.kind === 'file') {
+              const controller = new AbortController()
+              const timer = setTimeout(() => controller.abort(), 20000)
+              fileReads.set(request.id, controller)
+              try {
+                const query = new URLSearchParams({ sessionId: request.sessionId, attachmentId: request.attachmentId })
+                const response = await fetch(`/api/studio/file-preview?${query}`, { signal: controller.signal, credentials: 'same-origin', cache: 'no-store' })
+                if (!response.ok) { reply(false); return }
+                const value = await response.json()
+                if (typeof value?.text !== 'string' || value.text.length > 1048576) reply(false)
+                else reply(true, value)
+              } finally { clearTimeout(timer); fileReads.delete(request.id) }
+              return
+            }
             const result = await readImage({ sessionId: request.sessionId, attachmentId: request.attachmentId })
             if (!result?.ok || typeof result.value?.data !== 'string' || result.value.data.length > 27962028) reply(false)
             else reply(true, result.value)
@@ -95,6 +115,7 @@ window.__ModuleLoader__.load({
         window.addEventListener('message', onImage)
         ctx.effect(() => () => {
           active = false
+          for (const controller of fileReads.values()) controller.abort()
           window.removeEventListener('message', onImage)
         }, 'dsh-studio: authorized image preview')
       }

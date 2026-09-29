@@ -1,4 +1,4 @@
-/** Image reads stay on the authenticated Harness session API, never host paths. */
+/** Attachment reads stay on authenticated Harness APIs, never host paths. */
 export const IMAGE_LIMIT = 20 * 1024 * 1024
 const TIMEOUT = 20_000
 const REQUEST = 'dsh-studio:image-read'
@@ -48,7 +48,31 @@ export function imageBlob(value: unknown, expected: string): Blob {
   return new Blob([bytes], { type: ref.mediaType })
 }
 
-type ReadImage = (sessionId: string, attachmentId: string, signal: AbortSignal) => Promise<Blob>
+export function textBlob(value: unknown, expected: string): Blob {
+  const reply = value as { attachmentId?: unknown; bytes?: number; text?: unknown } | null
+  if (
+    !reply ||
+    reply.attachmentId !== expected ||
+    !Number.isSafeInteger(reply.bytes) ||
+    reply.bytes! < 0 ||
+    reply.bytes! > 1024 * 1024 ||
+    typeof reply.text !== 'string' ||
+    reply.text.length > 1024 * 1024 ||
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/u.test(reply.text)
+  ) {
+    throw new Error('Invalid text preview')
+  }
+  const blob = new Blob([reply.text], { type: 'text/plain;charset=utf-8' })
+  if (blob.size !== reply.bytes) throw new Error('Invalid text preview size')
+  return blob
+}
+
+type ReadImage = (
+  sessionId: string,
+  attachmentId: string,
+  signal: AbortSignal,
+  kind?: 'image' | 'file',
+) => Promise<Blob>
 let reader: ReadImage | null = null
 
 export function previewImage(
@@ -60,10 +84,19 @@ export function previewImage(
   return reader(sessionId, attachmentId, signal)
 }
 
+export function previewText(
+  sessionId: string,
+  attachmentId: string,
+  signal: AbortSignal,
+): Promise<Blob> {
+  if (!reader) return Promise.reject(new Error('Start Harness before previewing a file'))
+  return reader(sessionId, attachmentId, signal, 'file')
+}
+
 /** Bound to one exact iframe generation; teardown rejects all outstanding reads. */
 export function serveImagePreview(peer: Window, origin: string): () => void {
   const pending = new Map<string, (data?: unknown, error?: Error) => void>()
-  const read: ReadImage = (sessionId, attachmentId, signal) =>
+  const read: ReadImage = (sessionId, attachmentId, signal, kind = 'image') =>
     new Promise((resolve, reject) => {
       if (signal.aborted) {
         reject(new Error('Image preview cancelled'))
@@ -87,10 +120,17 @@ export function serveImagePreview(peer: Window, origin: string): () => void {
         if (!pending.delete(id)) return
         clearTimeout(timer)
         signal.removeEventListener('abort', abort)
+        if (error && kind === 'file') {
+          try {
+            peer.postMessage({ type: 'dsh-studio:preview-cancel', id }, origin)
+          } catch {
+            /* Frame already closed. */
+          }
+        }
         if (error) reject(error)
         else {
           try {
-            resolve(imageBlob(data, attachmentId))
+            resolve(kind === 'file' ? textBlob(data, attachmentId) : imageBlob(data, attachmentId))
           } catch (cause) {
             reject(cause)
           }
@@ -99,7 +139,7 @@ export function serveImagePreview(peer: Window, origin: string): () => void {
       pending.set(id, finish)
       signal.addEventListener('abort', abort, { once: true })
       try {
-        peer.postMessage({ type: REQUEST, id, sessionId, attachmentId }, origin)
+        peer.postMessage({ type: REQUEST, id, sessionId, attachmentId, kind }, origin)
       } catch {
         finish(undefined, new Error('Image preview connection is unavailable'))
       }
