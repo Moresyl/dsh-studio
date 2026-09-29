@@ -62,7 +62,6 @@ export function validateCapabilities(capabilities) {
     'clipboard-manager:allow-read-text',
     'opener:allow-reveal-item-in-dir',
     'opener:allow-open-url',
-    'process:allow-restart',
   ]
   for (const identifier of exact) {
     if (!identifiers.includes(identifier)) {
@@ -73,6 +72,7 @@ export function validateCapabilities(capabilities) {
     'dialog:default',
     'opener:default',
     'process:default',
+    'process:allow-restart',
     'updater:default',
     'updater:allow-download-and-install',
     'updater:allow-install',

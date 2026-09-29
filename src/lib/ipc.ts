@@ -7,6 +7,16 @@
 import { Channel, invoke } from '@tauri-apps/api/core'
 import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 
+export const applicationLifecycleReply = (id: string, ready: boolean): Promise<void> =>
+  invoke('application_lifecycle_reply', { id, ready })
+
+export const onLifecyclePrepare = (handler: (id: string) => void): Promise<UnlistenFn> =>
+  listen<string>('application://lifecycle-prepare', (event) => handler(event.payload))
+export const onLifecycleRelease = (handler: (id: string) => void): Promise<UnlistenFn> =>
+  listen<string>('application://lifecycle-release', (event) => handler(event.payload))
+export const onLifecycleBlocked = (handler: () => void): Promise<UnlistenFn> =>
+  listen('application://lifecycle-blocked', handler)
+
 export interface ApplicationReleaseSummary {
   version: string
   title: string

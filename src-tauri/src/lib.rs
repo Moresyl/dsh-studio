@@ -11,6 +11,7 @@ mod diagnostics;
 mod error;
 mod fetch;
 mod harness;
+mod lifecycle;
 mod locale;
 mod logging;
 mod material;
@@ -112,6 +113,7 @@ pub fn run() {
             app.manage(recovery::RendererHealth::default());
             app.manage(terminal::Terminals::new()?);
             app.manage(updates::UpdateState::default());
+            app.manage(lifecycle::Lifecycle::default());
             // Serve the compiled shell from loopback so the harness iframe is
             // same-site with it: dsh 0.1.2+ issues a SameSite=Strict session
             // cookie that WKWebView only holds and sends inside a same-site
@@ -235,6 +237,7 @@ pub fn run() {
             updates::application_update_discard,
             updates::application_update_cancel,
             updates::application_update_install,
+            lifecycle::application_lifecycle_reply,
             diagnostics::report_build,
             diagnostics::report_save,
             diagnostics::report_archive,
@@ -251,8 +254,13 @@ pub fn run() {
             workspace::workspace_worktree_create,
             workspace::review::workspace_worktree_review,
         ])
-        .run(tauri::generate_context!())
-        .expect("dsh-studio failed to start");
+        .build(tauri::generate_context!())
+        .expect("dsh-studio failed to start")
+        .run(|app, event| {
+            if let tauri::RunEvent::ExitRequested { code, api, .. } = event {
+                lifecycle::on_exit(app, code, &api);
+            }
+        });
 }
 
 /// Export bounded, redacted evidence without starting Tauri, Harness or a window.

@@ -9,6 +9,7 @@
         retry: '重试界面',
         export: '导出诊断包',
         quit: '退出',
+        discard: '强制退出会丢失所有窗口中未保存的修改。确定退出吗？',
         failed: '操作失败：',
         saved: '诊断包已保存：',
         unavailable: '原生恢复通道不可用。请使用命令行参数 --export-diagnostics。',
@@ -21,6 +22,7 @@
         retry: 'Retry interface',
         export: 'Export diagnostics',
         quit: 'Quit',
+        discard: 'Force quitting will discard unsaved changes in every window. Quit anyway?',
         failed: 'Action failed: ',
         saved: 'Diagnostics saved: ',
         unavailable: 'Native recovery is unavailable. Run the app with --export-diagnostics.',
@@ -36,7 +38,7 @@
   byId('quit').textContent = text.quit
   reason.textContent = text.loading
 
-  const run = async (button, command) => {
+  const run = async (button, command, args) => {
     if (!invoke) {
       result.textContent = text.unavailable
       return undefined
@@ -44,7 +46,7 @@
     button.disabled = true
     result.textContent = ''
     try {
-      return await invoke(command)
+      return await invoke(command, args)
     } catch (error) {
       result.textContent = text.failed + String(error)
       return undefined
@@ -73,6 +75,7 @@
     if (typeof path === 'string') result.textContent = text.saved + path
   })
   byId('quit').addEventListener('click', (event) => {
-    void run(event.currentTarget, 'recovery_quit')
+    if (window.confirm(text.discard))
+      void run(event.currentTarget, 'recovery_quit', { discard: true })
   })
 })()

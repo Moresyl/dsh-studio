@@ -114,6 +114,7 @@ pub async fn application_update_install(
     review_id: String,
     progress: Channel<Progress>,
 ) -> Result<()> {
+    let lifecycle = crate::lifecycle::acquire(&app).await?;
     if cfg!(debug_assertions) {
         return Err(failure(
             "application installation is disabled in development builds",
@@ -179,6 +180,7 @@ pub async fn application_update_install(
         .map_err(|_| failure("application installer could not finish"))?
         .map_err(|cause| failure(format!("application installer failed: {cause}")))?;
     job.installed();
+    lifecycle.commit();
     app.restart();
 }
 

@@ -100,7 +100,7 @@ mod native {
                 }
                 let _ = app.emit(CHECK_UPDATE_EVENT, ());
             }
-            RESTART => app.restart(),
+            RESTART => crate::lifecycle::request(app, true, 0),
             _ => {}
         }
     }

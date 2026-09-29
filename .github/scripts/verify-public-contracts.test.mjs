@@ -18,13 +18,16 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
     'clipboard-manager:allow-read-text',
     'opener:allow-reveal-item-in-dir',
     { identifier: 'opener:allow-open-url', allow: [{ url: 'https://*' }] },
-    'process:allow-restart',
     'shell-commands',
   ]
   assert.doesNotThrow(() => validateCapabilities({ permissions }))
   assert.throws(
     () => validateCapabilities({ permissions: [...permissions, 'process:default'] }),
     /broad process:default/,
+  )
+  assert.throws(
+    () => validateCapabilities({ permissions: [...permissions, 'process:allow-restart'] }),
+    /broad process:allow-restart/,
   )
   for (const permission of ['updater:allow-download-and-install', 'updater:allow-install']) {
     assert.throws(
@@ -125,6 +128,6 @@ test('repository public contracts agree end to end', async () => {
     hostProtocol: 1,
     schema: '1.0.0',
     version: manifest.version,
-    commands: { invoked: 100, registered: 104, allowed: 104 },
+    commands: { invoked: 101, registered: 105, allowed: 105 },
   })
 })

@@ -226,8 +226,16 @@ pub async fn recovery_export_diagnostics() -> Result<String> {
 }
 
 #[tauri::command]
-pub fn recovery_quit(app: AppHandle) {
+pub fn recovery_quit(app: AppHandle, window: WebviewWindow, discard: bool) -> Result<()> {
+    if window.label() != LABEL || !discard {
+        return Err(Error::Window(
+            "Confirm discarding unsaved work in the recovery window before quitting".into(),
+        ));
+    }
+    app.state::<crate::lifecycle::Lifecycle>()
+        .abandon_for_recovery();
     app.exit(1);
+    Ok(())
 }
 
 fn show<R: Runtime>(app: &AppHandle<R>, failure: &RendererFailure) {

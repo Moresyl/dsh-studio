@@ -131,6 +131,14 @@ pub fn open<R: Runtime>(
     app: &AppHandle<R>,
     from: Option<&WebviewWindow<R>>,
 ) -> Result<WebviewWindow<R>> {
+    app.state::<crate::lifecycle::Lifecycle>()
+        .with_idle(|| open_idle(app, from))
+}
+
+fn open_idle<R: Runtime>(
+    app: &AppHandle<R>,
+    from: Option<&WebviewWindow<R>>,
+) -> Result<WebviewWindow<R>> {
     let ordinal = vacancy(&app.webview_windows()).ok_or_else(|| {
         Error::Window(format!(
             "{CEILING} windows are open already, which is as many as this app will run at once"

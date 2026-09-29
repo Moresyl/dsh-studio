@@ -17,6 +17,7 @@ import { pushWorkspaceDrop } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
 import { ownAsync } from '@/lib/lifecycle'
 import { guardPresentationClose } from '@/lib/presentation/close-guard'
+import { guardApplicationLifecycle } from '@/lib/presentation/lifecycle-guard'
 import { needsWorkbench, rendererDocument } from '@/lib/renderer-recovery'
 import { standby } from '@/lib/platform'
 import { readPreference, savePreference } from '@/lib/preferences'
@@ -55,6 +56,7 @@ const StudioSidebar = lazy(() =>
  */
 export default function App() {
   useEffect(() => ownAsync(guardPresentationClose(), reportFailure), [])
+  useEffect(() => ownAsync(guardApplicationLifecycle(), reportFailure), [])
   const status = useHarness((state) => state.status)
   const environment = useHarness((state) => state.environment)
   const inspect = useHarness((state) => state.inspect)

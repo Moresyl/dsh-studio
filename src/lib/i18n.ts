@@ -145,6 +145,8 @@ const en = {
   'deck.template.series': 'Sample data',
   'deck.untitled': 'Untitled presentation',
   'deck.save': 'Save',
+  'deck.saveBeforeExit':
+    'Save unfinished presentations in every window, then retry. A window that is still loading or unavailable also prevents exit or update installation.',
   'deck.saveBeforeUpdate':
     'Save your presentation and wait for any document operation to finish before installing an application update.',
   'deck.export': 'Export PPTX',
@@ -1062,6 +1064,8 @@ const zh: Record<MessageKey, string> = {
   'deck.template.series': '示例数据',
   'deck.untitled': '未命名文稿',
   'deck.save': '保存',
+  'deck.saveBeforeExit':
+    '请先保存所有窗口中未完成的文稿再重试。仍在加载或没有响应的窗口也会阻止退出和安装更新。',
   'deck.saveBeforeUpdate': '请先保存文稿，并等待文稿操作完成，再安装应用更新。',
   'deck.export': '导出 PPTX',
   'deck.exported': 'PPTX 已导出',
