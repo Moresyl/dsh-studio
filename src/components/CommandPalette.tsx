@@ -438,6 +438,7 @@ function Palette({
       <div
         role="dialog"
         aria-modal="true"
+        data-window-shortcuts="palette"
         aria-label={t('palette.title')}
         className="dialog-panel flex h-fit max-h-[68vh] w-full max-w-[520px] animate-pop flex-col overflow-hidden rounded-[16px] border border-line-strong bg-surface shadow-lift"
       >

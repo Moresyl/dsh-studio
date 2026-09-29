@@ -16,6 +16,7 @@ import { t } from '@/lib/i18n'
 import { pushWorkspaceDrop } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
 import { ownAsync } from '@/lib/lifecycle'
+import { hasBlockingModal } from '@/lib/modal'
 import { guardPresentationClose } from '@/lib/presentation/close-guard'
 import { needsWorkbench, rendererDocument } from '@/lib/renderer-recovery'
 import { standby } from '@/lib/platform'
@@ -101,6 +102,7 @@ export default function App() {
   // keystroke by changing something the user cannot see.
   const show = useCallback(
     (next: View) => {
+      if (hasBlockingModal(document)) return
       setView(next)
       setWorkbenchLoaded(true)
       choosePresentation('advanced')
@@ -298,7 +300,13 @@ export default function App() {
       if (!(event.ctrlKey || event.metaKey) || event.altKey) return
       // A modal is a question, and the rest of the window is not answering it.
       // Nor is the guide, which is the whole window until it is done with.
-      if (managing || stage === 'guiding' || useDialog.getState().pending) return
+      if (
+        managing ||
+        stage === 'guiding' ||
+        useDialog.getState().pending ||
+        hasBlockingModal(document)
+      )
+        return
 
       if (event.key === 'k' || event.key === 'K') {
         event.preventDefault()

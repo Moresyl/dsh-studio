@@ -347,6 +347,15 @@ mod tests {
         output.into_inner()
     }
 
+    fn marked_png(marker: u8) -> Vec<u8> {
+        let image = image::RgbaImage::from_pixel(1, 1, image::Rgba([marker, 0, 0, 255]));
+        let mut output = Cursor::new(Vec::new());
+        DynamicImage::ImageRgba8(image)
+            .write_to(&mut output, ImageFormat::Png)
+            .unwrap();
+        output.into_inner()
+    }
+
     #[test]
     fn imports_deduplicates_and_verifies_immutable_resource_bytes() {
         let root = Fixture::new();
@@ -540,6 +549,39 @@ mod tests {
         let candidate = format!("{:x}", Sha256::digest(&normalized));
         let path = asset_path(&root.0, &candidate).unwrap();
         assert!(!path.exists());
+        assert!(store_for_document(&root.0, input, &document).is_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn full_document_image_roster_allows_duplicates_but_rejects_new_assets_before_storage() {
+        let root = Fixture::new();
+        let mut ids = Vec::new();
+        for marker in 0..100 {
+            ids.push(store(&root.0, &marked_png(marker)).unwrap().id);
+        }
+        let document = serde_json::json!({
+            "format": "dsh-studio-presentation",
+            "version": 2,
+            "id": "count",
+            "title": "Count",
+            "slides": [{
+                "elements": ids.iter().map(|id| serde_json::json!({
+                    "kind": "image",
+                    "asset": id,
+                })).collect::<Vec<_>>(),
+            }],
+        });
+        let duplicate = store_for_document(&root.0, marked_png(0), &document).unwrap();
+        assert_eq!(duplicate.id, ids[0]);
+        assert_eq!(
+            std::fs::read_dir(root.0.join("assets")).unwrap().count(),
+            100
+        );
+
+        let input = marked_png(255);
+        let candidate = format!("{:x}", Sha256::digest(normalize(&input).unwrap()));
+        let path = asset_path(&root.0, &candidate).unwrap();
         assert!(store_for_document(&root.0, input, &document).is_err());
         assert!(!path.exists());
     }

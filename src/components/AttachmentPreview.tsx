@@ -4,7 +4,11 @@ import { Check, Download, ImagePlus, Loader2, RefreshCw, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { downloadFile, previewImage, previewText } from '@/lib/attachment-preview'
-import { attachmentPreviewKind, presentationImageIssue } from '@/lib/attachment-kind'
+import {
+  attachmentPreviewCanDismiss,
+  attachmentPreviewKind,
+  presentationImageIssue,
+} from '@/lib/attachment-kind'
 import { saveAttachment } from '@/lib/attachment-save'
 import { t } from '@/lib/i18n'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
@@ -48,6 +52,9 @@ export function AttachmentPreview({
   const [addState, setAddState] = useState<'idle' | 'adding' | 'added' | 'failed'>('idle')
   const editor = usePresentationEditor()
   const imageIssue = image ? presentationImageIssue(image) : null
+  const dismiss = () => {
+    if (attachmentPreviewCanDismiss(adding.current)) onClose()
+  }
 
   useEffect(() => {
     mounted.current = true
@@ -137,8 +144,8 @@ export function AttachmentPreview({
   return createPortal(
     <div
       role="presentation"
-      onMouseDown={(event) => pressedBackdrop(event, onClose)}
-      onKeyDown={(event) => holdFocus(card.current, event, onClose)}
+      onMouseDown={(event) => pressedBackdrop(event, dismiss)}
+      onKeyDown={(event) => holdFocus(card.current, event, dismiss)}
       className="fixed inset-0 z-30 grid place-items-center bg-canvas-deep/70 p-4 backdrop-blur-[2px]"
     >
       <div
@@ -198,9 +205,10 @@ export function AttachmentPreview({
           <button
             ref={close}
             type="button"
-            onClick={onClose}
+            onClick={dismiss}
+            disabled={addState === 'adding'}
             aria-label={t('sessions.closePreview')}
-            className="grid size-8 shrink-0 place-items-center rounded-control text-muted hover:bg-surface-2 hover:text-text"
+            className="grid size-8 shrink-0 place-items-center rounded-control text-muted hover:bg-surface-2 hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -214,7 +222,7 @@ export function AttachmentPreview({
         )}
         {addState === 'failed' && (
           <p role="status" className="px-5 pt-3 text-[12px] text-danger">
-            {t('sessions.addToPresentationFailed')}
+            {editor.error || t('sessions.addToPresentationFailed')}
           </p>
         )}
         {image && imageIssue && (

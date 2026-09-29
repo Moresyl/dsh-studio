@@ -4,11 +4,7 @@ import { copyPresentation, retainHistory } from '@/lib/presentation/authoring'
 import { loadPresentation, savePresentation } from '@/lib/presentation/repository'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
-import {
-  choosePresentationImage,
-  documentImages,
-  importPresentationAttachment,
-} from '@/lib/presentation/media'
+import { choosePresentationImage, importPresentationAttachment } from '@/lib/presentation/media'
 import { presentationSize } from '@/lib/presentation/document'
 import type { PresentationImage } from '@/lib/ipc'
 
@@ -52,25 +48,36 @@ export const isPresentationDirty = (
   Object.keys(state.inputs).length > 0 ||
   (state.document !== null && JSON.stringify(state.document) !== state.saved)
 
-async function appendImage(
+interface PendingImagePlacement {
+  document: PresentationDocument
+  id: string
+}
+
+const PREFLIGHT_IMAGE = { id: 'f'.repeat(64), width: 1, height: 1 }
+// The final four finite coordinates can add at most 92 JSON characters. This
+// padding makes a successful preflight at least as large as the committed item.
+const PREFLIGHT_ALT = 'x'.repeat(128)
+
+function appendImage(
   source: PresentationDocument,
   slideId: string,
-  image: PresentationImage,
-) {
+  id: string,
+  image: Pick<PresentationImage, 'id' | 'width' | 'height'>,
+  alt: string,
+): PresentationDocument {
   const document = parsePresentation(source)
   const slide = document.slides.find((page) => page.id === slideId)
   if (!slide) throw new Error('The selected slide no longer exists')
   const size = presentationSize(document.aspect)
   const scale = Math.min((size.width - 160) / image.width, (size.height - 160) / image.height, 1)
   const width = Math.max(1, image.width * scale),
-    height = Math.max(1, image.height * scale),
-    id = crypto.randomUUID()
+    height = Math.max(1, image.height * scale)
   document.version = 2
   slide.elements.push({
     id,
     kind: 'image',
     asset: image.id,
-    alt: '',
+    alt,
     fit: 'contain',
     x: (size.width - width) / 2,
     y: (size.height - height) / 2,
@@ -78,9 +85,37 @@ async function appendImage(
     height,
     rotation: 0,
   })
-  const checked = parsePresentation(document)
-  await documentImages(checked)
-  return { document: checked, id }
+  return parsePresentation(document)
+}
+
+function preflightImage(source: PresentationDocument, slideId: string): PendingImagePlacement {
+  const id = crypto.randomUUID()
+  const existingAsset = source.slides
+    .flatMap((slide) => slide.elements)
+    .find((element) => element.kind === 'image')?.asset
+  return {
+    document: appendImage(
+      source,
+      slideId,
+      id,
+      { ...PREFLIGHT_IMAGE, id: existingAsset ?? PREFLIGHT_IMAGE.id },
+      PREFLIGHT_ALT,
+    ),
+    id,
+  }
+}
+
+function completeImage(
+  pending: PendingImagePlacement,
+  slideId: string,
+  image: PresentationImage,
+): PresentationDocument {
+  const document = parsePresentation(pending.document)
+  const slide = document.slides.find((page) => page.id === slideId)
+  const index = slide?.elements.findIndex((element) => element.id === pending.id) ?? -1
+  if (!slide || index < 0) throw new Error('The prepared image placement no longer exists')
+  slide.elements.splice(index, 1)
+  return appendImage(document, slideId, pending.id, image, '')
 }
 
 /** One editor owns its draft; switching panes does not discard pending changes. */
@@ -284,18 +319,19 @@ export function createPresentationEditor(synchronizing = false) {
         return null
       set({ busy: 'image', error: null })
       try {
+        const pending = preflightImage(state.document, slideId)
         const image = await choosePresentationImage(state.document)
         if (!image) return null
-        const placed = await appendImage(state.document, slideId, image)
+        const document = completeImage(pending, slideId, image)
         set((current) => ({
-          document: placed.document,
-          activeSlide: placed.document.slides.some((slide) => slide.id === current.activeSlide)
+          document,
+          activeSlide: document.slides.some((slide) => slide.id === current.activeSlide)
             ? current.activeSlide
             : slideId,
           past: retainHistory(state.past, JSON.stringify(state.document)),
           future: [],
         }))
-        return placed.id
+        return pending.id
       } catch (cause) {
         set({ error: describe(cause) })
         return null
@@ -310,17 +346,18 @@ export function createPresentationEditor(synchronizing = false) {
       if (state.busy || !state.document || !slideId) return null
       set({ busy: 'image', error: null })
       try {
+        const pending = preflightImage(state.document, slideId)
         const image = await importPresentationAttachment(attachmentId, blob, state.document)
-        const placed = await appendImage(state.document, slideId, image)
+        const document = completeImage(pending, slideId, image)
         set((current) => ({
-          document: placed.document,
-          activeSlide: placed.document.slides.some((slide) => slide.id === current.activeSlide)
+          document,
+          activeSlide: document.slides.some((slide) => slide.id === current.activeSlide)
             ? current.activeSlide
             : slideId,
           past: retainHistory(state.past, JSON.stringify(state.document)),
           future: [],
         }))
-        return placed.id
+        return pending.id
       } catch (cause) {
         set({ error: describe(cause) })
         return null

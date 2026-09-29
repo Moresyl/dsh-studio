@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { KeyboardEvent, MouseEvent } from 'react'
 
-import { holdFocus, pressedBackdrop } from './modal'
+import { hasBlockingModal, holdFocus, pressedBackdrop } from './modal'
 
 function control(options: { disabled?: boolean; hidden?: boolean; tabIndex?: number } = {}) {
   return {
@@ -29,6 +29,31 @@ function card(stops: HTMLElement[]) {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('modal keyboard boundaries', () => {
+  it('blocks only visible ordinary modals and reserves the palette marker', () => {
+    const visible = {
+      closest: vi.fn(() => null),
+      getClientRects: vi.fn(() => [{}]),
+    } as unknown as HTMLElement
+    const hidden = {
+      closest: vi.fn(() => ({})),
+      getClientRects: vi.fn(() => [{}]),
+    } as unknown as HTMLElement
+    const collapsed = {
+      closest: vi.fn(() => null),
+      getClientRects: vi.fn(() => []),
+    } as unknown as HTMLElement
+    const root = (modals: HTMLElement[]) =>
+      ({ querySelectorAll: vi.fn(() => modals) }) as unknown as Document
+    const blocked = root([visible])
+    expect(hasBlockingModal(blocked)).toBe(true)
+    expect(hasBlockingModal(root([]))).toBe(false)
+    expect(hasBlockingModal(root([hidden, collapsed]))).toBe(false)
+    expect(hasBlockingModal(root([collapsed, visible]))).toBe(true)
+    expect(blocked.querySelectorAll).toHaveBeenCalledWith(
+      '[aria-modal="true"]:not([data-window-shortcuts="palette"])',
+    )
+  })
+
   it('wraps both directions without visiting disabled, hidden or untabbable controls', () => {
     const first = control()
     const last = control()

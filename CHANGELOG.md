@@ -11,7 +11,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Added
 
-- Add session-authorized PNG, JPEG and WebP images from conversation previews to the active presentation slide. Keep later slide selection stable, reject incompatible previews before import, and validate the complete document image budget before durable storage.
+- Add session-authorized PNG, JPEG and WebP images from conversation previews to the active presentation slide. Keep later slide selection stable, preflight MIME, size and complete document structure before durable storage, and surface native static-frame validation errors without closing an in-flight operation.
 - Add local static PNG, JPEG and WebP images to presentations, with contain, crop and stretch sizing, descriptions, undo/redo and embedded editable PPTX pictures. Normalize resources to bounded PNG files, share immutable assets across copies, and reject missing or damaged image references before opening, saving or exporting a document.
 - Add application version history with reviewed upgrades, reinstalls and supported downgrades, cancellable signed downloads, and a website fallback for release metadata. Recheck the selected artifact before installation and serialize replacement with runtime and terminal activity; RPM downgrades remain unavailable in the built-in updater.
 - Preserve file and image attachment records in offline conversations, including attachment-only messages, filename search, and Markdown/HTML/JSON exports. Show names, recorded sizes and image dimensions in responsive cards. These are metadata records, not embedded files or authorized file previews.

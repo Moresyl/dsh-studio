@@ -8,6 +8,15 @@
  */
 import type { KeyboardEvent, MouseEvent } from 'react'
 
+/** True while a modal other than the command palette owns the whole window. */
+export function hasBlockingModal(root: Pick<Document, 'querySelectorAll'>): boolean {
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(
+      '[aria-modal="true"]:not([data-window-shortcuts="palette"])',
+    ),
+  ).some((modal) => !modal.closest('[hidden], [inert]') && modal.getClientRects().length > 0)
+}
+
 /**
  * Answer Escape, and keep Tab inside `card`.
  *
