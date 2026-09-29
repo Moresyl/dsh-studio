@@ -1,13 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Download, Loader2, RefreshCw, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
-import { previewImage, previewText } from '@/lib/attachment-preview'
+import { downloadFile, previewImage, previewText } from '@/lib/attachment-preview'
+import { attachmentPreviewKind } from '@/lib/attachment-kind'
 import { saveAttachment } from '@/lib/attachment-save'
 import { t } from '@/lib/i18n'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import type { SessionAttachment } from '@/lib/ipc'
+
+const PdfPreview = lazy(() =>
+  import('@/components/PdfPreview').catch(() => ({ default: PdfUnavailable })),
+)
+
+function PdfUnavailable() {
+  return (
+    <p role="status" className="p-4 text-[13px] text-muted">
+      {t('sessions.pdfFailed')}
+    </p>
+  )
+}
 
 export function AttachmentPreview({
   sessionId,
@@ -22,6 +35,8 @@ export function AttachmentPreview({
   const close = useRef<HTMLButtonElement>(null)
   const [url, setUrl] = useState<string | null>(null)
   const [text, setText] = useState<string | null>(null)
+  const [pdf, setPdf] = useState<Blob | null>(null)
+  const kind = attachmentPreviewKind(attachment)
   const [failed, setFailed] = useState(false)
   const [revision, setRevision] = useState(0)
   const saving = useRef<AbortController | null>(null)
@@ -55,10 +70,14 @@ export function AttachmentPreview({
   useEffect(() => {
     const controller = new AbortController()
     let resource: string | null = null
-    const read = attachment.kind === 'file' ? previewText : previewImage
+    const read = kind === 'pdf' ? downloadFile : kind === 'text' ? previewText : previewImage
     void read(sessionId, attachment.id ?? '', controller.signal)
       .then(async (blob) => {
-        if (attachment.kind === 'file') {
+        if (kind === 'pdf') {
+          if (!controller.signal.aborted) setPdf(blob)
+          return
+        }
+        if (kind === 'text') {
           const content = await blob.text()
           if (!controller.signal.aborted) setText(content)
           return
@@ -74,13 +93,14 @@ export function AttachmentPreview({
       controller.abort()
       if (resource) URL.revokeObjectURL(resource)
     }
-  }, [sessionId, attachment.id, attachment.kind, revision])
+  }, [sessionId, attachment.id, kind, revision])
 
   const retry = () => {
     close.current?.focus()
     setFailed(false)
     setUrl(null)
     setText(null)
+    setPdf(null)
     setRevision((value) => value + 1)
   }
   return createPortal(
@@ -148,6 +168,10 @@ export function AttachmentPreview({
                 {t('sessions.previewRetry')}
               </Button>
             </div>
+          ) : pdf ? (
+            <Suspense fallback={<p role="status">{t('sessions.pdfLoading')}</p>}>
+              <PdfPreview blob={pdf} />
+            </Suspense>
           ) : text !== null ? (
             <pre
               tabIndex={0}

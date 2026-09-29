@@ -35,6 +35,7 @@ import { TabButton } from '@/components/TabButton'
 import { UsageReport } from '@/components/UsageReport'
 import { count, day, filesize, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
+import { attachmentPreviewKind } from '@/lib/attachment-kind'
 import { sessionPage } from '@/lib/session-page'
 import type { MessageKey } from '@/lib/i18n'
 import type {
@@ -851,7 +852,13 @@ function Turn({ line, lit, sessionId }: { line: SessionLine; lit: boolean; sessi
                         onClick={() => setPreview(item)}
                         className="mt-2 rounded-control px-1 py-0.5 text-[11px] font-medium text-text hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-text"
                       >
-                        {t(item.kind === 'file' ? 'sessions.previewFile' : 'sessions.previewImage')}
+                        {t(
+                          attachmentPreviewKind(item) === 'pdf'
+                            ? 'sessions.previewPdf'
+                            : item.kind === 'file'
+                              ? 'sessions.previewFile'
+                              : 'sessions.previewImage',
+                        )}
                       </button>
                     )}
                     <p className="mt-0.5 break-words text-[11px] text-muted">

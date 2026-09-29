@@ -1,4 +1,8 @@
 import { fileURLToPath, URL } from 'node:url'
+import { readFile, readdir } from 'node:fs/promises'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import type { Plugin } from 'vite'
 import { configDefaults, defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -7,8 +11,46 @@ import tailwindcss from '@tailwindcss/vite'
 // side is configured with that exact URL and cannot follow a port change.
 const DEV_PORT = 1420
 
+/** Ship fonts, CMaps and decoders locally; opening a PDF never needs a CDN. */
+function pdfAssets(): Plugin {
+  const root = dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'))
+  const inventory = async () => {
+    const files = new Map<string, string>([['/pdfjs/LICENSE', join(root, 'LICENSE')]])
+    for (const folder of ['cmaps', 'standard_fonts', 'wasm', 'iccs']) {
+      for (const file of await readdir(join(root, folder), { withFileTypes: true })) {
+        if (file.isFile()) files.set(`/pdfjs/${folder}/${file.name}`, join(root, folder, file.name))
+      }
+    }
+    return files
+  }
+  return {
+    name: 'local-pdf-assets',
+    async generateBundle() {
+      for (const [name, path] of await inventory()) {
+        this.emitFile({ type: 'asset', fileName: name.slice(1), source: await readFile(path) })
+      }
+    },
+    async configureServer(server) {
+      const files = await inventory()
+      server.middlewares.use((request, response, next) => {
+        const path = files.get((request.url ?? '').split('?')[0] ?? '')
+        if (!path) return next()
+        void readFile(path)
+          .then((bytes) => {
+            response.setHeader(
+              'Content-Type',
+              path.endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream',
+            )
+            response.end(bytes)
+          })
+          .catch(next)
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), pdfAssets()],
   clearScreen: false,
   resolve: {
     alias: {
@@ -42,6 +84,8 @@ export default defineConfig({
       // composition is verified by typecheck/build and desktop smoke tests.
       include: [
         'src/lib/attachment-preview.ts',
+        'src/lib/attachment-kind.ts',
+        'src/lib/pdf-preview.ts',
         'src/lib/attachment-save.ts',
         'src/lib/bridge.ts',
         'src/lib/crash.ts',

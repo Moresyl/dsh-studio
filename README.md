@@ -46,11 +46,13 @@ LAN addresses are blurred; screenshots illustrate the interface, not test covera
 
 ## Why this exists
 
-Session attachments support literal text and raster image previews, plus saving
+Session attachments support literal text, raster images and PDF previews, plus saving
 the original file through the system save dialog. Harness must be running to
 authorize the read. Original downloads are limited to 20 MiB and verified by
 SHA-256 before an atomic write; text previews are limited to 1 MiB. Files are
-saved without executing their contents.
+saved without executing their contents. The PDF reader supports pagination, zoom,
+password-protected files and selectable extracted text, with a 20 MiB file limit.
+Its worker, fonts and decoders are bundled locally; PDF scripts are not executed.
 
 `dsh` is a local web service. Running it from a terminal works, but it leaves you
 managing a process by hand: finding a free port, noticing when it dies, and

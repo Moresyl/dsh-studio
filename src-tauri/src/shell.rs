@@ -208,7 +208,8 @@ fn serve(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
 
     let content_type = match canonical.extension().and_then(|ext| ext.to_str()) {
         Some("html") => "text/html; charset=utf-8",
-        Some("js") => "text/javascript; charset=utf-8",
+        Some("js" | "mjs") => "text/javascript; charset=utf-8",
+        Some("wasm") => "application/wasm",
         Some("css") => "text/css; charset=utf-8",
         Some("json") => "application/json",
         Some("png") => "image/png",
@@ -220,7 +221,7 @@ fn serve(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
 
     stream.write_all(
         format!(
-            "HTTP/1.1 200 OK\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\ncontent-security-policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*\r\naccess-control-allow-origin: *\r\ncache-control: no-store\r\nconnection: close\r\n\r\n",
+            "HTTP/1.1 200 OK\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\ncontent-security-policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self'; font-src 'self' blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*\r\naccess-control-allow-origin: *\r\ncache-control: no-store\r\nconnection: close\r\n\r\n",
             body.len()
         )
         .as_bytes(),
@@ -273,6 +274,8 @@ mod tests {
         std::fs::create_dir_all(root.join("assets")).unwrap();
         std::fs::write(root.join("index.html"), b"<html>shell</html>").unwrap();
         std::fs::write(root.join("assets").join("app.js"), b"console.log(1)").unwrap();
+        std::fs::write(root.join("assets/worker.mjs"), b"export {}").unwrap();
+        std::fs::write(root.join("assets/decoder.wasm"), b"fixture").unwrap();
 
         let (server, origin) = ShellServer::start(root.clone()).unwrap();
         assert!(origin.starts_with("http://127.0.0.1:"));
@@ -284,6 +287,14 @@ mod tests {
         let asset = reqwest_like_get(&format!("{origin}/assets/app.js"));
         assert!(asset.contains("200 OK"));
         assert!(asset.contains("console.log(1)"));
+        assert!(reqwest_like_get(&format!("{origin}/assets/worker.mjs"))
+            .contains("content-type: text/javascript"));
+        assert!(reqwest_like_get(&format!("{origin}/assets/decoder.wasm"))
+            .contains("content-type: application/wasm"));
+        assert!(asset.contains("worker-src 'self'"));
+        assert!(asset.contains("font-src 'self' blob:"));
+        assert!(asset.contains("script-src 'self' 'wasm-unsafe-eval'"));
+        assert!(!asset.contains("'unsafe-eval'"));
 
         // Escaping the root is refused.
         // Escaping the root is refused: the resolved path falls outside the
