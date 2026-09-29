@@ -454,8 +454,14 @@ const en = {
   'sessions.attachments': 'Attachments',
   'sessions.file': 'Unnamed file',
   'sessions.image': 'Unnamed image',
+  'sessions.previewImage': 'Preview image',
+  'sessions.closePreview': 'Close image preview',
+  'sessions.previewLoading': 'Reading the image from Harness…',
+  'sessions.previewRetry': 'Retry',
+  'sessions.previewFailed':
+    'The image could not be read. Start a compatible Harness profile and check that this session still has access to the original attachment.',
   'sessions.attachmentNotice':
-    'Attachment records only. Original files are not included in this offline view or transcript exports.',
+    'Image previews require Harness. Transcript exports contain attachment records, not the original files.',
   'sessions.attachmentsOmitted':
     '{n} more attachment records exceed the per-message display limit.',
   'sessions.collapse': 'Show less',
@@ -1255,7 +1261,13 @@ const zh: Record<MessageKey, string> = {
   'sessions.attachments': '附件',
   'sessions.file': '未命名文件',
   'sessions.image': '未命名图片',
-  'sessions.attachmentNotice': '这里保留附件记录；离线阅读与会话导出不包含原始文件。',
+  'sessions.previewImage': '预览图片',
+  'sessions.closePreview': '关闭图片预览',
+  'sessions.previewLoading': '正在从 Harness 读取图片…',
+  'sessions.previewRetry': '重试',
+  'sessions.previewFailed':
+    '无法读取图片。请启动兼容的 Harness 配置，并确认此会话仍可访问原始附件。',
+  'sessions.attachmentNotice': '图片预览需要运行 Harness；会话导出保留附件记录，不包含原始文件。',
   'sessions.attachmentsOmitted': '另有 {n} 条附件记录超出单条消息的显示上限。',
   'sessions.collapse': '收起',
   'sessions.untitled': '什么都没说',

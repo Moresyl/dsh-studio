@@ -66,6 +66,40 @@ window.__ModuleLoader__.load({
       if (!desktop || !desktop.workspace || typeof desktop.workspace.onDrop !== 'function') return
 
       if (window.parent !== window) {
+        let active = true
+        let reading = 0
+        let readImage = null
+        // Keep theme/workspace integration active on generations without this API.
+        ctx.inject(['remote', 'remote.session'], (client) => {
+          readImage = (request) => client.remote.session.attachment(request)
+          client.effect(() => () => { readImage = null }, 'dsh-studio: image API lifetime')
+        })
+        const onImage = async (event) => {
+          const request = event.data
+          if (event.source !== window.parent || request?.type !== 'dsh-studio:image-read') return
+          if (typeof request.id !== 'string' || request.id.length > 64
+            || typeof request.sessionId !== 'string' || !request.sessionId || request.sessionId.length > 512
+            || typeof request.attachmentId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(request.attachmentId)) return
+          const reply = (ok, value) => {
+            if (active) window.parent.postMessage({ type: 'dsh-studio:image-result', id: request.id, ok, value }, event.origin)
+          }
+          if (reading >= 4 || !readImage) { reply(false); return }
+          reading += 1
+          try {
+            const result = await readImage({ sessionId: request.sessionId, attachmentId: request.attachmentId })
+            if (!result?.ok || typeof result.value?.data !== 'string' || result.value.data.length > 27962028) reply(false)
+            else reply(true, result.value)
+          } catch { reply(false) }
+          finally { reading -= 1 }
+        }
+        window.addEventListener('message', onImage)
+        ctx.effect(() => () => {
+          active = false
+          window.removeEventListener('message', onImage)
+        }, 'dsh-studio: authorized image preview')
+      }
+
+      if (window.parent !== window) {
         const style = document.createElement('style')
         style.textContent = themeStyle
         document.head.append(style)
@@ -81,7 +115,7 @@ window.__ModuleLoader__.load({
         }
         window.addEventListener('message', onTheme)
         window.parent.postMessage({ type: 'dsh-studio:theme-ready' }, '*')
-        ctx.effect(() => {
+        ctx.effect(() => () => {
           window.removeEventListener('message', onTheme)
           style.remove()
           delete document.body.dataset.dshStudioTheme

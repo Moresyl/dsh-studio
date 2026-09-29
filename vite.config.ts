@@ -41,6 +41,7 @@ export default defineConfig({
       // adapters whose behavior is owned by the Rust command tests; React view
       // composition is verified by typecheck/build and desktop smoke tests.
       include: [
+        'src/lib/attachment-preview.ts',
         'src/lib/bridge.ts',
         'src/lib/crash.ts',
         'src/lib/errors.ts',
@@ -65,8 +66,8 @@ export default defineConfig({
         'src/state/sessions.ts',
         'src/state/terminals.ts',
         'src/state/terminal-layout.ts',
-          'src/state/update.ts',
-          'src/state/releases.ts',
+        'src/state/update.ts',
+        'src/state/releases.ts',
         'src/state/workspace.ts',
       ],
       thresholds: {

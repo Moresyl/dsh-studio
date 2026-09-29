@@ -220,7 +220,7 @@ fn serve(mut stream: TcpStream, root: &Path) -> std::io::Result<()> {
 
     stream.write_all(
         format!(
-            "HTTP/1.1 200 OK\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\ncontent-security-policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*\r\naccess-control-allow-origin: *\r\ncache-control: no-store\r\nconnection: close\r\n\r\n",
+            "HTTP/1.1 200 OK\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\ncontent-security-policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:* ws://127.0.0.1:*; frame-src http://127.0.0.1:* http://localhost:*\r\naccess-control-allow-origin: *\r\ncache-control: no-store\r\nconnection: close\r\n\r\n",
             body.len()
         )
         .as_bytes(),

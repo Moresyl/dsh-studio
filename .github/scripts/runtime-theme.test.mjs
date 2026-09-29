@@ -51,7 +51,7 @@ function mount({ desktop = true, framed = true } = {}) {
     },
   }
   runInNewContext(source, { window, document, Symbol })
-  module.apply({ effect: (cleanup) => effects.push(cleanup) })
+  module.apply({ inject: () => {}, effect: (setup) => effects.push(setup()) })
   return { attributes, body, document, effects, listeners, parent, parentMessages, styles }
 }
 

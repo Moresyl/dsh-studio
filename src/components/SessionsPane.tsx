@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 
 import { Button } from '@/components/Button'
+import { AttachmentPreview } from '@/components/AttachmentPreview'
 import { Empty } from '@/components/Empty'
 import { PaneHeader } from '@/components/PaneHeader'
 import { TabButton } from '@/components/TabButton'
@@ -42,6 +43,7 @@ import type {
   SessionFormat,
   SessionHit,
   SessionLine,
+  SessionAttachment,
   SessionMark,
   Tokens,
 } from '@/lib/ipc'
@@ -610,7 +612,12 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
           lines
             .slice(page.start, page.end)
             .map((line, index) => (
-              <Turn key={`${line.seq}-${index}`} line={line} lit={line.seq === anchor} />
+              <Turn
+                key={`${line.seq}-${index}`}
+                line={line}
+                lit={line.seq === anchor}
+                sessionId={card?.id ?? ''}
+              />
             ))
         ) : (
           <Empty icon={Loader2} spin message={t('sessions.opening')} />
@@ -758,8 +765,9 @@ function Spend({ tokens }: { tokens: Tokens }) {
 }
 
 /** One line of the transcript, long ones folded until asked for. */
-function Turn({ line, lit }: { line: SessionLine; lit: boolean }) {
+function Turn({ line, lit, sessionId }: { line: SessionLine; lit: boolean; sessionId: string }) {
   const [shown, setShown] = useState(false)
+  const [preview, setPreview] = useState<SessionAttachment | null>(null)
   const Icon = MARKER[line.role]
   const machine = line.role === 'tool'
   const { head, folded } = fold(line.text)
@@ -837,6 +845,15 @@ function Turn({ line, lit }: { line: SessionLine; lit: boolean }) {
                     <p className="selectable break-words text-[12px] font-medium text-text">
                       {item.name || t(item.kind === 'image' ? 'sessions.image' : 'sessions.file')}
                     </p>
+                    {item.kind === 'image' && item.id && (
+                      <button
+                        type="button"
+                        onClick={() => setPreview(item)}
+                        className="mt-2 rounded-control px-1 py-0.5 text-[11px] font-medium text-text hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-text"
+                      >
+                        {t('sessions.previewImage')}
+                      </button>
+                    )}
                     <p className="mt-0.5 break-words text-[11px] text-muted">
                       {[
                         item.bytes !== null
@@ -862,6 +879,13 @@ function Turn({ line, lit }: { line: SessionLine; lit: boolean }) {
             </p>
           )}
         </div>
+      )}
+      {preview && (
+        <AttachmentPreview
+          sessionId={sessionId}
+          attachment={preview}
+          onClose={() => setPreview(null)}
+        />
       )}
     </article>
   )

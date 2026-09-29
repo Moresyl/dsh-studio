@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 
 import { serveDesktop } from '@/lib/bridge'
+import { serveImagePreview } from '@/lib/attachment-preview'
 import { ownAsync } from '@/lib/lifecycle'
 import { reportFailure } from '@/state/failure'
 import { useTheme } from '@/state/theme'
@@ -67,6 +68,11 @@ export function HarnessFrame({ origin, hidden }: HarnessFrameProps) {
   // with the most reason to send a notification.
   useEffect(() => {
     return ownAsync(serveDesktop(origin), reportFailure)
+  }, [origin])
+
+  useEffect(() => {
+    const peer = frame.current?.contentWindow
+    if (peer) return serveImagePreview(peer, new URL(origin).origin)
   }, [origin])
 
   return (

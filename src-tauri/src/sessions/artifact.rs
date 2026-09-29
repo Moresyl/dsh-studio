@@ -20,12 +20,6 @@ use std::path::{Path, PathBuf};
 use ruzstd::decoding::errors::{FrameDecoderError, ReadFrameHeaderError};
 use ruzstd::decoding::StreamingDecoder;
 
-/// What every session log is called inside its own directory, before the suffix.
-const STEM: &str = "session";
-
-/// The two encodings the harness writes, in the order it prefers them.
-const SUFFIXES: [&str; 2] = [".jsonl.zstd", ".jsonl"];
-
 /// A skippable frame's fixed header: four bytes of magic, four of length.
 const SKIPPED_HEADER: usize = 8;
 
@@ -37,10 +31,40 @@ const MAX_TEXT_BYTES: usize = 32 * 1024 * 1024;
 
 /// The log inside a session directory, or nothing when there is not one yet.
 pub fn locate(dir: &Path) -> Option<PathBuf> {
-    SUFFIXES
-        .iter()
-        .map(|suffix| dir.join(format!("{STEM}{suffix}")))
-        .find(|path| path.is_file())
+    fs::read_dir(dir)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter_map(|entry| {
+            let name = entry.file_name();
+            let name = name.to_str()?;
+            let (generation, compressed) = generation(name)?;
+            Some(((generation, compressed), entry.path()))
+        })
+        .max_by_key(|(order, _)| *order)
+        .map(|(_, path)| path)
+}
+
+/// Select the latest published format generation, never an abandoned temporary file.
+fn generation(name: &str) -> Option<(u64, bool)> {
+    let (raw, compressed) = name
+        .strip_suffix(".zstd")
+        .map_or((name, false), |raw| (raw, true));
+    if raw == "session.jsonl" {
+        return Some((0, compressed));
+    }
+    let number = raw.strip_prefix("session.v")?.strip_suffix(".jsonl")?;
+    if number.is_empty()
+        || number.starts_with('0')
+        || !number.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let version = number
+        .parse::<u64>()
+        .ok()
+        .filter(|value| *value <= 9_007_199_254_740_991)?;
+    Some((version, compressed))
 }
 
 /// Read a log back as the JSONL text the harness wrote into it.
@@ -236,6 +260,38 @@ fn push_valid(text: &mut String, valid: &str, maximum: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generation_names_are_canonical_and_numerically_ordered() {
+        assert_eq!(generation("session.jsonl"), Some((0, false)));
+        assert_eq!(generation("session.v4.jsonl.zstd"), Some((4, true)));
+        for name in [
+            "session.v0.jsonl",
+            "session.v01.jsonl",
+            "session.v-1.jsonl",
+            "session.v1.JSONL",
+            "session.v1.jsonl.tmp",
+            "session.v.jsonl",
+            "session.v9007199254740992.jsonl",
+            "session.v99999999999999999999.jsonl",
+        ] {
+            assert_eq!(generation(name), None, "{name}");
+        }
+        let root = std::env::temp_dir().join(format!("dsh-generation-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        for name in [
+            "session.jsonl",
+            "session.v2.jsonl",
+            "session.v10.jsonl",
+            "session.v11.jsonl.tmp",
+        ] {
+            fs::write(root.join(name), "fixture").unwrap();
+        }
+        assert_eq!(locate(&root), Some(root.join("session.v10.jsonl")));
+        fs::write(root.join("session.v10.jsonl.zstd"), "fixture").unwrap();
+        assert_eq!(locate(&root), Some(root.join("session.v10.jsonl.zstd")));
+        fs::remove_dir_all(root).unwrap();
+    }
 
     /// Two frames, each one line, the way an appended log accumulates them.
     fn framed() -> Vec<u8> {
