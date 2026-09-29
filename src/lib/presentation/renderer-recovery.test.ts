@@ -21,6 +21,21 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
+it('keeps the editor locked while asynchronous reload preparation runs and unlocks on failure', async () => {
+  let reject!: (cause: Error) => void
+  const operation = reloadPreservingPresentation(
+    () =>
+      new Promise<void>((_, fail) => {
+        reject = fail
+      }),
+  )
+  expect(editor.getState().busy).toBe('update')
+  expect(editor.getState().replace(fixture())).toBe(false)
+  reject(new Error('Preparation failed'))
+  await expect(operation).rejects.toThrow('Preparation failed')
+  expect(editor.getState().busy).toBeNull()
+})
+
 it('saves unfinished input retained after the editor component unmounts', async () => {
   const document = fixture()
   editor.setState({ document, saved: JSON.stringify(document) })

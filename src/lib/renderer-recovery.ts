@@ -53,6 +53,7 @@ export function installPreloadRecovery(
 ): () => void {
   const timers = new Set<number>()
   let disposed = false
+  let cancel: (() => void) | null = null
 
   const onPreloadError = (event: Event) => {
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
@@ -67,38 +68,53 @@ export function installPreloadRecovery(
       return
     }
 
-    event.preventDefault()
-    let finished = false
-    const reload = () => {
-      if (finished || disposed) return
-      finished = true
-      for (const timer of timers) target.clearTimeout(timer)
-      timers.clear()
-      void reloadPreservingPresentation(() => target.location.reload(), false)
-        .then((reloaded) => {
-          if (!reloaded)
-            reportFailure(
-              new Error(
-                'Reload paused to protect your presentation. / 为保护文稿，已暂停重新加载。请先保存文稿。',
-              ),
-            )
-        })
-        .catch(reportFailure)
-    }
-    const timer = target.setTimeout(reload, REARM_DEADLINE_MS)
-    timers.add(timer)
-
-    try {
-      void rearm().then(reload, reload)
-    } catch {
-      // A detached test/preview window may fail before it can return a Promise.
-      reload()
-    }
+    // Acquire the clean-editor lock before rearming. Otherwise typing during
+    // native IPC could cancel navigation but leave the watchdog armed.
+    void reloadPreservingPresentation(
+      () =>
+        new Promise<void>((resolve, reject) => {
+          event.preventDefault()
+          let finished = false
+          const clear = () => {
+            for (const timer of timers) target.clearTimeout(timer)
+            timers.clear()
+            cancel = null
+          }
+          cancel = () => {
+            finished = true
+            clear()
+            reject(new Error('Renderer recovery disposed'))
+          }
+          const reload = () => {
+            if (finished || disposed) return
+            finished = true
+            clear()
+            try {
+              target.location.reload()
+              resolve()
+            } catch (cause) {
+              reject(cause)
+            }
+          }
+          const timer = target.setTimeout(reload, REARM_DEADLINE_MS)
+          timers.add(timer)
+          try {
+            void rearm().then(reload, reload)
+          } catch {
+            // A detached test/preview can fail before returning a Promise.
+            reload()
+          }
+        }),
+      false,
+    ).catch((cause) => {
+      if (!disposed) reportFailure(cause)
+    })
   }
 
   target.addEventListener(PRELOAD_EVENT, onPreloadError)
   return () => {
     disposed = true
+    cancel?.()
     target.removeEventListener(PRELOAD_EVENT, onPreloadError)
     for (const timer of timers) target.clearTimeout(timer)
     timers.clear()

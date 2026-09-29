@@ -11,14 +11,14 @@ export function canAutomaticallyReload(): boolean {
 
 /** A failed save or an edit during saving must never fall through to reload. */
 export async function reloadPreservingPresentation(
-  reload: () => void,
+  reload: () => void | Promise<void>,
   saveDirty = true,
 ): Promise<boolean> {
   if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
     document.activeElement.blur()
   let state = usePresentationEditor.getState()
   if (state.busy === 'synchronizing' && state.document === null) {
-    reload()
+    await reload()
     return true
   }
   if (state.busy !== null) {
@@ -36,7 +36,7 @@ export async function reloadPreservingPresentation(
     throw new Error(t('deck.recoveryChanged'))
   }
   try {
-    reload()
+    await reload()
     return true
   } catch (cause) {
     state.unlockUpdate()

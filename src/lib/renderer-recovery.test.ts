@@ -27,16 +27,19 @@ class Target extends EventTarget {
 }
 
 describe('renderer surface recovery', () => {
-  it('protects edits made while native rearming is pending and explains the blocked reload', async () => {
+  it('locks editing before native rearming so late input cannot strand an armed watchdog', async () => {
     const target = new Target()
-    installPreloadRecovery(target, () => new Promise(() => {}))
+    installPreloadRecovery(target, () => {
+      expect(usePresentationEditor.getState().busy).toBe('update')
+      return new Promise(() => {})
+    })
     target.dispatchEvent(new Event('vite:preloadError', { cancelable: true }))
-    usePresentationEditor.getState().replace(fixture())
+    expect(usePresentationEditor.getState().replace(fixture())).toBe(false)
     await Promise.resolve()
     await Promise.resolve()
-    expect(target.location.reload).not.toHaveBeenCalled()
-    expect(reportFailure).toHaveBeenCalledOnce()
-    expect(usePresentationEditor.getState().document).toEqual(fixture())
+    expect(target.location.reload).toHaveBeenCalledOnce()
+    expect(reportFailure).not.toHaveBeenCalled()
+    expect(usePresentationEditor.getState().document).toBeNull()
   })
 
   it('still recovers if native rearming throws synchronously', async () => {
@@ -60,6 +63,7 @@ describe('renderer surface recovery', () => {
     expect(event.defaultPrevented).toBe(false)
     expect(rearm).not.toHaveBeenCalled()
     expect(target.location.reload).not.toHaveBeenCalled()
+    expect(usePresentationEditor.getState().busy).toBeNull()
   })
 
   it('does not navigate after recovery has been disposed', async () => {
@@ -70,6 +74,24 @@ describe('renderer surface recovery', () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(target.location.reload).not.toHaveBeenCalled()
+    expect(usePresentationEditor.getState().busy).toBeNull()
+    expect(reportFailure).not.toHaveBeenCalled()
+  })
+
+  it('releases the editor and reports a failed navigation after rearming', async () => {
+    const target = new Target()
+    target.location.reload.mockImplementation(() => {
+      throw new Error('reload failed')
+    })
+    installPreloadRecovery(target, async () => {})
+    target.dispatchEvent(new Event('vite:preloadError', { cancelable: true }))
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(usePresentationEditor.getState().busy).toBeNull()
+    expect(reportFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'reload failed' }),
+    )
   })
 
   it('always loads the Workbench when no Harness surface exists', () => {
@@ -100,6 +122,8 @@ describe('renderer surface recovery', () => {
     expect(rearm).toHaveBeenCalledTimes(1)
     expect(target.location.reload).toHaveBeenCalledTimes(1)
 
+    // The new document owns a fresh editor; the per-session loop guard survives.
+    usePresentationEditor.setState({ busy: null })
     const repeated = new Event('vite:preloadError', { cancelable: true })
     target.dispatchEvent(repeated)
     await Promise.resolve()
