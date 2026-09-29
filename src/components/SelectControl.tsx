@@ -50,11 +50,17 @@ export function SelectControl({
       return []
     }
 
-    const optionValue = String(child.props.value ?? child.props.children ?? '')
+    // JSX text can be an array containing conditional children. String(array)
+    // inserts commas (including for absent badges) into the popup labels.
+    const text = Children.toArray(child.props.children)
+      .filter((part) => typeof part === 'string' || typeof part === 'number')
+      .join('')
+    const label = child.props.label ?? text
+    const optionValue = String(child.props.value ?? text)
     return [
       {
         value: optionValue,
-        label: child.props.label ?? child.props.children,
+        label,
         disabled: child.props.disabled ?? false,
       },
     ]
@@ -66,7 +72,7 @@ export function SelectControl({
     if (disabled || options.length === 0) return
 
     const entries: MenuEntry[] = options.map((option) => ({
-      label: String(option.label ?? option.value),
+      label: option.label,
       selected: option.value === currentValue,
       disabled: option.disabled,
       run: () => {

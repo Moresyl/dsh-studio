@@ -66,6 +66,7 @@ assert(normalize(identity.profile).startsWith(`${normalize(qaHome)}/profiles/`),
 assert.equal(identity.label, 'main')
 const selectors = []
 const checks = []
+const visibleSelectors = `[...document.querySelectorAll('button.select-control__trigger:not(:disabled)')].filter(b=>b.getClientRects().length)`
 try {
   await command('Runtime.enable')
   for (const route of ['运行状态', '终端', '会话', '插件', '远程', '关于', '设置']) {
@@ -79,19 +80,11 @@ try {
       `[...document.querySelectorAll('h1,h2')].some(h=>h.getClientRects().length&&h.innerText.trim()===${JSON.stringify(route === '插件' ? '插件市场' : route === '远程' ? '远程访问' : route)})`,
     )
     await evaluate('new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>r(true))))')
-    if (route === '插件')
-      await wait(
-        `document.querySelectorAll('button.select-control__trigger:not(:disabled)').length>=3`,
-      )
-    if (route === '设置')
-      await wait(
-        `document.querySelectorAll('button.select-control__trigger:not(:disabled)').length>=2`,
-      )
-    const count = await evaluate(
-      `document.querySelectorAll('button.select-control__trigger:not(:disabled)').length`,
-    )
+    if (route === '插件') await wait(`${visibleSelectors}.length>=3`)
+    if (route === '设置') await wait(`${visibleSelectors}.length>=2`)
+    const count = await evaluate(`${visibleSelectors}.length`)
     for (let index = 0; index < count; index++) {
-      const trigger = `document.querySelectorAll('button.select-control__trigger:not(:disabled)')[${index}]`
+      const trigger = `${visibleSelectors}[${index}]`
       const before = await evaluate(
         `(()=>{const b=${trigger};b.scrollIntoView({block:'nearest'});b.focus();return {label:b.getAttribute('aria-label'),value:b.innerText}})()`,
       )
@@ -107,6 +100,13 @@ try {
       assert(state.within, `${route}/${before.label}: menu outside viewport`)
       assert(state.items.length > 0, `${route}/${before.label}: empty options`)
       assert.equal(state.selected, 1, `${route}/${before.label}: selected item count`)
+      assert.equal(
+        await evaluate(
+          `document.querySelector('[role=menu] [aria-checked=true]').innerText.trim()`,
+        ),
+        before.value.trim(),
+        `${route}/${before.label}: popup label differs from selected text`,
+      )
       for (const [name, number, target] of [
         ['End', 35, state.items.at(-1)],
         ['Home', 36, state.items[0]],

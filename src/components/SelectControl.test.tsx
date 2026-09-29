@@ -31,4 +31,42 @@ describe('SelectControl', () => {
     expect(markup).toContain('disabled=""')
     expect(markup).toContain('field-control--small')
   })
+
+  it('joins version text and conditional badges without array separators', () => {
+    const markup = renderToStaticMarkup(
+      <SelectControl aria-label="Version" value="0.1.7-rc.2">
+        <option value="0.1.7-rc.2">
+          {'0.1.7-rc.2'}
+          {false}
+          {null}
+          {' · Studio'}
+          {' · In use'}
+        </option>
+      </SelectControl>,
+    )
+
+    expect(markup).toContain('0.1.7-rc.2 · Studio · In use')
+    expect(markup).not.toContain('0.1.7-rc.2,')
+  })
+
+  it('preserves an explicit option label and numeric text', () => {
+    const markup = renderToStaticMarkup(
+      <SelectControl aria-label="Count" value="0">
+        <option>{0}</option>
+        <option value="1" label="One">
+          Ignored text
+        </option>
+      </SelectControl>,
+    )
+    expect(markup).toContain('text-left">0</span>')
+    const labelled = renderToStaticMarkup(
+      <SelectControl aria-label="Count" value="1">
+        <option value="1" label="One">
+          Ignored text
+        </option>
+      </SelectControl>,
+    )
+    expect(labelled).toContain('text-left">One</span>')
+    expect(labelled).not.toContain('Ignored text')
+  })
 })
