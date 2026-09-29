@@ -1,6 +1,13 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import {
+  LayoutDashboard,
+  MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelsTopLeft,
+  type LucideIcon,
+} from 'lucide-react'
 
 import { BrandMark } from '@/components/BrandMark'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
@@ -169,7 +176,7 @@ export function TitleBar({
       >
         <div
           data-tauri-drag-region
-          className="flex min-w-0 items-baseline gap-2 pl-4 max-[860px]:hidden"
+          className="flex w-[calc(50%_-_160px)] min-w-0 items-baseline gap-2 pl-4 max-[1100px]:hidden"
         >
           <span className="truncate text-[13px] font-semibold text-text">{pageTitle}</span>
           {sectionTitle && (
@@ -248,16 +255,19 @@ function ViewSwitch({
     <div className="flex items-center gap-0.5 rounded-[8px] bg-canvas-deep p-0.5 hairline">
       <SwitchTab
         label={t('view.harness')}
+        icon={MessageSquare}
         active={mode === 'compatibility'}
         onClick={() => onChoose('compatibility')}
       />
       <SwitchTab
         label={t('view.extended')}
+        icon={PanelsTopLeft}
         active={mode === 'extended'}
         onClick={() => onChoose('extended')}
       />
       <SwitchTab
         label={t('view.panel')}
+        icon={LayoutDashboard}
         active={mode === 'advanced'}
         onClick={() => onChoose('advanced')}
       />
@@ -267,20 +277,23 @@ function ViewSwitch({
 
 interface SwitchTabProps {
   label: string
+  icon: LucideIcon
   active: boolean
   onClick: () => void
 }
 
-function SwitchTab({ label, active, onClick }: SwitchTabProps) {
+function SwitchTab({ label, icon: Icon, active, onClick }: SwitchTabProps) {
   return (
     <button
       type="button"
       // The pair is one control, so the pressed one is the state of the whole
       // rather than two buttons that happen to look related.
       aria-pressed={active}
+      aria-label={label}
+      data-hint={label}
       onClick={active ? undefined : onClick}
       className={[
-        'h-7 rounded-[6px] px-2.5 text-[12px] font-medium transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px',
+        'flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-[6px] px-2.5 text-[12px] font-medium transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px max-[760px]:px-1.5',
         // The raised half of the pair does nothing when pressed, so it does not
         // offer the hand that promises it would.
         active
@@ -288,7 +301,8 @@ function SwitchTab({ label, active, onClick }: SwitchTabProps) {
           : 'text-faint hover:bg-surface-2/60 hover:text-text',
       ].join(' ')}
     >
-      {label}
+      <Icon size={16} aria-hidden="true" className="hidden max-[760px]:block" />
+      <span className="max-[760px]:sr-only">{label}</span>
     </button>
   )
 }

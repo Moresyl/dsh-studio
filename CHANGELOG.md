@@ -18,6 +18,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Keep titlebar navigation on one line, use labelled icons in narrow layouts, and prevent page breadcrumbs from overlapping the centered view switch.
 - Stream isolated runtime startup progress into the installation log and include the Node startup phase in timeout diagnostics. Bound and redact forwarded lines, and clear the cleanup timer after the child exits. These diagnostics do not bypass startup verification.
 - Allow cancelling a pending remote connection, interrupting unanswered runtime authentication and queued opens. Ignore obsolete replies so a cancelled attempt cannot reopen the panel or clear a newer operation's busy state.
 - Revoke live remote streams when recovering poisoned authentication state, rather than only clearing the displayed device list and refusing later requests.

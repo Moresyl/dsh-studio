@@ -449,6 +449,10 @@ commits are worded here.
 The one house rule is in the code style: comments explain _why_ a thing is the
 way it is, not what the line below does.
 
+## Star history
+
+[![DSH Studio star history](https://api.star-history.com/svg?repos=Moresyl/dsh-studio&type=Date)](https://www.star-history.com/#Moresyl/dsh-studio&Date)
+
 ## License
 
 [MIT](LICENSE).

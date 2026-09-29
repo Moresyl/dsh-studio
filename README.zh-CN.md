@@ -404,6 +404,10 @@ supervisor 再从服务自己打印的就绪行里把真实端口读回来。
 唯一的家规写在代码风格里：
 注释解释**为什么**这样写，而不是复述下一行在做什么。
 
+## 星标增长
+
+[![DSH Studio 星标增长趋势](https://api.star-history.com/svg?repos=Moresyl/dsh-studio&type=Date)](https://www.star-history.com/#Moresyl/dsh-studio&Date)
+
 ## 许可
 
 [MIT](LICENSE)。
