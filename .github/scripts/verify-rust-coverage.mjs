@@ -17,6 +17,7 @@ const required = [
   'src/plugins/receipts.rs',
   'src/plugins/switches.rs',
   'src/preferences.rs',
+  'src/presentations/package.rs',
   'src/remote/access.rs',
   'src/remote/gateway.rs',
   'src/remote/lan.rs',

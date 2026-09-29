@@ -410,17 +410,29 @@ mod tests {
         let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
         for name in ["[Content_Types].xml", "ppt/presentation.xml"] {
             archive
-                .start_file(name, zip::write::SimpleFileOptions::default())
+                .start_file(
+                    name,
+                    zip::write::SimpleFileOptions::default()
+                        .compression_method(zip::CompressionMethod::Stored),
+                )
                 .unwrap();
             archive.write_all(b"<document />").unwrap();
         }
         let bytes = archive.finish().unwrap().into_inner();
+        let mut damaged = bytes.clone();
+        let payload = zip::ZipArchive::new(std::io::Cursor::new(&bytes))
+            .unwrap()
+            .by_index_raw(0)
+            .unwrap()
+            .data_start() as usize;
+        damaged[payload] ^= 1;
         let path = root.0.join("output.pptx");
         export_file(&path, &STANDARD.encode(&bytes)).unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
         for bad in [
             "!".into(),
             STANDARD.encode(b"not a zip"),
+            STANDARD.encode(&damaged),
             "A".repeat((20 * 1024 * 1024_usize).div_ceil(3) * 4 + 1),
         ] {
             assert!(export_file(&path, &bad).is_err());
