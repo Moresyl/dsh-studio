@@ -9,6 +9,8 @@
 
 ## [未发布]
 
+## [0.9.20] —— 2026-09-29
+
 ### 新增
 
 - 可将会话预览中经过授权的 PNG、JPEG 和 WebP 图片直接添加到当前演示文稿页面。导入完成后保留用户后来选择的页面，在资源持久化前预检 MIME、大小及完整文稿结构，并直接显示原生静态帧校验错误；导入完成前保持操作可见。
@@ -25,6 +27,7 @@
 
 ### 修复与打磨
 
+- 将发布身份绑定到规范的稳定版 tag 与流水线实际提交，要求应用、SDK 和原生侧五处版本源完全一致；拒绝只重建部分平台或用旧版本覆盖最新通道，仅在身份匹配的未公开草稿中清理旧产物，然后重新构建全部平台。
 - 将 Tauri JavaScript 绑定限制在与原生插件一致的次版本线内，仅允许补丁升级；已解析的客户端/原生版本发生偏移时，在打包前的发布校验中直接拒绝。
 - 让递归 XML 树解析器使用大小受限的独立线程栈，同时保留输入深度限制，保护小栈调用线程；补充 512 KiB 调用栈回归测试。
 - 保存 PPTX 前验证 XML 编码、命名空间、内容类型和页面关系，按文稿声明读取页面顺序；拒绝重复或缺失页面、外部主文档、DTD 和超限 XML。新增结构解析仍不代表已经支持 PPTX 内容导入。
@@ -1054,7 +1057,10 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...HEAD
+[0.9.20]: https://github.com/Moresyl/dsh-studio/compare/v0.9.19...v0.9.20
+[0.9.19]: https://github.com/Moresyl/dsh-studio/compare/v0.9.18...v0.9.19
+[0.9.18]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...v0.9.18
 [0.9.17]: https://github.com/Moresyl/dsh-studio/compare/v0.9.16...v0.9.17
 [0.9.16]: https://github.com/Moresyl/dsh-studio/compare/v0.9.15...v0.9.16
 [0.9.4]: https://github.com/Moresyl/dsh-studio/compare/v0.9.2...v0.9.4

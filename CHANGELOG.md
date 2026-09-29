@@ -9,6 +9,8 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.20] — 2026-09-29
+
 ### Added
 
 - Add session-authorized PNG, JPEG and WebP images from conversation previews to the active presentation slide. Keep later slide selection stable, preflight MIME, size and complete document structure before durable storage, and surface native static-frame validation errors without closing an in-flight operation.
@@ -25,6 +27,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Bind release identity to a canonical stable tag and the exact workflow commit, require all five application/SDK/native version sources to agree, reject partial-platform rebuilds and older versions replacing the latest channel, and clear stale assets only from the matching unpublished draft before rebuilding every platform.
 - Keep Tauri JavaScript bindings on patch-only ranges matching their native plugin minor versions, and fail release verification before packaging when a resolved guest/native pair drifts.
 - Run the recursive XML tree parser on a bounded dedicated stack while retaining input depth limits, protecting callers with small thread stacks; add a 512 KiB caller-stack regression.
 - Validate XML encoding, namespaces, content types and slide relationships before saving PPTX exports, preserving declared slide order. Reject duplicate or missing slides, external document parts, DTDs and oversized XML. Structural parsing does not yet provide editable PPTX import.
@@ -1194,7 +1197,10 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...HEAD
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...HEAD
+[0.9.20]: https://github.com/Moresyl/dsh-studio/compare/v0.9.19...v0.9.20
+[0.9.19]: https://github.com/Moresyl/dsh-studio/compare/v0.9.18...v0.9.19
+[0.9.18]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...v0.9.18
 [0.9.17]: https://github.com/Moresyl/dsh-studio/compare/v0.9.16...v0.9.17
 [0.9.16]: https://github.com/Moresyl/dsh-studio/compare/v0.9.15...v0.9.16
 [0.9.4]: https://github.com/Moresyl/dsh-studio/compare/v0.9.2...v0.9.4
