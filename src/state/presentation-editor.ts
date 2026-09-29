@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { parsePresentation, type PresentationDocument } from '@/lib/presentation/document'
-import { retainHistory } from '@/lib/presentation/authoring'
+import { copyPresentation, retainHistory } from '@/lib/presentation/authoring'
 import { loadPresentation, savePresentation } from '@/lib/presentation/repository'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
@@ -17,7 +17,7 @@ interface EditorState {
   saved: string | null
   past: string[]
   future: string[]
-  busy: 'load' | 'save' | 'update' | 'synchronizing' | null
+  busy: 'load' | 'save' | 'copy' | 'update' | 'synchronizing' | null
   lockForUpdate: () => boolean
   unlockUpdate: () => void
   error: string | null
@@ -32,6 +32,7 @@ interface EditorState {
   redo: () => void
   open: (id: string, discard?: boolean) => Promise<boolean>
   save: () => Promise<boolean>
+  saveCopy: (suffix: string) => Promise<boolean>
 }
 
 export const isPresentationDirty = (
@@ -166,6 +167,29 @@ export function createPresentationEditor(synchronizing = false) {
       try {
         const saved = await loadPresentation(id)
         if (!saved) throw new Error('The presentation no longer exists')
+        set({
+          document: saved.document,
+          revision: saved.revision,
+          saved: JSON.stringify(saved.document),
+          past: [],
+          future: [],
+          inputs: {},
+        })
+        return true
+      } catch (cause) {
+        set({ error: describe(cause) })
+        return false
+      } finally {
+        set({ busy: null })
+      }
+    },
+    saveCopy: async (suffix) => {
+      if (!get().flushInputs()) return false
+      const state = get()
+      if (state.busy || !state.document) return false
+      set({ busy: 'copy', error: null })
+      try {
+        const saved = await savePresentation(copyPresentation(state.document, suffix), null)
         set({
           document: saved.document,
           revision: saved.revision,

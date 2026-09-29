@@ -19,6 +19,7 @@ pre-1.0 caveat that anything may still move.
 - Save original session-authorized attachments through a native file picker with size and digest verification and atomic file replacement; transcript exports continue to contain attachment metadata rather than file bytes.
 - Create and edit local presentations with text, shapes, tables and charts, object selection, drag positioning, keyboard nudging and undo/redo. Start from original blank, project-brief or progress-report templates with page previews and independent document identities. Save bounded document sources atomically and reject stale revisions from other windows.
 - Generate editable PPTX exports in a cancellable background worker and save through a native picker. Export captures the selected document snapshot; cancellation ends before native atomic writing begins. PPTX import, personal-template import and whole-process draft recovery are not included yet.
+- Save the current presentation as an independent copy, including valid unfinished input. Assign new document/page/object identities and open the copy only after persistence succeeds; preserve the original file and retain the current draft on failure.
 
 ### Fixes and polish
 

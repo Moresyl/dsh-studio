@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Plus, Save, Undo2, Redo2, RefreshCw, FileDown } from 'lucide-react'
+import { Plus, Save, Undo2, Redo2, RefreshCw, FileDown, Copy } from 'lucide-react'
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PresentationSlideView } from '@/components/PresentationSlideView'
@@ -226,6 +226,23 @@ export function PresentationsPane() {
         >
           <Save size={13} />
           {t('deck.save')}
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={!document || editor.busy !== null || exportPhase !== null}
+          title={t('deck.saveCopyHint')}
+          onClick={() =>
+            void editor.saveCopy(t('deck.copySuffix')).then((saved) => {
+              if (saved) {
+                setPage(null)
+                setSelected(null)
+                setRefresh((n) => n + 1)
+              }
+            })
+          }
+        >
+          <Copy size={13} />
+          {t('deck.saveCopy')}
         </Button>
       </PaneHeader>
       <div className="flex min-h-0 flex-1 gap-4 overflow-y-auto px-6 pb-6">

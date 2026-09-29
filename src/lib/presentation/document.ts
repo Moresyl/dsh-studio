@@ -77,6 +77,7 @@ export class PresentationError extends Error {
 }
 
 export const PRESENTATION_LIMIT = 2 * 1024 * 1024
+export const PRESENTATION_TITLE_LIMIT = 160
 const FRAME_KEYS = ['id', 'kind', 'x', 'y', 'width', 'height', 'rotation']
 const XML_CONTROLS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/u
 const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/u
@@ -152,7 +153,7 @@ export function parsePresentation(value: unknown): PresentationDocument {
   choice(doc.version, [1], 'document.version')
   choice(doc.aspect, ['wide', 'standard'], 'document.aspect')
   identity(doc.id, new Set(), 'document.id')
-  text(doc.title, 160, 'document.title', true)
+  text(doc.title, PRESENTATION_TITLE_LIMIT, 'document.title', true)
   list(doc.slides, 1, 100, 'document.slides')
   const size = presentationSize(doc.aspect as PresentationDocument['aspect'])
   const slideIds = new Set<string>()

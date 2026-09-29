@@ -94,6 +94,26 @@ current Profile unchanged.
 
 Completion/failure notifications for user turns and background jobs can be enabled independently in Settings. Workspace selection uses the native folder picker and also accepts a dropped folder.
 
+## Local presentations (development branch)
+
+These controls are under acceptance and are not included in the published v0.9.19.
+
+Open **Presentations**, choose **New presentation**, preview a starting template,
+then create the document. Select objects to edit their properties; drag them to
+move or use arrow keys for small adjustments (Shift for larger steps). Save stores
+the editable source in the local library. Export PPTX creates a separate editable
+PowerPoint file from the current snapshot; it does not save later edits to the
+local source automatically.
+
+**Save a copy** includes current edits and opens a newly saved independent document.
+The original library file remains unchanged, even if the current edits had not yet
+been saved there. Rename the copy in its title field if desired. A failed copy keeps
+the current document available. Save/copy/export validate unfinished fields first;
+correct invalid input or press Escape to discard that field's pending input.
+
+Do not treat the editor's in-memory draft as crash recovery. Save important edits.
+PPTX import and imported personal templates are not available in this branch yet.
+
 ## Worktree review
 
 Settings lists the current repository's Git worktrees and can create an isolated branch/directory.
