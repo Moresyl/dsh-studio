@@ -125,6 +125,6 @@ test('repository public contracts agree end to end', async () => {
     hostProtocol: 1,
     schema: '1.0.0',
     version: manifest.version,
-    commands: { invoked: 99, registered: 103, allowed: 103 },
+    commands: { invoked: 100, registered: 104, allowed: 104 },
   })
 })

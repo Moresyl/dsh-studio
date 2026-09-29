@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Save, Undo2, Redo2, RefreshCw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Save, Undo2, Redo2, RefreshCw, FileDown } from 'lucide-react'
 import { Button } from '@/components/Button'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PresentationSlideView } from '@/components/PresentationSlideView'
@@ -8,6 +8,7 @@ import { describe } from '@/lib/errors'
 import { presentationList, type PresentationSummary } from '@/lib/ipc'
 import { blankSlide, newPresentation } from '@/lib/presentation/authoring'
 import type { SlideElement } from '@/lib/presentation/document'
+import { savePresentationExport, type ExportPhase } from '@/lib/presentation/save-export'
 import { ask } from '@/state/dialog'
 import { isPresentationDirty, usePresentationEditor } from '@/state/presentation-editor'
 
@@ -18,10 +19,34 @@ export function PresentationsPane() {
   const [refresh, setRefresh] = useState(0)
   const [page, setPage] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [exportPhase, setExportPhase] = useState<ExportPhase | null>(null)
+  const [exportStatus, setExportStatus] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const exportJob = useRef<AbortController | null>(null)
   const document = editor.document
   const slide = document?.slides.find((item) => item.id === page) ?? document?.slides[0]
   const element = slide?.elements.find((item) => item.id === selected)
   const dirty = isPresentationDirty(editor)
+
+  useEffect(() => () => exportJob.current?.abort(), [])
+  const exportPptx = async () => {
+    const source = usePresentationEditor.getState().document
+    if (!source || exportJob.current) return
+    const controller = new AbortController()
+    exportJob.current = controller
+    setExportStatus(null)
+    setExportError(null)
+    try {
+      const saved = await savePresentationExport(source, controller.signal, setExportPhase)
+      setExportStatus(t(saved ? 'deck.exported' : 'deck.exportCancelled'))
+    } catch (cause) {
+      if (controller.signal.aborted) setExportStatus(t('deck.exportCancelled'))
+      else setExportError(describe(cause))
+    } finally {
+      exportJob.current = null
+      setExportPhase(null)
+    }
+  }
 
   useEffect(() => {
     let active = true
@@ -50,6 +75,7 @@ export function PresentationsPane() {
       tone: 'danger',
     }))
   const create = async () => {
+    if (exportJob.current) return
     if (!(await canDiscard())) return
     if (editor.replace(newPresentation(t('deck.untitled')), true)) {
       setPage(null)
@@ -57,6 +83,7 @@ export function PresentationsPane() {
     }
   }
   const open = async (id: string) => {
+    if (exportJob.current) return
     if (!(await canDiscard())) return
     if (await editor.open(id, true)) {
       setPage(null)
@@ -144,7 +171,24 @@ export function PresentationsPane() {
       }}
     >
       <PaneHeader title={t('nav.presentations')} subtitle={t('deck.subtitle')}>
-        <Button variant="secondary" onClick={() => void create()} disabled={editor.busy !== null}>
+        <Button
+          variant="secondary"
+          disabled={!document || editor.busy !== null || exportPhase !== null}
+          onClick={() => void exportPptx()}
+        >
+          <FileDown size={13} />
+          {t('deck.export')}
+        </Button>
+        {exportPhase === 'generating' && (
+          <Button variant="secondary" onClick={() => exportJob.current?.abort()}>
+            {t('deck.cancelExport')}
+          </Button>
+        )}
+        <Button
+          variant="secondary"
+          onClick={() => void create()}
+          disabled={editor.busy !== null || exportPhase !== null}
+        >
           <Plus size={13} />
           {t('deck.new')}
         </Button>
@@ -192,7 +236,7 @@ export function PresentationsPane() {
             <button
               key={item.id}
               type="button"
-              disabled={editor.busy !== null}
+              disabled={editor.busy !== null || exportPhase !== null}
               onClick={() => void open(item.id)}
               aria-pressed={document?.id === item.id}
               className="block w-full truncate rounded-control px-2 py-2 text-left text-[12px] text-muted hover:bg-control-fill aria-pressed:bg-control-fill aria-pressed:text-text"
@@ -241,6 +285,19 @@ export function PresentationsPane() {
           )}
         </aside>
         <div className="min-w-0 flex-1 space-y-3">
+          {(exportPhase || exportStatus) && (
+            <p role="status" className="text-[12px] text-muted">
+              {exportPhase ? t(`deck.export.${exportPhase}`) : exportStatus}
+            </p>
+          )}
+          {exportError && (
+            <p
+              role="alert"
+              className="selectable rounded-control border border-danger/30 px-3 py-2 text-[12px] text-danger"
+            >
+              {exportError}
+            </p>
+          )}
           {(editor.error || libraryError) && (
             <p
               role="alert"

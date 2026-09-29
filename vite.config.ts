@@ -49,8 +49,30 @@ function pdfAssets(): Plugin {
   }
 }
 
+/** Retain notices for the libraries compiled into the presentation worker. */
+function presentationNotices(): Plugin {
+  const require = createRequire(import.meta.url)
+  const zipRequire = createRequire(require.resolve('jszip'))
+  const files = new Map([
+    ['licenses/pptxgenjs.txt', join(dirname(dirname(require.resolve('pptxgenjs'))), 'LICENSE')],
+    ['licenses/pako.txt', join(dirname(zipRequire.resolve('pako/package.json')), 'LICENSE')],
+    [
+      'licenses/jszip.txt',
+      join(dirname(require.resolve('jszip/package.json')), 'LICENSE.markdown'),
+    ],
+  ])
+  return {
+    name: 'presentation-license-notices',
+    async generateBundle() {
+      for (const [name, path] of files)
+        this.emitFile({ type: 'asset', fileName: name, source: await readFile(path) })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), pdfAssets()],
+  plugins: [react(), tailwindcss(), pdfAssets(), presentationNotices()],
+  worker: { format: 'es' },
   clearScreen: false,
   resolve: {
     alias: {
@@ -92,6 +114,7 @@ export default defineConfig({
         'src/lib/presentation/repository.ts',
         'src/lib/presentation/authoring.ts',
         'src/lib/presentation/close-guard.ts',
+        'src/lib/presentation/save-export.ts',
         'src/state/presentation-editor.ts',
         'src/lib/attachment-save.ts',
         'src/lib/bridge.ts',

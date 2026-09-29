@@ -1229,3 +1229,6 @@ export const presentationSave = (
   source: string,
   revision: string | null,
 ): Promise<SavedPresentation> => invoke('presentation_save', { id, source, revision })
+
+export const presentationExportSave = (path: string, data: string): Promise<void> =>
+  invoke('presentation_export_save', { path, data })

@@ -1,4 +1,5 @@
 //! Bounded local presentation sources. No imported paths or executable content.
+use base64::{engine::general_purpose::STANDARD, Engine};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -195,6 +196,42 @@ pub async fn presentation_save(
         .map_err(|_| failure("save task failed"))?
 }
 
+fn export_file(path: &Path, data: &str) -> Result<()> {
+    const MAXIMUM: usize = 20 * 1024 * 1024;
+    if !path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("pptx"))
+        || data.len() > MAXIMUM.div_ceil(3) * 4
+    {
+        return Err(failure("invalid presentation export destination or size"));
+    }
+    let bytes = STANDARD
+        .decode(data)
+        .map_err(|_| failure("invalid presentation export data"))?;
+    if bytes.len() > MAXIMUM {
+        return Err(failure("presentation export size limit exceeded"));
+    }
+    let mut archive = zip::ZipArchive::new(std::io::Cursor::new(&bytes))
+        .map_err(|_| failure("invalid presentation export archive"))?;
+    if archive.len() > 20_000
+        || archive.by_name("[Content_Types].xml").is_err()
+        || archive.by_name("ppt/presentation.xml").is_err()
+    {
+        return Err(failure("unsupported presentation export archive"));
+    }
+    drop(archive);
+    crate::atomic::write(path, bytes)
+        .map_err(|_| failure("could not save export at the selected location"))
+}
+
+#[tauri::command]
+pub async fn presentation_export_save(path: String, data: String) -> Result<()> {
+    tokio::task::spawn_blocking(move || export_file(Path::new(&path), &data))
+        .await
+        .map_err(|_| failure("export save task failed"))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367,6 +404,44 @@ mod tests {
         assert_eq!(items[0].id, "broken");
         assert!(items[0].title.is_none());
         assert_eq!(items[1].title.as_deref(), Some("中文标题"));
+    }
+
+    #[test]
+    fn exports_package_atomically_and_preserves_existing_output_on_bad_input() {
+        use std::io::Write;
+        let root = Fixture::new();
+        directory(&root.0).unwrap();
+        let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        for name in ["[Content_Types].xml", "ppt/presentation.xml"] {
+            archive
+                .start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            archive.write_all(b"<document />").unwrap();
+        }
+        let bytes = archive.finish().unwrap().into_inner();
+        let path = root.0.join("output.pptx");
+        export_file(&path, &STANDARD.encode(&bytes)).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        for bad in [
+            "!".into(),
+            STANDARD.encode(b"not a zip"),
+            "A".repeat((20 * 1024 * 1024_usize).div_ceil(3) * 4 + 1),
+        ] {
+            assert!(export_file(&path, &bad).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        }
+        assert!(export_file(&root.0.join("output.exe"), &STANDARD.encode(&bytes)).is_err());
+        assert!(export_file(
+            &root.0.join("missing/output.pptx"),
+            &STANDARD.encode(&bytes)
+        )
+        .is_err());
+        let archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        assert!(export_file(
+            &path,
+            &STANDARD.encode(archive.finish().unwrap().into_inner())
+        )
+        .is_err());
     }
 
     #[cfg(unix)]

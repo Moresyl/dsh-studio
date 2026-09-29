@@ -54,6 +54,7 @@ commands.allow = [
     "presentation_list",
     "presentation_load",
     "presentation_save",
+    "presentation_export_save",
     "preset_export",
     "preset_import",
     "preset_package",

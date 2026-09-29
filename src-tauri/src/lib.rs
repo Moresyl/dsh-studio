@@ -184,6 +184,7 @@ pub fn run() {
             presentations::presentation_list,
             presentations::presentation_load,
             presentations::presentation_save,
+            presentations::presentation_export_save,
             presets::preset_choose,
             presets::preset_export,
             presets::preset_package,
