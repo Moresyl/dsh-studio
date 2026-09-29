@@ -9,6 +9,7 @@ use crate::error::Result;
 
 const BYTES: usize = 8 * 1024 * 1024;
 const DEPTH: usize = 128;
+const PARSER_STACK: usize = 8 * 1024 * 1024;
 const NODES: u32 = 100_000;
 const ATTRIBUTES: usize = 64;
 
@@ -29,7 +30,7 @@ impl Source {
                 return Err(failure("truncated PPTX UTF-16 XML"));
             }
             let mut text = String::new();
-            for character in char::decode_utf16(bytes[2..].chunks_exact(2).map(|pair| {
+            for character in char::decode_utf16(bytes[2..].as_chunks::<2>().0.iter().map(|pair| {
                 if little {
                     u16::from_le_bytes([pair[0], pair[1]])
                 } else {
@@ -56,6 +57,20 @@ impl Source {
     }
 
     pub(super) fn parse(&self) -> Result<Document<'_>> {
+        // roxmltree recurses per element. Caller stacks differ across platforms;
+        // use a bounded dedicated stack without relaxing input admission limits.
+        std::thread::scope(|scope| {
+            std::thread::Builder::new()
+                .name("presentation-xml".into())
+                .stack_size(PARSER_STACK)
+                .spawn_scoped(scope, || self.parse_tree())
+                .map_err(|_| failure("could not start PPTX XML parser"))?
+                .join()
+                .map_err(|_| failure("PPTX XML parser failed"))?
+        })
+    }
+
+    fn parse_tree(&self) -> Result<Document<'_>> {
         Document::parse_with_options(
             &self.0,
             ParsingOptions {
@@ -214,6 +229,23 @@ mod tests {
         ] {
             assert!(!accepted(input.as_bytes()), "accepted {input:?}");
         }
+    }
+
+    #[test]
+    fn parses_admitted_depth_on_a_small_thread_stack() {
+        std::thread::Builder::new()
+            .stack_size(512 * 1024)
+            .spawn(|| {
+                assert!(accepted(
+                    format!("{}{}", "<a>".repeat(DEPTH), "</a>".repeat(DEPTH)).as_bytes()
+                ));
+                assert!(!accepted(
+                    format!("{}{}", "<a>".repeat(DEPTH + 1), "</a>".repeat(DEPTH + 1)).as_bytes()
+                ));
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[test]
