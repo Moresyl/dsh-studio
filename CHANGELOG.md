@@ -25,6 +25,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Keep Tauri JavaScript bindings on patch-only ranges matching their native plugin minor versions, and fail release verification before packaging when a resolved guest/native pair drifts.
 - Run the recursive XML tree parser on a bounded dedicated stack while retaining input depth limits, protecting callers with small thread stacks; add a 512 KiB caller-stack regression.
 - Validate XML encoding, namespaces, content types and slide relationships before saving PPTX exports, preserving declared slide order. Reject duplicate or missing slides, external document parts, DTDs and oversized XML. Structural parsing does not yet provide editable PPTX import.
 - Validate PPTX package directory counts and names before building the ZIP index, reject duplicate/overlapping or encrypted parts, bound expanded sizes, and verify part checksums before atomically saving an export. Package validation does not yet provide PPTX content import.
