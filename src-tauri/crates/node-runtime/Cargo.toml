@@ -9,4 +9,5 @@ description = "Locate a usable Node.js runtime across PATH, nvm, fnm, volta and 
 [dependencies]
 proc-guard.workspace = true
 serde.workspace = true
+tokio.workspace = true
 dirs = "6"
