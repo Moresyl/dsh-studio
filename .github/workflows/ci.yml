@@ -86,6 +86,8 @@ jobs:
         run: cargo check --manifest-path src-tauri/Cargo.toml --workspace
 
       - run: pnpm install --frozen-lockfile
+      - name: Verify Tauri JavaScript/native versions
+        run: pnpm verify:tauri
       - run: pnpm lint
       - run: pnpm build
       - run: pnpm test:packaging

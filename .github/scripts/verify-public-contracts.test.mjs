@@ -107,16 +107,137 @@ test('catalog schema validates its native security limits', () => {
 })
 
 test('release and SDK versions stay aligned', () => {
+  const cargoManifest = (version = '0.7.1') => `
+[workspace.package]
+version = "${version}"
+
+[workspace.dependencies]
+example = { version = "99.0.0" }
+
+[package]
+name = "dsh-studio"
+version.workspace = true
+
+[dependencies]
+example = "88.0.0"
+`
+  const cargoLock = (version = '0.7.1') => `
+[[package]]
+name = "dependency"
+version = "77.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "dsh-studio"
+version = "${version}"
+`
   assert.doesNotThrow(() =>
-    validateVersions({ version: '0.7.1' }, { version: '0.7.1' }, { version: '0.7.1' }),
+    validateVersions(
+      { version: '0.7.1' },
+      { version: '0.7.1' },
+      { version: '0.7.1' },
+      cargoManifest(),
+      cargoLock(),
+    ),
   )
   assert.throws(
-    () => validateVersions({ version: '0.7.0' }, { version: '0.7.1' }, { version: '0.7.0' }),
+    () =>
+      validateVersions(
+        { version: '0.7.0' },
+        { version: '0.7.1' },
+        { version: '0.7.0' },
+        cargoManifest('0.7.0'),
+        cargoLock('0.7.0'),
+      ),
     /differ/,
   )
   assert.throws(
-    () => validateVersions({ version: 'next' }, { version: 'next' }, { version: 'next' }),
-    /semantic/,
+    () =>
+      validateVersions(
+        { version: '0.7.1-beta.1' },
+        { version: '0.7.1-beta.1' },
+        { version: '0.7.1-beta.1' },
+        cargoManifest('0.7.1-beta.1'),
+        cargoLock('0.7.1-beta.1'),
+      ),
+    /stable semantic version/,
+  )
+  assert.throws(
+    () =>
+      validateVersions(
+        { version: '0.7.1' },
+        { version: '0.7.1' },
+        { version: '0.7.1' },
+        cargoManifest('0.7.2'),
+        cargoLock(),
+      ),
+    /Cargo\.toml=0\.7\.2/,
+  )
+  assert.throws(
+    () =>
+      validateVersions(
+        { version: '0.7.1' },
+        { version: '0.7.1' },
+        { version: '0.7.1' },
+        cargoManifest(),
+        cargoLock('0.7.2'),
+      ),
+    /Cargo\.lock=0\.7\.2/,
+  )
+})
+
+test('native version extraction ignores dependencies and fails on ambiguous project metadata', () => {
+  const manifest = `
+[workspace.package]
+version = "0.7.1"
+
+[workspace.dependencies]
+dependency = { version = "9.9.9" }
+
+[package]
+name = "dsh-studio"
+version.workspace = true
+`
+  const lock = `
+[[package]]
+name = "dsh-studio"
+version = "9.9.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "dsh-studio"
+version = "0.7.1"
+`
+  const validate = (cargoManifest = manifest, cargoLock = lock) =>
+    validateVersions(
+      { version: '0.7.1' },
+      { version: '0.7.1' },
+      { version: '0.7.1' },
+      cargoManifest,
+      cargoLock,
+    )
+
+  assert.doesNotThrow(validate)
+  assert.throws(
+    () => validate(manifest.replace('version.workspace = true', 'edition.workspace = true')),
+    /must declare exactly one version/,
+  )
+  assert.throws(
+    () => validate(manifest, `${lock}\n[[package]]\nname = "dsh-studio"\nversion = "0.7.1"\n`),
+    /exactly one local dsh-studio package/,
+  )
+  assert.throws(
+    () => validate(manifest.replace('name = "dsh-studio"', 'name = "renamed"')),
+    /package name must be dsh-studio/,
+  )
+})
+
+test('main CI verifies Tauri guest/native versions immediately after dependency install', async () => {
+  const source = await readFile('.github/workflows/ci.yml', 'utf8')
+  assert.match(source, /push:\s*\r?\n\s*branches: \[main\]/)
+  assert.match(
+    source,
+    /- run: pnpm install --frozen-lockfile\r?\n\s+- name: Verify Tauri JavaScript\/native versions\r?\n\s+run: pnpm verify:tauri/,
   )
 })
 

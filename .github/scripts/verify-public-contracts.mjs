@@ -4,6 +4,74 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const DEFAULT_ROOT = resolve(HERE, '..', '..')
+const STABLE_VERSION = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/
+
+function tomlSection(source, heading, label) {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const headings = [...source.matchAll(new RegExp(`^\\s*\\[${escaped}\\]\\s*(?:#.*)?$`, 'gm'))]
+  if (headings.length !== 1) {
+    throw new Error(`${label} must contain exactly one [${heading}] section`)
+  }
+  const start = (headings[0].index ?? 0) + headings[0][0].length
+  const remainder = source.slice(start)
+  const nextHeading = remainder.search(/^\s*\[\[?[^\]\r\n]+\]\]?\s*(?:#.*)?$/m)
+  return nextHeading < 0 ? remainder : remainder.slice(0, nextHeading)
+}
+
+function oneTomlString(section, key, label) {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const matches = [
+    ...section.matchAll(new RegExp(`^\\s*${escaped}\\s*=\\s*"([^"\\r\\n]+)"\\s*(?:#.*)?$`, 'gm')),
+  ]
+  if (matches.length !== 1 || matches[0]?.[1] === undefined) {
+    throw new Error(`${label} must contain exactly one ${key} string declaration`)
+  }
+  return matches[0][1]
+}
+
+function cargoManifestProjectVersion(source) {
+  const workspace = tomlSection(source, 'workspace.package', 'src-tauri/Cargo.toml')
+  const packageSection = tomlSection(source, 'package', 'src-tauri/Cargo.toml')
+  const workspaceVersion = oneTomlString(
+    workspace,
+    'version',
+    'src-tauri/Cargo.toml [workspace.package]',
+  )
+  const packageName = oneTomlString(packageSection, 'name', 'src-tauri/Cargo.toml [package]')
+  if (packageName !== 'dsh-studio') {
+    throw new Error(`src-tauri/Cargo.toml package name must be dsh-studio, found ${packageName}`)
+  }
+
+  const inheritsWorkspace = /^\s*version\.workspace\s*=\s*true\s*(?:#.*)?$/m.test(packageSection)
+  const directVersions = [
+    ...packageSection.matchAll(/^\s*version\s*=\s*"([^"\r\n]+)"\s*(?:#.*)?$/gm),
+  ]
+  if (Number(inheritsWorkspace) + directVersions.length !== 1) {
+    throw new Error(
+      'src-tauri/Cargo.toml [package] must declare exactly one version or version.workspace = true',
+    )
+  }
+  return inheritsWorkspace ? workspaceVersion : directVersions[0][1]
+}
+
+function cargoLockProjectVersion(source) {
+  const versions = []
+  for (const section of source.split('[[package]]').slice(1)) {
+    const name = /(?:^|\r?\n)name = "([^"\r\n]+)"/.exec(section)?.[1]
+    if (name !== 'dsh-studio') continue
+    // Workspace packages have no registry/git source. Ignore a dependency that
+    // merely happens to use the same package name.
+    if (/(?:^|\r?\n)source = "[^"\r\n]+"/.test(section)) continue
+    const version = /(?:^|\r?\n)version = "([^"\r\n]+)"/.exec(section)?.[1]
+    if (version) versions.push(version)
+  }
+  if (versions.length !== 1) {
+    throw new Error(
+      `src-tauri/Cargo.lock must contain exactly one local dsh-studio package, found ${versions.length}`,
+    )
+  }
+  return versions[0]
+}
 
 /** Extract one integer protocol declaration and reject ambiguity. */
 export function protocolNumber(source, pattern, label) {
@@ -36,14 +104,27 @@ export function validateCatalogSchema(schema) {
   }
 }
 
-/** Keep the application, SDK and Tauri release versions in one release train. */
-export function validateVersions(rootPackage, sdkPackage, tauriConfig) {
-  const versions = [rootPackage?.version, sdkPackage?.version, tauriConfig?.version]
-  if (versions.some((version) => !/^\d+\.\d+\.\d+$/.test(version ?? ''))) {
-    throw new Error('application, SDK and Tauri versions must be stable semantic versions')
+/** Keep every public JavaScript and native release version in one release train. */
+export function validateVersions(rootPackage, sdkPackage, tauriConfig, cargoManifest, cargoLock) {
+  const versions = [
+    ['package.json', rootPackage?.version],
+    ['sdk/package.json', sdkPackage?.version],
+    ['src-tauri/tauri.conf.json', tauriConfig?.version],
+    ['src-tauri/Cargo.toml', cargoManifestProjectVersion(cargoManifest ?? '')],
+    ['src-tauri/Cargo.lock', cargoLockProjectVersion(cargoLock ?? '')],
+  ]
+  const unstable = versions.find(([, version]) => !STABLE_VERSION.test(version ?? ''))
+  if (unstable) {
+    throw new Error(
+      `${unstable[0]} version must be one stable semantic version, found ${unstable[1]}`,
+    )
   }
-  if (new Set(versions).size !== 1) {
-    throw new Error(`application, SDK and Tauri versions differ: ${versions.join(', ')}`)
+  if (new Set(versions.map(([, version]) => version)).size !== 1) {
+    throw new Error(
+      `application, SDK and Tauri versions differ: ${versions
+        .map(([label, version]) => `${label}=${version}`)
+        .join(', ')}`,
+    )
   }
 }
 
@@ -141,6 +222,8 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
       'package.json',
       'sdk/package.json',
       'src-tauri/tauri.conf.json',
+      'src-tauri/Cargo.toml',
+      'src-tauri/Cargo.lock',
       'src-tauri/capabilities/default.json',
       'src/lib/ipc.ts',
       'src-tauri/src/lib.rs',
@@ -163,6 +246,8 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     rootPackageRaw,
     sdkPackageRaw,
     tauriConfigRaw,
+    cargoManifest,
+    cargoLock,
     capabilitiesRaw,
     ipcSource,
     rustSource,
@@ -214,6 +299,8 @@ export async function verifyPublicContracts(root = DEFAULT_ROOT) {
     JSON.parse(rootPackageRaw),
     JSON.parse(sdkPackageRaw),
     JSON.parse(tauriConfigRaw),
+    cargoManifest,
+    cargoLock,
   )
   validateCapabilities(JSON.parse(capabilitiesRaw))
   const commands = validateCommandAcl(ipcSource, rustSource, permissionSource)

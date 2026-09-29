@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       linux_only:
-        description: Only rebuild Linux in an unpublished draft, then verify all release assets
+        description: Deprecated and rejected; releases must rebuild every platform from one commit
         required: false
         type: boolean
         default: false
@@ -46,30 +46,47 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LINUX_ONLY: ${{ github.event.inputs.linux_only || 'false' }}
           UPDATER_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
         run: |
           version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
           expected="v$version"
+          if [ "$LINUX_ONLY" = true ]; then
+            echo "::error title=Partial release disabled::linux_only cannot prove that retained platform assets came from $GITHUB_SHA. Re-run without linux_only so every platform is rebuilt."
+            exit 1
+          fi
           if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$expected" ]; then
             echo "::error title=Version mismatch::Tag $GITHUB_REF_NAME does not match $expected."
             exit 1
           fi
-          existing_target="$(gh release view "$expected" --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)"
-          existing_draft="$(gh release view "$expected" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || true)"
+          remote_refs="$(git ls-remote origin "refs/tags/$expected" "refs/tags/$expected^{}")"
+          tag_object="$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$expected" '$2 == ref { print $1; exit }')"
+          tag_commit="$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$expected^{}" '$2 == ref { print $1; exit }')"
+          if [ -z "$tag_object" ]; then
+            if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+              echo "::error title=Manual release requires an existing tag::$expected does not exist. Create and review the tag first; workflow_dispatch never creates a first release tag."
+            else
+              echo "::error title=Release tag missing::$expected disappeared from origin before the release could be verified."
+            fi
+            exit 1
+          fi
+          if [ -z "$tag_commit" ]; then tag_commit="$tag_object"; fi
+          if [ "$tag_commit" != "$GITHUB_SHA" ]; then
+            echo "::error title=Release commit mismatch::$expected resolves to $tag_commit, but this workflow is running $GITHUB_SHA. Dispatch the workflow from the tagged commit."
+            exit 1
+          fi
+          existing_release="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$expected\") | [.target_commitish, .draft] | join(\"|\")")"
+          IFS='|' read -r existing_target existing_draft <<< "$existing_release"
           if [ "$existing_draft" = false ]; then
             echo "::error title=Published release is immutable::$expected is already public. Bump the version instead of replacing artifacts that users may already have downloaded."
             exit 1
           fi
-          # A manually-created draft/release may retain `main` as targetCommitish
-          # even when the tag is already pinned to this exact commit. For tag
-          # builds, the immutable tag is the source of truth; keep the guard for
-          # genuinely conflicting commit targets.
-          if [ -n "$existing_target" ] && [ "$existing_target" != "$GITHUB_SHA" ] && [ "$existing_target" != "main" ]; then
-            existing_commit="$(git rev-parse "$existing_target^{commit}" 2>/dev/null || true)"
-            if [ "$existing_commit" != "$GITHUB_SHA" ]; then
-              echo "::error title=Release already exists::$expected already targets $existing_target; refusing to overwrite it from $GITHUB_SHA. Bump the application version before publishing."
-              exit 1
-            fi
+          # GitHub may retain `main` as targetCommitish on a manually-created
+          # draft. That is safe only because the remote tag above is the
+          # immutable identity and has already been bound to this exact SHA.
+          if [ -n "$existing_target" ] && [ "$existing_target" != "$GITHUB_SHA" ] && [ "$existing_target" != "$expected" ] && [ "$existing_target" != "main" ]; then
+            echo "::error title=Release already exists::$expected already targets $existing_target; refusing to overwrite it from $GITHUB_SHA. Bump the application version before publishing."
+            exit 1
           fi
           test -s ".github/release-notes/$version.zh-CN.md" || { echo "::error::Missing detailed Chinese release notes for $version"; exit 1; }
           test -s ".github/release-notes/$version.en.md" || { echo "::error::Missing English release notes for $version"; exit 1; }
@@ -110,14 +127,83 @@ jobs:
           package-manager-cache: false
       - run: node .github/scripts/verify-runtime-install.mjs
 
+  prepare-release:
+    name: Clear stale draft assets
+    needs: [quality, runtime-contract]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Remove assets left by an earlier unpublished run
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          tag="v$version"
+          remote_refs="$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}")"
+          tag_object="$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$tag" '$2 == ref { print $1; exit }')"
+          tag_commit="$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$tag^{}" '$2 == ref { print $1; exit }')"
+          if [ -z "$tag_object" ]; then
+            echo "::error title=Release tag missing::$tag disappeared after the quality gate."
+            exit 1
+          fi
+          if [ -z "$tag_commit" ]; then tag_commit="$tag_object"; fi
+          if [ "$tag_commit" != "$GITHUB_SHA" ]; then
+            echo "::error title=Release commit changed::$tag now resolves to $tag_commit instead of $GITHUB_SHA; refusing to clear draft assets."
+            exit 1
+          fi
+          existing_release="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | join(\"|\")")"
+          if [ -z "$existing_release" ]; then
+            echo "$tag has no existing draft assets to clear."
+            exit 0
+          fi
+          IFS='|' read -r release_id draft <<< "$existing_release"
+          if [ "$draft" != true ]; then
+            echo "::error title=Published release is immutable::$tag became public after the identity gate; refusing to alter its assets."
+            exit 1
+          fi
+          asset_ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?per_page=100" --jq '.[].id')"
+          removed=0
+          while IFS= read -r asset_id; do
+            if [ -z "$asset_id" ]; then continue; fi
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
+            removed=$((removed + 1))
+          done <<< "$asset_ids"
+          echo "Removed $removed stale assets from the unpublished $tag draft."
+
   publish:
     name: Build (${{ matrix.name }})
-    needs: [quality, runtime-contract]
+    needs: [quality, runtime-contract, prepare-release]
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(github.event.inputs.linux_only == 'true' && '[{"name":"Linux x64","os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","rustTargets":"x86_64-unknown-linux-gnu","args":"--target x86_64-unknown-linux-gnu"}]' || '[{"name":"Linux x64","os":"ubuntu-22.04","target":"x86_64-unknown-linux-gnu","rustTargets":"x86_64-unknown-linux-gnu","args":"--target x86_64-unknown-linux-gnu"},{"name":"Windows x64","os":"windows-2025","target":"x86_64-pc-windows-msvc","rustTargets":"x86_64-pc-windows-msvc","args":"--target x86_64-pc-windows-msvc"},{"name":"macOS Apple Silicon","os":"macos-15","target":"aarch64-apple-darwin","rustTargets":"aarch64-apple-darwin","args":"--target aarch64-apple-darwin"},{"name":"macOS Intel","os":"macos-15-intel","target":"x86_64-apple-darwin","rustTargets":"x86_64-apple-darwin","args":"--target x86_64-apple-darwin"},{"name":"macOS Universal","os":"macos-15","target":"universal-apple-darwin","rustTargets":"aarch64-apple-darwin,x86_64-apple-darwin","args":"--target universal-apple-darwin"}]') }}
+        include:
+          - name: Linux x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            rustTargets: x86_64-unknown-linux-gnu
+            args: --target x86_64-unknown-linux-gnu
+          - name: Windows x64
+            os: windows-2025
+            target: x86_64-pc-windows-msvc
+            rustTargets: x86_64-pc-windows-msvc
+            args: --target x86_64-pc-windows-msvc
+          - name: macOS Apple Silicon
+            os: macos-15
+            target: aarch64-apple-darwin
+            rustTargets: aarch64-apple-darwin
+            args: --target aarch64-apple-darwin
+          - name: macOS Intel
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+            rustTargets: x86_64-apple-darwin
+            args: --target x86_64-apple-darwin
+          - name: macOS Universal
+            os: macos-15
+            target: universal-apple-darwin
+            rustTargets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -301,12 +387,14 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Download previous Windows installer for upgrade smoke
-        if: runner.os == 'Windows' && github.ref_type == 'tag'
+        if: runner.os == 'Windows'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          previous="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 20 --json tagName --jq '.[].tagName' | grep -Fxv "$GITHUB_REF_NAME" | head -n 1)"
+          current="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          release_tags="$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[].tagName')"
+          previous="$(printf '%s\n' "$release_tags" | node .github/scripts/release-history.mjs "$current")"
           if [ -z "$previous" ]; then
             echo "No previous release exists; this is the only release where upgrade smoke is not applicable."
             exit 0
@@ -496,6 +584,28 @@ jobs:
             tag="$GITHUB_REF_NAME"
           else
             tag="v$(node -p 'require("./src-tauri/tauri.conf.json").version')"
+          fi
+          remote_refs="$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}")"
+          tag_object="$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$tag" '$2 == ref { print $1; exit }')"
+          tag_commit="$(printf '%s\n' "$remote_refs" | awk -v ref="refs/tags/$tag^{}" '$2 == ref { print $1; exit }')"
+          if [ -z "$tag_object" ]; then
+            echo "::error title=Release tag missing::$tag disappeared before publication."
+            exit 1
+          fi
+          if [ -z "$tag_commit" ]; then tag_commit="$tag_object"; fi
+          if [ "$tag_commit" != "$GITHUB_SHA" ]; then
+            echo "::error title=Release commit changed::$tag now resolves to $tag_commit instead of $GITHUB_SHA; refusing to publish."
+            exit 1
+          fi
+          release_state="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | join(\"|\")")"
+          if [ -z "$release_state" ] || [[ "$release_state" == *$'\n'* ]]; then
+            echo "::error title=Draft release missing::$tag must identify exactly one unpublished release before publication."
+            exit 1
+          fi
+          IFS='|' read -r release_id draft <<< "$release_state"
+          if [ "$draft" != true ]; then
+            echo "::error title=Release left draft state::$tag was published outside this verified workflow."
+            exit 1
           fi
           gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
 
