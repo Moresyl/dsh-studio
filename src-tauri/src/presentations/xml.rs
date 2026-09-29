@@ -25,7 +25,7 @@ impl Source {
         }
         let (text, encoding) = if bytes.starts_with(b"\xff\xfe") || bytes.starts_with(b"\xfe\xff") {
             let little = bytes.starts_with(b"\xff\xfe");
-            if bytes.len() % 2 != 0 {
+            if !bytes.len().is_multiple_of(2) {
                 return Err(failure("truncated PPTX UTF-16 XML"));
             }
             let mut text = String::new();
