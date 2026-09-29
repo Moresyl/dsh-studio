@@ -238,6 +238,7 @@ pub fn run() {
             updates::application_update_cancel,
             updates::application_update_install,
             lifecycle::application_lifecycle_reply,
+            lifecycle::application_lifecycle_state,
             diagnostics::report_build,
             diagnostics::report_save,
             diagnostics::report_archive,

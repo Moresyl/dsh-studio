@@ -4,6 +4,14 @@ vi.mock('@/lib/presentation/repository', () => repository)
 import { createPresentationEditor, isPresentationDirty } from './presentation-editor'
 import { fixture } from '@/lib/presentation/fixtures.test-support'
 
+it('can keep a newly loaded document closed to editing until native lifecycle synchronization', async () => {
+  const store = createPresentationEditor(true)
+  expect(store.getState().busy).toBe('synchronizing')
+  expect(store.getState().replace(fixture(), true)).toBe(false)
+  expect(await store.getState().open('document', true)).toBe(false)
+  expect(store.getState().lockForUpdate()).toBe(false)
+})
+
 it('locks all mutation paths for an update without clearing existing history', async () => {
   const store = createPresentationEditor()
   store.getState().replace(fixture(), true)

@@ -10,6 +10,9 @@ import { emit, listen, type UnlistenFn } from '@tauri-apps/api/event'
 export const applicationLifecycleReply = (id: string, ready: boolean): Promise<void> =>
   invoke('application_lifecycle_reply', { id, ready })
 
+export const applicationLifecycleState = (): Promise<{ id: string; awaiting: boolean } | null> =>
+  invoke('application_lifecycle_state')
+
 export const onLifecyclePrepare = (handler: (id: string) => void): Promise<UnlistenFn> =>
   listen<string>('application://lifecycle-prepare', (event) => handler(event.payload))
 export const onLifecycleRelease = (handler: (id: string) => void): Promise<UnlistenFn> =>

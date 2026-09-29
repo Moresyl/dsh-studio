@@ -10,7 +10,7 @@ interface EditorState {
   saved: string | null
   past: string[]
   future: string[]
-  busy: 'load' | 'save' | 'update' | null
+  busy: 'load' | 'save' | 'update' | 'synchronizing' | null
   lockForUpdate: () => boolean
   unlockUpdate: () => void
   error: string | null
@@ -26,14 +26,14 @@ export const isPresentationDirty = (state: Pick<EditorState, 'document' | 'saved
   state.document !== null && JSON.stringify(state.document) !== state.saved
 
 /** One editor owns its draft; switching panes does not discard pending changes. */
-export function createPresentationEditor() {
+export function createPresentationEditor(synchronizing = false) {
   return create<EditorState>((set, get) => ({
     document: null,
     revision: null,
     saved: null,
     past: [],
     future: [],
-    busy: null,
+    busy: synchronizing ? 'synchronizing' : null,
     error: null,
     lockForUpdate: () => {
       const state = get()
@@ -135,4 +135,4 @@ export function createPresentationEditor() {
   }))
 }
 
-export const usePresentationEditor = createPresentationEditor()
+export const usePresentationEditor = createPresentationEditor(true)

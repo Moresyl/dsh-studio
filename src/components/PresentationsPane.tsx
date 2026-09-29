@@ -29,7 +29,7 @@ export function PresentationsPane() {
   const slide = document?.slides.find((item) => item.id === page) ?? document?.slides[0]
   const element = slide?.elements.find((item) => item.id === selected)
   const dirty = isPresentationDirty(editor)
-  const readOnly = editor.busy === 'load' || editor.busy === 'update'
+  const readOnly = editor.busy !== null && editor.busy !== 'save'
 
   useEffect(() => () => exportJob.current?.abort(), [])
   const exportPptx = async () => {
@@ -164,7 +164,7 @@ export function PresentationsPane() {
   return (
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col"
-      inert={editor.busy === 'update'}
+      inert={editor.busy === 'update' || editor.busy === 'synchronizing'}
       onKeyDown={(event) => {
         if (templatesOpen) return
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {

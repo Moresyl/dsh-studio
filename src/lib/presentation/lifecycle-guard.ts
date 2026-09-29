@@ -1,6 +1,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import {
   applicationLifecycleReply,
+  applicationLifecycleState,
   onLifecyclePrepare,
   onLifecycleRelease,
   onLifecycleBlocked,
@@ -14,36 +15,53 @@ export async function guardApplicationLifecycle(): Promise<() => void> {
   const stops: (() => void)[] = []
   let request: string | null = null
   let owned = false
+  let syncing = true
+  const released = new Set<string>()
+  const synchronized = () => {
+    if (usePresentationEditor.getState().busy === 'synchronizing')
+      usePresentationEditor.setState({ busy: null })
+  }
   const release = (id: string) => {
+    if (syncing) released.add(id)
     if (request !== id) return
     request = null
     if (owned) usePresentationEditor.getState().unlockUpdate()
     owned = false
   }
+  const prepare = (id: string, awaiting = true) => {
+    if (request !== null) return
+    request = id
+    synchronized()
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    const state = usePresentationEditor.getState()
+    // The initiating window may already own the local updater lock.
+    const inherited = state.busy === 'update' && !isPresentationDirty(state)
+    owned = !inherited && state.lockForUpdate()
+    const ready = inherited || owned
+    if (!ready) {
+      void getCurrentWindow().show().catch(reportFailure)
+      reportFailure(new Error(t('deck.saveBeforeExit')))
+    }
+    // A reloaded document rejoins an already-approved lease without a second vote.
+    if (awaiting)
+      void applicationLifecycleReply(id, ready).catch((cause) => {
+        release(id)
+        reportFailure(cause)
+      })
+  }
   try {
     // Subscribe to release before prepare so a cancelled request cannot leave a lock behind.
     stops.push(await onLifecycleRelease(release))
     stops.push(await onLifecycleBlocked(() => reportFailure(new Error(t('deck.saveBeforeExit')))))
-    stops.push(
-      await onLifecyclePrepare((id) => {
-        if (request !== null) return
-        request = id
-        if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-        const state = usePresentationEditor.getState()
-        // The initiating window may already own the local updater lock.
-        const inherited = state.busy === 'update' && !isPresentationDirty(state)
-        owned = !inherited && state.lockForUpdate()
-        const ready = inherited || owned
-        if (!ready) {
-          void getCurrentWindow().show().catch(reportFailure)
-          reportFailure(new Error(t('deck.saveBeforeExit')))
-        }
-        void applicationLifecycleReply(id, ready).catch((cause) => {
-          release(id)
-          reportFailure(cause)
-        })
-      }),
-    )
+    stops.push(await onLifecyclePrepare(prepare))
+    const pending = await applicationLifecycleState()
+    // Ignore a released snapshot, but not a different live lease just because an
+    // older request's release arrived while the snapshot was in flight.
+    if (request === null && pending && !released.has(pending.id))
+      prepare(pending.id, pending.awaiting)
+    syncing = false
+    released.clear()
+    synchronized()
   } catch (cause) {
     stops.forEach((stop) => stop())
     throw cause

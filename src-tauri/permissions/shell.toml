@@ -17,6 +17,7 @@ commands.allow = [
     "application_update_cancel",
     "application_update_install",
     "application_lifecycle_reply",
+    "application_lifecycle_state",
     "desktop_attention",
     "desktop_badge",
     "desktop_notify",

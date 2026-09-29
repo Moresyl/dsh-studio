@@ -16,8 +16,15 @@ pub struct Lifecycle {
 
 struct Pending {
     id: String,
+    participants: BTreeSet<String>,
     remaining: BTreeSet<String>,
     completion: Option<oneshot::Sender<bool>>,
+}
+
+#[derive(serde::Serialize, Debug, PartialEq, Eq)]
+pub struct PendingLifecycle {
+    id: String,
+    awaiting: bool,
 }
 
 fn failure() -> Error {
@@ -44,9 +51,11 @@ impl Lifecycle {
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>();
         let (tx, rx) = oneshot::channel();
+        let participants = labels();
         let mut request = Pending {
             id: id.clone(),
-            remaining: labels(),
+            remaining: participants.clone(),
+            participants,
             completion: Some(tx),
         };
         if request.remaining.is_empty() {
@@ -79,6 +88,17 @@ impl Lifecycle {
                 *pending = None;
             }
         }
+    }
+
+    fn snapshot(&self, window: &str) -> Result<Option<PendingLifecycle>> {
+        let pending = self.pending.lock().map_err(|_| failure())?;
+        Ok(pending
+            .as_ref()
+            .filter(|request| request.participants.contains(window))
+            .map(|request| PendingLifecycle {
+                id: request.id.clone(),
+                awaiting: request.remaining.contains(window),
+            }))
     }
 
     /// Serialize window creation against taking the lifecycle window snapshot.
@@ -152,6 +172,14 @@ pub async fn acquire<R: Runtime>(app: &AppHandle<R>) -> Result<Lease<R>> {
 }
 
 #[tauri::command]
+pub fn application_lifecycle_state(
+    window: WebviewWindow,
+    state: State<'_, Lifecycle>,
+) -> Result<Option<PendingLifecycle>> {
+    state.snapshot(window.label())
+}
+
+#[tauri::command]
 pub fn application_lifecycle_reply(
     window: WebviewWindow,
     state: State<'_, Lifecycle>,
@@ -205,7 +233,22 @@ mod tests {
         assert!(state.with_idle(|| Ok(())).is_err());
         assert!(state.reply("other", &id, true).is_err());
         assert!(state.reply("main", "stale", true).is_err());
+        assert_eq!(
+            state.snapshot("main").unwrap(),
+            Some(PendingLifecycle {
+                id: id.clone(),
+                awaiting: true
+            })
+        );
+        assert_eq!(state.snapshot("other").unwrap(), None);
         state.reply("main", &id, true).unwrap();
+        assert_eq!(
+            state.snapshot("main").unwrap(),
+            Some(PendingLifecycle {
+                id: id.clone(),
+                awaiting: false
+            })
+        );
         assert!(rx.try_recv().is_err());
         assert!(state.reply("main", &id, true).is_err());
         state.release("stale");
@@ -215,6 +258,7 @@ mod tests {
         // Approval keeps the lease held until the caller releases or exits.
         assert!(state.with_idle(|| Ok(())).is_err());
         state.release(&id);
+        assert_eq!(state.snapshot("main").unwrap(), None);
         assert!(state.with_idle(|| Ok(())).is_ok());
     }
 
@@ -247,6 +291,7 @@ mod tests {
         });
         assert!(state.begin(BTreeSet::new).is_err());
         assert!(state.reply("main", "id", true).is_err());
+        assert!(state.snapshot("main").is_err());
         assert!(state.with_idle(|| Ok(())).is_err());
         state.release("id");
     }
