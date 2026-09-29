@@ -14,7 +14,6 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
   const [zoom, setZoom] = useState(1)
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(true)
-  const container = useRef<HTMLDivElement>(null)
   const canvasHost = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(600)
 
@@ -43,14 +42,15 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
   }, [blob, attempt])
 
   useEffect(() => {
-    const element = container.current
+    const element = canvasHost.current
     if (!element) return
     const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(Math.max(100, Math.floor(entry.contentRect.width - 24)))
+      // The content box excludes both padding and the vertical scrollbar.
+      if (entry) setWidth(Math.max(100, Math.floor(entry.contentRect.width)))
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [])
+  }, [error])
 
   useEffect(() => {
     if (!session || !canvasHost.current) return
@@ -136,7 +136,7 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
     setPage(next)
   }
   return (
-    <div ref={container} className="flex w-full min-w-0 flex-col gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-3">
       {error ? (
         <div role="status" className="space-y-3 p-4 text-center text-[13px] text-muted">
           <p>{t(error === 'password' ? 'sessions.pdfPassword' : 'sessions.pdfFailed')}</p>
