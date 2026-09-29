@@ -1,5 +1,7 @@
 //! Bounded local presentation sources. No imported paths or executable content.
 mod package;
+mod structure;
+mod xml;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -214,8 +216,7 @@ fn export_file(path: &Path, data: &str) -> Result<()> {
         return Err(failure("presentation export size limit exceeded"));
     }
     let mut archive = package::Package::open(&bytes)?;
-    archive.read_part("[Content_Types].xml", 8 * 1024 * 1024)?;
-    archive.read_part("ppt/presentation.xml", 8 * 1024 * 1024)?;
+    structure::slides(&mut archive)?;
     archive.verify_contents()?;
     crate::atomic::write(path, bytes)
         .map_err(|_| failure("could not save export at the selected location"))
@@ -404,21 +405,9 @@ mod tests {
 
     #[test]
     fn exports_package_atomically_and_preserves_existing_output_on_bad_input() {
-        use std::io::Write;
         let root = Fixture::new();
         directory(&root.0).unwrap();
-        let mut archive = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
-        for name in ["[Content_Types].xml", "ppt/presentation.xml"] {
-            archive
-                .start_file(
-                    name,
-                    zip::write::SimpleFileOptions::default()
-                        .compression_method(zip::CompressionMethod::Stored),
-                )
-                .unwrap();
-            archive.write_all(b"<document />").unwrap();
-        }
-        let bytes = archive.finish().unwrap().into_inner();
+        let bytes = structure::tests::fixture_bytes();
         let mut damaged = bytes.clone();
         let payload = zip::ZipArchive::new(std::io::Cursor::new(&bytes))
             .unwrap()
@@ -433,6 +422,7 @@ mod tests {
             "!".into(),
             STANDARD.encode(b"not a zip"),
             STANDARD.encode(&damaged),
+            STANDARD.encode(structure::tests::missing_slide_bytes()),
             "A".repeat((20 * 1024 * 1024_usize).div_ceil(3) * 4 + 1),
         ] {
             assert!(export_file(&path, &bad).is_err());

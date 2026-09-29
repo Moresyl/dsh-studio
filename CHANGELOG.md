@@ -23,6 +23,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Validate XML encoding, namespaces, content types and slide relationships before saving PPTX exports, preserving declared slide order. Reject duplicate or missing slides, external document parts, DTDs and oversized XML. Structural parsing does not yet provide editable PPTX import.
 - Validate PPTX package directory counts and names before building the ZIP index, reject duplicate/overlapping or encrypted parts, bound expanded sizes, and verify part checksums before atomically saving an export. Package validation does not yet provide PPTX content import.
 - Show update-check progress and completion time, surface failures from manual checks that join an existing background request, and bound each complete native check to 30 seconds.
 - Prioritize the total installation deadline even when a child continuously emits output, report the configured timeout duration, and bound Node version probes while cleaning up failed child processes.

@@ -1,6 +1,6 @@
 //! Bounded in-memory package access, shared by export validation and import parsing.
 //! No part is extracted to disk and no relationship target is fetched.
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Read};
 
 use super::failure;
@@ -13,6 +13,7 @@ const ENTRY_LIMIT: usize = 20_000;
 
 pub(super) struct Package<'a> {
     archive: zip::ZipArchive<Cursor<&'a [u8]>>,
+    parts: HashMap<String, usize>,
 }
 
 fn integer(bytes: &[u8], at: usize, width: usize) -> Result<u64> {
@@ -121,6 +122,7 @@ impl<'a> Package<'a> {
             return Err(failure("ambiguous PPTX ZIP directory"));
         }
         let mut names = HashSet::new();
+        let mut parts = HashMap::new();
         let mut expanded = 0_u64;
         let mut ranges = Vec::new();
         for index in 0..archive.len() {
@@ -147,6 +149,9 @@ impl<'a> Package<'a> {
             if part.size() > PART_LIMIT || (part.is_dir() && part.size() != 0) {
                 return Err(failure("PPTX part size limit exceeded"));
             }
+            if !part.is_dir() {
+                parts.insert(name.to_ascii_lowercase(), index);
+            }
             expanded = expanded
                 .checked_add(part.size())
                 .ok_or_else(|| failure("PPTX size overflow"))?;
@@ -168,13 +173,17 @@ impl<'a> Package<'a> {
         if ranges.windows(2).any(|parts| parts[0].1 > parts[1].0) {
             return Err(failure("overlapping PPTX parts"));
         }
-        Ok(Self { archive })
+        Ok(Self { archive, parts })
     }
 
     pub(super) fn read_part(&mut self, name: &str, maximum: usize) -> Result<Vec<u8>> {
+        let index = self
+            .parts
+            .get(&name.to_ascii_lowercase())
+            .ok_or_else(|| failure("missing PPTX part"))?;
         let part = self
             .archive
-            .by_name(name)
+            .by_index(*index)
             .map_err(|_| failure("missing or unsupported PPTX part"))?;
         let expected = part.size();
         if expected > maximum.min(PART_LIMIT as usize) as u64 {
