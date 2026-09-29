@@ -1,0 +1,81 @@
+import type { PresentationDocument } from './document'
+
+export function fixture(): PresentationDocument {
+  const frame = { x: 40, y: 40, width: 1100, height: 100, rotation: 0 }
+  return {
+    format: 'dsh-studio-presentation',
+    version: 1,
+    id: 'fixture',
+    title: 'Editable 中文 & <report>',
+    aspect: 'wide',
+    slides: [
+      {
+        id: 'slide-1',
+        title: 'Quarterly report',
+        notes: 'Speaker notes: first line\nSecond line 中文',
+        background: 'FFFFFF',
+        elements: [
+          {
+            ...frame,
+            id: 'title',
+            kind: 'text',
+            text: 'Editable 中文 & <text> 😀\nSecond paragraph',
+            fontFace: 'Microsoft YaHei',
+            fontSize: 28,
+            color: '17202A',
+            bold: true,
+            italic: false,
+            align: 'left',
+          },
+          {
+            ...frame,
+            id: 'shape',
+            kind: 'shape',
+            x: 40,
+            y: 190,
+            width: 160,
+            height: 120,
+            shape: 'roundRect',
+            fill: '4080C0',
+            line: '306090',
+            lineWidth: 1,
+            opacity: 0.75,
+          },
+          {
+            ...frame,
+            id: 'table',
+            kind: 'table',
+            x: 250,
+            y: 190,
+            width: 450,
+            height: 200,
+            rows: [
+              ['Region', 'Amount'],
+              ['北区', '12'],
+              ['South', '3.5'],
+            ],
+            fontFace: 'Microsoft YaHei',
+            fontSize: 16,
+            color: '17202A',
+            fill: 'F5F7FA',
+            border: 'CED6DE',
+          },
+          {
+            ...frame,
+            id: 'chart',
+            kind: 'chart',
+            x: 760,
+            y: 190,
+            width: 440,
+            height: 300,
+            chart: 'bar',
+            categories: ['一季度', 'Q2'],
+            series: [{ name: 'Actual', values: [12, -3.5] }],
+            colors: ['4080C0'],
+            showLegend: true,
+          },
+        ],
+      },
+    ],
+  }
+}

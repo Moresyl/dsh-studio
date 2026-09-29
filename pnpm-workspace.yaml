@@ -1,2 +1,6 @@
 allowBuilds:
   esbuild: true
+overrides:
+  # The exporter does not use legacy path-based image detection; keep its
+  # transitive parser on the patched release for future image support too.
+  pptxgenjs>image-size: 2.0.4

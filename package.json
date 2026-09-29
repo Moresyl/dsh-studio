@@ -60,6 +60,7 @@
     "@xterm/xterm": "^6.0.0",
     "lucide-react": "^0.577.0",
     "pdfjs-dist": "6.3.289",
+    "pptxgenjs": "4.0.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "zustand": "^5.0.12"
@@ -77,6 +78,7 @@
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
+    "jszip": "3.10.2",
     "prettier": "^3.8.3",
     "semver": "^7.8.5",
     "tailwindcss": "^4.2.1",
