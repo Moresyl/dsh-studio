@@ -22,6 +22,11 @@ const SettingsPane = lazy(() =>
 const TerminalPane = lazy(() =>
   import('@/components/TerminalPane').then((module) => ({ default: module.TerminalPane })),
 )
+const PresentationsPane = lazy(() =>
+  import('@/components/PresentationsPane').then((module) => ({
+    default: module.PresentationsPane,
+  })),
+)
 
 export type { View } from '@/components/workbench-contract'
 
@@ -43,6 +48,7 @@ export function Workbench({ hidden, view }: WorkbenchProps) {
         {view === 'remote' && <RemotePane />}
         {view === 'about' && <AboutPane />}
         {view === 'settings' && <SettingsPane />}
+        {view === 'presentations' && <PresentationsPane />}
       </Suspense>
     </div>
   )

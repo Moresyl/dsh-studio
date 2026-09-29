@@ -16,6 +16,7 @@ import { t } from '@/lib/i18n'
 import { pushWorkspaceDrop } from '@/lib/bridge'
 import * as ipc from '@/lib/ipc'
 import { ownAsync } from '@/lib/lifecycle'
+import { guardPresentationClose } from '@/lib/presentation/close-guard'
 import { needsWorkbench, rendererDocument } from '@/lib/renderer-recovery'
 import { standby } from '@/lib/platform'
 import { readPreference, savePreference } from '@/lib/preferences'
@@ -53,6 +54,7 @@ const StudioSidebar = lazy(() =>
  * up happens in the application rather than in front of it.
  */
 export default function App() {
+  useEffect(() => ownAsync(guardPresentationClose(), reportFailure), [])
   const status = useHarness((state) => state.status)
   const environment = useHarness((state) => state.environment)
   const inspect = useHarness((state) => state.inspect)
@@ -72,8 +74,8 @@ export default function App() {
   // covers the window, and a modal inside a strip 36px tall would be positioned
   // against a strip 36px tall.
   const [managing, setManaging] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() =>
-    readPreference('dsh-studio.sidebar') === 'collapsed',
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => readPreference('dsh-studio.sidebar') === 'collapsed',
   )
 
   useEffect(() => {

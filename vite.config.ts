@@ -91,6 +91,7 @@ export default defineConfig({
         'src/lib/presentation/export-background.ts',
         'src/lib/presentation/repository.ts',
         'src/lib/presentation/authoring.ts',
+        'src/lib/presentation/close-guard.ts',
         'src/state/presentation-editor.ts',
         'src/lib/attachment-save.ts',
         'src/lib/bridge.ts',

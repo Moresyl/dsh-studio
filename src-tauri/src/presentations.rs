@@ -18,6 +18,12 @@ pub struct SavedPresentation {
     revision: String,
 }
 
+#[derive(Serialize)]
+pub struct PresentationSummary {
+    id: String,
+    title: Option<String>,
+}
+
 fn failure(message: &str) -> Error {
     Error::Window(format!("presentation storage: {message}"))
 }
@@ -85,7 +91,10 @@ fn validate(document: &Value, id: &str) -> Result<()> {
     if document.get("format").and_then(Value::as_str) != Some("dsh-studio-presentation")
         || document.get("version").and_then(Value::as_u64) != Some(1)
         || document.get("id").and_then(Value::as_str) != Some(id)
-        || !document.get("title").is_some_and(Value::is_string)
+        || !document
+            .get("title")
+            .and_then(Value::as_str)
+            .is_some_and(|title| !title.trim().is_empty() && title.encode_utf16().count() <= 160)
         || !document
             .get("slides")
             .and_then(Value::as_array)
@@ -148,9 +157,22 @@ fn root() -> PathBuf {
     crate::paths::app_data_dir().join("presentations")
 }
 
+fn summaries(root: &Path) -> Result<Vec<PresentationSummary>> {
+    Ok(list(root)?
+        .into_iter()
+        .map(|id| {
+            let title = load(root, &id)
+                .ok()
+                .flatten()
+                .and_then(|saved| saved.document["title"].as_str().map(str::to_owned));
+            PresentationSummary { id, title }
+        })
+        .collect())
+}
+
 #[tauri::command]
-pub async fn presentation_list() -> Result<Vec<String>> {
-    tokio::task::spawn_blocking(|| list(&root()))
+pub async fn presentation_list() -> Result<Vec<PresentationSummary>> {
+    tokio::task::spawn_blocking(|| summaries(&root()))
         .await
         .map_err(|_| failure("list task failed"))?
 }
@@ -332,6 +354,19 @@ mod tests {
             assert!(save(&root.0, "report", &source("report", "replacement"), None).is_err());
             assert_eq!(std::fs::read(&file).unwrap(), body);
         }
+    }
+
+    #[test]
+    fn lists_titles_but_keeps_damaged_entries_identifiable() {
+        let root = Fixture::new();
+        save(&root.0, "good", &source("good", "中文标题"), None).unwrap();
+        std::fs::write(root.0.join("broken.json"), "broken").unwrap();
+        assert!(save(&root.0, "huge", &source("huge", &"a".repeat(161)), None).is_err());
+        let items = summaries(&root.0).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].id, "broken");
+        assert!(items[0].title.is_none());
+        assert_eq!(items[1].title.as_deref(), Some("中文标题"));
     }
 
     #[cfg(unix)]

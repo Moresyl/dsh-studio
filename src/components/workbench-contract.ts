@@ -3,6 +3,7 @@ import {
   History,
   Info,
   Puzzle,
+  Presentation,
   Settings,
   Smartphone,
   SquareTerminal,
@@ -12,7 +13,15 @@ import {
 import type { MessageKey } from '@/lib/i18n'
 import { ACCELERATOR } from '@/lib/platform'
 
-export type View = 'console' | 'terminal' | 'sessions' | 'plugins' | 'remote' | 'about' | 'settings'
+export type View =
+  | 'console'
+  | 'terminal'
+  | 'sessions'
+  | 'plugins'
+  | 'remote'
+  | 'about'
+  | 'settings'
+  | 'presentations'
 
 /** Rail order, which is also the order the number accelerators follow. */
 export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
@@ -22,6 +31,7 @@ export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'plugins', icon: Puzzle, label: 'nav.plugins' },
   { id: 'remote', icon: Smartphone, label: 'nav.remote' },
   { id: 'about', icon: Info, label: 'nav.about' },
+  { id: 'presentations', icon: Presentation, label: 'nav.presentations' },
 ]
 
 export const SETTINGS = { id: 'settings' as View, icon: Settings, label: 'nav.settings' as const }

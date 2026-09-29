@@ -1217,7 +1217,11 @@ export interface SavedPresentation {
   revision: string
 }
 
-export const presentationList = (): Promise<string[]> => invoke('presentation_list')
+export interface PresentationSummary {
+  id: string
+  title: string | null
+}
+export const presentationList = (): Promise<PresentationSummary[]> => invoke('presentation_list')
 export const presentationLoad = (id: string): Promise<SavedPresentation | null> =>
   invoke('presentation_load', { id })
 export const presentationSave = (

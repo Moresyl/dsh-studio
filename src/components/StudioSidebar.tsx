@@ -97,12 +97,12 @@ export function StudioSidebar({
         />
 
         <div className="my-2.5 border-t border-line" />
-        {VIEWS.filter((entry) => entry.id !== 'about').map((entry, index) => (
+        {VIEWS.filter((entry) => entry.id !== 'about').map((entry) => (
           <SidebarItem
             key={entry.id}
             icon={entry.icon}
             label={t(entry.label)}
-            hint={`${t(entry.label)}  ${ACCELERATOR}${index + 1}`}
+            hint={`${t(entry.label)}  ${ACCELERATOR}${VIEWS.indexOf(entry) + 1}`}
             collapsed={collapsed}
             active={!inHarness && view === entry.id}
             onClick={() => onSelect(entry.id)}
