@@ -8,14 +8,11 @@
 //! credentials exist is [`Access`]'s business rather than this module's: here a
 //! request is read, asked about, and either carried or refused.
 //!
-//! Why a byte relay rather than an HTTP proxy: the harness speaks HTTP, then
-//! server-sent events, then WebSocket over the same connections, and a relay
-//! that stops parsing after the first header block carries all three without
-//! having to understand any of them. The parsing that does happen is exactly
-//! what the decision needs — the request line and two headers — and the bytes
-//! that were read to get there are forwarded along with everything after.
+//! Each HTTP connection is authenticated and gets loopback-owned credentials
+//! in its first request head. Ordinary responses close the connection, so the
+//! next request cannot bypass header rewriting. Streaming responses and upgraded
+//! WebSockets keep relaying bytes until completion, shutdown or device revocation.
 
-use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,6 +22,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, OwnedSemaphorePermit, Semaphore};
 
 use super::access::Access;
+use super::upstream::Upstream;
 
 /// Cookie a device gets after pairing, and presents on every later request.
 const COOKIE: &str = "dsh_studio_remote";
@@ -62,11 +60,12 @@ pub struct Counters {
 pub async fn serve(
     listener: TcpListener,
     access: Arc<Access>,
-    upstream: SocketAddr,
+    upstream: impl Into<Upstream>,
     counters: Arc<Counters>,
     mut closing: broadcast::Receiver<()>,
     changed: broadcast::Sender<()>,
 ) {
+    let upstream = Arc::new(upstream.into());
     let permits = Arc::new(Semaphore::new(MAX_CONNECTIONS));
     loop {
         let accepted = tokio::select! {
@@ -85,6 +84,7 @@ pub async fn serve(
         };
 
         let access = Arc::clone(&access);
+        let upstream = Arc::clone(&upstream);
         let counters = Arc::clone(&counters);
         // Derived from the receiver rather than from a sender, for the reason
         // above: this task must not be able to keep the door open either.
@@ -96,7 +96,7 @@ pub async fn serve(
             relay(
                 socket,
                 access,
-                upstream,
+                &upstream,
                 counters,
                 connection_closing,
                 &changed,
@@ -116,7 +116,7 @@ fn connection_permit(permits: &Arc<Semaphore>) -> Option<OwnedSemaphorePermit> {
 async fn relay(
     mut inbound: TcpStream,
     access: Arc<Access>,
-    upstream: SocketAddr,
+    upstream: &Upstream,
     counters: Arc<Counters>,
     mut shutdown: broadcast::Receiver<()>,
     changed: &broadcast::Sender<()>,
@@ -133,7 +133,7 @@ async fn relay(
 async fn relay_open(
     inbound: &mut TcpStream,
     access: Arc<Access>,
-    upstream: SocketAddr,
+    upstream: &Upstream,
     counters: Arc<Counters>,
     changed: &broadcast::Sender<()>,
 ) {
@@ -184,7 +184,7 @@ impl Drop for ActiveConnection<'_> {
 async fn forward(
     inbound: &mut TcpStream,
     head: &Head,
-    upstream: SocketAddr,
+    upstream: &Upstream,
     device: &str,
     revocations: &mut broadcast::Receiver<String>,
 ) {
@@ -195,8 +195,8 @@ async fn forward(
     }
 }
 
-async fn forward_open(inbound: &mut TcpStream, head: &Head, upstream: SocketAddr) {
-    let Ok(mut outbound) = TcpStream::connect(upstream).await else {
+async fn forward_open(inbound: &mut TcpStream, head: &Head, upstream: &Upstream) {
+    let Ok(mut outbound) = TcpStream::connect(upstream.address).await else {
         let _ = inbound.write_all(UNAVAILABLE.as_bytes()).await;
         let _ = inbound.shutdown().await;
         return;
@@ -239,6 +239,12 @@ enum Decision {
 }
 
 fn decide(head: &Head, access: &Access) -> Decision {
+    // Check the browser's original authority before replacing Origin/Host for
+    // the loopback service. Same-site requests from a different port are not
+    // same-origin, even though the browser may attach the pairing cookie.
+    if !head.trusted_origin() {
+        return Decision::Refuse;
+    }
     // A code in the URL is the user saying which credential they mean, so a
     // stale QR presented by an already-paired phone is a refusal rather than a
     // quiet success on the cookie it happens to still hold.
@@ -271,6 +277,45 @@ struct Head {
 }
 
 impl Head {
+    fn trusted_origin(&self) -> bool {
+        for name in ["host", "origin", "sec-fetch-site"] {
+            if self
+                .headers
+                .iter()
+                .filter(|(key, _)| key.eq_ignore_ascii_case(name))
+                .count()
+                > 1
+            {
+                return false;
+            }
+        }
+        if self
+            .header("sec-fetch-site")
+            .is_some_and(|site| !matches!(site, "same-origin" | "none"))
+        {
+            return false;
+        }
+        let Some(origin) = self.header("origin") else {
+            return true;
+        };
+        let Some(host) = self.header("host") else {
+            return false;
+        };
+        let Ok(expected) = url::Url::parse(&format!("http://{host}")) else {
+            return false;
+        };
+        let Ok(offered) = url::Url::parse(origin) else {
+            return false;
+        };
+        offered.origin() == expected.origin()
+            && offered.scheme() == "http"
+            && offered.username().is_empty()
+            && offered.password().is_none()
+            && offered.path() == "/"
+            && offered.query().is_none()
+            && offered.fragment().is_none()
+    }
+
     /// The request target, e.g. `/session?id=4`.
     fn target(&self) -> &str {
         self.line.split(' ').nth(1).unwrap_or("/")
@@ -330,13 +375,16 @@ impl Head {
     /// actually bound, because a service that checks either one is checking for
     /// exactly the case where a request arrives claiming a name it does not
     /// serve — which is every request through this gateway.
-    fn rewritten(&self, upstream: SocketAddr) -> Vec<u8> {
-        let authority = upstream.to_string();
+    fn rewritten(&self, upstream: &Upstream) -> Vec<u8> {
+        let authority = upstream.address.to_string();
         let mut out = String::with_capacity(512);
         out.push_str(&self.line);
         out.push_str("\r\n");
 
         for (name, value) in &self.headers {
+            if name.eq_ignore_ascii_case("cookie") || name.eq_ignore_ascii_case("connection") {
+                continue;
+            }
             let replacement = if name.eq_ignore_ascii_case("host") {
                 Some(authority.clone())
             } else if name.eq_ignore_ascii_case("origin") {
@@ -348,6 +396,22 @@ impl Head {
             out.push_str(": ");
             out.push_str(replacement.as_deref().unwrap_or(value));
             out.push_str("\r\n");
+        }
+        if let Some(cookie) = &upstream.cookie {
+            out.push_str("Cookie: ");
+            out.push_str(cookie);
+            out.push_str("\r\n");
+        }
+        // Only the first HTTP head is rewritten. Force another authenticated
+        // gateway connection for the next request; upgraded streams keep their
+        // duplex transport, and SSE keeps streaming until its response ends.
+        if self
+            .header("upgrade")
+            .is_some_and(|value| value.eq_ignore_ascii_case("websocket"))
+        {
+            out.push_str("Connection: Upgrade\r\n");
+        } else {
+            out.push_str("Connection: close\r\n");
         }
         out.push_str("\r\n");
 
@@ -474,6 +538,59 @@ const UNAVAILABLE: &str = concat!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::SocketAddr;
+
+    #[test]
+    fn refuses_cross_origin_requests_before_spending_pairing_codes() {
+        let (access, code) = waiting();
+        for headers in [
+            "Origin: http://other\r\n",
+            "Origin: http://phone:9000\r\n",
+            "Origin: null\r\n",
+            "Sec-Fetch-Site: cross-site\r\n",
+            "Sec-Fetch-Site: same-site\r\n",
+            "Origin: http://phone\r\nOrigin: http://other\r\n",
+        ] {
+            let request = head(&format!(
+                "GET /?k={code} HTTP/1.1\r\nHost: phone\r\n{headers}\r\n"
+            ));
+            assert!(matches!(decide(&request, &access), Decision::Refuse));
+            assert!(
+                access.pairing().is_some(),
+                "rejected request spent the code"
+            );
+        }
+        let request = head(&format!("GET /?k={code} HTTP/1.1\r\nHost: phone\r\nOrigin: http://phone\r\nSec-Fetch-Site: same-origin\r\n\r\n"));
+        assert!(matches!(decide(&request, &access), Decision::Pair { .. }));
+    }
+
+    #[test]
+    fn substitutes_upstream_credentials_and_closes_ordinary_http_connections() {
+        let request = head("GET /api/session HTTP/1.1\r\nHost: phone\r\nCookie: dsh_studio_remote=phone-secret\r\nConnection: keep-alive\r\n\r\n");
+        let upstream = Upstream {
+            address: "127.0.0.1:3456".parse().expect("addr"),
+            cookie: Some("dsh-auth-test=upstream-secret".into()),
+        };
+        let text = String::from_utf8(request.rewritten(&upstream)).expect("utf8");
+        assert!(text.contains("Cookie: dsh-auth-test=upstream-secret\r\n"));
+        assert!(!text.contains("phone-secret"));
+        assert!(!text.contains("keep-alive"));
+        assert!(text.contains("Connection: close\r\n"));
+    }
+
+    #[test]
+    fn websocket_upgrade_retains_its_authenticated_duplex_transport() {
+        let request = head("GET /ws HTTP/1.1\r\nHost: phone\r\nConnection: keep-alive, Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Key: test\r\n\r\n");
+        let upstream = Upstream {
+            address: "127.0.0.1:3456".parse().expect("addr"),
+            cookie: Some("auth=secret".into()),
+        };
+        let text = String::from_utf8(request.rewritten(&upstream)).expect("utf8");
+        assert!(text.contains("Connection: Upgrade\r\n"));
+        assert!(text.contains("Cookie: auth=secret\r\n"));
+        assert!(text.contains("Sec-WebSocket-Key: test\r\n"));
+        assert!(!text.contains("Connection: close"));
+    }
 
     fn head(raw: &str) -> Head {
         let bytes = raw.as_bytes().to_vec();
@@ -639,7 +756,7 @@ mod tests {
             "GET / HTTP/1.1\r\nHost: 192.168.1.5:7000\r\nOrigin: http://192.168.1.5:7000\r\nAccept: */*\r\n\r\n",
         );
         let upstream: SocketAddr = "127.0.0.1:41234".parse().expect("addr");
-        let rewritten = String::from_utf8(request.rewritten(upstream)).expect("utf-8");
+        let rewritten = String::from_utf8(request.rewritten(&upstream.into())).expect("utf-8");
 
         assert!(rewritten.contains("Host: 127.0.0.1:41234"));
         assert!(rewritten.contains("Origin: http://127.0.0.1:41234"));
@@ -651,7 +768,7 @@ mod tests {
     fn carries_body_bytes_that_arrived_with_the_head() {
         let request = head("POST /m HTTP/1.1\r\nHost: h\r\nContent-Length: 5\r\n\r\nhello");
         let upstream: SocketAddr = "127.0.0.1:1".parse().expect("addr");
-        let rewritten = request.rewritten(upstream);
+        let rewritten = request.rewritten(&upstream.into());
         assert!(rewritten.ends_with(b"hello"));
     }
 
@@ -851,7 +968,7 @@ mod tests {
             forward(
                 &mut inbound,
                 &request,
-                upstream.local_addr().expect("addr"),
+                &upstream.local_addr().expect("addr").into(),
                 &device,
                 &mut revocations,
             ),
@@ -884,7 +1001,17 @@ mod tests {
                 let counters = Arc::clone(&counters);
                 let closing = shutdown.subscribe();
                 let address = upstream.local_addr().expect("addr");
-                async move { relay(inbound, access, address, counters, closing, &changed).await }
+                async move {
+                    relay(
+                        inbound,
+                        access,
+                        &address.into(),
+                        counters,
+                        closing,
+                        &changed,
+                    )
+                    .await
+                }
             });
             let request = if authenticated {
                 format!("GET /events HTTP/1.1\r\nHost: phone\r\nCookie: {COOKIE}={held}\r\n\r\n")

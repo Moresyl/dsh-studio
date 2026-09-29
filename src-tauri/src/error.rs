@@ -60,6 +60,9 @@ pub enum Error {
     #[error("could not open a port for remote access: {0}")]
     RemoteBind(#[source] io::Error),
 
+    #[error("could not authenticate remote access with Harness; restart Harness and try again")]
+    RemoteAuthentication,
+
     #[error("the system entropy source is unavailable, so no pairing secret can be made")]
     NoEntropy,
 

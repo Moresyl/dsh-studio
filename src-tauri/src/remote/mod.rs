@@ -27,6 +27,7 @@ pub mod commands;
 pub mod gateway;
 pub mod lan;
 pub mod qr;
+mod upstream;
 
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -198,7 +199,7 @@ impl Remote {
         origin: &str,
         suspended: Option<&Suspended>,
     ) -> Result<RemoteStatus> {
-        let upstream = upstream_from(origin)?;
+        let upstream = upstream::Upstream::authenticate(origin).await?;
         let host = suspended
             .map(|state| state.host)
             .or_else(lan::best_address)
@@ -408,13 +409,13 @@ async fn bind_listener(host: Ipv4Addr, port: u16) -> Result<TcpListener> {
 /// that makes this module safe to read. If the harness ever came up on a public
 /// interface, relaying to it would compound the mistake instead of reporting it.
 fn upstream_from(origin: &str) -> Result<SocketAddr> {
-    let malformed = || {
-        Error::Readiness(format!(
-            "the harness is serving somewhere unusable: {origin}"
-        ))
-    };
+    let malformed =
+        || Error::Readiness("the harness is serving at an unusable loopback URL".into());
 
     let url = url::Url::parse(origin).map_err(|_| malformed())?;
+    if url.scheme() != "http" || !url.username().is_empty() || url.password().is_some() {
+        return Err(malformed());
+    }
     let host = url.host_str().ok_or_else(malformed)?;
     let port = url.port_or_known_default().ok_or_else(malformed)?;
     let address: Ipv4Addr = host.parse().map_err(|_| malformed())?;
