@@ -121,10 +121,29 @@ async fn relay(
     mut shutdown: broadcast::Receiver<()>,
     changed: &broadcast::Sender<()>,
 ) {
-    let Some(head) = read_head(&mut inbound).await else {
+    // Closing access also cancels incomplete headers and upstream setup, not
+    // just connections which have already reached the streaming phase.
+    tokio::select! {
+        biased;
+        _ = shutdown.recv() => {}
+        _ = relay_open(&mut inbound, access, upstream, counters, changed) => {}
+    }
+}
+
+async fn relay_open(
+    inbound: &mut TcpStream,
+    access: Arc<Access>,
+    upstream: SocketAddr,
+    counters: Arc<Counters>,
+    changed: &broadcast::Sender<()>,
+) {
+    let Some(head) = read_head(inbound).await else {
         return;
     };
 
+    // Subscribe before authentication. A device removed after admission must
+    // remain observable even while connecting or writing to the upstream.
+    let mut revocations = access.watch_revocations();
     match decide(&head, &access) {
         Decision::Pair {
             cookie,
@@ -146,17 +165,19 @@ async fn relay(
             counters.active.fetch_add(1, Ordering::Relaxed);
             let _ = changed.send(());
 
-            forward(
-                &mut inbound,
-                &head,
-                upstream,
-                &access,
-                &device,
-                &mut shutdown,
-            )
-            .await;
-            counters.active.fetch_sub(1, Ordering::Relaxed);
+            let _active = ActiveConnection(&counters);
+            forward(inbound, &head, upstream, &device, &mut revocations).await;
         }
+    }
+}
+
+// Cancellation drops the relay future; keep accounting correct on that path
+// as well as on ordinary EOF and revocation.
+struct ActiveConnection<'a>(&'a Counters);
+
+impl Drop for ActiveConnection<'_> {
+    fn drop(&mut self) {
+        self.0.active.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -164,10 +185,17 @@ async fn forward(
     inbound: &mut TcpStream,
     head: &Head,
     upstream: SocketAddr,
-    access: &Access,
     device: &str,
-    shutdown: &mut broadcast::Receiver<()>,
+    revocations: &mut broadcast::Receiver<String>,
 ) {
+    tokio::select! {
+        biased;
+        _ = revoked(revocations, device) => {}
+        _ = forward_open(inbound, head, upstream) => {}
+    }
+}
+
+async fn forward_open(inbound: &mut TcpStream, head: &Head, upstream: SocketAddr) {
     let Ok(mut outbound) = TcpStream::connect(upstream).await else {
         let _ = inbound.write_all(UNAVAILABLE.as_bytes()).await;
         let _ = inbound.shutdown().await;
@@ -179,15 +207,7 @@ async fn forward(
         return;
     }
 
-    // Subscribed before the first byte moves, so a revocation cannot slip
-    // through the gap between deciding to relay and starting to.
-    let mut revocations = access.watch_revocations();
-
-    tokio::select! {
-        _ = shutdown.recv() => {}
-        _ = revoked(&mut revocations, device) => {}
-        _ = tokio::io::copy_bidirectional(inbound, &mut outbound) => {}
-    }
+    let _ = tokio::io::copy_bidirectional(inbound, &mut outbound).await;
 }
 
 /// Resolve when this connection's own device is forgotten.
@@ -754,11 +774,13 @@ mod tests {
         // relay's point of view.
         let silent = TcpListener::bind("127.0.0.1:0").await.expect("bind");
         let upstream = silent.local_addr().expect("addr");
+        let (arrived, received) = tokio::sync::oneshot::channel();
         tokio::spawn(async move {
-            let mut held = Vec::new();
-            while let Ok((socket, _)) = silent.accept().await {
-                held.push(socket);
-            }
+            let (mut socket, _) = silent.accept().await.expect("upstream connection");
+            let mut byte = [0u8; 1];
+            assert_eq!(socket.read(&mut byte).await.expect("request byte"), 1);
+            let _ = arrived.send(());
+            let _ = tokio::io::copy(&mut socket, &mut tokio::io::sink()).await;
         });
 
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
@@ -790,12 +812,10 @@ mod tests {
 
         // Revoke only once the relay is genuinely up, or the test would be
         // proving that a connection which never started also never continued.
-        for _ in 0..100 {
-            if counters.active.load(Ordering::Relaxed) == 1 {
-                break;
-            }
-            tokio::time::sleep(Duration::from_millis(20)).await;
-        }
+        tokio::time::timeout(Duration::from_secs(5), received)
+            .await
+            .expect("upstream received request")
+            .expect("upstream task");
         assert_eq!(counters.active.load(Ordering::Relaxed), 1, "relaying");
 
         assert!(access.forget(&device));
@@ -806,6 +826,100 @@ mod tests {
             matches!(read, Ok(Ok(0))),
             "the socket should have closed with the credential, got {read:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn revocation_between_admission_and_upstream_setup_forwards_nothing() {
+        let upstream = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let door = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+        let _phone = TcpStream::connect(door.local_addr().expect("addr"))
+            .await
+            .expect("connect");
+        let (mut inbound, _) = door.accept().await.expect("accept");
+        let (access, code) = waiting();
+        let held = access.pair(&code, "").expect("pairs");
+        let request = head(&format!(
+            "POST /action HTTP/1.1\r\nHost: phone\r\nCookie: {COOKIE}={held}\r\nContent-Length: 0\r\n\r\n"
+        ));
+        let mut revocations = access.watch_revocations();
+        let Decision::Forward { device } = decide(&request, &access) else {
+            panic!("paired device should be admitted");
+        };
+        assert!(access.forget(&device));
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            forward(
+                &mut inbound,
+                &request,
+                upstream.local_addr().expect("addr"),
+                &device,
+                &mut revocations,
+            ),
+        )
+        .await
+        .expect("revocation cancels setup");
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), upstream.accept())
+                .await
+                .is_err(),
+            "a revoked device must not open an upstream connection"
+        );
+    }
+
+    #[tokio::test]
+    async fn closing_access_cancels_incomplete_headers_and_active_streams() {
+        for authenticated in [false, true] {
+            let upstream = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+            let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
+            let mut phone = TcpStream::connect(listener.local_addr().expect("addr"))
+                .await
+                .expect("connect");
+            let (inbound, _) = listener.accept().await.expect("accept");
+            let (access, code) = waiting();
+            let held = access.pair(&code, "").expect("pairs");
+            let counters = Arc::new(Counters::default());
+            let shutdown = broadcast::channel::<()>(1).0;
+            let changed = broadcast::channel::<()>(8).0;
+            let worker = tokio::spawn({
+                let counters = Arc::clone(&counters);
+                let closing = shutdown.subscribe();
+                let address = upstream.local_addr().expect("addr");
+                async move { relay(inbound, access, address, counters, closing, &changed).await }
+            });
+            let request = if authenticated {
+                format!("GET /events HTTP/1.1\r\nHost: phone\r\nCookie: {COOKIE}={held}\r\n\r\n")
+            } else {
+                "GET /events HTTP/1.1\r\nHost:".into()
+            };
+            phone.write_all(request.as_bytes()).await.expect("write");
+            let mut upstream_socket = None;
+            if authenticated {
+                let (mut socket, _) =
+                    tokio::time::timeout(Duration::from_secs(5), upstream.accept())
+                        .await
+                        .expect("upstream connected")
+                        .expect("accept");
+                let mut byte = [0u8; 1];
+                tokio::time::timeout(Duration::from_secs(5), socket.read_exact(&mut byte))
+                    .await
+                    .expect("upstream received request")
+                    .expect("read");
+                assert_eq!(counters.active.load(Ordering::Relaxed), 1);
+                upstream_socket = Some(socket);
+            }
+            drop(shutdown);
+            tokio::time::timeout(Duration::from_secs(1), worker)
+                .await
+                .expect("closing cancels all relay phases")
+                .expect("relay task");
+            assert_eq!(counters.active.load(Ordering::Relaxed), 0);
+            let mut byte = [0u8; 1];
+            let read = tokio::time::timeout(Duration::from_secs(1), phone.read(&mut byte))
+                .await
+                .expect("phone disconnected");
+            assert!(matches!(read, Ok(0) | Err(_)), "unexpected data: {read:?}");
+            drop(upstream_socket);
+        }
     }
 
     /// Closing the door means the port stops answering, not that the next

@@ -18,6 +18,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Subscribe to remote-device revocation before admission and cancel upstream setup as well as established streams. Closing remote access also drops incomplete requests, with active connection counts cleaned up on cancellation.
 - Read current tool-role result bodies and their attachments, retain legacy nested results, and resolve tool names from recorded calls. Keep append-origin human history while excluding model-only surface replacement copies from transcript text, turn counts and duplicated usage.
 - Refresh the Studio-owned host entry and file-preview module during startup and materialize the complete integration in profile and cold-install checks, so existing compatible environments gain the preview route without reinstalling Harness.
 - Bound attachment metadata and per-message counts, report omitted records, strip local paths and display control characters from attachment names, escape attachment records in HTML exports, and include metadata in session cache accounting.
