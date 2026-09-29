@@ -333,6 +333,15 @@ export function PresentationsPane() {
                     aspect={document.aspect}
                     selected={selected}
                     onSelect={setSelected}
+                    onMove={
+                      editor.busy === 'load'
+                        ? undefined
+                        : (id, position) =>
+                            editSlide((draft) => {
+                              const target = draft.elements.find((item) => item.id === id)
+                              if (target) Object.assign(target, position)
+                            })
+                    }
                   />
                   <ValueField
                     key={`${slide.id}-notes`}

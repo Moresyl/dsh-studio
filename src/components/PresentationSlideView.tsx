@@ -1,3 +1,5 @@
+import { memo, useRef, useState, type PointerEvent } from 'react'
+import { moveFrame } from '@/lib/presentation/movement'
 import {
   presentationSize,
   type PresentationDocument,
@@ -11,23 +13,61 @@ interface Props {
   aspect: PresentationDocument['aspect']
   selected?: string | null
   onSelect?: (id: string) => void
+  onMove?: (id: string, position: { x: number; y: number }) => void
 }
 
 /** Data-only editing preview. Object order follows the saved slide's stacking order. */
-export function PresentationSlideView({ slide, aspect, selected, onSelect }: Props) {
+export function PresentationSlideView({ slide, aspect, selected, onSelect, onMove }: Props) {
   const size = presentationSize(aspect)
+  const drag = useRef<{
+    pointer: number
+    slide: string
+    element: SlideElement
+    clientX: number
+    clientY: number
+    moved: boolean
+  } | null>(null)
+  const [preview, setPreview] = useState<{
+    slide: string
+    id: string
+    x: number
+    y: number
+  } | null>(null)
+  const point = (event: PointerEvent<SVGGElement>, origin = { clientX: 0, clientY: 0 }) => {
+    try {
+      const matrix = event.currentTarget.ownerSVGElement?.getScreenCTM()
+      const inverse = matrix?.inverse()
+      // Transform a screen-space displacement, excluding the viewport translation.
+      // Selection, scrolling or resizing may change the SVG's screen origin mid-drag.
+      const value = inverse
+        ? new DOMPoint(
+            event.clientX - origin.clientX,
+            event.clientY - origin.clientY,
+            0,
+            0,
+          ).matrixTransform(inverse)
+        : null
+      return value && Number.isFinite(value.x) && Number.isFinite(value.y) ? value : null
+    } catch {
+      return null
+    }
+  }
+  const cancel = () => {
+    drag.current = null
+    setPreview(null)
+  }
   return (
     <svg
       viewBox={`0 0 ${size.width} ${size.height}`}
       className="block h-auto w-full rounded-[4px] shadow-lift"
       aria-label={slide.title}
       role={onSelect ? 'group' : 'img'}
-      style={{ background: `#${slide.background}` }}
+      style={{ background: `#${slide.background}`, touchAction: onMove ? 'none' : undefined }}
     >
       {slide.elements.map((element) => (
         <g
           key={element.id}
-          transform={`translate(${element.x} ${element.y}) rotate(${element.rotation} ${element.width / 2} ${element.height / 2})`}
+          transform={`translate(${preview?.slide === slide.id && preview.id === element.id ? preview.x : element.x} ${preview?.slide === slide.id && preview.id === element.id ? preview.y : element.y}) rotate(${element.rotation} ${element.width / 2} ${element.height / 2})`}
           role={onSelect ? 'button' : undefined}
           tabIndex={onSelect ? 0 : undefined}
           aria-label={
@@ -39,9 +79,105 @@ export function PresentationSlideView({ slide, aspect, selected, onSelect }: Pro
           }
           aria-pressed={onSelect ? selected === element.id : undefined}
           onClick={onSelect ? () => onSelect(element.id) : undefined}
+          onPointerDown={
+            onMove
+              ? (event) => {
+                  if (event.button !== 0 || drag.current) return
+                  const start = point(event)
+                  if (!start) return
+                  event.preventDefault()
+                  event.currentTarget.focus()
+                  onSelect?.(element.id)
+                  event.currentTarget.setPointerCapture(event.pointerId)
+                  drag.current = {
+                    pointer: event.pointerId,
+                    slide: slide.id,
+                    element,
+                    clientX: event.clientX,
+                    clientY: event.clientY,
+                    moved: false,
+                  }
+                }
+              : undefined
+          }
+          onPointerMove={
+            onMove
+              ? (event) => {
+                  const start = drag.current
+                  const next = start ? point(event, start) : null
+                  if (
+                    !start ||
+                    start.pointer !== event.pointerId ||
+                    start.slide !== slide.id ||
+                    !next
+                  )
+                    return
+                  if (
+                    !start.moved &&
+                    Math.hypot(event.clientX - start.clientX, event.clientY - start.clientY) < 3
+                  )
+                    return
+                  start.moved = true
+                  setPreview({
+                    slide: slide.id,
+                    id: start.element.id,
+                    ...moveFrame(start.element, size, next.x, next.y),
+                  })
+                }
+              : undefined
+          }
+          onPointerUp={
+            onMove
+              ? (event) => {
+                  const start = drag.current
+                  const next = start ? point(event, start) : null
+                  if (start && start.pointer !== event.pointerId) return
+                  cancel()
+                  if (event.currentTarget.hasPointerCapture(event.pointerId))
+                    event.currentTarget.releasePointerCapture(event.pointerId)
+                  if (
+                    !start ||
+                    !start.moved ||
+                    start.pointer !== event.pointerId ||
+                    start.slide !== slide.id ||
+                    !next
+                  )
+                    return
+                  onMove(start.element.id, moveFrame(start.element, size, next.x, next.y))
+                }
+              : undefined
+          }
+          onPointerCancel={(event) => {
+            if (drag.current?.pointer === event.pointerId) cancel()
+          }}
+          onLostPointerCapture={(event) => {
+            if (drag.current?.pointer === event.pointerId) cancel()
+          }}
           onKeyDown={
             onSelect
               ? (event) => {
+                  if (event.key === 'Escape' && drag.current) {
+                    event.preventDefault()
+                    cancel()
+                    return
+                  }
+                  const directions: Record<string, [number, number]> = {
+                    ArrowLeft: [-1, 0],
+                    ArrowRight: [1, 0],
+                    ArrowUp: [0, -1],
+                    ArrowDown: [0, 1],
+                  }
+                  const direction = directions[event.key]
+                  if (onMove && direction && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                    event.preventDefault()
+                    if (drag.current) return
+                    const step = event.shiftKey ? 10 : 1
+                    onMove(
+                      element.id,
+                      moveFrame(element, size, direction[0] * step, direction[1] * step),
+                    )
+                    return
+                  }
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault()
                     onSelect(element.id)
@@ -69,7 +205,7 @@ export function PresentationSlideView({ slide, aspect, selected, onSelect }: Pro
   )
 }
 
-function ElementView({ element }: { element: SlideElement }) {
+const ElementView = memo(function ElementView({ element }: { element: SlideElement }) {
   const { width, height } = element
   if (element.kind === 'shape') {
     const style = {
@@ -146,7 +282,7 @@ function ElementView({ element }: { element: SlideElement }) {
       )}
     </foreignObject>
   )
-}
+})
 
 function ChartView({ element }: { element: ChartElement }) {
   const { width, height, categories, series, colors } = element
