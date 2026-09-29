@@ -66,6 +66,15 @@ The priorities below are future work, not capabilities claimed for v0.9.19.
 
 ## Next priorities
 
+The current development branch also includes authorized image/text/PDF attachment
+reading and original-file saving, local presentation authoring with editable PPTX
+export, and multi-window save protection around exit/update/reload. These remain
+unreleased. Windows WebView checks and deterministic/native tests cover specific
+flows; they do not establish complete native-picker, installer or cross-platform
+GUI acceptance. PPTX import, imported personal templates, session/workspace-linked
+presentation projects, whole-process draft recovery and integrated image generation
+remain capability gaps. Public tunnel activation is not part of the shipped LAN gateway.
+
 ### Reliability and complete user flows
 
 - Maintain a per-page checklist for loading, empty, success, failure, cancellation,
