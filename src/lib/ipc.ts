@@ -971,6 +971,9 @@ export const sessionExport = (id: string, format: SessionFormat): Promise<Sessio
 export const sessionSave = (path: string, text: string): Promise<void> =>
   invoke('session_save', { path, text })
 
+export const sessionAttachmentSave = (path: string, id: string, data: string): Promise<void> =>
+  invoke('session_attachment_save', { path, id, data })
+
 /* -------------------------------------------------------------------------- */
 /* Window                                                                     */
 /* -------------------------------------------------------------------------- */

@@ -170,6 +170,28 @@ test('file bridge rejects denied and oversized text without forwarding backend e
   }
 })
 
+test('original file downloads use the authenticated binary route without requiring the image API', async () => {
+  const calls = []
+  const value = { attachmentId, bytes: 3, data: 'AP+A' }
+  const h = mount(undefined, async (url, options) => {
+    calls.push({ url, options })
+    return { ok: true, json: async () => value }
+  })
+  await h.send({ kind: 'download' })
+  assert.equal(calls.length, 1)
+  assert.equal(new URL(calls[0].url, 'http://localhost').pathname, '/api/studio/file-download')
+  assert.equal(calls[0].options.credentials, 'same-origin')
+  assert.equal(h.messages.at(-1).data.value, value)
+  h.dispose()
+  const oversized = mount(undefined, async () => ({
+    ok: true,
+    json: async () => ({ data: 'x'.repeat(27962029) }),
+  }))
+  await oversized.send({ kind: 'download' })
+  assert.equal(oversized.messages.at(-1).data.ok, false)
+  oversized.dispose()
+})
+
 test('only the initiating parent can cancel its pending file request', async () => {
   let aborted = false
   const h = mount(

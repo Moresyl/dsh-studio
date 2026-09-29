@@ -73,7 +73,12 @@ window.__ModuleLoader__.load({
         // Keep theme/workspace integration active on generations without this API.
         ctx.inject(['remote', 'remote.session'], (client) => {
           readImage = (request) => client.remote.session.attachment(request)
-          client.effect(() => () => { readImage = null }, 'dsh-studio: image API lifetime')
+          client.effect(
+            () => () => {
+              readImage = null
+            },
+            'dsh-studio: image API lifetime',
+          )
         })
         const onImage = async (event) => {
           const request = event.data
@@ -82,42 +87,90 @@ window.__ModuleLoader__.load({
             return
           }
           if (event.source !== window.parent || request?.type !== 'dsh-studio:image-read') return
-          if (request.kind !== undefined && !['image', 'file'].includes(request.kind)) return
-          if (typeof request.id !== 'string' || request.id.length > 64
-            || typeof request.sessionId !== 'string' || !request.sessionId || request.sessionId.length > 512
-            || typeof request.attachmentId !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(request.attachmentId)) return
+          if (request.kind !== undefined && !['image', 'file', 'download'].includes(request.kind)) return
+          if (
+            typeof request.id !== 'string' ||
+            request.id.length > 64 ||
+            typeof request.sessionId !== 'string' ||
+            !request.sessionId ||
+            request.sessionId.length > 512 ||
+            typeof request.attachmentId !== 'string' ||
+            !/^sha256:[a-f0-9]{64}$/.test(request.attachmentId)
+          )
+            return
           const reply = (ok, value) => {
-            if (active) window.parent.postMessage({ type: 'dsh-studio:image-result', id: request.id, ok, value }, event.origin)
+            if (active)
+              window.parent.postMessage(
+                { type: 'dsh-studio:image-result', id: request.id, ok, value },
+                event.origin,
+              )
           }
-          if (reading >= 4 || fileReads.has(request.id) || (request.kind !== 'file' && !readImage)) { reply(false); return }
+          const fileRequest = request.kind === 'file' || request.kind === 'download'
+          if (reading >= 4 || fileReads.has(request.id) || (!fileRequest && !readImage)) {
+            reply(false)
+            return
+          }
           reading += 1
           try {
-            if (request.kind === 'file') {
+            if (fileRequest) {
               const controller = new AbortController()
               const timer = setTimeout(() => controller.abort(), 20000)
               fileReads.set(request.id, controller)
               try {
-                const query = new URLSearchParams({ sessionId: request.sessionId, attachmentId: request.attachmentId })
-                const response = await fetch(`/api/studio/file-preview?${query}`, { signal: controller.signal, credentials: 'same-origin', cache: 'no-store' })
-                if (!response.ok) { reply(false); return }
+                const query = new URLSearchParams({
+                  sessionId: request.sessionId,
+                  attachmentId: request.attachmentId,
+                })
+                const route = request.kind === 'download' ? 'file-download' : 'file-preview'
+                const response = await fetch(`/api/studio/${route}?${query}`, {
+                  signal: controller.signal,
+                  credentials: 'same-origin',
+                  cache: 'no-store',
+                })
+                if (!response.ok) {
+                  reply(false)
+                  return
+                }
                 const value = await response.json()
-                if (typeof value?.text !== 'string' || value.text.length > 1048576) reply(false)
+                const content = request.kind === 'download' ? value?.data : value?.text
+                if (
+                  typeof content !== 'string' ||
+                  content.length > (request.kind === 'download' ? 27962028 : 1048576)
+                )
+                  reply(false)
                 else reply(true, value)
-              } finally { clearTimeout(timer); fileReads.delete(request.id) }
+              } finally {
+                clearTimeout(timer)
+                fileReads.delete(request.id)
+              }
               return
             }
-            const result = await readImage({ sessionId: request.sessionId, attachmentId: request.attachmentId })
-            if (!result?.ok || typeof result.value?.data !== 'string' || result.value.data.length > 27962028) reply(false)
+            const result = await readImage({
+              sessionId: request.sessionId,
+              attachmentId: request.attachmentId,
+            })
+            if (
+              !result?.ok ||
+              typeof result.value?.data !== 'string' ||
+              result.value.data.length > 27962028
+            )
+              reply(false)
             else reply(true, result.value)
-          } catch { reply(false) }
-          finally { reading -= 1 }
+          } catch {
+            reply(false)
+          } finally {
+            reading -= 1
+          }
         }
         window.addEventListener('message', onImage)
-        ctx.effect(() => () => {
-          active = false
-          for (const controller of fileReads.values()) controller.abort()
-          window.removeEventListener('message', onImage)
-        }, 'dsh-studio: authorized image preview')
+        ctx.effect(
+          () => () => {
+            active = false
+            for (const controller of fileReads.values()) controller.abort()
+            window.removeEventListener('message', onImage)
+          },
+          'dsh-studio: authorized image preview',
+        )
       }
 
       if (window.parent !== window) {
@@ -136,13 +189,16 @@ window.__ModuleLoader__.load({
         }
         window.addEventListener('message', onTheme)
         window.parent.postMessage({ type: 'dsh-studio:theme-ready' }, '*')
-        ctx.effect(() => () => {
-          window.removeEventListener('message', onTheme)
-          style.remove()
-          delete document.body.dataset.dshStudioTheme
-          document.body.toggleAttribute('data-ds-dark-theme', originalDark)
-          document.documentElement.style.colorScheme = originalColorScheme
-        }, 'dsh-studio: theme')
+        ctx.effect(
+          () => () => {
+            window.removeEventListener('message', onTheme)
+            style.remove()
+            delete document.body.dataset.dshStudioTheme
+            document.body.toggleAttribute('data-ds-dark-theme', originalDark)
+            document.documentElement.style.colorScheme = originalColorScheme
+          },
+          'dsh-studio: theme',
+        )
       }
 
       ctx.effect(

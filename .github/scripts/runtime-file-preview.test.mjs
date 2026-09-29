@@ -4,6 +4,9 @@ import test from 'node:test'
 import {
   FILE_PREVIEW_BYTES,
   FILE_PREVIEW_ROUTE,
+  FILE_DOWNLOAD_BYTES,
+  FILE_DOWNLOAD_ROUTE,
+  readFileDownload,
   readFilePreview,
   registerFilePreview,
 } from '../../src-tauri/runtime-contract/dsh-studio-integration/lib/file-preview.js'
@@ -34,6 +37,49 @@ function fixture(data = Buffer.from('中文 <script>alert(1)</script>\n')) {
 }
 const signal = () => new AbortController().signal
 const read = (f) => readFilePreview(f.ctx, 'session', f.id, signal())
+
+test('original downloads preserve binary and empty content while enforcing session references and size', async () => {
+  for (const bytes of [
+    Buffer.from([0, 255, 128, 1]),
+    Buffer.alloc(0),
+    Buffer.alloc(FILE_PREVIEW_BYTES + 1),
+  ]) {
+    const f = fixture(bytes)
+    assert.deepEqual(await readFileDownload(f.ctx, 'session', f.id, signal()), {
+      attachmentId: f.id,
+      bytes: bytes.length,
+      data: bytes.toString('base64'),
+    })
+    const route = mounted(f, FILE_DOWNLOAD_ROUTE)
+    const response = await route.fetch()
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('cache-control'), 'no-store')
+    assert.equal((await response.json()).data, bytes.toString('base64'))
+    route.dispose()
+  }
+  const f = fixture()
+  f.ref.bytes = FILE_DOWNLOAD_BYTES + 1
+  await assert.rejects(readFileDownload(f.ctx, 'session', f.id, signal()), {
+    code: 'FILE_TOO_LARGE',
+  })
+  f.events.length = 0
+  await assert.rejects(readFileDownload(f.ctx, 'session', f.id, signal()), {
+    code: 'ATTACHMENT_NOT_REFERENCED',
+  })
+  assert.equal(f.reads(), 0)
+})
+
+test('original downloads reject corrupt provider bytes before returning a response', async () => {
+  const f = fixture(Buffer.from('abc'))
+  f.ctx.attachments.readFileStream = async function* () {
+    yield Buffer.from('abd')
+  }
+  const route = mounted(f, FILE_DOWNLOAD_ROUTE)
+  const response = await route.fetch()
+  assert.equal(response.status, 422)
+  assert.deepEqual(await response.json(), { error: 'INVALID_ATTACHMENT' })
+  route.dispose()
+})
 
 test('file previews preserve literal Unicode text and empty files without host paths', async () => {
   for (const bytes of [Buffer.from('中文 <script>alert(1)</script>\n'), Buffer.alloc(0)]) {
@@ -136,14 +182,14 @@ test('cancellation prevents reads and never publishes partial bytes', async () =
   await assert.rejects(readFilePreview(f.ctx, 'session', f.id, next.signal), { name: 'AbortError' })
 })
 
-function mounted(f) {
+function mounted(f, path = FILE_PREVIEW_ROUTE) {
   let route, dispose
   registerFilePreview({
     ...f.ctx,
     connection: {
       fetch: {
         register: (value) => {
-          route = value
+          if (value.path === path) route = value
         },
       },
     },
@@ -151,7 +197,7 @@ function mounted(f) {
       dispose = setup()
     },
   })
-  assert.equal(route.path, FILE_PREVIEW_ROUTE)
+  assert.equal(route.path, path)
   assert.deepEqual(route.methods, ['GET'])
   const fetch = (query = `sessionId=session&attachmentId=${f.id}`) =>
     route.fetch(new Request(`http://localhost${route.path}?${query}`))

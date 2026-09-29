@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Loader2, RefreshCw, X } from 'lucide-react'
+import { Download, Loader2, RefreshCw, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
 import { previewImage, previewText } from '@/lib/attachment-preview'
+import { saveAttachment } from '@/lib/attachment-save'
 import { t } from '@/lib/i18n'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import type { SessionAttachment } from '@/lib/ipc'
@@ -23,6 +24,25 @@ export function AttachmentPreview({
   const [text, setText] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [revision, setRevision] = useState(0)
+  const saving = useRef<AbortController | null>(null)
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
+
+  useEffect(() => () => saving.current?.abort(), [])
+
+  const saveOriginal = async () => {
+    if (saving.current) return
+    const controller = new AbortController()
+    saving.current = controller
+    setSaveState('saving')
+    try {
+      const saved = await saveAttachment(sessionId, attachment, controller.signal)
+      if (!controller.signal.aborted) setSaveState(saved ? 'saved' : 'idle')
+    } catch {
+      if (!controller.signal.aborted) setSaveState('failed')
+    } finally {
+      if (saving.current === controller) saving.current = null
+    }
+  }
 
   useEffect(() => {
     const previous = document.activeElement
@@ -84,6 +104,18 @@ export function AttachmentPreview({
           >
             {attachment.name || t(attachment.kind === 'file' ? 'sessions.file' : 'sessions.image')}
           </h2>
+          <Button
+            variant="secondary"
+            onClick={() => void saveOriginal()}
+            disabled={saveState === 'saving'}
+          >
+            {saveState === 'saving' ? (
+              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Download size={14} aria-hidden="true" />
+            )}
+            {t('sessions.saveAttachment')}
+          </Button>
           <button
             ref={close}
             type="button"
@@ -94,6 +126,13 @@ export function AttachmentPreview({
             <X size={18} aria-hidden="true" />
           </button>
         </div>
+        {(saveState === 'saved' || saveState === 'failed') && (
+          <p role="status" className="px-5 pt-3 text-[12px] text-muted">
+            {t(
+              saveState === 'saved' ? 'sessions.attachmentSaved' : 'sessions.attachmentSaveFailed',
+            )}
+          </p>
+        )}
         <div className="grid min-h-40 min-w-0 place-items-center overflow-auto p-4">
           {failed ? (
             <div role="status" className="space-y-4 text-center text-[13px] text-muted">

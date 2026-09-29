@@ -28,6 +28,7 @@ const required = [
   'src/sessions/find.rs',
   'src/sessions/mod.rs',
   'src/sessions/read.rs',
+  'src/sessions/save_attachment.rs',
   'src/terminal/decoder.rs',
   'src/terminal/shell.rs',
   'src/updates/catalog.rs',

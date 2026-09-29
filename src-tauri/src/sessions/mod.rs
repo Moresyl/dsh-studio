@@ -24,6 +24,7 @@ pub mod commands;
 pub mod export;
 pub mod find;
 pub mod read;
+pub mod save_attachment;
 
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, HashMap};

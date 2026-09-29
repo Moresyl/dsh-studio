@@ -459,6 +459,10 @@ const en = {
   'sessions.previewImage': 'Preview image',
   'sessions.previewFile': 'Preview text',
   'sessions.fileContent': 'File content',
+  'sessions.saveAttachment': 'Save original file',
+  'sessions.attachmentSaved': 'Original file saved.',
+  'sessions.attachmentSaveFailed':
+    'Could not save the attachment. Keep Harness running, check the destination and retry. Files must be at most 20 MiB.',
   'sessions.emptyFile': 'This file is empty.',
   'sessions.filePreviewFailed':
     'The file could not be previewed. Start Harness and check access to the original attachment. Text preview supports UTF-8 files up to 1 MiB; binary files and other encodings are not supported.',
@@ -1275,6 +1279,10 @@ const zh: Record<MessageKey, string> = {
   'sessions.previewImage': '预览图片',
   'sessions.previewFile': '预览文本',
   'sessions.fileContent': '文件内容',
+  'sessions.saveAttachment': '保存原文件',
+  'sessions.attachmentSaved': '原文件已保存。',
+  'sessions.attachmentSaveFailed':
+    '附件保存失败。请保持 Harness 运行、检查保存位置后重试；文件不能超过 20 MiB。',
   'sessions.emptyFile': '这是一个空文件。',
   'sessions.filePreviewFailed':
     '无法预览文件。请启动 Harness 并确认原始附件仍可访问。文本预览支持 1 MiB 以内的 UTF-8 文件，暂不支持二进制文件或其他编码。',

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import {
   imageBlob,
   textBlob,
+  fileBlob,
+  downloadFile,
   IMAGE_LIMIT,
   previewImage,
   previewText,
@@ -17,6 +19,28 @@ const valid = () => ({
 const listeners = new Set<(event: MessageEvent) => void>()
 const disposers: Array<() => void> = []
 const signal = () => new AbortController().signal
+
+it('downloads opaque bytes through the bound frame and rejects malformed payloads', async () => {
+  await expect(downloadFile('s', id, signal())).rejects.toThrow('Start Harness')
+  const c = connection()
+  const waiting = downloadFile('s', id, signal())
+  expect(c.postMessage.mock.calls[0]?.[0].kind).toBe('download')
+  c.reply({ value: { attachmentId: id, bytes: 3, data: 'AP+A' } })
+  const blob = await waiting
+  expect(blob.type).toBe('application/octet-stream')
+  expect([...new Uint8Array(await blob.arrayBuffer())]).toEqual([0, 255, 128])
+  for (const patch of [
+    { attachmentId: 'other' },
+    { bytes: -1 },
+    { bytes: IMAGE_LIMIT + 1 },
+    { bytes: 2 },
+    { data: '!' },
+    { data: 'AP+A\n' },
+  ]) {
+    expect(() => fileBlob({ attachmentId: id, bytes: 3, data: 'AP+A', ...patch }, id)).toThrow()
+  }
+  expect(fileBlob({ attachmentId: id, bytes: 0, data: '' }, id).size).toBe(0)
+})
 function connection() {
   const postMessage = vi.fn()
   const peer = { postMessage } as unknown as Window

@@ -67,11 +67,33 @@ export function textBlob(value: unknown, expected: string): Blob {
   return blob
 }
 
+/** Downloads remain opaque bytes: do not interpret HTML, scripts or documents. */
+export function fileBlob(value: unknown, expected: string): Blob {
+  const reply = value as { attachmentId?: unknown; bytes?: number; data?: unknown } | null
+  if (
+    !reply ||
+    reply.attachmentId !== expected ||
+    !Number.isSafeInteger(reply.bytes) ||
+    reply.bytes! < 0 ||
+    reply.bytes! > IMAGE_LIMIT ||
+    typeof reply.data !== 'string' ||
+    reply.data.length > Math.ceil(IMAGE_LIMIT / 3) * 4
+  ) {
+    throw new Error('Invalid file download')
+  }
+  const raw = atob(reply.data)
+  if (raw.length !== reply.bytes || btoa(raw) !== reply.data)
+    throw new Error('Invalid file download encoding')
+  return new Blob([Uint8Array.from(raw, (character) => character.charCodeAt(0))], {
+    type: 'application/octet-stream',
+  })
+}
+
 type ReadImage = (
   sessionId: string,
   attachmentId: string,
   signal: AbortSignal,
-  kind?: 'image' | 'file',
+  kind?: 'image' | 'file' | 'download',
 ) => Promise<Blob>
 let reader: ReadImage | null = null
 
@@ -91,6 +113,15 @@ export function previewText(
 ): Promise<Blob> {
   if (!reader) return Promise.reject(new Error('Start Harness before previewing a file'))
   return reader(sessionId, attachmentId, signal, 'file')
+}
+
+export function downloadFile(
+  sessionId: string,
+  attachmentId: string,
+  signal: AbortSignal,
+): Promise<Blob> {
+  if (!reader) return Promise.reject(new Error('Start Harness before saving an attachment'))
+  return reader(sessionId, attachmentId, signal, 'download')
 }
 
 /** Bound to one exact iframe generation; teardown rejects all outstanding reads. */
@@ -120,7 +151,7 @@ export function serveImagePreview(peer: Window, origin: string): () => void {
         if (!pending.delete(id)) return
         clearTimeout(timer)
         signal.removeEventListener('abort', abort)
-        if (error && kind === 'file') {
+        if (error && kind !== 'image') {
           try {
             peer.postMessage({ type: 'dsh-studio:preview-cancel', id }, origin)
           } catch {
@@ -130,7 +161,8 @@ export function serveImagePreview(peer: Window, origin: string): () => void {
         if (error) reject(error)
         else {
           try {
-            resolve(kind === 'file' ? textBlob(data, attachmentId) : imageBlob(data, attachmentId))
+            const decode = kind === 'file' ? textBlob : kind === 'download' ? fileBlob : imageBlob
+            resolve(decode(data, attachmentId))
           } catch (cause) {
             reject(cause)
           }

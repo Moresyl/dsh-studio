@@ -42,6 +42,7 @@ export default defineConfig({
       // composition is verified by typecheck/build and desktop smoke tests.
       include: [
         'src/lib/attachment-preview.ts',
+        'src/lib/attachment-save.ts',
         'src/lib/bridge.ts',
         'src/lib/crash.ts',
         'src/lib/errors.ts',

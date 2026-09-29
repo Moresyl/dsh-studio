@@ -209,6 +209,7 @@ pub fn run() {
             sessions::commands::session_archive,
             sessions::commands::session_export,
             sessions::commands::session_save,
+            sessions::save_attachment::session_attachment_save,
             startup::startup_state,
             startup::startup_autostart,
             startup::startup_shortcut,

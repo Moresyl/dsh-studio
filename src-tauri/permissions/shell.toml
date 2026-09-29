@@ -89,6 +89,7 @@ commands.allow = [
     "session_read",
     "session_roster",
     "session_save",
+    "session_attachment_save",
     "session_search",
     "startup_autostart",
     "startup_harness_port",
