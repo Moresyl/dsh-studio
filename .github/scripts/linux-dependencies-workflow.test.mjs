@@ -5,12 +5,14 @@ import { join } from 'node:path'
 import test from 'node:test'
 
 const sources = await Promise.all(
-  ['ci.yml', 'release.yml'].map((name) => readFile(`.github/workflows/${name}`, 'utf8')),
+  ['ci.yml', 'release.yml', 'packaging.yml'].map((name) =>
+    readFile(`.github/workflows/${name}`, 'utf8'),
+  ),
 )
 const commands = sources.flatMap((source) => source.match(/sudo find \/etc\/apt[^\n]+/g) ?? [])
 
 test('every Linux dependency bootstrap repairs both APT source and mirror-list files', () => {
-  assert.equal(commands.length, 4)
+  assert.equal(commands.length, 5)
   for (const command of commands) {
     for (const pattern of ["-name '*.list'", "-name '*.sources'", "-name '*mirrors.txt'"]) {
       assert(command.includes(pattern), `missing source form: ${pattern}`)
@@ -48,7 +50,7 @@ test('APT index and package downloads have retries and bounded network waits', (
   const downloads = sources.flatMap(
     (source) => source.match(/sudo apt-get (?:update|install)[^\n]+/g) ?? [],
   )
-  assert.equal(downloads.length, 8)
+  assert.equal(downloads.length, 10)
   for (const command of downloads) {
     assert(command.includes('Acquire::Retries=3'))
     assert(command.includes('Acquire::http::Timeout=30'))

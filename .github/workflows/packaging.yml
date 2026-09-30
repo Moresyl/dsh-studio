@@ -110,8 +110,9 @@ jobs:
         with:
           name: package-channel-manifests
       - run: |
-          sudo apt-get update
-          sudo apt-get install -y appstream-compose flatpak flatpak-builder
+          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' -o -name '*mirrors.txt' \) -exec sed -i 's|http[s]*://azure[.]archive[.]ubuntu[.]com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 appstream-compose flatpak flatpak-builder
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.flatpak.Builder org.gnome.Platform//49 org.gnome.Sdk//49
           flatpak-builder --user --force-clean --disable-rofiles-fuse build-dir packaging/flathub/io.github.moresyl.dshstudio.yml
