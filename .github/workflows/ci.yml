@@ -80,9 +80,9 @@ jobs:
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
-          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
-          sudo apt-get update -o Acquire::Retries=3
-          sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
+          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' -o -name '*mirrors.txt' \) -exec sed -i 's|http[s]*://azure[.]archive[.]ubuntu[.]com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
 
       - name: Cold Rust check without generated frontend bundle
         run: cargo check --manifest-path src-tauri/Cargo.toml --workspace
@@ -124,8 +124,8 @@ jobs:
       - uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install Linux dependencies
         run: |
-          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' \) -exec sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
-          sudo apt-get update -o Acquire::Retries=3
-          sudo apt-get install -y libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
+          sudo find /etc/apt -type f \( -name '*.list' -o -name '*.sources' -o -name '*mirrors.txt' \) -exec sed -i 's|http[s]*://azure[.]archive[.]ubuntu[.]com/ubuntu|https://archive.ubuntu.com/ubuntu|g' {} +
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 libayatana-appindicator3-dev librsvg2-dev libwebkit2gtk-4.1-dev
       - run: cargo llvm-cov --manifest-path src-tauri/Cargo.toml --workspace --json --output-path src-tauri/target/llvm-cov.json
       - run: node .github/scripts/verify-rust-coverage.mjs

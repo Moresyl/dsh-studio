@@ -10,6 +10,7 @@ pre-1.0 caveat that anything may still move.
 ## [Unreleased]
 
 - Prepare a single draft before the release build matrix and bind every Tauri upload to its numeric ID, preventing concurrent platforms from creating same-tag drafts with split artifact inventories.
+- Include Ubuntu mirror-list files when replacing the unavailable Azure APT endpoint and bound HTTP/HTTPS requests, preventing Linux CI setup from hanging before tests run.
 
 ## [0.9.21] — 2026-09-30
 
