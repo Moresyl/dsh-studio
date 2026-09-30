@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import test from 'node:test'
 
 const source = await readFile('.github/workflows/release.yml', 'utf8')
@@ -113,4 +115,45 @@ test('creates one shared draft before concurrent builds and binds uploads to its
   assert.match(preparation, /echo "release_id=\$release_id" >> "\$GITHUB_OUTPUT"/)
   assert.match(builds, /releaseId: \$\{\{ needs\.prepare-release\.outputs\.release_id \}\}/)
   assert.ok(preparation.indexOf('gh release create') < preparation.indexOf('asset_ids='))
+})
+
+test('waits for draft list visibility without creating another release or retrying ambiguity', () => {
+  const retry = preparation.match(/for attempt in \{1\.\.10\}; do[\s\S]*?\n +done/)?.[0]
+  assert.ok(retry, 'bounded draft visibility retry missing')
+  assert.doesNotMatch(retry, /gh release create/)
+  const guard = preparation.match(/if \[ -z "\$existing_release" \] \|\|[\s\S]*?\n +fi/)?.[0]
+  assert.ok(guard, 'unique draft identity guard missing')
+  const bash =
+    process.platform === 'win32' ? join(process.env.ProgramFiles, 'Git', 'bin', 'bash.exe') : 'bash'
+  for (const [visibility, expected] of [
+    ['delayed', '400208805|true'],
+    ['never', 'rejected'],
+    ['ambiguous', 'rejected'],
+  ]) {
+    const script = `
+      set -e
+      gh() {
+        if [ "$1" = release ]; then exit 99; fi
+        case "$VISIBILITY" in
+          delayed) if [ "$attempt" -ge 3 ]; then printf '400208805|true'; fi ;;
+          ambiguous) printf '400208805|true\\n400208806|true' ;;
+        esac
+      }
+      sleep() { :; }
+      tag=v0.9.22
+      existing_release=
+      ${retry}
+      if ( ${guard} ) >/dev/null; then
+        printf '%s' "$existing_release"
+      else
+        printf rejected
+      fi
+      printf '\\n%s' "$attempt"
+    `
+    const result = execFileSync(bash, ['-c', script], {
+      encoding: 'utf8',
+      env: { ...process.env, VISIBILITY: visibility },
+    })
+    assert.equal(result, `${expected}\n${{ delayed: 3, never: 10, ambiguous: 1 }[visibility]}`)
+  }
 })

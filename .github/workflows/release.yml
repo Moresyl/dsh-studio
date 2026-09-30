@@ -160,7 +160,12 @@ jobs:
             # Matrix builds must not race to create their own same-tag drafts.
             node .github/scripts/release-notes.mjs > release-body.md
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --title "DSH Studio $tag" --notes-file release-body.md --draft
-            existing_release="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | join(\"|\")")"
+            # A newly created draft may take a few seconds to appear in the list API.
+            for attempt in {1..10}; do
+              existing_release="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | join(\"|\")")"
+              if [ -n "$existing_release" ]; then break; fi
+              if [ "$attempt" -lt 10 ]; then sleep 2; fi
+            done
           fi
           if [ -z "$existing_release" ] || [[ "$existing_release" == *$'\n'* ]]; then
             echo "::error title=Ambiguous draft release::$tag must identify exactly one shared draft before platform builds."
