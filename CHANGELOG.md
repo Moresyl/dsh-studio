@@ -9,6 +9,16 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Fixes and polish
+
+- Fix module-resolution stalls during runtime installation, repair and startup on newer Node releases. Continue ESM resolution directly and guard synchronous CommonJS re-entry while preserving import / require conditional exports, Profile extension fallback and managed runtime precedence.
+- Keep custom window controls above error and recovery dialogs so their backdrops cannot intercept close, minimize or maximize clicks; preserve unsaved-document protection.
+
+### Verification
+
+- Add hook-depth, conditional-export, missing-package recovery, Profile extension and third-party fallback regressions. Cold installation and full Profile boot CI cover Node 22.19.0 and 24.21.0 on Windows, Linux and macOS.
+- Reproduce the old resolver's silent 120-second timeout on Windows / Node 24.21.0; the same Harness 0.1.7-rc.2 environment passes full boot checks in about 26 seconds with the fix. Harness 0.1.1-rc.2 also passes native installation and real boot verification. Add window-control stacking, native action dispatch and document-close protection regressions; actual GUI click acceptance remains pending.
+
 ## [0.9.20] — 2026-09-30
 
 ### Changed

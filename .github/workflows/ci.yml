@@ -33,11 +33,12 @@ jobs:
         run: cargo audit --file src-tauri/Cargo.lock
 
   runtime-contract:
-    name: Cold runtime install and full profile boot (${{ matrix.os }})
+    name: Cold runtime install and full profile boot (${{ matrix.os }}, Node ${{ matrix.node }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-22.04, windows-2025, macos-15]
+        node: [22.19.0, 24.21.0]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -47,8 +48,9 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v5
         with:
-          node-version: 22.19.0
+          node-version: ${{ matrix.node }}
           package-manager-cache: false
+      - run: node --test .github/scripts/runtime-resolver.test.mjs
       - run: node .github/scripts/verify-runtime-install.mjs
 
   test:

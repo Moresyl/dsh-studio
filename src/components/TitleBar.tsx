@@ -128,7 +128,7 @@ export function TitleBar({
     <header
       data-tauri-drag-region
       onContextMenu={drawsWindowControls ? windowMenu : undefined}
-      className="relative z-20 flex h-9 shrink-0 items-center border-b border-line bg-canvas select-none"
+      className="relative flex h-9 shrink-0 items-center border-b border-line bg-canvas select-none"
       style={isMac ? { paddingLeft: TRAFFIC_LIGHT_INSET } : undefined}
     >
       <div
@@ -202,7 +202,13 @@ export function TitleBar({
       </div>
 
       {drawsWindowControls && (
-        <div className="flex items-stretch self-stretch">
+        // Window controls must remain reachable above errors and recovery
+        // dialogs. Keep the header out of a stacking context so only these
+        // controls, rather than workspace navigation, rise above the backdrop.
+        <div
+          data-window-controls
+          className="relative z-60 flex items-stretch self-stretch bg-canvas"
+        >
           <ControlButton
             label={t('window.minimize')}
             onClick={() => void reportAction(() => appWindow.minimize())}

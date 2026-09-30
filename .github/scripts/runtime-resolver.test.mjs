@@ -32,6 +32,7 @@ function runFixture(resolver, entry) {
   return spawnSync(process.execPath, ['--require', resolver, entry], {
     encoding: 'utf8',
     windowsHide: true,
+    timeout: 10_000,
   })
 }
 
@@ -68,6 +69,24 @@ test('runtime resolver supplies only managed official Harness packages', async (
     const thirdParty = runFixture(resolver, thirdPartyEntry)
     assert.notEqual(thirdParty.status, 0)
     assert.match(thirdParty.stderr, /Cannot find package 'third-party-resolver-fixture'/)
+
+    await writePackage(profile, 'third-party-resolver-fixture', 'profile-third-party')
+    await writeFile(
+      thirdPartyEntry,
+      "import marker from 'third-party-resolver-fixture'; console.log(marker)\n",
+    )
+    const localThirdParty = runFixture(resolver, thirdPartyEntry)
+    assert.equal(localThirdParty.status, 0, localThirdParty.stderr)
+    assert.equal(localThirdParty.stdout.trim(), 'profile-third-party')
+
+    await writePackage(profile, '@deepseek-ai/dsh-extension-fixture', 'profile-extension')
+    await writeFile(
+      officialEntry,
+      "import marker from '@deepseek-ai/dsh-extension-fixture'; console.log(marker)\n",
+    )
+    const extension = runFixture(resolver, officialEntry)
+    assert.equal(extension.status, 0, extension.stderr)
+    assert.equal(extension.stdout.trim(), 'profile-extension')
   } finally {
     await rm(root, { recursive: true, force: true })
   }
@@ -99,6 +118,65 @@ test('runtime resolver rejects Profile version skew for official packages', asyn
     const loaded = runFixture(resolver, entry)
     assert.equal(loaded.status, 0, loaded.stderr)
     assert.equal(loaded.stdout.trim(), 'managed')
+  } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+test('runtime resolver bounds hook re-entry and preserves import and require export conditions', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'dsh-studio-runtime-resolver-hooks-'))
+  try {
+    const managed = join(root, 'managed')
+    const resolver = join(
+      managed,
+      'node_modules',
+      '@moresyl',
+      'dsh-studio-integration',
+      'lib',
+      'runtime-resolver.cjs',
+    )
+    await mkdir(dirname(resolver), { recursive: true })
+    await copyFile(resolverSource, resolver)
+    const name = '@deepseek-ai/dsh-resolver-fixture'
+    await writePackage(managed, name, 'import')
+    const directory = join(managed, 'node_modules', ...name.split('/'))
+    await writeFile(
+      join(directory, 'package.json'),
+      JSON.stringify({
+        name,
+        type: 'module',
+        exports: { import: './index.js', require: './index.cjs' },
+      }),
+    )
+    await writeFile(join(directory, 'index.cjs'), "module.exports = 'require'\n")
+    const profile = join(root, 'profile')
+    await mkdir(profile)
+    const entry = join(profile, 'entry.mjs')
+    await writeFile(
+      entry,
+      `
+import assert from 'node:assert/strict'
+import { createRequire, registerHooks } from 'node:module'
+let depth = 0
+let maximum = 0
+registerHooks({ resolve(specifier, context, nextResolve) {
+  depth++
+  maximum = Math.max(maximum, depth)
+  try { return nextResolve(specifier, context) } finally { depth-- }
+} })
+const imported = await import('${name}')
+assert.equal(maximum, 1, 'the managed resolver must not re-enter its own hook chain')
+const required = createRequire(import.meta.url)('${name}')
+assert.ok(maximum <= 2, 'CommonJS managed resolution must stop at the re-entry guard')
+assert.equal(imported.default, 'import')
+assert.equal(required, 'require')
+const require = createRequire(import.meta.url)
+assert.throws(() => require('@deepseek-ai/dsh-missing-fixture'), { code: 'MODULE_NOT_FOUND' })
+assert.equal(require('${name}'), 'require', 'a failed resolution must release the guard')
+`,
+    )
+    const loaded = runFixture(resolver, entry)
+    assert.equal(loaded.status, 0, loaded.stderr || String(loaded.error))
   } finally {
     await rm(root, { recursive: true, force: true })
   }
