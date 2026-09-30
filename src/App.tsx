@@ -421,7 +421,7 @@ export default function App() {
               )}
               {/* Hidden rather than unmounted so pane state survives a visit to Harness. */}
               {inspected && needsWorkbench(origin !== null, presentation, workbenchLoaded) && (
-                <Workbench hidden={!showPanel} view={view} />
+                <Workbench hidden={!showPanel} view={view} onView={show} />
               )}
             </div>
           </div>

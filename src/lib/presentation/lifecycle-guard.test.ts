@@ -14,6 +14,7 @@ vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => mocks }))
 vi.mock('@/state/failure', () => ({ reportFailure: mocks.reportFailure }))
 import { guardApplicationLifecycle } from './lifecycle-guard'
 import { usePresentationEditor } from '@/state/presentation-editor'
+import { useLibrary } from '@/state/library'
 import { fixture } from './fixtures.test-support'
 const prepare = (id: string) => mocks.onLifecyclePrepare.mock.calls[0]![0](id)
 const release = (id: string) => mocks.onLifecycleRelease.mock.calls[0]![0](id)
@@ -31,8 +32,26 @@ beforeEach(() => {
   mocks.applicationLifecycleState.mockResolvedValue(null)
   mocks.show.mockResolvedValue(undefined)
   usePresentationEditor.setState({ document: null, saved: null, busy: null })
+  useLibrary.setState({ editing: false, busy: false })
 })
 afterEach(() => vi.unstubAllGlobals())
+
+it('refuses an open personal editor or pending save without locking the deck', async () => {
+  const stop = await guardApplicationLifecycle()
+  useLibrary.setState({ editing: true })
+  prepare('editing')
+  expect(mocks.applicationLifecycleReply).toHaveBeenCalledWith('editing', false)
+  expect(usePresentationEditor.getState().busy).toBeNull()
+  release('editing')
+  useLibrary.setState({ editing: false, busy: true })
+  prepare('saving')
+  expect(mocks.applicationLifecycleReply).toHaveBeenCalledWith('saving', false)
+  release('saving')
+  useLibrary.setState({ busy: false })
+  prepare('ready')
+  expect(mocks.applicationLifecycleReply).toHaveBeenCalledWith('ready', true)
+  stop()
+})
 
 it('holds editing until its matching release and coalesces repeated prepare', async () => {
   const stop = await guardApplicationLifecycle()

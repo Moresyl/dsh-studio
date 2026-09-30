@@ -4,6 +4,8 @@ import {
   Archive,
   ArchiveRestore,
   Bot,
+  Bookmark,
+  Pin,
   Braces,
   Check,
   ChevronDown,
@@ -35,6 +37,14 @@ import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
 import { Segmented } from '@/components/Segmented'
 import { UsageReport } from '@/components/UsageReport'
+import { SessionActions } from '@/components/SessionOrganizer'
+import {
+  annotationMatches,
+  emptyAnnotation,
+  organizeSessions,
+  sessionTitle,
+  useLibrary,
+} from '@/state/library'
 import { count, day, filesize, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { attachmentPreviewKind } from '@/lib/attachment-kind'
@@ -167,6 +177,12 @@ export function SessionsPane() {
 
   const field = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
+  const annotations = useLibrary((state) => state.data.sessions)
+  const loadLibrary = useLibrary((state) => state.load)
+  const libraryError = useLibrary((state) => state.error)
+  const [pinned, setPinned] = useState(false)
+  const [tag, setTag] = useState('')
+  const [order, setOrder] = useState<'recent' | 'oldest' | 'title'>('recent')
   /** The line an opened session should land on, when a quote is what opened it. */
   const [anchor, setAnchor] = useState<number | null>(null)
   // The statement is a second reading of the same shelf, not a seventh pane in
@@ -175,7 +191,8 @@ export function SessionsPane() {
 
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    void loadLibrary()
+  }, [refresh, loadLibrary])
 
   useEffect(() => {
     if (searchRequest === 0) return
@@ -191,18 +208,29 @@ export function SessionsPane() {
 
   const listed = useMemo(
     () =>
-      (cards ?? []).filter(
-        (card) =>
-          (project === null || card.project === project) &&
-          (tab === 'archived' ? archived.includes(card.id) : !archived.includes(card.id)),
+      organizeSessions(
+        (cards ?? []).filter(
+          (card) =>
+            (project === null || card.project === project) &&
+            (tab === 'archived' ? archived.includes(card.id) : !archived.includes(card.id)),
+        ),
+        annotations,
+        tab === 'usage' ? {} : { pinned, tag, order },
       ),
-    [archived, cards, project, tab],
+    [archived, cards, project, tab, annotations, pinned, tag, order],
   )
 
-  const visibleHits = useMemo(
-    () => hits?.filter((hit) => listed.some((card) => card.id === hit.card.id)) ?? hits,
-    [hits, listed],
-  )
+  const visibleHits = useMemo(() => {
+    if (!hits) return hits
+    const visible = hits.filter((hit) => listed.some((card) => card.id === hit.card.id))
+    const matched = new Set(visible.map((hit) => hit.card.id))
+    return [
+      ...visible,
+      ...listed
+        .filter((card) => !matched.has(card.id) && annotationMatches(card, annotations, asked))
+        .map((card) => ({ card, matches: 0, marks: [] })),
+    ]
+  }, [hits, listed, annotations, asked])
 
   const reach = useMemo(() => projects(cards ?? []), [cards])
 
@@ -266,6 +294,7 @@ export function SessionsPane() {
       </PaneHeader>
 
       {listed.some((card) => card.limited) && <Warning message={t('sessions.limitedShelf')} />}
+      {libraryError && <Warning message={libraryError} />}
 
       {tab === 'usage' ? (
         <UsageReport cards={listed} onOpen={(id) => show(id, null)} />
@@ -315,6 +344,47 @@ export function SessionsPane() {
               </label>
 
               <Filter project={project} reach={reach} onPick={(picked) => void narrow(picked)} />
+            </div>
+          </div>
+
+          <div className="shrink-0 px-6 pb-3">
+            <div className={`${COLUMN} flex flex-wrap items-center gap-2`}>
+              <Button
+                variant={pinned ? 'secondary' : 'ghost'}
+                size="sm"
+                aria-pressed={pinned}
+                onClick={() => setPinned(!pinned)}
+              >
+                <Pin />
+                {t('organize.pinned')}
+              </Button>
+              <FilterTags
+                value={tag}
+                values={[
+                  ...new Set((cards ?? []).flatMap((card) => annotations[card.id]?.tags ?? [])),
+                ].sort()}
+                onChange={setTag}
+              />
+              <button
+                type="button"
+                className="select-trigger"
+                aria-haspopup="menu"
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect()
+                  useMenu.getState().show(
+                    box.left,
+                    box.bottom + 4,
+                    (['recent', 'oldest', 'title'] as const).map((value) => ({
+                      label: t(`organize.order.${value}`),
+                      selected: value === order,
+                      run: () => setOrder(value),
+                    })),
+                  )
+                }}
+              >
+                {t(`organize.order.${order}`)}
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
             </div>
           </div>
 
@@ -447,6 +517,8 @@ interface EntryProps {
 
 /** One session in the list: what was asked, where, and what it cost. */
 function Entry({ card, matches, marks, onOpen }: EntryProps) {
+  const annotations = useLibrary((state) => state.data.sessions)
+  const item = annotations[card.id]
   return (
     <li>
       <div
@@ -455,6 +527,7 @@ function Entry({ card, matches, marks, onOpen }: EntryProps) {
         onClick={() => onOpen(null)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' || event.key === ' ') {
+            if (event.target !== event.currentTarget) return
             event.preventDefault()
             onOpen(null)
           }
@@ -464,7 +537,7 @@ function Entry({ card, matches, marks, onOpen }: EntryProps) {
         <div className={`${COLUMN} flex flex-col gap-1`}>
           <div className="flex items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-ui-base font-medium text-text">
-              {card.title || t('sessions.untitled')}
+              {sessionTitle(card, annotations) || t('sessions.untitled')}
             </span>
             {card.delegated && (
               <Badge data-hint={t('sessions.delegatedHint')}>{t('sessions.delegated')}</Badge>
@@ -477,7 +550,19 @@ function Entry({ card, matches, marks, onOpen }: EntryProps) {
             <span className="shrink-0 text-ui-sm text-faint tabular-nums">
               {when(card.touched)}
             </span>
+            <SessionActions card={card} />
           </div>
+
+          {!!item?.tags.length && (
+            <div className="flex flex-wrap gap-1">
+              {item.tags.map((label) => (
+                <Badge key={label}>{label}</Badge>
+              ))}
+            </div>
+          )}
+          {!!item?.note && (
+            <p className="line-clamp-2 text-ui-sm leading-relaxed text-muted">{item.note}</p>
+          )}
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-faint">
             <span className="truncate" data-hint={card.project || undefined}>
@@ -538,13 +623,19 @@ interface ReaderProps {
 
 /** One session, read back in full. */
 function Reader({ card, lines, anchor, onBack }: ReaderProps) {
+  const annotations = useLibrary((state) => state.data.sessions)
+  const [bookmarksOnly, setBookmarksOnly] = useState(false)
+  const bookmarks = card ? (annotations[card.id]?.bookmarks ?? []) : []
+  const shownLines = bookmarksOnly
+    ? (lines ?? []).filter((line) => bookmarks.includes(line.seq))
+    : (lines ?? [])
   const error = useSessions((state) => state.error)
   const archiving = useSessions((state) => state.archiving)
   const archived = useSessions((state) => state.archived)
   const archive = useSessions((state) => state.archive)
   const body = useRef<HTMLDivElement>(null)
   const [requestedPage, setRequestedPage] = useState<number | null>(null)
-  const page = sessionPage(lines ?? [], requestedPage, anchor)
+  const page = sessionPage(shownLines, requestedPage, anchor)
 
   // The point of a search result is the moment inside the session, so arriving
   // at the top of a thousand-line transcript would be arriving nowhere.
@@ -571,11 +662,25 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col bg-canvas">
       <PaneHeader
-        title={card ? card.title || t('sessions.untitled') : t('sessions.opening')}
+        title={
+          card ? sessionTitle(card, annotations) || t('sessions.untitled') : t('sessions.opening')
+        }
         subtitle={card?.project ? leaf(card.project) : undefined}
         subtitleHint={card?.project}
       >
         {card && <Export id={card.id} />}
+        {card && <SessionActions card={card} />}
+        <Button
+          variant="secondary"
+          aria-pressed={bookmarksOnly}
+          onClick={() => {
+            setBookmarksOnly(!bookmarksOnly)
+            setRequestedPage(null)
+          }}
+        >
+          <Bookmark />
+          {t('organize.bookmarks', { count: bookmarks.length })}
+        </Button>
 
         {card && (
           <Button
@@ -619,8 +724,14 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
       )}
 
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto">
-        {lines ? (
-          lines
+        {lines && bookmarksOnly && shownLines.length === 0 ? (
+          <Empty
+            icon={Bookmark}
+            message={t('organize.noBookmarks')}
+            hint={t('organize.noBookmarksHint')}
+          />
+        ) : lines ? (
+          shownLines
             .slice(page.start, page.end)
             .map((line, index) => (
               <Turn
@@ -644,7 +755,7 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
               {t('sessions.page.range', {
                 start: page.start + 1,
                 end: page.end,
-                total: lines.length,
+                total: shownLines.length,
               })}
             </span>
             {[
@@ -775,6 +886,9 @@ function Spend({ tokens }: { tokens: Tokens }) {
 
 /** One line of the transcript, long ones folded until asked for. */
 function Turn({ line, lit, sessionId }: { line: SessionLine; lit: boolean; sessionId: string }) {
+  const item = useLibrary((state) => state.data.sessions[sessionId]) ?? emptyAnnotation()
+  const marked = item.bookmarks.includes(line.seq)
+  const disabled = useLibrary((state) => state.busy || !state.loaded)
   const [shown, setShown] = useState(false)
   const [preview, setPreview] = useState<SessionAttachment | null>(null)
   const Icon = MARKER[line.role]
@@ -810,6 +924,21 @@ function Turn({ line, lit, sessionId }: { line: SessionLine; lit: boolean; sessi
           {line.time > 0 && (
             <span className="ml-auto text-ui-xs text-faint tabular-nums">{clock(line.time)}</span>
           )}
+          <IconButton
+            icon={Bookmark}
+            size="xs"
+            label={t(marked ? 'organize.unbookmark' : 'organize.bookmark')}
+            aria-pressed={marked}
+            disabled={disabled}
+            className={marked ? 'text-text' : 'text-faint'}
+            onClick={() =>
+              void useLibrary.getState().annotate(sessionId, {
+                bookmarks: marked
+                  ? item.bookmarks.filter((seq) => seq !== line.seq)
+                  : [...item.bookmarks, line.seq],
+              })
+            }
+          />
         </div>
 
         <p
@@ -944,6 +1073,40 @@ function Filter({
     >
       <span className="truncate">{project ? leaf(project) : t('sessions.allProjects')}</span>
       <ChevronDown size={14} strokeWidth={2} className="shrink-0 opacity-55" aria-hidden="true" />
+    </button>
+  )
+}
+
+function FilterTags({
+  value,
+  values,
+  onChange,
+}: {
+  value: string
+  values: string[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      className="select-trigger max-w-[180px]"
+      aria-haspopup="menu"
+      aria-label={t('organize.tags')}
+      onClick={(event) => {
+        const box = event.currentTarget.getBoundingClientRect()
+        useMenu.getState().show(
+          box.left,
+          box.bottom + 4,
+          ['', ...values].map((tag) => ({
+            label: tag || t('organize.allTags'),
+            selected: tag === value,
+            run: () => onChange(tag),
+          })),
+        )
+      }}
+    >
+      <span className="truncate">{value || t('organize.allTags')}</span>
+      <ChevronDown size={14} aria-hidden="true" />
     </button>
   )
 }

@@ -41,6 +41,7 @@ import { usePlugins } from '@/state/plugins'
 import { switchProfile, useProfiles } from '@/state/profiles'
 import { useSessions } from '@/state/sessions'
 import { useTheme, type Theme } from '@/state/theme'
+import { organizeSessions, sessionTitle, useLibrary } from '@/state/library'
 
 /**
  * How many sessions the unsearched list offers.
@@ -133,6 +134,7 @@ function Palette({
   const installed = usePlugins((state) => state.profile?.plugins)
   const togglePlugin = usePlugins((state) => state.toggle)
   const cards = useSessions((state) => state.cards)
+  const annotations = useLibrary((state) => state.data.sessions)
   const scanning = useSessions((state) => state.scanning)
   const refreshSessions = useSessions((state) => state.refresh)
   const theme = useTheme((state) => state.theme)
@@ -296,12 +298,12 @@ function Palette({
     // thing this palette reaches, and a search that quietly skipped most of it
     // would answer "no such session" about one somebody is looking straight at.
     // Only what is drawn unasked is capped, and that happens further down.
-    for (const session of cards ?? []) {
+    for (const session of organizeSessions(cards ?? [], annotations)) {
       all.push({
         id: `session:${session.id}`,
         group: 'palette.group.session',
         icon: History,
-        label: session.title || t('sessions.untitled'),
+        label: sessionTitle(session, annotations) || t('sessions.untitled'),
         hint: [session.project && leaf(session.project), when(session.touched)]
           .filter(Boolean)
           .join(' · '),
@@ -335,6 +337,7 @@ function Palette({
     installed,
     togglePlugin,
     cards,
+    annotations,
     theme,
     chooseTheme,
   ])

@@ -27,15 +27,24 @@ const PresentationsPane = lazy(() =>
     default: module.PresentationsPane,
   })),
 )
+const WorkspacesPane = lazy(() =>
+  import('@/components/WorkspacesPane').then((module) => ({ default: module.WorkspacesPane })),
+)
+const PromptLibraryPane = lazy(() =>
+  import('@/components/PromptLibraryPane').then((module) => ({
+    default: module.PromptLibraryPane,
+  })),
+)
 
 export type { View } from '@/components/workbench-contract'
 
 interface WorkbenchProps {
   hidden: boolean
   view: View
+  onView: (view: View) => void
 }
 
-export function Workbench({ hidden, view }: WorkbenchProps) {
+export function Workbench({ hidden, view, onView }: WorkbenchProps) {
   return (
     <div className={hidden ? 'hidden' : 'flex min-h-0 flex-1 bg-canvas'}>
       <div className={view === 'console' ? 'flex min-h-0 flex-1' : 'hidden'}>
@@ -49,6 +58,8 @@ export function Workbench({ hidden, view }: WorkbenchProps) {
         {view === 'about' && <AboutPane />}
         {view === 'settings' && <SettingsPane />}
         {view === 'presentations' && <PresentationsPane />}
+        {view === 'workspaces' && <WorkspacesPane onSessions={() => onView('sessions')} />}
+        {view === 'library' && <PromptLibraryPane />}
       </Suspense>
     </div>
   )

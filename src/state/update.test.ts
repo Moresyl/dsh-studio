@@ -13,6 +13,7 @@ vi.mock('@/lib/updater', () => updater)
 import type { Release } from '@/lib/updater'
 import { useDialog } from '@/state/dialog'
 import { usePresentationEditor } from '@/state/presentation-editor'
+import { useLibrary } from '@/state/library'
 import { fixture } from '@/lib/presentation/fixtures.test-support'
 import { isAnnounceable, useUpdate, watchForUpdates } from '@/state/update'
 
@@ -49,6 +50,7 @@ const localStorage = {
 beforeEach(() => {
   vi.resetAllMocks()
   stored.clear()
+  useLibrary.setState({ editing: false, busy: false })
   vi.stubGlobal('window', {
     localStorage,
     setTimeout: (...args: Parameters<typeof setTimeout>) => setTimeout(...args),
@@ -77,6 +79,14 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
+})
+
+it('refuses an update while the personal library is being edited or saved', async () => {
+  useLibrary.setState({ editing: true })
+  await useUpdate.getState().runInstall(release, 'selected')
+  expect(updater.installUpdate).not.toHaveBeenCalled()
+  expect(usePresentationEditor.getState().busy).toBeNull()
+  expect(useUpdate.getState().error).toBeTruthy()
 })
 
 describe('checking', () => {

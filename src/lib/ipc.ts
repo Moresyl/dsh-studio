@@ -934,6 +934,37 @@ export interface SessionHit {
 /** Every session the harness has run on this machine, newest first. */
 export const sessionRoster = (): Promise<Shelved> => invoke('session_roster')
 
+export interface SessionAnnotation {
+  title: string
+  pinned: boolean
+  tags: string[]
+  note: string
+  bookmarks: number[]
+}
+
+export interface SavedPrompt {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+}
+
+export interface PersonalLibrary {
+  version: number
+  sessions: Record<string, SessionAnnotation>
+  prompts: Record<string, SavedPrompt>
+}
+
+export const libraryRead = (): Promise<PersonalLibrary> => invoke('library_read')
+export const sessionAnnotate = (
+  id: string,
+  annotation: Partial<SessionAnnotation>,
+): Promise<PersonalLibrary> => invoke('session_annotate', { id, annotation })
+export const promptSave = (prompt: SavedPrompt): Promise<PersonalLibrary> =>
+  invoke('prompt_save', { prompt })
+export const promptRemove = (id: string): Promise<PersonalLibrary> =>
+  invoke('prompt_remove', { id })
+
 /**
  * The sessions a query describes, best answer first.
  *

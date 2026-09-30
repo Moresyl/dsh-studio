@@ -20,6 +20,8 @@ describe('workbench navigation contract', () => {
       { id: 'remote', label: 'nav.remote' },
       { id: 'about', label: 'nav.about' },
       { id: 'presentations', label: 'nav.presentations' },
+      { id: 'workspaces', label: 'nav.workspaces' },
+      { id: 'library', label: 'nav.library' },
     ])
   })
 
