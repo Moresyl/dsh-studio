@@ -39,6 +39,30 @@ that cookie exactly like a browser tab — no Harness patching is involved.
 
 ## Session history
 
+Pin sessions, set personal display names, add tags and notes, and filter or sort by
+tag, name or activity. Search also matches those annotations. Bookmark individual
+messages and use **Important messages** to show only marked turns. Studio stores
+annotations in `personal-library.json` without rewriting Harness logs. Up to 12
+tags with 40 characters each are accepted; excess input must be corrected before saving.
+
+## Prompt library and workspaces
+
+Create, edit, search and delete local instructions in **Prompt library**. Use
+`{{file}}` or `{{topic}}` for variables. **Copy instruction** requires all values
+and previews the result before copying to the system clipboard; it never sends a
+message or runs tools. Canceling an unsaved edit requires confirmation. Exit,
+update and renderer reload protect open editors and pending writes. Up to 250
+prompts and a 2 MiB personal-library file are supported. Damaged or unsupported
+files are reported and preserved.
+
+**Workspaces** groups the current directory and directories associated with local
+sessions, with session/turn/token counts and recent activity. Search paths, switch
+directories, open associated sessions or use the existing Git worktree manager
+and read-only review. A running Harness still requires a confirmed restart to
+apply a directory switch. Summaries inherit transcript read limits and are not billing records.
+
+## Reading and export
+
 Search saved conversations by their content, open a matching excerpt, and export
 the native transcript as Markdown, HTML or JSON. Long transcripts display up to
 120 messages per segment; the footer goes to earlier, later, first or latest
@@ -94,9 +118,9 @@ current Profile unchanged.
 
 Completion/failure notifications for user turns and background jobs can be enabled independently in Settings. Workspace selection uses the native folder picker and also accepts a dropped folder.
 
-## Local presentations (development branch)
+## Local presentations
 
-These controls are under acceptance and are not included in the published v0.9.19.
+Local presentation editing and editable PPTX export shipped in v0.9.20.
 
 Open **Presentations**, choose **New presentation**, preview a starting template,
 then create the document. Select objects to edit their properties; drag them to

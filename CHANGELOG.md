@@ -9,6 +9,27 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.23] — 2026-10-01
+
+### Added
+
+- Pin sessions, set personal display names, tags and notes, filter/sort the shelf, search annotations alongside transcripts and bookmark individual messages. Show aliases and pins in the sidebar and command palette without changing Harness logs.
+- Add a workspace overview with current/recent directories, session/turn/token totals, recent activity, associated-session navigation and existing Git worktree management/review.
+- Add a local prompt library with editing, search, tags, original starter instructions, required template variables, preview and clipboard copying without sending messages or executing tools.
+
+### Fixes and safety
+
+- Store personal data in a bounded native library with validated schema, atomic writes and serialized field merges. Preserve corrupt/future files and reject invalid or oversized changes. Protect open editors and pending writes during close, update and renderer recovery.
+- Reject excess tags explicitly instead of silently truncating input. Reuse shared fields, cards, buttons, themes and modal focus handling across the new pages.
+- Guard inherited annotation keys for special session IDs, and prioritize the page name over secondary title-bar text in compact windows.
+- Update stale documentation that described shipped presentation/update capabilities as unreleased. Target visible search fields in long-transcript acceptance when hidden console controls remain mounted.
+
+### Verification
+
+- Exercise new workflows in two complete real-WebView rounds using compressed session logs, native persistence, actual pointer/keyboard input, clipboard reads, canceled actions, light/dark themes and a 900×620 viewport.
+- Regress all ten desktop routes, native profile/preset/session operations, five real PTYs, 4000-message pagination and read-limit warnings. Verify three Harness stop/start cycles and actual repair on Windows/Node 24.21.0.
+- Local tests cover 668 frontend cases, 569 executed Rust cases and 147 packaging cases; frontend line coverage is 99.36%. Production build, strict Clippy, lint, public ACL and bilingual documentation remain release gates. External paid providers and physical macOS/Linux GUI interaction are outside local Windows evidence.
+
 ## [0.9.22] — 2026-09-30
 
 ### Fixes and polish

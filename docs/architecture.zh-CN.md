@@ -2,6 +2,11 @@
 
 [English](architecture.md)
 
+个人资料使用独立的 `personal-library.json`，保存会话显示名、置顶、标签、笔记、书签和提示词。
+原生端限定格式、数量和 2 MiB 文件大小，序列化写入按字段合并并原子提交；损坏或未知格式拒绝覆盖。
+这些命令仅对 Studio 外壳开放，不加入 Harness 公开桥或只读 Host 合同。资料编辑与保存纳入退出、
+更新和渲染器恢复保护。工作区汇总读取已有会话索引，不新增扫描文件内容的权限。
+
 DSH Studio 是 Harness 的宿主，不是其 fork。React WebView 只通过列入 Tauri invoke handler 的命令访问 Rust；Harness 运行在受进程树保护的子进程中，只监听回环地址。Rust supervisor 解析就绪输出、探测健康状态、退避重启，并在退出时由 Windows Job Object 或 Unix 进程组回收整棵子进程树。
 
 供应链分成三条边界：Node 从官方发布索引解析并以官方 SHA-256 验证；Harness 固定到已验证的精确 npm 版本并通过 staging/backup 事务替换；插件目录不能提供命令，只能给出精确 npm 包和版本，实际安装仍经过 npm manifest 与 peer 兼容预检。

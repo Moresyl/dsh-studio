@@ -64,6 +64,18 @@ the harness UI.
 
 ## What it does
 
+**Keep projects, sessions and reusable instructions close.**
+Workspace summaries show sessions, turns, usage and recent activity, with direct
+navigation to associated records. Pin sessions, name them, add tags/notes and
+bookmark messages. The local prompt library supports editing, search, variables,
+preview and copying. Bounded native validation and atomic writes preserve original
+Harness logs; close, update and recovery protect unfinished edits.
+
+<img src="assets/prompt-library.png" width="820" alt="Local prompt library in the actual desktop: shared cards, tags and copy actions">
+
+The prompt-library image uses the v0.9.23 frontend in isolated Windows QA, with
+demonstration content and processed local paths.
+
 **Supervises, rather than just launches.**
 The service runs under a supervisor that restarts it with backoff when it exits.
 A restart lands on a new port and the window follows it — no stale bookmarks, no
