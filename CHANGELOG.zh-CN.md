@@ -9,15 +9,21 @@
 
 ## [未发布]
 
+## [0.9.21] —— 2026-09-30
+
 ### 修复与打磨
 
 - 修复较新 Node 上运行环境安装、修复及启动卡在模块解析的问题。官方包的 ESM 导入直接继续解析，CommonJS 解析增加同步重入保护；保持 import / require 条件导出、Profile 扩展回退及官方运行环境版本优先级。
 - 自绘窗口控制按钮独立显示在错误及恢复弹窗之上，避免弹窗遮罩拦截关闭、最小化和最大化点击；未保存文档保护保持生效。
+- 补齐 Tauri 关闭回调使用的精确窗口销毁与隐藏权限。Harness 运行时阻止主窗口销毁，收起到托盘保留未保存文稿；停止后的窗口正常退出，不再被 ACL 拒绝。
 
 ### 验证
 
 - 增加解析钩子深度、条件导出、缺失包后恢复、Profile 扩展与第三方包回退的回归检查。冷安装和完整 Profile 启动流水线覆盖 Node 22.19.0 与 24.21.0 的 Windows、Linux、macOS 环境。
-- 本地 Windows / Node 24.21.0 已复现旧解析器的 120 秒静默超时；替换解析器后同一 Harness 0.1.7-rc.2 环境约 26 秒通过完整启动检查，Harness 0.1.1-rc.2 也通过原生安装及真实启动测试。窗口按钮增加弹窗层级、原生操作分发及文档关闭保护回归测试；实际 GUI 点击验收尚待完成。
+- 本地 Windows / Node 24.21.0 已复现旧解析器的 120 秒静默超时；替换解析器后同一 Harness 0.1.7-rc.2 环境约 26 秒通过完整启动检查，Harness 0.1.1-rc.2 也通过原生安装及真实启动测试。
+- 新增独立真实 WebView 指针验收，覆盖原生错误弹窗下的最大化、还原、最小化和关闭，验证未保存文稿取消关闭以及运行中的主窗口收起到托盘。实际检查全部 8 个桌面页面、选择菜单键盘导航、原生 ACL、配置/预设/会话操作、PTY、偏好重载和工作区审阅。
+- macOS 冷安装验收规范化 npm 临时目录并使用实际项目目录执行安装；并行插件恢复测试的目录增加原子序号，避免多个用例共享备份文件。
+- 实际点击 Node 24.21.0 / Harness 0.1.1-rc.2 的安装及修复按钮，验证检查更新反馈和进程正常退出；预设迁移测试完成后原样恢复隔离 Profile 的覆盖文件。
 
 ## [0.9.20] —— 2026-09-30
 
@@ -1081,7 +1087,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...HEAD
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.21...HEAD
+[0.9.21]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...v0.9.21
 [0.9.20]: https://github.com/Moresyl/dsh-studio/compare/v0.9.19...v0.9.20
 [0.9.19]: https://github.com/Moresyl/dsh-studio/compare/v0.9.18...v0.9.19
 [0.9.18]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...v0.9.18
