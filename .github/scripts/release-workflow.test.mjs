@@ -15,6 +15,7 @@ test('keeps installers in a draft while platform resource and runtime checks run
   assert.match(builds, /releaseDraft: true/)
   assert.doesNotMatch(builds, /releaseDraft: false|--draft=false/)
   assert.match(builds, /verify-packaged-app\.mjs/)
+  assert.match(builds, /timeout-minutes: 90/)
 })
 
 test('publishes only after all build jobs, artifact inventory and uploaded checksums', () => {

@@ -9,16 +9,15 @@
 
 ## [未发布]
 
-- 发布矩阵构建前创建唯一草稿，并将所有 Tauri 上传绑定到其数字 ID，避免并行平台创建同名草稿、分散安装包附件。
-- 更换失效的 Azure APT 地址时同时处理 Ubuntu 镜像列表文件，限制 HTTP/HTTPS 请求等待时间，避免 Linux CI 在测试前卡住。
-
-## [0.9.21] —— 2026-09-30
+## [0.9.22] —— 2026-09-30
 
 ### 修复与打磨
 
 - 修复较新 Node 上运行环境安装、修复及启动卡在模块解析的问题。官方包的 ESM 导入直接继续解析，CommonJS 解析增加同步重入保护；保持 import / require 条件导出、Profile 扩展回退及官方运行环境版本优先级。
 - 自绘窗口控制按钮独立显示在错误及恢复弹窗之上，避免弹窗遮罩拦截关闭、最小化和最大化点击；未保存文档保护保持生效。
 - 补齐 Tauri 关闭回调使用的精确窗口销毁与隐藏权限。Harness 运行时阻止主窗口销毁，收起到托盘保留未保存文稿；停止后的窗口正常退出，不再被 ACL 拒绝。
+- 发布矩阵构建前创建唯一草稿，将所有 Tauri 上传绑定到其数字 ID，避免同名草稿分散安装包；Lite、Full 和原生恢复验收的总预算调整为 90 分钟，覆盖较慢的 Runner。
+- 更换失效的 Azure APT 地址时同时处理 Ubuntu 镜像列表文件，限制 HTTP/HTTPS 请求等待时间，避免 Linux CI 在测试前卡住。
 
 ### 验证
 
@@ -1090,8 +1089,8 @@
 - **发布流水线。** 打了 tag 的版本由 CI 构建 Windows x64、Linux x64、
   macOS Apple Silicon 与 macOS Intel 四个目标。
 
-[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.21...HEAD
-[0.9.21]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...v0.9.21
+[未发布]: https://github.com/Moresyl/dsh-studio/compare/v0.9.22...HEAD
+[0.9.22]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...v0.9.22
 [0.9.20]: https://github.com/Moresyl/dsh-studio/compare/v0.9.19...v0.9.20
 [0.9.19]: https://github.com/Moresyl/dsh-studio/compare/v0.9.18...v0.9.19
 [0.9.18]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...v0.9.18

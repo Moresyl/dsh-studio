@@ -184,7 +184,9 @@ jobs:
   publish:
     name: Build (${{ matrix.name }})
     needs: [quality, runtime-contract, prepare-release]
-    timeout-minutes: 60
+    # Lite, Full and native recovery qualification compile separate targets.
+    # The Intel macOS runner needs room for all three before artifact upload.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:

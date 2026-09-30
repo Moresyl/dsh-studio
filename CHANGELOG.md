@@ -9,16 +9,15 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
-- Prepare a single draft before the release build matrix and bind every Tauri upload to its numeric ID, preventing concurrent platforms from creating same-tag drafts with split artifact inventories.
-- Include Ubuntu mirror-list files when replacing the unavailable Azure APT endpoint and bound HTTP/HTTPS requests, preventing Linux CI setup from hanging before tests run.
-
-## [0.9.21] — 2026-09-30
+## [0.9.22] — 2026-09-30
 
 ### Fixes and polish
 
 - Fix module-resolution stalls during runtime installation, repair and startup on newer Node releases. Continue ESM resolution directly and guard synchronous CommonJS re-entry while preserving import / require conditional exports, Profile extension fallback and managed runtime precedence.
 - Keep custom window controls above error and recovery dialogs so their backdrops cannot intercept close, minimize or maximize clicks; preserve unsaved-document protection.
 - Grant the exact Tauri window destroy/hide permissions used by close callbacks. Prevent main-window destruction while Harness is active, preserving unsaved drafts when hiding to the tray; stopped windows can exit without an ACL rejection.
+- Prepare a single draft before the release build matrix and bind every Tauri upload to its numeric ID, preventing concurrent platforms from creating same-tag drafts with split artifact inventories. Allow 90 minutes for Lite, Full and native recovery qualification on slower runners.
+- Include Ubuntu mirror-list files when replacing the unavailable Azure APT endpoint and bound HTTP/HTTPS requests, preventing Linux CI setup from hanging before tests run.
 
 ### Verification
 
@@ -1230,8 +1229,8 @@ CI but have not been run by a human yet.
 - **Release pipeline.** A tagged version is built by CI for Windows x64, Linux
   x64, macOS Apple Silicon and macOS Intel.
 
-[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.21...HEAD
-[0.9.21]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...v0.9.21
+[Unreleased]: https://github.com/Moresyl/dsh-studio/compare/v0.9.22...HEAD
+[0.9.22]: https://github.com/Moresyl/dsh-studio/compare/v0.9.20...v0.9.22
 [0.9.20]: https://github.com/Moresyl/dsh-studio/compare/v0.9.19...v0.9.20
 [0.9.19]: https://github.com/Moresyl/dsh-studio/compare/v0.9.18...v0.9.19
 [0.9.18]: https://github.com/Moresyl/dsh-studio/compare/v0.9.17...v0.9.18
