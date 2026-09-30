@@ -43,6 +43,13 @@ const COOKIE_MAX_AGE: u32 = 60 * 60 * 12;
 /// The externally visible origin is supplied by Studio, never by forwarded
 /// request headers. Pending public gateways cannot consume pairing codes.
 #[derive(Clone, Debug)]
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "Public tunnel audiences are staged; production currently selects LAN only"
+    )
+)]
 pub enum Audience {
     Lan,
     Pending,
@@ -50,6 +57,13 @@ pub enum Audience {
 }
 
 impl Audience {
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "The staged tunnel controller will supply its verified public origin"
+        )
+    )]
     pub fn https(origin: &str) -> crate::error::Result<Self> {
         let url = url::Url::parse(origin)
             .map_err(|_| crate::error::Error::RemoteTunnel("invalid public origin".into()))?;

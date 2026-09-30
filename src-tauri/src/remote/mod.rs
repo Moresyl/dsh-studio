@@ -27,7 +27,18 @@ pub mod commands;
 pub mod gateway;
 pub mod lan;
 pub mod qr;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "Tunnel providers are staged; the remote UI currently exposes LAN access only"
+    )
+)]
 pub mod tunnel;
+#[expect(
+    dead_code,
+    reason = "Managed tunnel installation is staged with the tunnel providers"
+)]
 pub mod tunnel_install;
 mod upstream;
 
