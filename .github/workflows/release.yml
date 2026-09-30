@@ -128,12 +128,15 @@ jobs:
       - run: node .github/scripts/verify-runtime-install.mjs
 
   prepare-release:
-    name: Clear stale draft assets
+    name: Prepare shared draft release
     needs: [quality, runtime-contract]
     runs-on: ubuntu-22.04
+    outputs:
+      release_id: ${{ steps.draft.outputs.release_id }}
     steps:
       - uses: actions/checkout@v5
-      - name: Remove assets left by an earlier unpublished run
+      - name: Create one draft and remove assets left by an unpublished run
+        id: draft
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -154,14 +157,21 @@ jobs:
           fi
           existing_release="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | join(\"|\")")"
           if [ -z "$existing_release" ]; then
-            echo "$tag has no existing draft assets to clear."
-            exit 0
+            # Matrix builds must not race to create their own same-tag drafts.
+            node .github/scripts/release-notes.mjs > release-body.md
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" --verify-tag --target "$GITHUB_SHA" --title "DSH Studio $tag" --notes-file release-body.md --draft
+            existing_release="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq ".[] | select(.tag_name == \"$tag\") | [.id, .draft] | join(\"|\")")"
+          fi
+          if [ -z "$existing_release" ] || [[ "$existing_release" == *$'\n'* ]]; then
+            echo "::error title=Ambiguous draft release::$tag must identify exactly one shared draft before platform builds."
+            exit 1
           fi
           IFS='|' read -r release_id draft <<< "$existing_release"
           if [ "$draft" != true ]; then
             echo "::error title=Published release is immutable::$tag became public after the identity gate; refusing to alter its assets."
             exit 1
           fi
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
           asset_ids="$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases/$release_id/assets?per_page=100" --jq '.[].id')"
           removed=0
           while IFS= read -r asset_id; do
@@ -427,6 +437,7 @@ jobs:
           # Supplying it explicitly keeps the bundler non-interactive in CI.
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ''
         with:
+          releaseId: ${{ needs.prepare-release.outputs.release_id }}
           tagName: v__VERSION__
           releaseName: DSH Studio v__VERSION__
           releaseBody: ${{ steps.release_notes.outputs.body }}

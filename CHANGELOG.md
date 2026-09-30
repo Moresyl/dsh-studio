@@ -9,6 +9,8 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+- Prepare a single draft before the release build matrix and bind every Tauri upload to its numeric ID, preventing concurrent platforms from creating same-tag drafts with split artifact inventories.
+
 ## [0.9.21] — 2026-09-30
 
 ### Fixes and polish

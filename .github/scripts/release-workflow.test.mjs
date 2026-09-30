@@ -101,3 +101,15 @@ test('upgrade smoke excludes the configured release tag for every trigger type',
   assert.doesNotMatch(builds, /grep -Fxv "\$GITHUB_REF_NAME"/)
   assert.doesNotMatch(builds, /github\.ref_type == 'tag'/)
 })
+
+test('creates one shared draft before concurrent builds and binds uploads to its numeric ID', () => {
+  assert.match(preparation, /release_id: \$\{\{ steps\.draft\.outputs\.release_id \}\}/)
+  assert.match(
+    preparation,
+    /gh release create "\$tag"[^\n]+--verify-tag[^\n]+--notes-file release-body\.md --draft/,
+  )
+  assert.match(preparation, /Ambiguous draft release/)
+  assert.match(preparation, /echo "release_id=\$release_id" >> "\$GITHUB_OUTPUT"/)
+  assert.match(builds, /releaseId: \$\{\{ needs\.prepare-release\.outputs\.release_id \}\}/)
+  assert.ok(preparation.indexOf('gh release create') < preparation.indexOf('asset_ids='))
+})
