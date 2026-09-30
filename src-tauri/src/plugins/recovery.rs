@@ -504,17 +504,23 @@ fn hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     use super::{RetryPlan, Store};
 
+    // Parallel fixtures can receive the same Windows clock tick. A counter
+    // keeps the corruption tests away from another test's valid backup.
+    static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
+
     fn store() -> (Store, std::path::PathBuf) {
         let base = std::env::temp_dir().join(format!(
-            "dsh-studio-plugin-recovery-{}-{}",
+            "dsh-studio-plugin-recovery-{}-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .expect("clock")
-                .as_nanos()
+                .as_nanos(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
         ));
         (
             Store {
