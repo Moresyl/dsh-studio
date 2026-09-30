@@ -175,9 +175,11 @@ export function TitleBar({
           data-tauri-drag-region
           className="flex w-[calc(50%_-_160px)] min-w-0 items-baseline gap-2 pl-4 max-[1100px]:hidden"
         >
-          <span className="truncate text-ui-base font-semibold text-text">{pageTitle}</span>
+          <span className="max-w-full shrink-0 truncate text-ui-base font-semibold text-text">
+            {pageTitle}
+          </span>
           {sectionTitle && (
-            <span className="truncate text-ui-xs text-faint before:mr-2 before:content-['·']">
+            <span className="truncate text-ui-xs text-faint before:mr-2 before:content-['·'] max-[1280px]:hidden">
               {sectionTitle}
             </span>
           )}
