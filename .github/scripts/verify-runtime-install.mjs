@@ -1,4 +1,14 @@
-import { copyFile, cp, lstat, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import {
+  copyFile,
+  cp,
+  lstat,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -6,7 +16,9 @@ import { verifyProfileBoot } from './runtime-profile-smoke.mjs'
 
 const expected = '0.1.7-rc.2'
 const expectedPnpm = '11.7.0'
-const directory = await mkdtemp(join(tmpdir(), 'dsh-runtime-contract-'))
+// macOS's temporary root can be a /var -> /private/var alias. npm's local
+// dependency admission must see the same canonical parent as its file lock.
+const directory = await realpath(await mkdtemp(join(tmpdir(), 'dsh-runtime-contract-')))
 
 try {
   const studioVersion = JSON.parse(await readFile('package.json', 'utf8')).version
@@ -126,7 +138,7 @@ try {
 
 function run(command, args, { timeout = 1_500_000 } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit' })
+    const child = spawn(command, args, { cwd: directory, stdio: 'inherit' })
     const timer = setTimeout(() => {
       child.kill('SIGTERM')
       reject(new Error(`${command} exceeded ${Math.round(timeout / 1000)} seconds`))
