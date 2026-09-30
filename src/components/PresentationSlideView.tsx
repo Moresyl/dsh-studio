@@ -18,7 +18,16 @@ interface Props {
   onMove?: (id: string, position: { x: number; y: number }) => void
 }
 
-/** Data-only editing preview. Object order follows the saved slide's stacking order. */
+/**
+ * Data-only editing preview. Object order follows the saved slide's stacking order.
+ *
+ * Only the frame and the selection outline are the app's: the slide itself is
+ * drawn at slide-coordinate sizes in the deck's own fonts and colours, so nothing
+ * inside the `viewBox` is snapped to the type or radius ladders. The frame is a
+ * hairline rather than a shadow because a white slide on the light theme's white
+ * ground has no other edge, and it is a border rather than a ring so that the
+ * scrolling column or tile around a slide never clips it.
+ */
 export function PresentationSlideView({ slide, aspect, selected, onSelect, onMove }: Props) {
   const size = presentationSize(aspect)
   const drag = useRef<{
@@ -61,7 +70,7 @@ export function PresentationSlideView({ slide, aspect, selected, onSelect, onMov
   return (
     <svg
       viewBox={`0 0 ${size.width} ${size.height}`}
-      className="block h-auto w-full rounded-[4px] shadow-lift"
+      className="block h-auto w-full rounded-sm border border-line-strong"
       aria-label={slide.title}
       role={onSelect ? 'group' : 'img'}
       style={{ background: `#${slide.background}`, touchAction: onMove ? 'none' : undefined }}
@@ -197,10 +206,13 @@ export function PresentationSlideView({ slide, aspect, selected, onSelect, onMov
               width={element.width}
               height={element.height}
               fill="transparent"
-              stroke={selected === element.id ? '#0088cc' : 'transparent'}
               strokeWidth={2}
               vectorEffect="non-scaling-stroke"
-              className="group-focus-visible:stroke-brand"
+              className={
+                selected === element.id
+                  ? 'stroke-focus'
+                  : 'stroke-transparent group-hover:stroke-focus/40 group-focus-visible:stroke-focus'
+              }
             />
           )}
         </g>

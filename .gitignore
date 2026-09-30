@@ -27,6 +27,8 @@ src-tauri/tauri.windows.conf.json
 .workflow/
 .firecrawl/
 .tmp-*/
+artifacts/
+dsh-studio/
 
 # Editor / OS
 .DS_Store

@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ChevronDown,
+  ChevronRight,
   ClipboardCopy,
   Copy,
   Eraser,
@@ -9,11 +9,15 @@ import {
   TriangleAlert,
 } from 'lucide-react'
 
+import { Badge } from '@/components/Badge'
+import { Button } from '@/components/Button'
+import { Empty } from '@/components/Empty'
+import { IconButton } from '@/components/IconButton'
+import { Segmented } from '@/components/Segmented'
 import { t } from '@/lib/i18n'
 import type { LogLine } from '@/lib/ipc'
 import { logTone } from '@/lib/log-tone'
 import { runtimeNotices } from '@/lib/runtime-notices'
-import { TabButton } from '@/components/TabButton'
 import { contextMenu, selectedText } from '@/state/menu'
 import { reportAction } from '@/state/failure'
 
@@ -28,6 +32,10 @@ import { reportAction } from '@/state/failure'
  * What people do with a log is paste it somewhere, so the right-click menu is
  * the pane's real interface: copy what is highlighted, copy the lot, or wipe
  * the screen before reproducing something.
+ *
+ * Above the output are two rows of the same 40px: the title, which is also the
+ * disclosure, and — once it is open — a toolbar of controls that are all one
+ * size, so the filter, the search and the two buttons read as one strip.
  */
 export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () => void }) {
   const viewport = useRef<HTMLDivElement>(null)
@@ -74,10 +82,10 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
             >
               <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
               <div className="min-w-0">
-                <p className="text-[13px] font-medium text-text [overflow-wrap:anywhere]">
+                <p className="text-ui-base font-medium text-text [overflow-wrap:anywhere]">
                   {t('log.pluginSkipped', { name: notice.name })}
                 </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                <p className="mt-1 text-ui-sm text-muted">
                   {t(notice.incompatible ? 'log.pluginIncompatible' : 'log.pluginSkippedHint')}
                 </p>
               </div>
@@ -85,47 +93,46 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
           ))}
         </div>
       )}
-      <header className="flex min-h-12 shrink-0 flex-wrap items-center gap-2 border-b border-line px-5">
-        <button
-          type="button"
+      <header className="flex min-h-10 shrink-0 flex-wrap items-center gap-2 border-b border-line px-5">
+        <Button
+          variant="ghost"
           aria-expanded={open}
           onClick={() => setExpanded(!open)}
-          className="flex min-h-10 items-center gap-2 text-[13px] font-medium text-text"
+          className="-ml-3"
         >
-          <ChevronDown size={15} className={open ? '' : '-rotate-90'} aria-hidden="true" />
-          {t('log.title')}
-        </button>
-        <span className="ml-auto text-[12px] tabular-nums text-muted">
+          <ChevronRight
+            aria-hidden="true"
+            className={`transition-transform duration-150 ease-[var(--ease-out-soft)] ${open ? 'rotate-90' : ''}`}
+          />
+          <span className="text-text">{t('log.title')}</span>
+        </Button>
+        <span className="ml-auto text-ui-sm tabular-nums text-faint">
           {open && (filter !== 'all' || query.trim())
             ? t('log.visibleLines', { count: visible.length, total: lines.length })
             : t('log.lines', { count: lines.length })}
         </span>
         {issues.length > 0 && (
-          <span
-            className={`rounded-full px-2 py-1 text-[11px] ${errors > 0 ? 'bg-danger/10 text-danger' : 'bg-warn/10 text-warn'}`}
-          >
+          <Badge tone={errors > 0 ? 'danger' : 'warn'}>
             {t('log.issuesCount', { count: issues.length })}
-          </span>
+          </Badge>
         )}
       </header>
-      {!open && (
-        <p className="px-5 py-4 text-[13px] leading-relaxed text-muted">{t('log.collapsed')}</p>
-      )}
+      {!open && <p className="px-5 py-4 text-ui-sm text-faint">{t('log.collapsed')}</p>}
       {open && (
         <>
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line px-5 py-2">
-            <TabButton
-              label={t('log.all')}
-              active={filter === 'all'}
-              onClick={() => setFilter('all')}
+          <div className="flex min-h-10 shrink-0 flex-wrap items-center gap-2 border-b border-line px-5 py-1">
+            <Segmented
+              size="sm"
+              label={t('log.title')}
+              value={filter}
+              onChange={setFilter}
+              items={[
+                { value: 'all', label: t('log.all') },
+                { value: 'issues', label: t('log.issues') },
+              ]}
             />
-            <TabButton
-              label={t('log.issues')}
-              active={filter === 'issues'}
-              onClick={() => setFilter('issues')}
-            />
-            <label className="ml-auto flex min-w-0 items-center gap-2 rounded-lg border border-line px-2">
-              <Search size={13} className="text-muted" aria-hidden="true" />
+            <label className="field-shell field-shell--sm ml-auto w-56 max-w-full">
+              <Search size={14} aria-hidden="true" />
               <input
                 type="search"
                 aria-label={t('log.search')}
@@ -138,33 +145,24 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
                     setQuery('')
                   }
                 }}
-                className="h-8 min-w-0 bg-transparent text-[12px] text-text outline-none"
               />
             </label>
-            <button
-              type="button"
-              aria-label={t('log.copyVisible')}
-              title={t('log.copyVisible')}
+            <IconButton
+              icon={Copy}
+              label={t('log.copyVisible')}
               disabled={visible.length === 0}
               onClick={() =>
                 void reportAction(() =>
                   navigator.clipboard.writeText(visible.map((entry) => entry.line).join('\n')),
                 )
               }
-              className="grid size-8 place-items-center rounded-lg text-muted hover:bg-control-fill disabled:opacity-40"
-            >
-              <Copy size={14} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              aria-label={t('menu.clearLog')}
-              title={t('menu.clearLog')}
+            />
+            <IconButton
+              icon={Eraser}
+              label={t('menu.clearLog')}
               disabled={lines.length === 0}
               onClick={onClear}
-              className="grid size-8 place-items-center rounded-lg text-muted hover:bg-control-fill disabled:opacity-40"
-            >
-              <Eraser size={14} aria-hidden="true" />
-            </button>
+            />
           </div>
           <div
             ref={viewport}
@@ -199,23 +197,16 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
                 },
               ]
             })}
-            className="selectable min-h-0 flex-1 overflow-y-auto px-3 py-2 font-mono text-[11.5px] leading-[1.65]"
+            className="selectable min-h-0 flex-1 overflow-y-auto px-5 py-2"
           >
             {visible.length === 0 ? (
               // Centred, because an empty pane's message is the whole content of
               // that pane — left in the corner it reads as the first line of output
               // that never came.
-              <div className="flex h-full flex-col items-center justify-center gap-2.5 text-faint">
-                <TerminalSquare
-                  size={24}
-                  strokeWidth={1.4}
-                  className="opacity-45"
-                  aria-hidden="true"
-                />
-                <p className="font-sans text-[12px]">
-                  {t(lines.length === 0 ? 'log.empty' : 'log.noMatches')}
-                </p>
-              </div>
+              <Empty
+                icon={TerminalSquare}
+                message={t(lines.length === 0 ? 'log.empty' : 'log.noMatches')}
+              />
             ) : (
               visible.map((entry, index) => <LogRow key={index} entry={entry} />)
             )}
@@ -226,13 +217,18 @@ export function LogConsole({ lines, onClear }: { lines: LogLine[]; onClear: () =
   )
 }
 
-/** Existing rows keep their object identity when one line is appended. */
+/**
+ * Existing rows keep their object identity when one line is appended.
+ *
+ * The mono face belongs to the row and not to the pane, so the empty state can
+ * share the pane in the interface's own face.
+ */
 const LogRow = memo(function LogRow({ entry }: { entry: LogLine }) {
   const tone = logTone(entry)
   return (
     <p
       className={[
-        'break-words whitespace-pre-wrap',
+        'font-mono text-ui-sm break-words whitespace-pre-wrap',
         tone === 'error' ? 'text-danger' : tone === 'warning' ? 'text-warn' : 'text-muted',
       ].join(' ')}
     >

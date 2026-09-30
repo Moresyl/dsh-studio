@@ -8,7 +8,9 @@ import {
 } from 'react'
 import { CheckCircle2, Database, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-react'
 
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 import { t } from '@/lib/i18n'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { usePlugins } from '@/state/plugins'
@@ -62,65 +64,52 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="dialog-backdrop fixed inset-0 z-40 grid place-items-center bg-canvas-deep/75 p-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
         role="dialog"
         aria-modal="true"
         aria-label={t('plugins.sources.title')}
-        className="dialog-panel flex max-h-full w-full max-w-[560px] flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-[min(720px,calc(100vh-64px))] w-full max-w-[560px] animate-pop flex-col overflow-hidden rounded-xl border border-line-strong bg-surface shadow-lift"
       >
-        <header className="flex items-center gap-3 border-b border-line px-4 py-3.5">
-          <Database size={17} className="text-brand" aria-hidden="true" />
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[13px] font-semibold text-text">{t('plugins.sources.title')}</h2>
-            <p className="mt-0.5 text-[11px] text-faint">{t('plugins.sources.subtitle')}</p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label={t('plugins.close')}
-            className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text"
+        <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
+          <span
+            aria-hidden="true"
+            className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-brand"
           >
-            <X size={14} aria-hidden="true" />
-          </button>
+            <Database size={18} strokeWidth={1.8} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-ui-lg font-semibold text-text">{t('plugins.sources.title')}</h2>
+            <p className="mt-0.5 text-ui-sm text-faint">{t('plugins.sources.subtitle')}</p>
+          </div>
+          <IconButton icon={X} size="sm" label={t('plugins.close')} onClick={onClose} />
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
-          <ul className="overflow-hidden rounded-control border border-line">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
+          <ul className="list-card">
             {sources.map((source) => {
               const health = sourceHealth[source.id]
               return (
-                <li
-                  key={source.id}
-                  className="flex items-center gap-3 border-b border-line px-3 py-2.5 last:border-b-0"
-                >
+                <li key={source.id} className="list-row">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-[12px] font-medium text-text">
+                      <span className="truncate text-ui-base font-medium text-text">
                         {source.label}
                       </span>
-                      {source.active && (
-                        <span className="rounded-full bg-ok/10 px-1.5 py-0.5 text-[9.5px] text-ok">
-                          {t('plugins.sources.active')}
-                        </span>
-                      )}
-                      {source.builtIn && (
-                        <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9.5px] text-faint">
-                          {t('plugins.builtin')}
-                        </span>
-                      )}
+                      {source.active && <Badge tone="ok">{t('plugins.sources.active')}</Badge>}
+                      {source.builtIn && <Badge>{t('plugins.builtin')}</Badge>}
                     </div>
-                    <p className="mt-1 truncate font-mono text-[10px] text-faint">
+                    <p className="mt-0.5 truncate font-mono text-ui-sm text-faint">
                       {source.endpoint ?? source.kind}
                     </p>
                     {health && (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[9.5px] text-faint">
-                        <span className="inline-flex items-center gap-1 text-ok">
-                          <CheckCircle2 size={10} aria-hidden="true" />
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-faint">
+                        <Badge tone="ok">
+                          <CheckCircle2 aria-hidden="true" />
                           {t('plugins.sources.conformant')}
-                        </span>
+                        </Badge>
                         <span>{health.contract}</span>
                         <span>
                           {health.installable}/{health.items} {t('plugins.sources.installable')}
@@ -134,44 +123,35 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
+                  <IconButton
+                    icon={checkingSource === source.id ? Loader2 : RefreshCw}
+                    size="sm"
+                    label={t('plugins.sources.check')}
                     onClick={() => void checkSource(source.id)}
                     disabled={sourceWorking || checkingSource !== null}
-                    aria-label={t('plugins.sources.check')}
-                    className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-brand/10 hover:text-brand disabled:opacity-50"
-                  >
-                    {checkingSource === source.id ? (
-                      <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-                    ) : (
-                      <RefreshCw size={13} aria-hidden="true" />
-                    )}
-                  </button>
+                    className={checkingSource === source.id ? '[&>svg]:animate-spin' : undefined}
+                  />
                   {!source.builtIn && (
-                    <button
-                      type="button"
+                    <IconButton
+                      icon={Trash2}
+                      variant="danger-ghost"
+                      size="sm"
+                      label={t('plugins.sources.remove')}
                       onClick={() => void removeSource(source.id)}
                       disabled={sourceWorking}
-                      aria-label={t('plugins.sources.remove')}
-                      className="grid size-7 shrink-0 place-items-center rounded-control text-faint hover:bg-danger/10 hover:text-danger"
-                    >
-                      <Trash2 size={13} aria-hidden="true" />
-                    </button>
+                    />
                   )}
                 </li>
               )
             })}
           </ul>
 
-          <form
-            onSubmit={(event) => void submit(event)}
-            className="mt-4 rounded-control border border-line bg-canvas-deep/45 p-3"
-          >
-            <h3 className="caption">{t('plugins.sources.add')}</h3>
-            <p className="mt-1 text-[10.5px] leading-relaxed text-faint">
-              {t('plugins.sources.security')}
-            </p>
-            <div className="mt-3 grid gap-2">
+          <form onSubmit={(event) => void submit(event)} className="card flex flex-col gap-3 p-4">
+            <div>
+              <h3 className="text-ui-base font-medium text-text">{t('plugins.sources.add')}</h3>
+              <p className="mt-1 text-ui-sm text-faint">{t('plugins.sources.security')}</p>
+            </div>
+            <div className="grid gap-2">
               <input
                 value={label}
                 aria-label={t('plugins.sources.name')}
@@ -187,16 +167,20 @@ export function CatalogSourcesDialog({ onClose }: CatalogSourcesDialogProps) {
                 placeholder="https://catalog.example/plugins.json"
                 inputMode="url"
                 spellCheck={false}
-                className="field-control w-full font-mono text-[10.5px]"
+                className="field-control w-full font-mono text-ui-sm"
               />
             </div>
-            <div className="mt-3 flex justify-end">
+            <div className="flex justify-end">
               <Button
                 type="submit"
                 variant="primary"
                 disabled={adding || sourceWorking || label.trim() === '' || endpoint.trim() === ''}
               >
-                {adding ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                {adding ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Plus aria-hidden="true" />
+                )}
                 {adding ? t('plugins.sources.validating') : t('plugins.sources.addAction')}
               </Button>
             </div>

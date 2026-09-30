@@ -6,7 +6,9 @@
  * not a window that appeared in front of it. The two-region shape is the console's
  * own — a chrome rail on the left, the work on the right — so the guide reads as
  * the same piece of software the user is about to be handed, rather than as an
- * installer that will vanish and be replaced by something unfamiliar.
+ * installer that will vanish and be replaced by something unfamiliar. The rail is
+ * the sidebar's width for the same reason: its edge lands on the title bar's
+ * divider, and the window does not appear to rearrange itself when the guide ends.
  *
  * Nothing here is exclusive to it. Step one is the console's environment checks,
  * step two is the console's agent picker, and step three is the button the console
@@ -70,21 +72,19 @@ export function Onboarding() {
 
   return (
     <div className="flex min-h-0 flex-1 animate-rise">
-      <aside className="chrome relative flex w-[288px] shrink-0 flex-col border-r border-line">
+      <aside className="chrome relative flex w-[264px] shrink-0 flex-col border-r border-line">
         <Ambient />
 
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-5">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-6">
           <div className="flex items-center gap-3">
-            <BrandMark size={38} className="rounded-[9px] shadow-lift" />
-            <div className="flex min-w-0 flex-col gap-1">
-              <h1 className="text-[15px] leading-none font-semibold tracking-[-0.01em] text-text">
-                {t('guide.welcome')}
-              </h1>
-              <p className="truncate text-[12px] leading-none text-muted">DSH Studio</p>
+            <BrandMark size={40} />
+            <div className="flex min-w-0 flex-col">
+              <h1 className="text-ui-xl font-semibold text-text">{t('guide.welcome')}</h1>
+              <p className="truncate text-ui-base text-muted">DSH Studio</p>
             </div>
           </div>
 
-          <p className="text-[12.5px] leading-relaxed text-muted">{t('guide.lead')}</p>
+          <p className="text-ui-base text-muted">{t('guide.lead')}</p>
 
           <ol className="flex flex-col gap-1">
             {TITLES.map((title, index) => (
@@ -103,8 +103,8 @@ export function Onboarding() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-7 py-7">
-          <div className="flex w-full max-w-[540px] flex-col gap-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-8">
+          <div className="mx-auto flex w-full max-w-[600px] flex-col gap-6">
             {step === 0 && (
               <Panel title={t('guide.runtime.title')} body={t('guide.runtime.body')}>
                 <EnvironmentChecks />
@@ -113,9 +113,7 @@ export function Onboarding() {
                     needed, so it explains a disabled button instead of warning
                     about one that is about to work. */}
                 {environment !== null && !ready && !working && (
-                  <p className="text-[12px] leading-relaxed text-faint">
-                    {t('guide.runtime.blocked')}
-                  </p>
+                  <p className="text-ui-sm text-muted">{t('guide.runtime.blocked')}</p>
                 )}
                 <Failure />
               </Panel>
@@ -129,9 +127,7 @@ export function Onboarding() {
                     and API keys are the harness's subsystem, with its own page
                     and its own place to keep a secret; a second copy here would
                     be a second thing to get wrong about somebody's credentials. */}
-                <p className="text-[11.5px] leading-relaxed text-faint">
-                  {t('guide.agent.models')}
-                </p>
+                <p className="text-ui-sm text-faint">{t('guide.agent.models')}</p>
               </Panel>
             )}
 
@@ -144,7 +140,10 @@ export function Onboarding() {
           </div>
         </div>
 
-        <footer className="chrome flex h-[52px] shrink-0 items-center gap-2 border-t border-line px-5">
+        {/* The one place on the screen with two sizes of button in a row, on
+            purpose: the way on is the hero action and takes the large one, and
+            the ways back and out are ordinary commands. */}
+        <footer className="chrome flex shrink-0 items-center gap-2 border-t border-line px-6 py-3">
           <Button variant="ghost" onClick={finish}>
             {t('guide.skip')}
           </Button>
@@ -157,7 +156,7 @@ export function Onboarding() {
             )}
             <Button
               variant="primary"
-              className="min-w-[104px]"
+              size="lg"
               onClick={advance}
               disabled={blocked || working || (last && starting)}
             >
@@ -175,7 +174,7 @@ function Begin({ running, starting }: { running: boolean; starting: boolean }) {
   if (starting) {
     return (
       <>
-        <Loader2 size={14} className="animate-spin" />
+        <Loader2 className="animate-spin" aria-hidden="true" />
         {t('action.starting')}
       </>
     )
@@ -183,7 +182,7 @@ function Begin({ running, starting }: { running: boolean; starting: boolean }) {
 
   return (
     <>
-      <Terminal size={14} strokeWidth={2.3} />
+      <Terminal aria-hidden="true" />
       {running ? t('guide.session.open') : t('guide.session.begin')}
     </>
   )
@@ -194,10 +193,8 @@ function Panel({ title, body, children }: { title: string; body: string; childre
   return (
     <>
       <header className="flex flex-col gap-2">
-        <h2 className="text-[17px] leading-tight font-semibold tracking-[-0.015em] text-text">
-          {title}
-        </h2>
-        <p className="text-[12.5px] leading-relaxed text-muted">{body}</p>
+        <h2 className="text-ui-2xl font-semibold text-text">{title}</h2>
+        <p className="text-ui-base text-muted">{body}</p>
       </header>
       <div className="flex flex-col gap-3">{children}</div>
     </>
@@ -209,7 +206,9 @@ function Panel({ title, body, children }: { title: string; body: string; childre
  *
  * The number becomes a tick once the step is behind you, which is the whole of
  * the progress indicator: three rows, and the shape of the marker says where you
- * are without a bar that has to be interpreted.
+ * are without a bar that has to be interpreted. The row is the sidebar's row —
+ * the current step takes the selected fill, and only the steps behind you answer
+ * the pointer.
  */
 function Rung({
   index,
@@ -228,9 +227,9 @@ function Rung({
     ahead: 'border-line-strong text-faint',
   }[state]
 
-  const text = {
-    done: 'text-muted',
-    current: 'text-text',
+  const row = {
+    done: 'text-muted hover:bg-surface-2/70 hover:text-text',
+    current: 'bg-surface-2 font-medium text-text',
     ahead: 'text-faint',
   }[state]
 
@@ -242,16 +241,17 @@ function Rung({
         disabled={onSelect === undefined}
         aria-current={state === 'current' ? 'step' : undefined}
         className={[
-          'flex w-full items-center gap-2.5 rounded-control py-1.5 pr-2 pl-1 text-left transition duration-100',
-          onSelect ? 'cursor-pointer hover:bg-surface-2' : 'cursor-default',
+          'flex h-10 w-full items-center gap-3 rounded-lg px-2 text-left text-ui-base transition-colors duration-100',
+          onSelect ? 'cursor-pointer' : 'cursor-default',
+          row,
         ].join(' ')}
       >
         <span
-          className={`grid size-[22px] shrink-0 place-items-center rounded-full border text-[11px] font-semibold tabular-nums ${marker}`}
+          className={`grid size-6 shrink-0 place-items-center rounded-full border text-ui-xs font-semibold tabular-nums ${marker}`}
         >
-          {state === 'done' ? <Check size={12} strokeWidth={3} aria-hidden="true" /> : index + 1}
+          {state === 'done' ? <Check size={14} strokeWidth={2.4} aria-hidden="true" /> : index + 1}
         </span>
-        <span className={`min-w-0 truncate text-[12.5px] font-medium ${text}`}>{label}</span>
+        <span className="min-w-0 truncate">{label}</span>
       </button>
     </li>
   )
@@ -274,7 +274,7 @@ function Recap() {
   const agent = preset ? (preset.name ?? preset.id) : chosen
 
   return (
-    <dl className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
+    <dl className="list-card">
       {agent && <Fact label={t('section.agent')} value={agent} />}
       {workspace && <Fact label={t('guide.session.workspace')} value={workspace} mono />}
     </dl>
@@ -283,11 +283,11 @@ function Recap() {
 
 function Fact({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex h-[30px] items-center gap-3 px-2.5">
-      <dt className="shrink-0 text-[12px] text-muted">{label}</dt>
+    <div className="list-row">
+      <dt className="shrink-0 text-ui-base text-muted">{label}</dt>
       <dd
         data-hint={value}
-        className={`ml-auto min-w-0 truncate text-[12px] text-text ${mono ? 'font-mono text-[11.5px]' : ''}`}
+        className={`ml-auto min-w-0 truncate text-text ${mono ? 'font-mono text-ui-sm' : 'text-ui-base'}`}
       >
         {value}
       </dd>
@@ -301,7 +301,7 @@ function Failure() {
   if (!error) return null
 
   return (
-    <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed text-danger">
+    <p className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger">
       {error}
     </p>
   )

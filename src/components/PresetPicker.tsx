@@ -7,9 +7,14 @@
  * value to pick from a list you have to open first.
  *
  * Two sizes of the same control. The guide has a pane to itself and shows each
- * one's description; the console rail has 340px and shows the names, with the
- * description on the pointer. Neither is a different component, because they are
- * the same choice and would otherwise be two things to keep in agreement.
+ * one's description; the console rail is one column of two and shows the names,
+ * with the description on the pointer. Neither is a different component, because
+ * they are the same choice and would otherwise be two things to keep in agreement.
+ *
+ * Drawn as a list card of rows, the same surface as the environment checks it
+ * sits beside in the console, so the two columns share their row lines. A column
+ * of separately bordered cards next to a single bordered list reads as two designs
+ * that happen to be on one screen.
  *
  * The names are the harness's own words in whatever language it shipped them in.
  * Nothing here translates them: a preset the user wrote themselves is shown the
@@ -20,6 +25,8 @@ import { useEffect, useState, type KeyboardEvent } from 'react'
 import { Archive, Download, Loader2, Upload } from 'lucide-react'
 import { open as pickFile, save as pickPath } from '@tauri-apps/plugin-dialog'
 
+import { Badge } from '@/components/Badge'
+import { Button } from '@/components/Button'
 import { t } from '@/lib/i18n'
 import type { AgentPreset } from '@/lib/ipc'
 import * as ipc from '@/lib/ipc'
@@ -104,49 +111,41 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
 
   if (loading && presets.length === 0) {
     return (
-      <p className="flex items-center gap-2 px-0.5 py-1 text-[12px] text-faint">
-        <Loader2 size={12} className="animate-spin" aria-hidden="true" />
+      <p className="flex items-center gap-2 text-ui-base text-muted">
+        <Loader2 size={16} className="animate-spin" aria-hidden="true" />
         {t('status.starting')}
       </p>
     )
   }
 
   if (presets.length === 0) {
-    return <p className="px-0.5 text-[12px] leading-relaxed text-faint">{t('guide.agent.empty')}</p>
+    return <p className="text-ui-sm text-faint">{t('guide.agent.empty')}</p>
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {detail && (
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-control border border-line px-2.5 py-1.5 text-[11px] text-muted transition hover:border-line-strong hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={!chosen || chosenPreset?.shipped !== false || transferring !== null}
             onClick={() => void exportPreset()}
           >
-            {transferring === 'export' ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <Download size={12} />
-            )}
+            {transferring === 'export' ? <Loader2 className="animate-spin" /> : <Download />}
             {t('preset.export')}
-          </button>
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-control border border-line px-2.5 py-1.5 text-[11px] text-muted transition hover:border-line-strong hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             disabled={transferring !== null}
             onClick={() => void importPreset()}
           >
-            {transferring === 'import' ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <Upload size={12} />
-            )}
+            {transferring === 'import' ? <Loader2 className="animate-spin" /> : <Upload />}
             {t('preset.import')}
-          </button>
-          <span className="inline-flex items-center gap-1 text-[10.5px] text-faint">
-            <Archive size={11} aria-hidden="true" />
+          </Button>
+          <span className="inline-flex items-center gap-1.5 text-ui-sm text-faint">
+            <Archive size={14} aria-hidden="true" />
             {t('preset.transferHint')}
           </span>
         </div>
@@ -155,7 +154,7 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
         role="radiogroup"
         aria-label={t('section.agent')}
         onKeyDown={moveSelection}
-        className="flex flex-col gap-1.5"
+        className="list-card"
       >
         {presets.map((preset) => (
           <Choice
@@ -170,12 +169,12 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
       </div>
 
       {error && (
-        <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed text-danger">
+        <p className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger [overflow-wrap:anywhere]">
           {error}
         </p>
       )}
       {transferError && (
-        <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-2.5 py-2 text-[12px] leading-relaxed text-danger">
+        <p className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger [overflow-wrap:anywhere]">
           {transferError}
         </p>
       )}
@@ -186,10 +185,19 @@ export function PresetPicker({ detail = false }: { detail?: boolean }) {
 /**
  * One preset, as something to press.
  *
- * A button carrying radio semantics rather than an `<input>`: the whole card is
- * the target, and a 6px dot inside a 300px row is not a target. `aria-checked`
+ * A button carrying radio semantics rather than an `<input>`: the whole row is
+ * the target, and a dot inside a row that wide is not a target. `aria-checked`
  * and the group above it are what keep it a radio to everything that is not
  * looking at the pixels.
+ *
+ * The row is the list card's own and not a card of its own, so two things about
+ * it differ from a free-standing control. The focus ring is drawn inside the edge,
+ * because the card clips what leaves it and a ring at the usual offset would be
+ * cut off on three sides; and the corner is squared, because the global focus rule
+ * gives a focused element a 4px one, which would round the selected fill against
+ * the rows above and below it. Only the fill is transitioned, because
+ * `transition-colors` carries the outline's colour with it and the ring would
+ * fade in from grey.
  */
 function Choice({
   preset,
@@ -209,6 +217,10 @@ function Choice({
   // who made it called it.
   const name = preset.name ?? preset.id
 
+  // Only where the description is on the row. A row without one stays single-line
+  // rather than being padded out to the height of its neighbours.
+  const described = detail && Boolean(preset.description)
+
   return (
     <button
       type="button"
@@ -216,48 +228,37 @@ function Choice({
       aria-checked={chosen}
       tabIndex={tabbable ? 0 : -1}
       onClick={onChoose}
-      // Only where the description is not already on the card. Two ways of
+      // Only where the description is not already on the row. Two ways of
       // reading the same sentence is one more than anybody needs.
       data-hint={detail ? undefined : (preset.description ?? undefined)}
       className={[
-        'group flex w-full cursor-pointer flex-col gap-1 rounded-control border px-2.5 text-left transition duration-100 ease-[var(--ease-out-soft)]',
-        detail ? 'py-2.5' : 'py-2',
-        chosen
-          ? 'border-control-border bg-surface-2'
-          : 'border-line bg-canvas-deep/40 hover:border-line-strong hover:bg-surface-2',
-      ].join(' ')}
+        'list-row group w-full rounded-none text-left transition-[background-color] focus-visible:-outline-offset-2',
+        // The dot and the badge sit on the name's line, not in the middle of the block.
+        described && 'list-row--roomy items-start',
+        chosen ? 'bg-surface-2' : 'hover:bg-surface-2/70',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
-      <span className="flex items-center gap-2">
-        <Dot chosen={chosen} />
-        <span
-          className={`min-w-0 truncate text-[12.5px] font-medium ${chosen ? 'text-text' : 'text-muted group-hover:text-text'}`}
-        >
-          {name}
-        </span>
+      <Dot chosen={chosen} className={described ? 'mt-0.5' : undefined} />
 
-        {chosen && (
-          <span className="ml-auto h-[18px] shrink-0 rounded-[4px] bg-brand/15 px-1.5 text-[10.5px] leading-[18px] font-medium text-brand">
-            {t('preset.current')}
-          </span>
-        )}
-        {!chosen && !preset.shipped && (
-          <span className="ml-auto shrink-0 text-[10.5px] text-faint">{t('preset.yours')}</span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate text-ui-base text-text">{name}</span>
+        {described && (
+          // Under the name rather than under the dot, so the row reads as one
+          // block rather than two.
+          <span className="text-ui-sm text-faint">{preset.description}</span>
         )}
       </span>
 
-      {detail && preset.description && (
-        // Indented past the dot so the description lines up under the name and
-        // the row reads as one block rather than two.
-        <span className="pl-[22px] text-[11.5px] leading-relaxed text-faint">
-          {preset.description}
-        </span>
-      )}
+      {chosen && <Badge tone="ok">{t('preset.current')}</Badge>}
+      {!chosen && !preset.shipped && <Badge>{t('preset.yours')}</Badge>}
     </button>
   )
 }
 
 /** The selected state, drawn rather than borrowed from the platform. */
-function Dot({ chosen }: { chosen: boolean }) {
+function Dot({ chosen, className }: { chosen: boolean; className?: string }) {
   return (
     <span
       aria-hidden="true"
@@ -266,7 +267,10 @@ function Dot({ chosen }: { chosen: boolean }) {
         chosen
           ? 'bg-brand shadow-[inset_0_0_0_1px_var(--color-brand)]'
           : 'shadow-[inset_0_0_0_1px_var(--color-control-border)] group-hover:shadow-[inset_0_0_0_1px_var(--color-control-border-hover)]',
-      ].join(' ')}
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       {chosen && <span className="size-1.5 rounded-full bg-on-brand" />}
     </span>

@@ -11,10 +11,11 @@ import {
   Wifi,
 } from 'lucide-react'
 
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
 import { QrCode } from '@/components/QrCode'
-import { StatusDot } from '@/components/StatusDot'
 import { t } from '@/lib/i18n'
 import type { MessageKey } from '@/lib/i18n'
 import type { RemoteDevice, RemoteStatus } from '@/lib/ipc'
@@ -46,6 +47,14 @@ const LOW_WATER = 20
  * the pane into a poller.
  */
 const RESYNC = 30_000
+
+/**
+ * An address, drawn as the thing it is: text to be read off the screen and typed
+ * into a phone. The chip is what makes it findable, and it stays selectable
+ * because "copy" is the other way it gets to the phone.
+ */
+const ADDRESS_CHIP =
+  'selectable rounded-sm bg-control-fill px-2 py-1 font-mono text-ui-sm text-text tabular-nums'
 
 /**
  * Reaching the harness from a phone.
@@ -93,14 +102,7 @@ export function RemotePane() {
   return (
     <section className="flex min-h-0 flex-1 animate-rise flex-col">
       <PaneHeader title={t('remote.title')} subtitle={t('remote.subtitle')} width="narrow">
-        <span className="flex items-center gap-1.5 text-[11.5px] text-muted">
-          <StatusDot
-            tone={{
-              color: isOpen ? 'var(--color-ok)' : 'var(--color-faint)',
-              live: false,
-            }}
-            size={6}
-          />
+        <Badge tone={isOpen ? 'ok' : 'neutral'}>
           {operation === 'open'
             ? t('remote.opening')
             : operation === 'close'
@@ -110,16 +112,16 @@ export function RemotePane() {
                 : suspended
                   ? t('remote.state.reconnecting')
                   : t('remote.state.closed')}
-        </span>
+        </Badge>
 
         {operation === 'open' ? (
           <Button variant="secondary" onClick={() => void close()}>
-            <Loader2 size={13} className="animate-spin" />
+            <Loader2 className="animate-spin" />
             {t('remote.cancelOpening')}
           </Button>
         ) : operation === 'close' ? (
           <Button variant="secondary" disabled>
-            <Loader2 size={13} className="animate-spin" />
+            <Loader2 className="animate-spin" />
             {t('remote.closing')}
           </Button>
         ) : isOpen ? (
@@ -132,7 +134,7 @@ export function RemotePane() {
               {t('remote.close')}
             </Button>
             <Button variant="primary" onClick={() => void open()} disabled={!serving || busy}>
-              {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+              {busy ? <Loader2 className="animate-spin" /> : <RefreshCw />}
               {t('remote.reconnect')}
             </Button>
           </span>
@@ -140,12 +142,12 @@ export function RemotePane() {
           <Button variant="primary" onClick={() => void open()} disabled={!serving || busy}>
             {busy ? (
               <>
-                <Loader2 size={13} className="animate-spin" />
+                <Loader2 className="animate-spin" />
                 {t('remote.opening')}
               </>
             ) : (
               <>
-                <Wifi size={13} strokeWidth={2.3} />
+                <Wifi />
                 {t('remote.open')}
               </>
             )}
@@ -153,7 +155,7 @@ export function RemotePane() {
         )}
       </PaneHeader>
 
-      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-6">
         <div className="mx-auto flex max-w-[780px] flex-col gap-4">
           {status?.open ? (
             <>
@@ -166,27 +168,27 @@ export function RemotePane() {
           )}
 
           {suspended && (
-            <p className="selectable rounded-control border border-warn/30 bg-warn/10 px-3 py-2 text-[12px] leading-relaxed text-warn">
+            <p className="selectable rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-ui-sm text-warn">
               {t('remote.reconnectingHint')}
             </p>
           )}
 
           {error && (
-            <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
+            <p className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger">
               {error}
             </p>
           )}
 
-          <ul className="flex flex-col gap-2.5 rounded-panel border border-line bg-canvas-deep/40 px-4 py-3.5">
+          <ul className="card flex flex-col gap-2 px-4 py-3">
             {NOTES.map((note) => (
-              <li key={note} className="flex gap-2.5">
+              <li key={note} className="flex gap-2">
                 <ShieldCheck
-                  size={13}
-                  strokeWidth={2.1}
-                  className="mt-[3px] shrink-0 text-ok"
+                  size={14}
+                  strokeWidth={2}
+                  className="mt-0.5 shrink-0 text-ok"
                   aria-hidden="true"
                 />
-                <p className="text-[12px] leading-relaxed text-muted">{t(note)}</p>
+                <p className="text-ui-sm text-muted">{t(note)}</p>
               </li>
             ))}
           </ul>
@@ -208,8 +210,8 @@ function Door({ status }: { status: RemoteStatus }) {
   const { qr, url, pairingUrl, codeSecondsLeft, codeLifetimeSeconds } = status
 
   return (
-    <div className="flex flex-col gap-5 rounded-panel border border-line bg-canvas-deep/50 p-5 sm:flex-row">
-      <div className="flex shrink-0 flex-col items-center gap-2.5" style={{ width: TILE }}>
+    <div className="card card--pad flex flex-col gap-5 sm:flex-row">
+      <div className="flex shrink-0 flex-col items-center gap-3" style={{ width: TILE }}>
         {qr && codeSecondsLeft !== null ? (
           <>
             <QrCode matrix={qr} size={TILE} label={t('remote.scan')} />
@@ -221,14 +223,14 @@ function Door({ status }: { status: RemoteStatus }) {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <p className="text-[12.5px] leading-relaxed text-muted">
+        <p className="text-ui-base text-muted">
           {pairingUrl ? t('remote.scanHint') : t('remote.expiredHint')}
         </p>
 
         {url && (
-          <dl className="flex flex-col gap-1">
+          <dl className="flex flex-col gap-1.5">
             <dt className="caption">{t('remote.address')}</dt>
-            <dd className="selectable font-mono text-[13px] text-text tabular-nums">
+            <dd className={`${ADDRESS_CHIP} self-start`}>
               {url.replace(/^https?:\/\//, '').replace(/\/$/, '')}
             </dd>
           </dl>
@@ -281,7 +283,7 @@ function Countdown({ seconds, lifetime, onLapse }: CountdownProps) {
 
   return (
     <div className="flex w-full flex-col gap-1.5">
-      <div className="h-[3px] overflow-hidden rounded-full bg-line">
+      <div className="h-1 overflow-hidden rounded-full bg-line">
         <div
           className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${
             low ? 'bg-warn' : 'bg-brand'
@@ -290,7 +292,7 @@ function Countdown({ seconds, lifetime, onLapse }: CountdownProps) {
         />
       </div>
       <span
-        className={`text-center text-[11px] tabular-nums ${low ? 'text-warn' : 'text-faint'}`}
+        className={`text-center text-ui-xs tabular-nums ${low ? 'text-warn' : 'text-faint'}`}
         aria-live="off"
       >
         {t('remote.expiresIn', { seconds: left })}
@@ -304,16 +306,21 @@ function Lapsed({ onRenew }: { onRenew: () => void }) {
   return (
     <>
       <div
-        className="grid place-items-center rounded-panel border border-dashed border-line-strong bg-canvas-deep/60"
+        className="grid place-items-center rounded-xl border border-dashed border-line-strong bg-control-fill"
         style={{ width: TILE, height: TILE }}
       >
         <div className="flex flex-col items-center gap-2 px-5 text-center">
-          <TimerOff size={22} strokeWidth={1.5} className="text-faint" aria-hidden="true" />
-          <span className="text-[12px] text-muted">{t('remote.expired')}</span>
+          <TimerOff
+            size={24}
+            strokeWidth={1.4}
+            className="text-faint opacity-60"
+            aria-hidden="true"
+          />
+          <span className="text-ui-sm text-muted">{t('remote.expired')}</span>
         </div>
       </div>
       <Button variant="secondary" onClick={onRenew}>
-        <RefreshCw size={13} strokeWidth={2.1} />
+        <RefreshCw />
         {t('remote.newCode')}
       </Button>
     </>
@@ -346,40 +353,37 @@ function Devices({ devices }: { devices: RemoteDevice[] }) {
       <h3 className="caption">{t('remote.devices')}</h3>
 
       {devices.length === 0 ? (
-        <p className="rounded-panel border border-dashed border-line-strong bg-canvas-deep/40 px-4 py-5 text-center text-[12px] text-faint">
+        <p className="rounded-xl border border-dashed border-line-strong px-4 py-5 text-center text-ui-sm text-faint">
           {t('remote.noDevices')}
         </p>
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
+        <ul className="list-card">
           {devices.map((device) => (
-            <li key={device.id} className="flex items-center gap-3 px-3.5 py-2.5">
+            <li key={device.id} className="list-row list-row--roomy">
               <Smartphone
-                size={15}
+                size={16}
                 strokeWidth={1.9}
                 className="shrink-0 text-faint"
                 aria-hidden="true"
               />
 
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[12.5px] text-text">
+                <span className="truncate text-ui-base font-medium text-text">
                   {device.label ?? t('remote.unknownDevice')}
                 </span>
-                <span className="truncate text-[11px] text-faint">
+                <span className="truncate text-ui-sm text-muted">
                   {t('remote.pairedAgo', { when: when(device.pairedSecondsAgo) })}
                   {' · '}
                   {t('remote.lastSeen', { when: when(device.lastSeenSecondsAgo) })}
                 </span>
               </div>
 
-              <button
-                type="button"
+              <IconButton
+                variant="danger-ghost"
+                icon={Trash2}
+                label={t('remote.forget')}
                 onClick={() => void confirmForget(device)}
-                data-hint={t('remote.forget')}
-                aria-label={t('remote.forget')}
-                className="grid size-[26px] shrink-0 place-items-center rounded-control text-faint/60 transition-colors duration-100 hover:bg-danger/12 hover:text-danger"
-              >
-                <Trash2 size={13} strokeWidth={2} />
-              </button>
+              />
             </li>
           ))}
         </ul>
@@ -399,22 +403,24 @@ function when(seconds: number): string {
 /** The closed door: what would happen, and what is stopping it. */
 function Closed({ serving, addresses }: { serving: boolean; addresses: string[] }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-panel border border-dashed border-line-strong bg-canvas-deep/40 px-6 py-10 text-center">
-      <Smartphone size={26} strokeWidth={1.5} className="text-faint" aria-hidden="true" />
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-line-strong px-6 py-10 text-center">
+      <Smartphone
+        size={24}
+        strokeWidth={1.4}
+        className="text-faint opacity-60"
+        aria-hidden="true"
+      />
 
       {!serving ? (
-        <p className="text-[12.5px] text-muted">{t('remote.needsHarness')}</p>
+        <p className="text-ui-base text-muted">{t('remote.needsHarness')}</p>
       ) : addresses.length === 0 ? (
-        <p className="text-[12.5px] text-muted">{t('remote.noNetwork')}</p>
+        <p className="text-ui-base text-muted">{t('remote.noNetwork')}</p>
       ) : (
         <>
           <p className="caption">{t('remote.reachableAt')}</p>
-          <ul className="flex flex-wrap items-center justify-center gap-1.5">
+          <ul className="flex flex-wrap items-center justify-center gap-2">
             {addresses.map((address) => (
-              <li
-                key={address}
-                className="selectable rounded-control border border-line bg-surface-2 px-2 py-1 font-mono text-[11.5px] text-muted tabular-nums"
-              >
+              <li key={address} className={ADDRESS_CHIP}>
                 {address}
               </li>
             ))}
@@ -436,7 +442,7 @@ function Counters({
   refused: number
 }) {
   return (
-    <dl className="grid grid-cols-3 gap-px overflow-hidden rounded-panel border border-line bg-line">
+    <dl className="card grid grid-cols-3 divide-x divide-line">
       <Stat label={t('remote.active')} value={active} tone={active > 0 ? 'text-ok' : undefined} />
       <Stat label={t('remote.served')} value={served} />
       <Stat
@@ -450,11 +456,9 @@ function Counters({
 
 function Stat({ label, value, tone }: { label: string; value: number; tone?: string }) {
   return (
-    <div className="flex flex-col gap-1 bg-canvas-deep px-3.5 py-2.5">
+    <div className="flex flex-col gap-1 px-4 py-3">
       <dt className="caption">{label}</dt>
-      <dd className={`font-mono text-[17px] leading-none tabular-nums ${tone ?? 'text-text'}`}>
-        {value}
-      </dd>
+      <dd className={`font-mono text-ui-xl tabular-nums ${tone ?? 'text-text'}`}>{value}</dd>
     </div>
   )
 }
@@ -479,11 +483,7 @@ function CopyButton({ value, label }: { value: string; label: string }): ReactNo
 
   return (
     <Button variant="secondary" className="self-start" onClick={copy}>
-      {copied ? (
-        <Check size={13} strokeWidth={2.6} className="text-ok" />
-      ) : (
-        <Copy size={13} strokeWidth={2.1} />
-      )}
+      {copied ? <Check className="text-ok" /> : <Copy />}
       {copied ? t('statusbar.copied') : label}
     </Button>
   )

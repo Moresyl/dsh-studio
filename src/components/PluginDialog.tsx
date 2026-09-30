@@ -19,17 +19,32 @@ import {
   X,
 } from 'lucide-react'
 
+import { Badge, type BadgeTone } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 import { Switch } from '@/components/Switch'
 import { count, day, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { pluginDisplayName, pluginVersionAction } from '@/lib/plugin-presentation'
 import { normalizeExternalUrl, openExternalUrl } from '@/lib/external-url'
-import type { InstalledPlugin } from '@/lib/ipc'
+import type { InstalledPlugin, PluginDetail } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { useHarness } from '@/state/harness'
 import { reportAction } from '@/state/failure'
 import { installedPlugin, usePlugins } from '@/state/plugins'
+
+type Verdict = PluginDetail['trust']['level']
+
+/**
+ * How a verdict is drawn: the badge that states it, the dot in front of a
+ * signal, and the colour its result is set in. One table so the three can never
+ * disagree about what "review" looks like.
+ */
+const VERDICT: Record<Verdict, { tone: BadgeTone; dot: string; text: string }> = {
+  verified: { tone: 'ok', dot: 'bg-ok', text: 'text-ok' },
+  review: { tone: 'warn', dot: 'bg-warn', text: 'text-warn' },
+  blocked: { tone: 'danger', dot: 'bg-danger', text: 'text-danger' },
+}
 
 interface PluginDialogProps {
   /** Asked by the pane, so both lists ask the removal question the same way. */
@@ -126,67 +141,63 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="dialog-backdrop fixed inset-0 z-30 grid animate-fade place-items-center bg-canvas-deep/70 p-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
         role="dialog"
         aria-modal="true"
         aria-label={t('plugins.details')}
-        className="dialog-panel flex max-h-full w-full max-w-[620px] animate-pop flex-col overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-[min(720px,calc(100vh-64px))] w-full max-w-[620px] animate-pop flex-col overflow-hidden rounded-xl border border-line-strong bg-surface shadow-lift"
       >
-        <header className="flex shrink-0 items-start gap-3 border-b border-line px-5 py-4">
+        <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
           <span
             aria-hidden="true"
-            className="grid size-9 shrink-0 place-items-center rounded-[8px] border border-line bg-surface-2 text-brand"
+            className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-brand"
           >
-            <Package size={17} strokeWidth={1.9} />
+            <Package size={18} strokeWidth={1.8} />
           </span>
 
-          <div className="min-w-0 flex-1 pt-px">
-            <h2 className="selectable text-[17px] leading-snug font-semibold text-text [overflow-wrap:anywhere]">
-              {pluginDisplayName(selected)}
-            </h2>
-            <p className="selectable mt-1 text-[12px] text-muted [overflow-wrap:anywhere]">
-              {selected}
-            </p>
-            <p className="mt-1 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 text-[11px] text-faint">
-              {detail && <span className="font-mono tabular-nums">{detail.version}</span>}
-              {listing?.publisher && <span className="truncate">{listing.publisher}</span>}
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="selectable min-w-0 text-ui-lg font-semibold text-text [overflow-wrap:anywhere]">
+                {pluginDisplayName(selected)}
+              </h2>
               {here && (
-                <span className="inline-flex items-center gap-1 text-ok">
-                  <Check size={10} strokeWidth={2.8} aria-hidden="true" />
+                <Badge tone="ok">
+                  <Check aria-hidden="true" />
                   {t('plugins.installed')}
-                </span>
+                </Badge>
+              )}
+            </div>
+            <p className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-ui-sm text-muted">
+              <span className="selectable [overflow-wrap:anywhere]">{selected}</span>
+              {detail && (
+                <span className="font-mono text-faint tabular-nums">v{detail.version}</span>
+              )}
+              {listing?.publisher && (
+                <span className="truncate text-faint">{listing.publisher}</span>
               )}
             </p>
           </div>
 
-          <button
-            type="button"
-            aria-label={t('plugins.close')}
-            data-hint={t('plugins.close')}
-            onClick={close}
-            className="-mt-0.5 -mr-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors duration-100 hover:bg-surface-2 hover:text-text"
-          >
-            <X size={14} strokeWidth={2.2} aria-hidden="true" />
-          </button>
+          <IconButton icon={X} size="sm" label={t('plugins.close')} onClick={close} />
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
             <div className="grid h-[168px] place-items-center">
-              <Loader2 size={18} className="animate-spin text-faint" aria-hidden="true" />
+              <Loader2 size={20} className="animate-spin text-faint" aria-hidden="true" />
             </div>
           ) : detail === null ? (
-            <div className="flex h-[168px] flex-col items-center justify-center gap-2.5 text-center">
+            <div className="flex h-[168px] flex-col items-center justify-center gap-3 text-center">
               <TriangleAlert
-                size={20}
-                strokeWidth={1.5}
-                className="text-faint opacity-70"
+                size={24}
+                strokeWidth={1.4}
+                className="text-faint opacity-60"
                 aria-hidden="true"
               />
-              <p className="text-[12px] text-faint">{t('plugins.detailFailed')}</p>
+              <p className="text-ui-base text-muted">{t('plugins.detailFailed')}</p>
               <Button
                 variant="secondary"
                 onClick={() =>
@@ -197,9 +208,9 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
               </Button>
             </div>
           ) : (
-            <div className="flex flex-col gap-3.5">
+            <div className="flex flex-col gap-4">
               {detail.description && (
-                <p className="selectable text-[13px] leading-relaxed text-muted [overflow-wrap:anywhere]">
+                <p className="selectable text-ui-base text-muted [overflow-wrap:anywhere]">
                   {detail.description}
                 </p>
               )}
@@ -208,141 +219,126 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                   merely mentions the harness in its description. */}
               <div
                 className={[
-                  'flex items-start gap-2 rounded-control border px-2.5 py-2 text-[11.5px] leading-relaxed',
+                  'flex items-start gap-2 rounded-lg border px-3 py-2 text-ui-sm',
                   detail.bundle
-                    ? 'border-ok/25 bg-ok/10 text-ok'
-                    : 'border-line bg-surface-2/60 text-muted',
+                    ? 'border-ok/30 bg-ok/10 text-ok'
+                    : 'border-line bg-control-fill text-muted',
                 ].join(' ')}
               >
                 <Layers
-                  size={12}
-                  strokeWidth={2.2}
-                  className="mt-[3px] shrink-0"
+                  size={14}
+                  strokeWidth={1.9}
+                  className="mt-0.5 shrink-0"
                   aria-hidden="true"
                 />
                 {detail.bundle ? t('plugins.declaresPatch') : t('plugins.noPatch')}
               </div>
 
-              <section className="rounded-control border border-line bg-canvas-deep/45 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck
-                      size={14}
-                      className={
-                        detail.trust.level === 'verified'
-                          ? 'text-ok'
-                          : detail.trust.level === 'review'
-                            ? 'text-warn'
-                            : 'text-danger'
-                      }
-                      aria-hidden="true"
-                    />
-                    <h3 className="text-[11.5px] font-medium text-text">
-                      {t('plugins.trust.title')}
-                    </h3>
-                  </div>
-                  <span
-                    className={[
-                      'rounded-full px-2 py-0.5 text-[10px] font-medium',
-                      detail.trust.level === 'verified'
-                        ? 'bg-ok/15 text-ok'
-                        : detail.trust.level === 'review'
-                          ? 'bg-warn/15 text-warn'
-                          : 'bg-danger/15 text-danger',
-                    ].join(' ')}
-                  >
+              <section className="card flex flex-col gap-3 px-4 py-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck
+                    size={16}
+                    strokeWidth={1.9}
+                    className={`shrink-0 ${VERDICT[detail.trust.level].text}`}
+                    aria-hidden="true"
+                  />
+                  <h3 className="text-ui-base font-medium text-text">{t('plugins.trust.title')}</h3>
+                  <Badge tone={VERDICT[detail.trust.level].tone} className="ml-auto">
                     {detail.trust.level === 'verified'
                       ? t('plugins.trust.verified')
                       : detail.trust.level === 'review'
                         ? t('plugins.trust.review')
                         : t('plugins.trust.blocked')}
-                  </span>
+                  </Badge>
                 </div>
-                <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {detail.trust.signals.map((signal) => (
-                    <li
-                      key={signal.code}
-                      data-hint={signal.detail}
-                      className="flex items-center gap-2 rounded-[5px] border border-line bg-surface/55 px-2 py-1.5 text-[10.5px]"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={[
-                          'size-1.5 shrink-0 rounded-full',
-                          signal.state === 'verified'
-                            ? 'bg-ok'
-                            : signal.state === 'review'
-                              ? 'bg-warn'
-                              : 'bg-danger',
-                        ].join(' ')}
-                      />
-                      <span className="min-w-0 flex-1 truncate text-muted">
-                        {trustSignalLabel(signal.code)}
-                      </span>
-                      <span
-                        className={
-                          signal.state === 'verified'
-                            ? 'text-ok'
-                            : signal.state === 'review'
-                              ? 'text-warn'
-                              : 'text-danger'
-                        }
-                      >
-                        {signal.state === 'verified'
-                          ? t('plugins.trust.pass')
-                          : signal.state === 'review'
-                            ? t('plugins.trust.reviewShort')
-                            : t('plugins.trust.stop')}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 border-t border-line pt-2 text-[10.5px]">
-                  <dt className="text-faint">{t('plugins.resources.dependencies')}</dt>
-                  <dd className="text-right tabular-nums text-muted">
-                    {detail.resources.directDependencies}
-                  </dd>
-                  <dt className="text-faint">{t('plugins.resources.size')}</dt>
-                  <dd className="text-right tabular-nums text-muted">
-                    {detail.resources.unpackedBytes === null
-                      ? t('common.unavailable')
-                      : filesize(detail.resources.unpackedBytes)}
-                  </dd>
-                  <dt className="text-faint">{t('plugins.resources.files')}</dt>
-                  <dd className="text-right tabular-nums text-muted">
-                    {detail.resources.publishedFiles ?? t('common.unavailable')}
-                  </dd>
-                  <dt className="text-faint">{t('plugins.resources.native')}</dt>
-                  <dd
-                    className={`text-right ${detail.resources.nativeBuildDeclared ? 'text-warn' : 'text-ok'}`}
+
+                {/* Two columns only when there is a second signal to put in one:
+                    a lone row would leave its verdict stranded mid-card. */}
+                {detail.trust.signals.length > 0 && (
+                  <ul
+                    className={[
+                      'grid grid-cols-1 gap-x-6 gap-y-1.5',
+                      detail.trust.signals.length > 1 ? 'sm:grid-cols-2' : '',
+                    ].join(' ')}
                   >
-                    {detail.resources.nativeBuildDeclared
-                      ? t('plugins.resources.declared')
-                      : t('plugins.resources.none')}
-                  </dd>
+                    {detail.trust.signals.map((signal) => (
+                      <li
+                        key={signal.code}
+                        data-hint={signal.detail}
+                        className="flex items-center gap-2 text-ui-sm"
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={`size-1.5 shrink-0 rounded-full ${VERDICT[signal.state].dot}`}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-muted">
+                          {trustSignalLabel(signal.code)}
+                        </span>
+                        <span className={VERDICT[signal.state].text}>
+                          {signal.state === 'verified'
+                            ? t('plugins.trust.pass')
+                            : signal.state === 'review'
+                              ? t('plugins.trust.reviewShort')
+                              : t('plugins.trust.stop')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-2 border-t border-line pt-3 text-ui-sm sm:grid-cols-4">
+                  <div>
+                    <dt className="text-faint">{t('plugins.resources.dependencies')}</dt>
+                    <dd className="mt-0.5 text-text tabular-nums">
+                      {detail.resources.directDependencies}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-faint">{t('plugins.resources.size')}</dt>
+                    <dd className="mt-0.5 text-text tabular-nums">
+                      {detail.resources.unpackedBytes === null
+                        ? t('common.unavailable')
+                        : filesize(detail.resources.unpackedBytes)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-faint">{t('plugins.resources.files')}</dt>
+                    <dd className="mt-0.5 text-text tabular-nums">
+                      {detail.resources.publishedFiles ?? t('common.unavailable')}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-faint">{t('plugins.resources.native')}</dt>
+                    <dd
+                      className={`mt-0.5 ${detail.resources.nativeBuildDeclared ? 'text-warn' : 'text-ok'}`}
+                    >
+                      {detail.resources.nativeBuildDeclared
+                        ? t('plugins.resources.declared')
+                        : t('plugins.resources.none')}
+                    </dd>
+                  </div>
                 </dl>
               </section>
 
               {(versionAction === 'install' || versionAction === 'replace') && reviewing && (
-                <section className="rounded-control border border-warn/35 bg-warn/7 p-3">
+                <section className="flex flex-col gap-3 rounded-xl border border-warn/30 bg-warn/10 px-4 py-3">
                   <div className="flex items-start gap-2">
                     <ShieldCheck
-                      size={14}
+                      size={16}
+                      strokeWidth={1.9}
                       className="mt-0.5 shrink-0 text-warn"
                       aria-hidden="true"
                     />
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-[11.5px] font-medium text-text">
+                      <h3 className="text-ui-base font-medium text-text">
                         {t('plugins.review.title')}
                       </h3>
-                      <p className="mt-1 text-[10.5px] leading-relaxed text-muted">
-                        {t('plugins.review.warning')}
-                      </p>
+                      <p className="mt-1 text-ui-sm text-muted">{t('plugins.review.warning')}</p>
                     </div>
                   </div>
-                  <dl className="mt-3 grid grid-cols-[106px_1fr] gap-x-3 gap-y-1.5 text-[10.5px]">
+                  <dl className="grid grid-cols-[112px_1fr] gap-x-3 gap-y-1.5 text-ui-sm">
                     <dt className="text-faint">{t('plugins.review.target')}</dt>
-                    <dd className="break-all font-mono text-muted">{detail.installSpec}</dd>
+                    <dd className="font-mono break-all text-muted">{detail.installSpec}</dd>
                     <dt className="text-faint">{t('plugins.review.integrity')}</dt>
                     <dd className={detail.integrityVerified ? 'text-ok' : 'text-danger'}>
                       {detail.integrityVerified
@@ -371,9 +367,7 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                     )}
                   </dl>
                   {installBlocked && (
-                    <p className="mt-3 text-[10.5px] leading-relaxed text-danger">
-                      {t('plugins.review.cannotInstall')}
-                    </p>
+                    <p className="text-ui-sm text-danger">{t('plugins.review.cannotInstall')}</p>
                   )}
                 </section>
               )}
@@ -390,7 +384,7 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                 />
               )}
 
-              <dl className="flex flex-col gap-2 border-t border-line pt-3.5">
+              <dl className="list-card">
                 {here && selectedSource !== 'profile' && (
                   <Row label={t('plugins.currentVersion')}>
                     <span className="tabular-nums">
@@ -399,13 +393,11 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
                   </Row>
                 )}
                 <Row label={t('plugins.source')}>
-                  <span className="selectable break-all font-mono text-[10.5px]">
-                    {detail.source}
-                  </span>
+                  <span className="selectable font-mono text-ui-sm break-all">{detail.source}</span>
                 </Row>
                 {here?.marketReceipt && (
                   <Row label={t('plugins.receipt')}>
-                    <span className="selectable break-all font-mono text-[10.5px]">
+                    <span className="selectable font-mono text-ui-sm break-all">
                       {here.marketReceipt}
                     </span>
                   </Row>
@@ -451,13 +443,13 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
               </dl>
 
               {detail.dependencies.length > 0 && (
-                <div className="flex flex-col gap-1.5 border-t border-line pt-3.5">
+                <div className="flex flex-col gap-2">
                   <h3 className="caption">{t('plugins.dependencies')}</h3>
-                  <ul className="flex flex-wrap gap-1">
+                  <ul className="flex flex-wrap gap-1.5">
                     {detail.dependencies.map((dependency) => (
                       <li
                         key={dependency}
-                        className="selectable rounded-[4px] border border-line bg-surface-2/60 px-1.5 py-0.5 font-mono text-[10.5px] text-faint"
+                        className="selectable rounded-sm bg-control-fill px-1.5 py-0.5 font-mono text-ui-sm text-muted"
                       >
                         {dependency}
                       </li>
@@ -469,11 +461,11 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
           )}
         </div>
 
-        <footer className="flex shrink-0 items-center gap-3 border-t border-line bg-canvas-deep/40 px-5 py-3 [&>button]:h-9 [&>button]:rounded-xl [&>button]:px-3 [&>button]:text-[13px]">
+        <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-5 py-3">
           {/* While a package manager is running, the footer is where it reports
               — the same tail the pane behind this shows, so closing the dialog
               loses nothing. */}
-          <p className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-faint">
+          <p className="min-w-0 flex-1 truncate font-mono text-ui-sm text-faint">
             {busy ? latest : ''}
           </p>
 
@@ -493,9 +485,9 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
               disabled={working !== null || here.builtin}
             >
               {busy ? (
-                <Loader2 size={13} className="animate-spin" />
+                <Loader2 className="animate-spin" aria-hidden="true" />
               ) : (
-                <Trash2 size={13} strokeWidth={2.2} />
+                <Trash2 aria-hidden="true" />
               )}
               {busy ? t('plugins.removing') : t('plugins.remove')}
             </Button>
@@ -527,9 +519,9 @@ export function PluginDialog({ onRemove }: PluginDialogProps) {
               }
             >
               {busy || previewing ? (
-                <Loader2 size={13} className="animate-spin" />
+                <Loader2 className="animate-spin" aria-hidden="true" />
               ) : (
-                <Download size={13} strokeWidth={2.3} />
+                <Download aria-hidden="true" />
               )}
               {versionAction === 'current'
                 ? t('plugins.currentVersionReady')
@@ -583,37 +575,25 @@ function ProfileState({ plugin, busy, locked, onToggle }: ProfileStateProps) {
         : incompatible
           ? t('plugins.runtimeBlockedHint')
           : null
+  const status: { tone: BadgeTone; label: string } = plugin.disabled
+    ? { tone: 'neutral', label: t('plugins.off') }
+    : incompatible
+      ? { tone: 'warn', label: t('plugins.runtimeBlocked') }
+      : layered
+        ? { tone: 'ok', label: t('plugins.on') }
+        : { tone: 'neutral', label: t('plugins.library') }
 
   return (
-    <section className="rounded-control border border-line bg-canvas-deep/55 px-3 py-2.5">
+    <section className="card px-4 py-3">
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="caption">{t('plugins.inProfile')}</h3>
-          <p className="mt-1 truncate font-mono text-[11px] text-muted tabular-nums">
+          <p className="mt-0.5 truncate font-mono text-ui-sm text-muted tabular-nums">
             {plugin.spec || t('plugins.builtin')}
           </p>
         </div>
 
-        <span
-          className={[
-            'text-[11.5px] font-medium',
-            plugin.disabled
-              ? 'text-faint'
-              : incompatible
-                ? 'text-warn'
-                : layered
-                  ? 'text-ok'
-                  : 'text-faint',
-          ].join(' ')}
-        >
-          {plugin.disabled
-            ? t('plugins.off')
-            : incompatible
-              ? t('plugins.runtimeBlocked')
-              : layered
-                ? t('plugins.on')
-                : t('plugins.library')}
-        </span>
+        <Badge tone={status.tone}>{status.label}</Badge>
 
         <Switch
           on={!plugin.disabled && layered}
@@ -624,16 +604,16 @@ function ProfileState({ plugin, busy, locked, onToggle }: ProfileStateProps) {
         />
       </div>
 
-      {note && <p className="mt-2 text-[11px] leading-relaxed text-faint">{note}</p>}
+      {note && <p className="mt-2 text-ui-sm text-faint">{note}</p>}
     </section>
   )
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline gap-3">
-      <dt className="shrink-0 text-[12px] text-muted">{label}</dt>
-      <dd className="ml-auto min-w-0 text-right text-[12px] text-muted [overflow-wrap:anywhere]">
+    <div className="list-row">
+      <dt className="shrink-0 text-ui-base text-muted">{label}</dt>
+      <dd className="ml-auto min-w-0 text-right text-ui-base text-text [overflow-wrap:anywhere]">
         {children}
       </dd>
     </div>
@@ -654,10 +634,15 @@ function Link({ href }: { href: string }) {
       type="button"
       data-hint={target}
       onClick={() => void reportAction(() => openExternalUrl(target))}
-      className="inline-flex max-w-full items-center gap-1 transition-colors duration-100 hover:text-brand"
+      className="inline-flex max-w-full items-center gap-1.5 hover:underline"
     >
       <span className="truncate">{target.replace(/^https?:\/\//, '')}</span>
-      <ExternalLink size={10} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />
+      <ExternalLink
+        size={14}
+        strokeWidth={1.9}
+        className="shrink-0 text-faint"
+        aria-hidden="true"
+      />
     </button>
   )
 }

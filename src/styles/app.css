@@ -87,26 +87,53 @@
   --font-mono:
     'Cascadia Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Stable UI roles keep typography coherent as individual panes evolve. The
-     setting changes only these tokens, never the root rem scale, so geometry
-     stays stable while text remains comfortable for long sessions. */
-  --ui-font-size: 14px;
-  --text-ui-xl: calc(var(--ui-font-size) + 4px);
-  --text-ui-lg: calc(var(--ui-font-size) + 2px);
-  --text-ui-base: var(--ui-font-size);
-  --text-ui-caption: calc(var(--ui-font-size) - 1px);
-  --text-ui-sm: calc(var(--ui-font-size) - 2px);
-  --text-ui-xs: calc(var(--ui-font-size) - 4px);
+  /* Type: the reference's own steps and nothing between them.
+   *
+   * Six sizes, each with a job. 11 is the status line and the counters; 12 is
+   * the dense control and the second line under a title; 14 is the body and the
+   * default control; 16 names a dialog or a section; 20 names a pane; 24 is the
+   * one place a page is allowed to raise its voice. A 12.5 or a 13.5 is not a
+   * seventh step, it is a size somebody picked by eye next to a neighbour that
+   * had itself been picked by eye — which is how a window ends up with fifteen
+   * of them and nothing that lines up. Line heights ride along, so a label set
+   * in a step gets that step's rhythm without a second class saying so. */
+  --text-ui-xs: 11px;
+  --text-ui-xs--line-height: 16px;
+  --text-ui-sm: 12px;
+  --text-ui-sm--line-height: 18px;
+  --text-ui-base: 14px;
+  --text-ui-base--line-height: 20px;
+  --text-ui-lg: 16px;
+  --text-ui-lg--line-height: 24px;
+  --text-ui-xl: 20px;
+  --text-ui-xl--line-height: 26px;
+  --text-ui-2xl: 24px;
+  --text-ui-2xl--line-height: 28px;
   --font-weight-medium: 510;
   --font-weight-semibold: 590;
 
-  /* A window corner is 8px, so nothing framed by one has any business being
-     rounder than that. Controls sit a step tighter again. */
-  --radius-panel: 0.5rem;
-  --radius-control: 0.375rem;
+  /* Corners: the reference's bases, multiplied by the scale below.
+   *
+   * These replace the framework's own `rounded-*` steps rather than sitting
+   * beside them, so `rounded-lg` here means what it means in the reference —
+   * ten pixels — and not the eight it would otherwise mean. Two roles get names
+   * of their own because they are the two most repeated: what a control is
+   * (`control`, one step under the button) and what holds controls (`panel`,
+   * the card and the grouped list). */
+  --radius-2xs: calc(0.125rem * var(--corner-radius-scale, 1));
+  --radius-xs: calc(0.25rem * var(--corner-radius-scale, 1));
+  --radius-sm: calc(0.375rem * var(--corner-radius-scale, 1));
+  --radius-md: calc(0.5rem * var(--corner-radius-scale, 1));
+  --radius-lg: calc(0.625rem * var(--corner-radius-scale, 1));
+  --radius-xl: calc(0.75rem * var(--corner-radius-scale, 1));
+  --radius-2xl: calc(1rem * var(--corner-radius-scale, 1));
+  --radius-3xl: calc(1.25rem * var(--corner-radius-scale, 1));
+  --radius-4xl: calc(1.5rem * var(--corner-radius-scale, 1));
+  --radius-control: var(--radius-md);
+  --radius-panel: var(--radius-xl);
 
   --shadow-panel: 0 1px 2px #00000030;
-  --shadow-lift: 0 6px 18px -8px #00000066;
+  --shadow-lift: 0 8px 16px -4px #0000003d, 0 2px 4px -1px #00000026;
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -257,7 +284,7 @@
     --color-on-danger: #ffffff;
 
     --shadow-panel: 0 1px 2px #00000014;
-    --shadow-lift: 0 6px 16px -8px #00000030;
+    --shadow-lift: 0 8px 16px -4px #0000001f, 0 2px 4px -1px #00000014;
 
     --term-black: #1b2231;
     --term-red: #c62d46;
@@ -315,7 +342,7 @@
   --color-on-danger: #ffffff;
 
   --shadow-panel: 0 1px 2px #00000014;
-  --shadow-lift: 0 6px 16px -8px #00000030;
+  --shadow-lift: 0 8px 16px -4px #0000001f, 0 2px 4px -1px #00000014;
 
   --term-black: #1b2231;
   --term-red: #c62d46;
@@ -353,6 +380,36 @@
 :root {
   --ground-window: var(--color-canvas);
   --ground-chrome: var(--color-surface);
+}
+
+/*
+ * Control geometry and the reference's corner shape.
+ *
+ * Heights are the reference's own control ladder, cut down to the four steps a
+ * desktop tool actually uses. They live here rather than in `@theme` because
+ * they are read by the component rules below, not spelled as utilities.
+ *
+ * The scale is 1 everywhere and 1.25 where the webview can draw a superellipse:
+ * the reference multiplies every radius by 1.25 *and* switches the corner to
+ * `superellipse(1.5)`, and either half alone reads wrong — a bigger circle is
+ * only a rounder rectangle, and a squircle at the old radius looks clipped.
+ * Engines that cannot draw the shape keep the plain circle at the plain radius,
+ * which is the design the rest of this file was drawn against.
+ */
+:root {
+  --control-h-xs: 24px;
+  --control-h-sm: 28px;
+  --control-h-md: 32px;
+  --control-h-lg: 40px;
+  --corner-radius-scale: 1;
+  --corner-shape: round;
+}
+
+@supports (corner-shape: superellipse(1.5)) {
+  :root {
+    --corner-radius-scale: 1.25;
+    --corner-shape: superellipse(1.5);
+  }
 }
 
 :root[data-material] {
@@ -558,37 +615,449 @@
     background-color: var(--ground-chrome);
   }
 
-  /* Section captions in the panel — the small tracked-out label a desktop tool
-     puts above a group of settings. */
+  /* Section captions in the panel — the small label a desktop tool puts above a
+     group of settings. */
   .caption {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--text-ui-sm);
+    line-height: var(--text-ui-sm--line-height);
+    font-weight: 510;
     letter-spacing: 0;
     color: var(--color-faint);
   }
 
-  /* Page-level commands use the reference's 28px medium control, while dense
-     table and toolbar buttons keep the 20px default. Segmented controls carry
-     aria-pressed and preserve their own shared-track geometry. */
-  .pane-header-actions :where(button:not([aria-pressed])) {
-    height: 28px;
-    min-height: 28px;
-    gap: 6px;
-    padding-inline: 10px;
+  /* Text that is still on its way: a highlight sweeps across it, the way the
+     reference draws a label it is waiting to fill. Muted with a brighter band,
+     so it reads as the same words the finished label will be — and with the
+     animation off (reduced motion) it is simply the muted colour, not a hole. */
+  .shimmer {
+    --shimmer-base: var(--color-muted);
+    --shimmer-peak: var(--color-text);
+
+    background: linear-gradient(
+        90deg,
+        var(--shimmer-base) 0%,
+        var(--shimmer-base) 38%,
+        var(--shimmer-peak) 50%,
+        var(--shimmer-base) 62%,
+        var(--shimmer-base) 100%
+      )
+      0 0 / 260% 100% no-repeat;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shimmer 2.2s ease-in-out infinite;
   }
 
-  /* Outline inputs stay transparent. Their focus is a stronger neutral inset
-     edge; the blue ring belongs to pressable controls such as selectors. */
+  @keyframes shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -60% 0;
+    }
+  }
+
+  /* The reference's superellipse, on every class that carries one of its
+     corners. The circle and the pill are left out on purpose: a squircle drawn
+     at a 9999px radius stops being a circle, and a switch thumb that is not
+     round is the first thing anyone would notice. */
+  .rounded-control,
+  .rounded-panel,
+  .rounded-md,
+  .rounded-lg,
+  .rounded-xl,
+  .rounded-2xl,
+  .rounded-3xl,
+  .rounded-4xl {
+    corner-shape: var(--corner-shape);
+  }
+
+  /*
+   * Buttons.
+   *
+   * One component in four sizes and five voices, and nothing else in the window
+   * is allowed to look like a button that is not one of them. The reference has
+   * a dozen size names for its dozen contexts; a desktop tool needs the four
+   * that the contexts collapse to:
+   *
+   *   xs  24  title-bar and row furniture: a chevron, a close, a copy
+   *   sm  28  toolbars, filters, actions repeated down a list or across a card
+   *   md  32  the default: a pane's own commands, a form, a dialog's footer
+   *   lg  40  the one action a whole screen exists for
+   *
+   * Height, corner, gutter, type size and icon size all step together, which is
+   * what keeps a 28px button and a 28px field looking like two of the same
+   * family when they sit in one row. Everything reads its numbers from the
+   * custom properties on `.btn`, so a variant only ever re-points colour.
+   */
+  .btn {
+    --btn-h: var(--control-h-md);
+    --btn-r: var(--radius-lg);
+    --btn-px: 14px;
+    --btn-gap: 6px;
+    --btn-fs: var(--text-ui-base);
+    --btn-icon: 16px;
+    --btn-bg: var(--color-control-fill);
+    --btn-bg-hover: var(--color-control-fill-hover);
+    --btn-fg: var(--color-text);
+    --btn-fg-hover: var(--color-text);
+    --btn-edge: var(--color-control-border);
+    --btn-edge-hover: var(--color-control-border-hover);
+
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: var(--btn-gap);
+    height: var(--btn-h);
+    padding-inline: var(--btn-px);
+    border: 0;
+    border-radius: var(--btn-r);
+    corner-shape: var(--corner-shape);
+    background: var(--btn-bg);
+    color: var(--btn-fg);
+    box-shadow: inset 0 0 0 1px var(--btn-edge);
+    font-family: var(--font-sans);
+    font-size: var(--btn-fs);
+    font-weight: 510;
+    line-height: 1;
+    white-space: nowrap;
+    text-decoration: none;
+    user-select: none;
+    transition:
+      background-color 150ms var(--ease-out-soft),
+      box-shadow 150ms var(--ease-out-soft),
+      color 150ms var(--ease-out-soft),
+      opacity 150ms var(--ease-out-soft),
+      filter 150ms var(--ease-out-soft);
+  }
+
+  .btn > svg {
+    width: var(--btn-icon);
+    height: var(--btn-icon);
+    flex: none;
+  }
+
+  .btn--xs {
+    --btn-h: var(--control-h-xs);
+    --btn-r: var(--radius-sm);
+    --btn-px: 8px;
+    --btn-gap: 4px;
+    --btn-fs: var(--text-ui-sm);
+    --btn-icon: 14px;
+  }
+
+  .btn--sm {
+    --btn-h: var(--control-h-sm);
+    --btn-r: var(--radius-md);
+    --btn-px: 10px;
+    --btn-gap: 6px;
+    --btn-fs: var(--text-ui-sm);
+    --btn-icon: 14px;
+  }
+
+  .btn--md {
+    --btn-h: var(--control-h-md);
+    --btn-r: var(--radius-lg);
+    --btn-px: 14px;
+    --btn-gap: 6px;
+    --btn-fs: var(--text-ui-base);
+    --btn-icon: 16px;
+  }
+
+  .btn--lg {
+    --btn-h: var(--control-h-lg);
+    --btn-r: var(--radius-xl);
+    --btn-px: 18px;
+    --btn-gap: 8px;
+    --btn-fs: var(--text-ui-base);
+    --btn-icon: 18px;
+  }
+
+  /* Icon-only: the same box on both axes, no gutter, and an icon one step
+     larger than the one that sits beside a label — alone in a square it has to
+     carry the whole meaning. */
+  .btn--icon {
+    width: var(--btn-h);
+    padding-inline: 0;
+  }
+
+  .btn--icon.btn--xs {
+    --btn-icon: 14px;
+  }
+
+  .btn--icon.btn--sm {
+    --btn-icon: 16px;
+  }
+
+  .btn--icon.btn--md {
+    --btn-icon: 18px;
+  }
+
+  .btn--icon.btn--lg {
+    --btn-icon: 20px;
+  }
+
+  /* The one saturated element on a surface: findable without a glow. */
+  .btn--primary {
+    --btn-bg: var(--color-brand);
+    --btn-bg-hover: color-mix(in oklab, var(--color-brand) 86%, var(--color-canvas));
+    --btn-fg: var(--color-on-brand);
+    --btn-fg-hover: var(--color-on-brand);
+    --btn-edge: transparent;
+    --btn-edge-hover: transparent;
+  }
+
+  /* Filled, like the primary, because the button that removes something should
+     be as easy to aim at as the one that keeps it — the safety is in the
+     question above it, not in making the answer hard to hit. */
+  .btn--danger {
+    --btn-bg: var(--color-danger);
+    --btn-bg-hover: color-mix(in oklab, var(--color-danger) 86%, var(--color-canvas));
+    --btn-fg: var(--color-on-danger);
+    --btn-fg-hover: var(--color-on-danger);
+    --btn-edge: transparent;
+    --btn-edge-hover: transparent;
+  }
+
+  .btn--ghost {
+    --btn-bg: transparent;
+    --btn-bg-hover: var(--color-control-fill);
+    --btn-fg: var(--color-muted);
+    --btn-fg-hover: var(--color-text);
+    --btn-edge: transparent;
+    --btn-edge-hover: transparent;
+  }
+
+  /* For the row-level "remove": quiet until it is pointed at, and then the
+     colour says what it does. */
+  .btn--danger-ghost {
+    --btn-bg: transparent;
+    --btn-bg-hover: color-mix(in oklab, var(--color-danger) 14%, transparent);
+    --btn-fg: var(--color-muted);
+    --btn-fg-hover: var(--color-danger);
+    --btn-edge: transparent;
+    --btn-edge-hover: transparent;
+  }
+
+  .btn:hover:not(:disabled, [aria-disabled='true']) {
+    background: var(--btn-bg-hover);
+    color: var(--btn-fg-hover);
+    box-shadow: inset 0 0 0 1px var(--btn-edge-hover);
+  }
+
+  .btn:active:not(:disabled, [aria-disabled='true']) {
+    filter: brightness(0.93);
+  }
+
+  /* Inside the edge rather than outside it, per the reference: a ring that
+     sits on the control's own outline cannot be clipped by a card around it. */
+  .btn:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -1px;
+  }
+
+  .btn:disabled,
+  .btn[aria-disabled='true'] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* A filled button that cannot be pressed goes back to the reference's disabled
+     look — a faint fill, a faint edge and grey ink — instead of the same fill at
+     40% opacity, which reads as a grey slab: the loudest thing on a surface that
+     is supposed to be saying "not now". */
+  .btn--primary:disabled,
+  .btn--primary[aria-disabled='true'],
+  .btn--danger:disabled,
+  .btn--danger[aria-disabled='true'] {
+    --btn-bg: var(--color-control-fill-disabled);
+    --btn-fg: var(--color-faint);
+    --btn-edge: var(--color-control-border-disabled);
+    opacity: 1;
+  }
+
+  /* A selected toggle button: the state is the fill, not a second colour. */
+  .btn[aria-pressed='true']:not(.btn--primary) {
+    --btn-bg: var(--color-control-fill-hover);
+    --btn-fg: var(--color-text);
+  }
+
+  /*
+   * Segmented controls: a recessed track with the selected option raised out of
+   * it, inverse, the shape a desktop toolbar has used for thirty years. Track and
+   * option step with the button scale, so a segmented control and a button in the
+   * same row share a height, and the option is the track less its own gutter.
+   */
+  .segmented {
+    --seg-h: var(--control-h-md);
+    --seg-r: var(--radius-lg);
+    --seg-px: 12px;
+    --seg-fs: var(--text-ui-base);
+    --seg-icon: 16px;
+
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+    height: var(--seg-h);
+    padding: 2px;
+    border-radius: var(--seg-r);
+    corner-shape: var(--corner-shape);
+    background: var(--color-control-fill);
+    box-shadow: inset 0 0 0 1px var(--color-line);
+  }
+
+  .segmented--sm {
+    --seg-h: var(--control-h-sm);
+    --seg-r: var(--radius-md);
+    --seg-px: 10px;
+    --seg-fs: var(--text-ui-sm);
+    --seg-icon: 14px;
+  }
+
+  .segmented__item {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: calc(var(--seg-h) - 4px);
+    min-width: calc(var(--seg-h) - 4px);
+    padding-inline: var(--seg-px);
+    border: 0;
+    border-radius: calc(var(--seg-r) - 2px);
+    corner-shape: var(--corner-shape);
+    background: transparent;
+    color: var(--color-muted);
+    font-family: var(--font-sans);
+    font-size: var(--seg-fs);
+    font-weight: 510;
+    line-height: 1;
+    white-space: nowrap;
+    transition:
+      background-color 150ms var(--ease-out-soft),
+      color 150ms var(--ease-out-soft),
+      box-shadow 150ms var(--ease-out-soft);
+  }
+
+  .segmented__item > svg {
+    width: var(--seg-icon);
+    height: var(--seg-icon);
+    flex: none;
+  }
+
+  .segmented--icons .segmented__item {
+    padding-inline: 0;
+  }
+
+  /* The title bar's version: icon and label while there is room, the icon alone
+     when there is not. The label stays in the tree for the accessible name. */
+  .segmented--responsive .segmented__item > svg {
+    display: none;
+  }
+
+  @media (max-width: 760px) {
+    .segmented--responsive .segmented__item {
+      padding-inline: 0;
+    }
+
+    .segmented--responsive .segmented__item > svg {
+      display: block;
+    }
+
+    .segmented--responsive .segmented__label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  .segmented__item:hover:not([aria-pressed='true'], :disabled) {
+    background: var(--color-control-fill-hover);
+    color: var(--color-text);
+  }
+
+  /* The selected half does nothing when pressed, so it does not offer the hand
+     that promises it would. */
+  .segmented__item[aria-pressed='true'] {
+    background: var(--color-text);
+    color: var(--color-canvas);
+    box-shadow: var(--shadow-panel);
+    cursor: default;
+  }
+
+  .segmented__item:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -1px;
+  }
+
+  .segmented__item:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /*
+   * Fields: an input, a textarea, a select trigger and the shell around a search
+   * box are one control in three positions, so they read their height, corner,
+   * gutter and type from the same three sizes as the button beside them.
+   *
+   * Outline inputs stay transparent. Their focus is a stronger neutral inset
+   * edge; the blue ring belongs to pressable controls such as selectors.
+   */
+  .field-control,
+  .field-shell,
+  .select-control__trigger,
+  .select-trigger {
+    --field-h: var(--control-h-md);
+    --field-r: var(--radius-lg);
+    --field-px: 12px;
+    --field-fs: var(--text-ui-base);
+  }
+
+  .field-control--sm,
+  .field-shell--sm,
+  .select-control__trigger.field-control--sm,
+  .select-trigger--sm {
+    --field-h: var(--control-h-sm);
+    --field-r: var(--radius-md);
+    --field-px: 10px;
+    --field-fs: var(--text-ui-sm);
+  }
+
+  .field-control--lg,
+  .field-shell--lg,
+  .select-control__trigger.field-control--lg {
+    --field-h: var(--control-h-lg);
+    --field-r: var(--radius-xl);
+    --field-px: 14px;
+    --field-fs: var(--text-ui-base);
+  }
+
+  .field-label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--color-muted);
+    font-size: var(--text-ui-sm);
+    line-height: var(--text-ui-sm--line-height);
+    font-weight: 510;
+  }
+
   .field-control {
-    height: 22px;
+    height: var(--field-h);
     min-width: 0;
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--field-r);
+    corner-shape: var(--corner-shape);
     background: transparent;
     color: var(--color-text);
-    padding-inline: 8px;
+    padding-inline: var(--field-px);
     font-family: var(--font-sans);
-    font-size: 12px;
+    font-size: var(--field-fs);
     font-weight: 400;
     line-height: 1.5;
     outline: none;
@@ -598,6 +1067,17 @@
       border-color 150ms var(--ease-out-soft),
       box-shadow 150ms var(--ease-out-soft),
       color 150ms var(--ease-out-soft);
+  }
+
+  /* A textarea is the same field taller: the line height is fixed so a row of
+     text sits where an input's does, and the height is the field's less the
+     line, split across the two sides. */
+  textarea.field-control {
+    height: auto;
+    min-height: var(--field-h);
+    padding-block: calc((var(--field-h) - 20px) / 2);
+    line-height: 20px;
+    resize: vertical;
   }
 
   .field-control::placeholder {
@@ -623,28 +1103,50 @@
     box-shadow: inset 0 0 0 1px var(--color-control-border-disabled);
   }
 
-  .field-control--compact {
-    height: 24px;
-    padding-inline: 8px;
-    font-size: 12px;
+  /* A number field is a text field that happens to be numeric. The webview's
+     stepper arrows appear on hover, are drawn by the engine and belong to no
+     palette here; the arrow keys still step the value. */
+  input[type='number'].field-control,
+  .field-shell > input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
   }
 
-  .field-control--small {
-    height: 22px;
-    padding-inline: 6px;
-    font-size: 12px;
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
-  .field-control--large {
-    height: 28px;
-    padding-inline: 10px;
-    font-size: 14px;
+  /* Native colour swatch: the browser's own well is a grey slab with a
+     four-pixel gutter, which is the one thing in the window that is not ours. */
+  input[type='color'].field-control {
+    padding: 4px;
+    cursor: pointer;
+  }
+
+  input[type='color'].field-control::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  input[type='color'].field-control::-webkit-color-swatch {
+    border: 0;
+    border-radius: calc(var(--field-r) - 4px);
   }
 
   .field-shell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: var(--field-h);
+    padding-inline: var(--field-px);
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--field-r);
+    corner-shape: var(--corner-shape);
     background: transparent;
+    color: var(--color-text);
+    font-size: var(--field-fs);
     box-shadow: inset 0 0 0 1px var(--color-control-border);
     transition:
       background-color 150ms var(--ease-out-soft),
@@ -660,6 +1162,30 @@
     box-shadow: inset 0 0 0 1px var(--color-control-border-focus);
   }
 
+  /* The bare input inside a shell: the shell draws the edge, the height and the
+     gutter, so the input is only text. */
+  .field-shell > input,
+  .field-shell > textarea {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    outline: none;
+  }
+
+  .field-shell > input::placeholder {
+    color: var(--color-faint);
+    opacity: 1;
+  }
+
+  .field-shell > svg {
+    flex: none;
+    color: var(--color-faint);
+  }
+
   .select-control {
     position: relative;
     display: inline-flex;
@@ -667,22 +1193,22 @@
     align-items: center;
   }
 
-  .select-control__trigger {
+  .select-control__trigger,
+  .select-trigger {
     position: relative;
     display: inline-flex;
-    width: 100%;
-    height: 22px;
     min-width: 0;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
+    height: var(--field-h);
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--field-r);
+    corner-shape: var(--corner-shape);
     background: var(--color-control-fill);
-    padding-inline: 6px 22px;
     cursor: pointer;
     color: var(--color-text);
     font-family: var(--font-sans);
-    font-size: 12px;
+    font-size: var(--field-fs);
     font-weight: 510;
     line-height: 1.5;
     outline: none;
@@ -693,44 +1219,50 @@
       color 150ms var(--ease-out-soft);
   }
 
+  .select-control__trigger {
+    width: 100%;
+    padding-inline: var(--field-px) calc(var(--field-px) + 16px);
+  }
+
+  /* The menu-backed picker: the same closed control, with its own content
+     rather than a value and a chevron. */
+  .select-trigger {
+    padding-inline: var(--field-px);
+    color: var(--color-muted);
+  }
+
   .select-control__trigger[data-selected='false'] {
     color: var(--color-faint);
   }
 
   .select-control__trigger:hover:not(:disabled),
-  .select-control__trigger[aria-expanded='true'] {
+  .select-control__trigger[aria-expanded='true'],
+  .select-trigger:hover:not(:disabled) {
     background: var(--color-control-fill-hover);
     box-shadow: inset 0 0 0 1px var(--color-control-border-hover);
   }
 
-  .select-control__trigger:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: -1px;
-    box-shadow: inset 0 0 0 1px var(--color-control-border-focus);
+  .select-trigger:hover:not(:disabled) {
+    color: var(--color-text);
   }
 
-  .select-control__trigger:disabled {
+  .select-control__trigger:focus-visible,
+  .select-trigger:focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: -1px;
+  }
+
+  .select-control__trigger:disabled,
+  .select-trigger:disabled {
     cursor: default;
     background: var(--color-control-fill-disabled);
     color: var(--color-faint);
     box-shadow: inset 0 0 0 1px var(--color-control-border-disabled);
   }
 
-  .select-control__trigger.field-control--compact {
-    height: 24px;
-    padding-inline: 8px 24px;
-    font-size: 12px;
-  }
-
-  .select-control__trigger.field-control--small {
-    height: 22px;
-    padding-inline: 6px 22px;
-    font-size: 12px;
-  }
-
   .select-control__chevron {
     position: absolute;
-    right: 8px;
+    right: var(--field-px);
     width: 8px;
     height: 5px;
     pointer-events: none;
@@ -750,55 +1282,133 @@
     opacity: 0.25;
   }
 
-  /* Menu-backed pickers use the same visual contract as native selects. The
-     popup is custom, but the closed control should not reveal that detail. */
-  .select-trigger {
+  /*
+   * Badges and key caps: small, rectangular, and never a button. A pill is the
+   * shape of something you can press; a status that only reports gets a corner.
+   */
+  .badge {
+    --badge-fg: var(--color-muted);
+    --badge-bg: var(--color-control-fill);
+
     display: inline-flex;
-    height: 22px;
-    min-width: 0;
+    flex: none;
     align-items: center;
     gap: 4px;
-    border: 0;
-    border-radius: 6px;
-    background: var(--color-control-fill);
+    height: 20px;
     padding-inline: 6px;
-    color: var(--color-muted);
+    border-radius: var(--radius-sm);
+    corner-shape: var(--corner-shape);
+    background: var(--badge-bg);
+    color: var(--badge-fg);
     font-family: var(--font-sans);
-    font-size: 12px;
+    font-size: var(--text-ui-sm);
+    font-weight: 590;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .badge > svg {
+    width: 12px;
+    height: 12px;
+    flex: none;
+  }
+
+  .badge--ok {
+    --badge-fg: var(--color-ok);
+    --badge-bg: color-mix(in oklab, var(--color-ok) 14%, transparent);
+  }
+
+  .badge--warn {
+    --badge-fg: var(--color-warn);
+    --badge-bg: color-mix(in oklab, var(--color-warn) 14%, transparent);
+  }
+
+  .badge--danger {
+    --badge-fg: var(--color-danger);
+    --badge-bg: color-mix(in oklab, var(--color-danger) 14%, transparent);
+  }
+
+  .badge--info {
+    --badge-fg: var(--color-brand-cyan);
+    --badge-bg: color-mix(in oklab, var(--color-brand-cyan) 14%, transparent);
+  }
+
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding-inline: 5px;
+    border-radius: var(--radius-sm);
+    corner-shape: var(--corner-shape);
+    background: var(--color-control-fill);
+    box-shadow: inset 0 0 0 1px var(--color-line-strong);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: var(--text-ui-xs);
     font-weight: 510;
     line-height: 1;
-    box-shadow: inset 0 0 0 1px var(--color-control-border);
+  }
+
+  /*
+   * Cards and the lists inside them.
+   *
+   * A card is a surface one step above the canvas, held by a hairline rather
+   * than a shadow: the window is flat, and depth is spent on the things that
+   * really do float — the menu, the dialog, the tooltip. A list card is the same
+   * surface whose children are rows, separated by the same hairline.
+   */
+  .card,
+  .list-card {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-panel);
+    corner-shape: var(--corner-shape);
+    background: var(--color-canvas-deep);
+  }
+
+  .card--pad {
+    padding: 16px;
+  }
+
+  .card--interactive {
     transition:
-      background-color 150ms var(--ease-out-soft),
       border-color 150ms var(--ease-out-soft),
-      box-shadow 150ms var(--ease-out-soft),
-      color 150ms var(--ease-out-soft);
+      background-color 150ms var(--ease-out-soft);
   }
 
-  .select-trigger:hover:not(:disabled) {
-    background: var(--color-control-fill-hover);
-    color: var(--color-text);
-    box-shadow: inset 0 0 0 1px var(--color-control-border-hover);
+  .card--interactive:hover {
+    border-color: var(--color-line-strong);
+    background: color-mix(in oklab, var(--color-canvas-deep) 94%, var(--color-text));
   }
 
-  .select-trigger:focus-visible {
-    outline: 2px solid var(--color-focus);
-    outline-offset: -1px;
+  .list-card {
+    overflow: hidden;
   }
 
-  .select-trigger:disabled {
-    cursor: default;
-    background: var(--color-control-fill-disabled);
-    color: var(--color-faint);
-    box-shadow: inset 0 0 0 1px var(--color-control-border-disabled);
+  .list-card > * + * {
+    border-top: 1px solid var(--color-line);
   }
 
-  .select-trigger--compact {
-    height: 28px;
-    gap: 6px;
-    padding-inline: 8px;
+  /* Single-line rows — a check, a key and its value, a runtime — are 40px. */
+  .list-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 40px;
+    padding: 8px 14px;
   }
 
+  /* Two lines and a control: a setting, in the reference's own 4rem row. */
+  .list-row--roomy {
+    min-height: 64px;
+    padding-block: 12px;
+  }
+
+  /*
+   * Menus. The popup is custom, but a menu should not reveal that: the same
+   * corner, gutter, type and hover as the native ones it stands in for.
+   */
   .menu-surface {
     min-width: 184px;
     max-width: calc(100vw - 12px);
@@ -808,7 +1418,8 @@
     overscroll-behavior: contain;
     padding: 6px;
     border: 1px solid var(--color-line-strong);
-    border-radius: 16px;
+    border-radius: var(--radius-2xl);
+    corner-shape: var(--corner-shape);
     background: var(--color-surface);
     box-shadow: var(--shadow-lift);
     animation: menu-scale-in 150ms var(--ease-out-soft) both;
@@ -816,7 +1427,7 @@
   }
 
   .menu-surface--dropdown {
-    border-radius: 12px;
+    border-radius: var(--radius-xl);
   }
 
   .menu-item {
@@ -826,10 +1437,11 @@
     align-items: center;
     gap: 6px;
     padding: 8px 12px;
-    border-radius: 10px;
+    border-radius: var(--radius-lg);
+    corner-shape: var(--corner-shape);
     color: var(--color-text);
     font-family: var(--font-sans);
-    font-size: 14px;
+    font-size: var(--text-ui-base);
     line-height: 20px;
     text-align: left;
     white-space: nowrap;
@@ -840,6 +1452,7 @@
     position: absolute;
     inset: 0;
     border-radius: inherit;
+    corner-shape: inherit;
     background: var(--color-menu-item);
     content: '';
     opacity: 0;

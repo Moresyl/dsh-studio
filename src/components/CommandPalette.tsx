@@ -76,7 +76,9 @@ interface Command {
   group: MessageKey
   icon: LucideIcon
   label: string
-  /** Faint text at the right edge — an accelerator, a time, a state. */
+  /** An accelerator, drawn as a key cap at the right edge. */
+  keys?: string
+  /** Faint text at the right edge — a time, a state. */
   hint?: string
   /** Already the case, so the row shows a tick instead of promising a change. */
   active?: boolean
@@ -177,7 +179,7 @@ function Palette({
         group: 'palette.group.go',
         icon: view.icon,
         label: t(view.label),
-        hint: `${ACCELERATOR}${index + 1}`,
+        keys: `${ACCELERATOR}${index + 1}`,
         run: close(() => onView(view.id)),
       })
     }
@@ -188,7 +190,7 @@ function Palette({
       group: 'palette.group.go',
       icon: SETTINGS.icon,
       label: t(SETTINGS.label),
-      hint: SETTINGS_KEYS,
+      keys: SETTINGS_KEYS,
       run: close(() => onView(SETTINGS.id)),
     })
 
@@ -201,7 +203,7 @@ function Palette({
       group: 'palette.group.window',
       icon: AppWindow,
       label: t('window.new'),
-      hint: NEW_WINDOW_KEYS,
+      keys: NEW_WINDOW_KEYS,
       run: close(() => void reportAction(ipc.windowOpen)),
     })
 
@@ -440,29 +442,31 @@ function Palette({
         aria-modal="true"
         data-window-shortcuts="palette"
         aria-label={t('palette.title')}
-        className="dialog-panel flex h-fit max-h-[68vh] w-full max-w-[520px] animate-pop flex-col overflow-hidden rounded-[16px] border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex h-fit max-h-[68vh] w-full max-w-[520px] animate-pop flex-col overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-lift"
       >
-        <div className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line px-3.5">
-          <Search size={15} strokeWidth={2.1} className="shrink-0 text-faint" aria-hidden="true" />
-          <input
-            ref={field}
-            aria-label={t('palette.search')}
-            type="text"
-            role="combobox"
-            aria-expanded="true"
-            aria-autocomplete="list"
-            aria-controls="palette-list"
-            aria-activedescendant={current ? `palette-${current.command.id}` : undefined}
-            autoComplete="off"
-            spellCheck={false}
-            value={query}
-            onChange={(event) => ask(event.target.value)}
-            placeholder={t('palette.search')}
-            className="min-w-0 flex-1 bg-transparent text-[13.5px] text-text outline-none placeholder:text-faint"
-          />
-          <kbd className="shrink-0 rounded-[4px] border border-line px-1.5 py-px font-sans text-[10.5px] text-faint">
-            {ACCELERATOR}K
-          </kbd>
+        <div className="shrink-0 border-b border-line p-2">
+          <label className="field-shell field-shell--lg">
+            <Search size={16} strokeWidth={1.8} aria-hidden="true" />
+            <input
+              ref={field}
+              aria-label={t('palette.search')}
+              type="text"
+              role="combobox"
+              aria-expanded="true"
+              aria-autocomplete="list"
+              aria-controls="palette-list"
+              aria-activedescendant={current ? `palette-${current.command.id}` : undefined}
+              autoComplete="off"
+              spellCheck={false}
+              value={query}
+              onChange={(event) => ask(event.target.value)}
+              placeholder={t('palette.search')}
+              // The shell draws the edge; without this the global focus rule's
+              // 4px corner lands on the bare input inside it.
+              className="rounded-none"
+            />
+            <kbd className="kbd shrink-0">{ACCELERATOR}K</kbd>
+          </label>
         </div>
 
         {shown.length === 0 ? (
@@ -480,7 +484,7 @@ function Palette({
             id="palette-list"
             role="listbox"
             aria-label={t('palette.title')}
-            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-1.5"
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-2"
           >
             {shown.map((row, index) => (
               <Row
@@ -502,7 +506,7 @@ function Palette({
           </div>
         )}
 
-        <div className="flex h-8 shrink-0 items-center gap-4 border-t border-line bg-canvas-deep/40 px-3.5">
+        <div className="flex h-9 shrink-0 items-center gap-4 border-t border-line bg-canvas-deep/40 px-4">
           <Legend keys="↑↓" label={t('palette.move')} />
           <Legend icon={CornerDownLeft} label={t('palette.run')} />
           <Legend keys="Esc" label={t('palette.close')} />
@@ -531,7 +535,7 @@ function Row({ command, at, heading, active, onHover }: RowProps) {
     // already says in full what it does.
     <div role="presentation">
       {heading && (
-        <p aria-hidden="true" className="caption px-3.5 pt-2 pb-1">
+        <p aria-hidden="true" className="caption px-3 pt-2 pb-1">
           {heading}
         </p>
       )}
@@ -547,29 +551,33 @@ function Row({ command, at, heading, active, onHover }: RowProps) {
           event.preventDefault()
           command.run()
         }}
+        // The selection is a fill and a step up in ink, not a dimmer on the
+        // rows around it: an opacity over `muted` text would take the light
+        // theme's labels under the contrast a 14px line needs.
         className={[
-          'mx-1.5 flex h-[34px] cursor-pointer items-center gap-2.5 rounded-control px-2 transition-colors duration-75',
-          active ? 'bg-control-fill text-text opacity-100' : 'text-muted opacity-75',
+          'flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-3 transition-colors duration-75',
+          active ? 'bg-control-fill text-text' : 'text-muted',
         ].join(' ')}
       >
         <Icon
-          size={14}
-          strokeWidth={2}
-          className={`shrink-0 ${active ? 'text-brand' : 'text-faint'}`}
+          size={16}
+          strokeWidth={1.8}
+          className={`shrink-0 ${active ? 'text-text' : 'text-faint'}`}
           aria-hidden="true"
         />
 
-        <span className="min-w-0 flex-1 truncate text-[12.5px]">
+        <span className="min-w-0 flex-1 truncate text-ui-base">
           {segments(command.label, at).map((part, index) =>
             part.hit ? <mark key={index}>{part.text}</mark> : part.text,
           )}
         </span>
 
         {command.active && (
-          <Check size={13} strokeWidth={2.4} className="shrink-0 text-ok" aria-hidden="true" />
+          <Check size={16} strokeWidth={2.4} className="shrink-0 text-ok" aria-hidden="true" />
         )}
+        {command.keys && <kbd className="kbd shrink-0">{command.keys}</kbd>}
         {command.hint && (
-          <span className="max-w-[42%] shrink-0 truncate text-[11px] text-faint">
+          <span className="max-w-[42%] shrink-0 truncate text-ui-sm text-faint">
             {command.hint}
           </span>
         )}
@@ -581,9 +589,9 @@ function Row({ command, at, heading, active, onHover }: RowProps) {
 /** One key and what it does, along the bottom edge. */
 function Legend({ keys, icon: Icon, label }: { keys?: string; icon?: LucideIcon; label: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-[10.5px] text-faint">
-      <kbd className="grid h-[15px] min-w-[16px] place-items-center rounded-[4px] border border-line px-1 font-sans text-[10px] text-muted">
-        {Icon ? <Icon size={9} strokeWidth={2.4} aria-hidden="true" /> : keys}
+    <span className="flex items-center gap-2 text-ui-xs text-faint">
+      <kbd className="kbd">
+        {Icon ? <Icon size={14} strokeWidth={2} aria-hidden="true" /> : keys}
       </kbd>
       {label}
     </span>

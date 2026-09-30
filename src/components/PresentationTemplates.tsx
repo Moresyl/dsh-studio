@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Button } from './Button'
+import { IconButton } from './IconButton'
 import { PresentationSlideView } from './PresentationSlideView'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { t } from '@/lib/i18n'
@@ -40,7 +41,7 @@ export function PresentationTemplates({
   }, [])
   return (
     <div
-      className="fixed inset-0 z-30 grid place-items-center bg-canvas-deep/65 p-4 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
       role="presentation"
       onMouseDown={(event) => pressedBackdrop(event, onClose)}
       onKeyDown={(event) => holdFocus(card.current, event, onClose)}
@@ -50,26 +51,18 @@ export function PresentationTemplates({
         role="dialog"
         aria-modal="true"
         aria-labelledby="presentation-templates-title"
-        className="flex max-h-[calc(100dvh-32px)] w-full max-w-[940px] flex-col overflow-hidden rounded-[16px] border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-[min(720px,calc(100vh-64px))] w-full max-w-[940px] animate-pop flex-col overflow-hidden rounded-xl border border-line-strong bg-surface shadow-lift"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-          <div>
-            <h2 id="presentation-templates-title" className="text-[15px] font-semibold">
+        <div className="flex items-center gap-3 border-b border-line px-5 py-4">
+          <div className="min-w-0 flex-1">
+            <h2 id="presentation-templates-title" className="text-ui-lg font-semibold text-text">
               {t('deck.templates')}
             </h2>
-            <p className="mt-1 text-[12px] text-muted">{t('deck.template.hint')}</p>
+            <p className="mt-1 text-ui-sm text-faint">{t('deck.template.hint')}</p>
           </div>
-          <button
-            ref={close}
-            type="button"
-            onClick={onClose}
-            aria-label={t('window.close')}
-            className="grid size-8 place-items-center rounded-control text-muted hover:bg-control-fill focus-visible:outline-2 focus-visible:outline-brand"
-          >
-            <X size={17} />
-          </button>
+          <IconButton ref={close} size="sm" icon={X} label={t('window.close')} onClick={onClose} />
         </div>
-        <div className="min-h-0 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {templates.map((template) => (
               <button
@@ -78,16 +71,16 @@ export function PresentationTemplates({
                 aria-label={t(`deck.template.${template.kind}`)}
                 aria-pressed={selected.kind === template.kind}
                 onClick={() => setSelected(template)}
-                className="min-w-0 rounded-panel border border-line p-3 text-left hover:bg-control-fill aria-pressed:border-brand focus-visible:outline-2 focus-visible:outline-brand"
+                className="card card--interactive min-w-0 p-3 text-left aria-pressed:border-brand aria-pressed:bg-surface-2"
               >
                 <PresentationSlideView slide={template.document.slides[0]!} aspect="wide" />
-                <span className="mt-3 block text-[13px] font-medium">
+                <span className="mt-3 block text-ui-base font-medium text-text">
                   {t(`deck.template.${template.kind}`)}
                 </span>
               </button>
             ))}
           </div>
-          <h3 className="mb-3 mt-5 text-[12px] text-muted">
+          <h3 className="caption mt-5 mb-3">
             {t('deck.template.pages', { count: selected.document.slides.length })}
           </h3>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -96,7 +89,7 @@ export function PresentationTemplates({
             ))}
           </div>
         </div>
-        <div className="flex justify-end border-t border-line px-5 py-4">
+        <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3">
           <Button onClick={() => onCreate(selected.document)}>{t('deck.template.create')}</Button>
         </div>
       </div>

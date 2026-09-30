@@ -19,7 +19,7 @@ use std::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{broadcast, watch, OwnedSemaphorePermit, Semaphore};
 
 use super::access::Access;
 use super::upstream::Upstream;
@@ -39,6 +39,35 @@ const MAX_CONNECTIONS: usize = 128;
 
 /// How long a paired browser stays paired without rescanning.
 const COOKIE_MAX_AGE: u32 = 60 * 60 * 12;
+
+/// The externally visible origin is supplied by Studio, never by forwarded
+/// request headers. Pending public gateways cannot consume pairing codes.
+#[derive(Clone, Debug)]
+pub enum Audience {
+    Lan,
+    Pending,
+    Https(url::Url),
+}
+
+impl Audience {
+    pub fn https(origin: &str) -> crate::error::Result<Self> {
+        let url = url::Url::parse(origin)
+            .map_err(|_| crate::error::Error::RemoteTunnel("invalid public origin".into()))?;
+        if url.scheme() != "https"
+            || url.host_str().is_none()
+            || !url.username().is_empty()
+            || url.password().is_some()
+            || url.path() != "/"
+            || url.query().is_some()
+            || url.fragment().is_some()
+        {
+            return Err(crate::error::Error::RemoteTunnel(
+                "invalid public origin".into(),
+            ));
+        }
+        Ok(Self::Https(url))
+    }
+}
 
 /// What the panel counts.
 #[derive(Debug, Default)]
@@ -62,8 +91,24 @@ pub async fn serve(
     access: Arc<Access>,
     upstream: impl Into<Upstream>,
     counters: Arc<Counters>,
+    closing: broadcast::Receiver<()>,
+    changed: broadcast::Sender<()>,
+) {
+    let (_, audience) = watch::channel(Audience::Lan);
+    serve_with_audience(
+        listener, access, upstream, counters, closing, changed, audience,
+    )
+    .await;
+}
+
+pub async fn serve_with_audience(
+    listener: TcpListener,
+    access: Arc<Access>,
+    upstream: impl Into<Upstream>,
+    counters: Arc<Counters>,
     mut closing: broadcast::Receiver<()>,
     changed: broadcast::Sender<()>,
+    audience: watch::Receiver<Audience>,
 ) {
     let upstream = Arc::new(upstream.into());
     let permits = Arc::new(Semaphore::new(MAX_CONNECTIONS));
@@ -90,6 +135,7 @@ pub async fn serve(
         // above: this task must not be able to keep the door open either.
         let connection_closing = closing.resubscribe();
         let changed = changed.clone();
+        let audience = audience.borrow().clone();
         tokio::spawn(async move {
             let _permit = permit;
             let _ = socket.set_nodelay(true);
@@ -100,6 +146,7 @@ pub async fn serve(
                 counters,
                 connection_closing,
                 &changed,
+                &audience,
             )
             .await;
             // Every connection that opens or closes is a number the panel shows,
@@ -120,13 +167,14 @@ async fn relay(
     counters: Arc<Counters>,
     mut shutdown: broadcast::Receiver<()>,
     changed: &broadcast::Sender<()>,
+    audience: &Audience,
 ) {
     // Closing access also cancels incomplete headers and upstream setup, not
     // just connections which have already reached the streaming phase.
     tokio::select! {
         biased;
         _ = shutdown.recv() => {}
-        _ = relay_open(&mut inbound, access, upstream, counters, changed) => {}
+        _ = relay_open(&mut inbound, access, upstream, counters, changed, audience) => {}
     }
 }
 
@@ -136,6 +184,7 @@ async fn relay_open(
     upstream: &Upstream,
     counters: Arc<Counters>,
     changed: &broadcast::Sender<()>,
+    audience: &Audience,
 ) {
     let Some(head) = read_head(inbound).await else {
         return;
@@ -144,12 +193,16 @@ async fn relay_open(
     // Subscribe before authentication. A device removed after admission must
     // remain observable even while connecting or writing to the upstream.
     let mut revocations = access.watch_revocations();
-    match decide(&head, &access) {
+    match decide_for(&head, &access, audience) {
         Decision::Pair {
             cookie,
             destination,
         } => {
-            let response = pair_response(&cookie, &destination);
+            let response = pair_response(
+                &cookie,
+                &destination,
+                matches!(audience, Audience::Https(_)),
+            );
             let _ = inbound.write_all(response.as_bytes()).await;
             let _ = inbound.shutdown().await;
             // A device that has just paired is a row the panel has to grow.
@@ -238,11 +291,11 @@ enum Decision {
     Refuse,
 }
 
-fn decide(head: &Head, access: &Access) -> Decision {
+fn decide_for(head: &Head, access: &Access, audience: &Audience) -> Decision {
     // Check the browser's original authority before replacing Origin/Host for
     // the loopback service. Same-site requests from a different port are not
     // same-origin, even though the browser may attach the pairing cookie.
-    if !head.trusted_origin() {
+    if !head.trusted_origin(audience) {
         return Decision::Refuse;
     }
     // A code in the URL is the user saying which credential they mean, so a
@@ -277,7 +330,10 @@ struct Head {
 }
 
 impl Head {
-    fn trusted_origin(&self) -> bool {
+    fn trusted_origin(&self, audience: &Audience) -> bool {
+        if matches!(audience, Audience::Pending) {
+            return false;
+        }
         for name in ["host", "origin", "sec-fetch-site"] {
             if self
                 .headers
@@ -295,20 +351,36 @@ impl Head {
         {
             return false;
         }
+        // Internet gateways require the configured public authority even for
+        // navigations without Origin; a spoofed forwarded host never enables it.
+        if let Audience::Https(expected) = audience {
+            let authority = &expected[url::Position::BeforeHost..url::Position::AfterPort];
+            if !self
+                .header("host")
+                .is_some_and(|host| host.eq_ignore_ascii_case(authority))
+            {
+                return false;
+            }
+        }
         let Some(origin) = self.header("origin") else {
             return true;
         };
         let Some(host) = self.header("host") else {
             return false;
         };
-        let Ok(expected) = url::Url::parse(&format!("http://{host}")) else {
-            return false;
+        let expected = match audience {
+            Audience::Https(url) => url.clone(),
+            Audience::Lan => match url::Url::parse(&format!("http://{host}")) {
+                Ok(url) => url,
+                Err(_) => return false,
+            },
+            Audience::Pending => return false,
         };
         let Ok(offered) = url::Url::parse(origin) else {
             return false;
         };
         offered.origin() == expected.origin()
-            && offered.scheme() == "http"
+            && offered.scheme() == expected.scheme()
             && offered.username().is_empty()
             && offered.password().is_none()
             && offered.path() == "/"
@@ -490,15 +562,15 @@ fn safe_local_target(target: &str) -> bool {
         && !target.bytes().any(|byte| byte.is_ascii_control())
 }
 
-fn pair_response(cookie: &str, destination: &str) -> String {
+fn pair_response(cookie: &str, destination: &str, secure: bool) -> String {
     // HttpOnly keeps the credential out of any script the harness happens to
     // run; SameSite=Lax keeps another site from steering the phone into using
-    // it. Not `Secure`: this is plain HTTP on a local network, and a cookie
-    // marked Secure would simply never be sent back.
+    // it. Public HTTPS gets Secure; LAN HTTP cannot send Secure cookies back.
+    let secure = if secure { "; Secure" } else { "" };
     format!(
         "HTTP/1.1 303 See Other\r\n\
          Location: {destination}\r\n\
-         Set-Cookie: {COOKIE}={cookie}; Path=/; Max-Age={COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax\r\n\
+         Set-Cookie: {COOKIE}={cookie}; Path=/; Max-Age={COOKIE_MAX_AGE}; HttpOnly; SameSite=Lax{secure}\r\n\
          Cache-Control: no-store\r\n\
          Content-Length: 0\r\n\
          Connection: close\r\n\r\n"
@@ -539,6 +611,75 @@ const UNAVAILABLE: &str = concat!(
 mod tests {
     use super::*;
     use std::net::SocketAddr;
+
+    fn decide(head: &Head, access: &Access) -> Decision {
+        decide_for(head, access, &Audience::Lan)
+    }
+
+    #[test]
+    fn public_origins_require_https_and_a_bare_authority() {
+        assert!(Audience::https("https://example.test/").is_ok());
+        for url in [
+            "http://example.test",
+            "https://user@example.test",
+            "https://example.test/path",
+            "https://example.test/?secret=hidden",
+            "https://example.test/#fragment",
+            "not a URL",
+        ] {
+            let error = Audience::https(url).unwrap_err().to_string();
+            assert!(!error.contains(url));
+        }
+    }
+
+    #[test]
+    fn pending_and_wrong_public_origins_do_not_spend_pairing_codes() {
+        let (access, code) = waiting();
+        let audience = Audience::https("https://public.example.test").unwrap();
+        let request = head(&format!(
+            "GET /?k={code} HTTP/1.1\r\nHost: public.example.test\r\n\r\n"
+        ));
+        assert!(matches!(
+            decide_for(&request, &access, &Audience::Pending),
+            Decision::Refuse
+        ));
+        for headers in [
+            "Host: different.example.test\r\n",
+            "Host: public.example.test\r\nOrigin: http://public.example.test\r\n",
+            "Host: public.example.test\r\nOrigin: https://other.example.test\r\n",
+            "Host: public.example.test\r\nOrigin: https://public.example.test:444\r\n",
+            "Host: public.example.test\r\nSec-Fetch-Site: same-site\r\n",
+            "Host: other\r\nX-Forwarded-Host: public.example.test\r\nX-Forwarded-Proto: https\r\n",
+            "Host: public.example.test\r\nHost: other\r\n",
+            "X-Forwarded-Host: public.example.test\r\n",
+        ] {
+            let request = head(&format!("GET /?k={code} HTTP/1.1\r\n{headers}\r\n"));
+            assert!(matches!(
+                decide_for(&request, &access, &audience),
+                Decision::Refuse
+            ));
+            assert!(access.pairing().is_some());
+        }
+        assert!(matches!(
+            decide_for(&request, &access, &audience),
+            Decision::Pair { .. }
+        ));
+    }
+
+    #[test]
+    fn public_same_origin_websocket_is_authenticated_and_cookie_is_secure() {
+        let (access, code) = waiting();
+        let audience = Audience::https("https://public.example.test").unwrap();
+        let credential = access.pair(&code, "test browser").unwrap();
+        let request = head(&format!("GET /api/remote.mux HTTP/1.1\r\nHost: public.example.test\r\nOrigin: https://public.example.test\r\nCookie: {COOKIE}={credential}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"));
+        assert!(matches!(
+            decide_for(&request, &access, &audience),
+            Decision::Forward { .. }
+        ));
+        let public = pair_response(&credential, "/", true);
+        assert!(public.contains("HttpOnly; SameSite=Lax; Secure\r\n"));
+        assert!(!pair_response(&credential, "/", false).contains("; Secure"));
+    }
 
     #[test]
     fn refuses_cross_origin_requests_before_spending_pairing_codes() {
@@ -881,6 +1022,50 @@ mod tests {
         panic!("a finished connection was still counted as active");
     }
 
+    #[tokio::test]
+    async fn public_gateway_waits_for_origin_then_pairs_and_relays_only_that_host() {
+        let upstream = echoing_upstream().await;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let door = listener.local_addr().unwrap();
+        let (access, code) = waiting();
+        let shutdown = broadcast::channel(1).0;
+        let (audience, receiver) = watch::channel(Audience::Pending);
+        let worker = tokio::spawn(serve_with_audience(
+            listener,
+            Arc::clone(&access),
+            upstream,
+            Arc::new(Counters::default()),
+            shutdown.subscribe(),
+            broadcast::channel(8).0,
+            receiver,
+        ));
+        let pair = format!("GET /chat?k={code} HTTP/1.1\r\nHost: public.example.test\r\n\r\n");
+        assert!(speak(door, &pair).await.starts_with("HTTP/1.1 401"));
+        assert!(access.pairing().is_some());
+        audience.send_replace(Audience::https("https://public.example.test").unwrap());
+        let paired = speak(door, &pair).await;
+        assert!(paired.starts_with("HTTP/1.1 303"));
+        assert!(paired.contains("; Secure\r\n"));
+        let credential = credential_in(&paired);
+        let public_request = format!("GET /chat HTTP/1.1\r\nHost: public.example.test\r\nOrigin: https://public.example.test\r\nCookie: {COOKIE}={credential}\r\n\r\n");
+        assert!(speak(door, &public_request)
+            .await
+            .starts_with("HTTP/1.1 200"));
+        let wrong_host =
+            public_request.replace("Host: public.example.test", "Host: other.example.test");
+        assert!(speak(door, &wrong_host).await.starts_with("HTTP/1.1 401"));
+        let device = access.admit(&credential).unwrap();
+        access.forget(&device);
+        assert!(speak(door, &public_request)
+            .await
+            .starts_with("HTTP/1.1 401"));
+        drop(shutdown);
+        tokio::time::timeout(Duration::from_secs(2), worker)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
     /// Forgetting a device has to reach the connection it already had open.
     /// A phone holding an event stream would otherwise keep receiving for
     /// hours after being revoked, because it never makes another request to be
@@ -1009,6 +1194,7 @@ mod tests {
                         counters,
                         closing,
                         &changed,
+                        &Audience::Lan,
                     )
                     .await
                 }

@@ -26,9 +26,9 @@ export function UpdateProgress() {
             : t('about.downloadingPercent', { percent })
   return (
     <div className="flex flex-col gap-2" aria-live="polite">
-      <div className="flex items-center justify-between gap-3 text-[12px] text-muted">
+      <div className="flex items-center justify-between gap-3 text-ui-base text-muted">
         <span className="flex items-center gap-2">
-          <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+          <Loader2 size={16} className="animate-spin" aria-hidden="true" />
           {label}
         </span>
         {phase !== 'installing' && (
@@ -43,10 +43,17 @@ export function UpdateProgress() {
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent ?? undefined}
-        className="h-1 overflow-hidden rounded-full bg-canvas-deep/70"
+        className="h-1 overflow-hidden rounded-full bg-line-strong"
       >
+        {/* The same two bars the environment's installs draw: a fill that
+            follows the bytes when the total is known, and the slow drift when
+            it is not. */}
         <div
-          className={`h-full rounded-full bg-brand transition-[width] duration-150 ${percent === null ? 'w-1/3 animate-pulse' : ''}`}
+          className={
+            percent === null
+              ? 'h-full w-1/4 animate-drift rounded-full bg-brand'
+              : 'h-full rounded-full bg-brand transition-[width] duration-200 ease-[var(--ease-out-soft)]'
+          }
           style={percent === null ? undefined : { width: `${percent}%` }}
         />
       </div>

@@ -27,6 +27,8 @@ pub mod commands;
 pub mod gateway;
 pub mod lan;
 pub mod qr;
+pub mod tunnel;
+pub mod tunnel_install;
 mod upstream;
 
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};

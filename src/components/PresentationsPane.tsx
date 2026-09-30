@@ -1,8 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
-import { Plus, Save, Undo2, Redo2, RefreshCw, FileDown, Copy } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import {
+  Plus,
+  Save,
+  Undo2,
+  Redo2,
+  RefreshCw,
+  FileDown,
+  Copy,
+  Presentation,
+  Trash2,
+} from 'lucide-react'
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { Empty } from '@/components/Empty'
+import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PresentationSlideView } from '@/components/PresentationSlideView'
+import { Segmented } from '@/components/Segmented'
 import { PresentationTemplates } from '@/components/PresentationTemplates'
 import { PresentationPendingInputs } from '@/components/PresentationPendingInputs'
 import { t } from '@/lib/i18n'
@@ -25,6 +39,7 @@ export function PresentationsPane() {
   const [exportStatus, setExportStatus] = useState<string | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const exportJob = useRef<AbortController | null>(null)
+  const propertiesHeading = useId()
   const document = editor.document
   const slide =
     document?.slides.find((item) => item.id === editor.activeSlide) ?? document?.slides[0]
@@ -182,7 +197,7 @@ export function PresentationsPane() {
           disabled={!document || editor.busy !== null || exportPhase !== null}
           onClick={() => void exportPptx()}
         >
-          <FileDown size={13} />
+          <FileDown />
           {t('deck.export')}
         </Button>
         {exportPhase === 'generating' && (
@@ -195,34 +210,35 @@ export function PresentationsPane() {
           onClick={() => setTemplatesOpen(true)}
           disabled={editor.busy !== null || exportPhase !== null}
         >
-          <Plus size={13} />
+          <Plus />
           {t('deck.new')}
         </Button>
-        <Button
+        <IconButton
           variant="secondary"
+          icon={Undo2}
+          label={t('deck.undo')}
           onClick={editor.undo}
           disabled={!editor.past.length || readOnly}
-          aria-label={t('deck.undo')}
-        >
-          <Undo2 size={13} />
-        </Button>
-        <Button
+        />
+        <IconButton
           variant="secondary"
+          icon={Redo2}
+          label={t('deck.redo')}
           onClick={editor.redo}
           disabled={!editor.future.length || readOnly}
-          aria-label={t('deck.redo')}
-        >
-          <Redo2 size={13} />
-        </Button>
+        />
+        {/* The pane's one primary, and it only lights up while there is something to
+            save. Ctrl+S is unchanged: it still writes a clean deck if asked. */}
         <Button
-          disabled={!document || editor.busy !== null}
+          variant="primary"
+          disabled={!document || editor.busy !== null || !dirty}
           onClick={() =>
             void editor.save().then((saved) => {
               if (saved) setRefresh((n) => n + 1)
             })
           }
         >
-          <Save size={13} />
+          <Save />
           {t('deck.save')}
         </Button>
         <Button
@@ -238,378 +254,459 @@ export function PresentationsPane() {
             })
           }
         >
-          <Copy size={13} />
+          <Copy />
           {t('deck.saveCopy')}
         </Button>
       </PaneHeader>
-      <div className="flex min-h-0 flex-1 gap-4 overflow-y-auto px-6 pb-6">
-        <aside className="w-[144px] shrink-0 space-y-3" aria-label={t('deck.library')}>
-          <div className="flex items-center justify-between text-[12px] text-muted">
-            <span>{t('deck.library')}</span>
-            <Button
-              variant="ghost"
-              aria-label={t('deck.refresh')}
-              onClick={() => setRefresh((n) => n + 1)}
-            >
-              <RefreshCw size={12} />
-            </Button>
-          </div>
-          {library.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              disabled={editor.busy !== null || exportPhase !== null}
-              onClick={() => void open(item.id)}
-              aria-pressed={document?.id === item.id}
-              className="block w-full truncate rounded-control px-2 py-2 text-left text-[12px] text-muted hover:bg-control-fill aria-pressed:bg-control-fill aria-pressed:text-text"
-              title={item.title ?? item.id}
-            >
-              {item.title ?? t('deck.unreadable')}
-            </button>
-          ))}
-          {document && (
-            <div className="space-y-3 border-t border-line pt-3">
-              {document.slides.map((item, index) => (
+      <div className="flex min-h-0 flex-1 flex-col px-6 pb-6">
+        {/* Same measure as the header above it, so the rail lines up under the title and
+            the properties card ends under the last button. Each column scrolls by
+            itself: a twenty-slide deck must not carry the canvas out of view. */}
+        <div className="mx-auto flex min-h-0 w-full max-w-[1040px] flex-1 gap-4">
+          {/* The 4px gutter (padding, cancelled by the margin) is where the rows' and
+              tiles' focus rings are drawn, so the scroll container does not clip them. */}
+          <aside
+            className="-m-1 flex w-42 shrink-0 flex-col gap-3 overflow-y-auto p-1"
+            aria-label={t('deck.library')}
+          >
+            <section className="flex flex-col gap-0.5">
+              <div className="mb-1 flex items-center justify-between pl-2.5">
+                <h2 className="caption">{t('deck.library')}</h2>
+                <IconButton
+                  size="xs"
+                  label={t('deck.refresh')}
+                  icon={RefreshCw}
+                  onClick={() => setRefresh((n) => n + 1)}
+                />
+              </div>
+              {library.map((item) => (
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => {
-                    editor.selectSlide(item.id)
-                    setSelected(null)
-                  }}
-                  aria-pressed={slide?.id === item.id}
-                  className="block w-full rounded-control border border-line p-1.5 text-left aria-pressed:border-brand"
+                  disabled={editor.busy !== null || exportPhase !== null}
+                  onClick={() => void open(item.id)}
+                  aria-pressed={document?.id === item.id}
+                  className={[
+                    'block h-9 w-full truncate rounded-lg px-2.5 text-left text-ui-base transition-colors',
+                    document?.id === item.id
+                      ? 'bg-surface-2 font-medium text-text'
+                      : 'text-muted enabled:hover:bg-surface-2/70 enabled:hover:text-text',
+                  ].join(' ')}
+                  title={item.title ?? item.id}
                 >
-                  <PresentationSlideView slide={item} aspect={document.aspect} />
-                  <span className="mt-1 block truncate text-[11px] text-muted">
-                    {t('deck.slide', { number: index + 1 })} · {item.title}
-                  </span>
+                  {item.title ?? t('deck.unreadable')}
                 </button>
               ))}
-              <Button
-                variant="secondary"
-                disabled={document.slides.length >= 100 || readOnly}
-                onClick={() => {
-                  const next = blankSlide(t('deck.slide', { number: document.slides.length + 1 }))
-                  if (
-                    editor.edit((draft) => {
-                      draft.slides.push(next)
-                    })
-                  ) {
-                    editor.selectSlide(next.id)
-                    setSelected(null)
-                  }
-                }}
-              >
-                {t('deck.addSlide')}
-              </Button>
-            </div>
-          )}
-        </aside>
-        <div className="min-w-0 flex-1 space-y-3">
-          {(exportPhase || exportStatus) && (
-            <p role="status" className="text-[12px] text-muted">
-              {exportPhase ? t(`deck.export.${exportPhase}`) : exportStatus}
-            </p>
-          )}
-          {exportError && (
-            <p
-              role="alert"
-              className="selectable rounded-control border border-danger/30 px-3 py-2 text-[12px] text-danger"
-            >
-              {exportError}
-            </p>
-          )}
-          {(editor.error || libraryError) && (
-            <p
-              role="alert"
-              className="selectable rounded-control border border-danger/30 px-3 py-2 text-[12px] text-danger"
-            >
-              {editor.error ?? libraryError}
-            </p>
-          )}
-          {editor.error && <PresentationPendingInputs />}
-          {!document || !slide ? (
-            <p className="p-8 text-[13px] text-muted">{t('deck.empty')}</p>
-          ) : (
-            <>
-              <p role="status" className="text-[12px] text-muted">
-                {editor.busy ? t('deck.busy') : dirty ? t('deck.unsaved') : t('deck.saved')}
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <div className="min-w-0 flex-[1_1_320px] space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    {(['text', 'shape', 'table', 'chart'] as const).map((kind) => (
-                      <Button
-                        key={kind}
-                        variant="secondary"
-                        disabled={readOnly || slide.elements.length >= 200}
-                        onClick={() => insert(kind)}
-                      >
-                        <Plus size={12} />
-                        {t(`deck.${kind}`)}
-                      </Button>
-                    ))}
-                    <Button
-                      variant="secondary"
-                      disabled={editor.busy !== null || slide.elements.length >= 200}
-                      onClick={() =>
-                        void editor.insertImage(slide.id).then((id) => {
-                          if (id) setSelected(id)
-                        })
-                      }
-                    >
-                      <Plus size={12} />
-                      {t('deck.image')}
-                    </Button>
-                  </div>
-                  <PresentationSlideView
-                    slide={slide}
-                    aspect={document.aspect}
-                    selected={selected}
-                    onSelect={setSelected}
-                    onMove={
-                      readOnly
-                        ? undefined
-                        : (id, position) =>
-                            editSlide((draft) => {
-                              const target = draft.elements.find((item) => item.id === id)
-                              if (target) Object.assign(target, position)
-                            })
-                    }
-                  />
-                  <ValueField
-                    fieldKey={`${document.id}/${slide.id}/notes`}
-                    key={`${slide.id}-notes`}
-                    label={t('deck.notes')}
-                    value={slide.notes}
-                    multiline
-                    commit={(value) =>
-                      editSlide((draft) => {
-                        draft.notes = value
-                      })
-                    }
-                  />
-                </div>
-                <fieldset
-                  disabled={readOnly}
-                  className="max-h-[calc(100vh-180px)] min-w-0 flex-[1_1_220px] space-y-3 overflow-y-auto rounded-panel border border-line p-3"
-                >
-                  <legend className="px-1 text-[12px] text-muted">{t('deck.properties')}</legend>
-                  <ValueField
-                    fieldKey={`${document.id}/title`}
-                    label={t('deck.title')}
-                    value={document.title}
-                    commit={(value) =>
+            </section>
+            {document && (
+              <div className="flex flex-col gap-2 border-t border-line pt-3">
+                {document.slides.map((item, index) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      editor.selectSlide(item.id)
+                      setSelected(null)
+                    }}
+                    aria-pressed={slide?.id === item.id}
+                    className={[
+                      'block w-full rounded-lg border p-1.5 text-left transition-colors',
+                      slide?.id === item.id
+                        ? 'border-brand bg-surface-2'
+                        : 'border-line hover:bg-surface-2/70',
+                    ].join(' ')}
+                  >
+                    <PresentationSlideView slide={item} aspect={document.aspect} />
+                    <span className="mt-1.5 block truncate text-ui-xs text-muted">
+                      {t('deck.slide', { number: index + 1 })} · {item.title}
+                    </span>
+                  </button>
+                ))}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full"
+                  disabled={document.slides.length >= 100 || readOnly}
+                  onClick={() => {
+                    const next = blankSlide(t('deck.slide', { number: document.slides.length + 1 }))
+                    if (
                       editor.edit((draft) => {
-                        draft.title = value
+                        draft.slides.push(next)
                       })
+                    ) {
+                      editor.selectSlide(next.id)
+                      setSelected(null)
                     }
-                  />
-                  <ValueField
-                    fieldKey={`${document.id}/${slide.id}/title`}
-                    label={t('deck.slideTitle')}
-                    value={slide.title}
-                    commit={(value) =>
-                      editSlide((draft) => {
-                        draft.title = value
-                      })
-                    }
-                  />
-                  <ColorField
-                    label={t('deck.background')}
-                    value={slide.background}
-                    commit={(value) =>
-                      editSlide((draft) => {
-                        draft.background = value
-                      })
-                    }
-                  />
+                  }}
+                >
+                  <Plus />
+                  {t('deck.addSlide')}
+                </Button>
+              </div>
+            )}
+          </aside>
+          {/* The container the editor's own breakpoint is measured against: side by side
+              once the canvas keeps at least ~300px next to the 256px properties card,
+              stacked (and scrolling as one) below that. */}
+          <div className="@container flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+            {(exportPhase || exportStatus || exportError || editor.error || libraryError) && (
+              <div className="shrink-0 space-y-3">
+                {(exportPhase || exportStatus) && (
+                  <p role="status" className="text-ui-sm text-muted">
+                    {exportPhase ? t(`deck.export.${exportPhase}`) : exportStatus}
+                  </p>
+                )}
+                {exportError && (
+                  <p
+                    role="alert"
+                    className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger"
+                  >
+                    {exportError}
+                  </p>
+                )}
+                {(editor.error || libraryError) && (
+                  <p
+                    role="alert"
+                    className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger"
+                  >
+                    {editor.error ?? libraryError}
+                  </p>
+                )}
+                {editor.error && <PresentationPendingInputs />}
+              </div>
+            )}
+            {!document || !slide ? (
+              <div className="card min-h-0 flex-1">
+                <Empty icon={Presentation} message={t('deck.empty')} />
+              </div>
+            ) : (
+              <>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  {(['text', 'shape', 'table', 'chart'] as const).map((kind) => (
+                    <Button
+                      key={kind}
+                      variant="secondary"
+                      size="sm"
+                      disabled={readOnly || slide.elements.length >= 200}
+                      onClick={() => insert(kind)}
+                    >
+                      <Plus />
+                      {t(`deck.${kind}`)}
+                    </Button>
+                  ))}
                   <Button
                     variant="secondary"
-                    disabled={document.slides.length <= 1}
-                    onClick={() => {
-                      if (
-                        editor.edit((draft) => {
-                          draft.slides = draft.slides.filter((item) => item.id !== slide.id)
-                        })
-                      ) {
-                        setSelected(null)
-                      }
-                    }}
+                    size="sm"
+                    disabled={editor.busy !== null || slide.elements.length >= 200}
+                    onClick={() =>
+                      void editor.insertImage(slide.id).then((id) => {
+                        if (id) setSelected(id)
+                      })
+                    }
                   >
-                    {t('deck.removeSlide')}
+                    <Plus />
+                    {t('deck.image')}
                   </Button>
-                  {element ? (
-                    <div key={element.id} className="space-y-3 border-t border-line pt-3">
-                      {(['x', 'y', 'width', 'height'] as const).map((key) => (
-                        <ValueField
-                          fieldKey={`${document.id}/${slide.id}/${element.id}/${key}`}
-                          key={key}
-                          label={t(`deck.${key}`)}
-                          value={String(element[key])}
-                          numeric
-                          commit={(value) =>
-                            editElement((draft) => {
-                              draft[key] = Number(value)
-                            })
-                          }
-                        />
-                      ))}
-                      {element.kind === 'text' && (
-                        <ValueField
-                          fieldKey={`${document.id}/${slide.id}/${element.id}/text`}
-                          label={t('deck.text')}
-                          value={element.text}
-                          multiline
-                          commit={(value) =>
-                            editElement((draft) => {
-                              if (draft.kind === 'text') draft.text = value
-                            })
-                          }
-                        />
-                      )}
-                      {element.kind === 'image' && (
-                        <>
-                          <ValueField
-                            fieldKey={`${document.id}/${slide.id}/${element.id}/alt`}
-                            label={t('deck.imageAlt')}
-                            value={element.alt}
-                            commit={(value) =>
-                              editElement((draft) => {
-                                if (draft.kind === 'image') draft.alt = value
+                  <Badge
+                    role="status"
+                    tone={editor.busy ? 'neutral' : dirty ? 'warn' : 'ok'}
+                    className="ml-auto"
+                  >
+                    {editor.busy ? t('deck.busy') : dirty ? t('deck.unsaved') : t('deck.saved')}
+                  </Badge>
+                </div>
+                <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto @xl:flex-row @xl:overflow-visible">
+                  <div className="flex min-w-0 flex-col gap-4 @xl:min-h-0 @xl:flex-1 @xl:overflow-y-auto">
+                    <PresentationSlideView
+                      slide={slide}
+                      aspect={document.aspect}
+                      selected={selected}
+                      onSelect={setSelected}
+                      onMove={
+                        readOnly
+                          ? undefined
+                          : (id, position) =>
+                              editSlide((draft) => {
+                                const target = draft.elements.find((item) => item.id === id)
+                                if (target) Object.assign(target, position)
                               })
-                            }
-                          />
-                          <div
-                            className="flex flex-wrap gap-1"
-                            role="group"
-                            aria-label={t('deck.imageFit')}
-                          >
-                            {(['contain', 'cover', 'stretch'] as const).map((fit) => (
-                              <Button
-                                key={fit}
-                                variant="secondary"
-                                aria-pressed={element.fit === fit}
-                                onClick={() =>
-                                  editElement((draft) => {
-                                    if (draft.kind === 'image') draft.fit = fit
-                                  })
-                                }
-                              >
-                                {t(`deck.imageFit.${fit}`)}
-                              </Button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                      {(element.kind === 'text' || element.kind === 'table') && (
-                        <>
-                          <ValueField
-                            fieldKey={`${document.id}/${slide.id}/${element.id}/fontSize`}
-                            label={t('deck.fontSize')}
-                            value={String(element.fontSize)}
-                            numeric
-                            commit={(value) =>
-                              editElement((draft) => {
-                                if (draft.kind === 'text' || draft.kind === 'table')
-                                  draft.fontSize = Number(value)
-                              })
-                            }
-                          />
-                          <ColorField
-                            label={t('deck.color')}
-                            value={element.color}
-                            commit={(value) =>
-                              editElement((draft) => {
-                                if (draft.kind === 'text' || draft.kind === 'table')
-                                  draft.color = value
-                              })
-                            }
-                          />
-                        </>
-                      )}
-                      {element.kind === 'shape' && (
-                        <ColorField
-                          label={t('deck.fill')}
-                          value={element.fill}
-                          commit={(value) =>
-                            editElement((draft) => {
-                              if (draft.kind === 'shape') draft.fill = value
+                      }
+                    />
+                    <ValueField
+                      fieldKey={`${document.id}/${slide.id}/notes`}
+                      key={`${slide.id}-notes`}
+                      label={t('deck.notes')}
+                      value={slide.notes}
+                      multiline
+                      commit={(value) =>
+                        editSlide((draft) => {
+                          draft.notes = value
+                        })
+                      }
+                    />
+                  </div>
+                  {/* Still a fieldset: `disabled` on it is what locks every field and button
+                      inside while the editor is busy. Its border and legend are gone; the
+                      card and the heading take their place. */}
+                  <fieldset
+                    aria-labelledby={propertiesHeading}
+                    disabled={readOnly}
+                    className="card min-w-0 p-4 @xl:max-h-full @xl:w-64 @xl:shrink-0 @xl:self-start @xl:overflow-y-auto"
+                  >
+                    <h2 id={propertiesHeading} className="caption mb-3">
+                      {t('deck.properties')}
+                    </h2>
+                    <div className="flex flex-col gap-4">
+                      <ValueField
+                        fieldKey={`${document.id}/title`}
+                        label={t('deck.title')}
+                        value={document.title}
+                        commit={(value) =>
+                          editor.edit((draft) => {
+                            draft.title = value
+                          })
+                        }
+                      />
+                      <ValueField
+                        fieldKey={`${document.id}/${slide.id}/title`}
+                        label={t('deck.slideTitle')}
+                        value={slide.title}
+                        commit={(value) =>
+                          editSlide((draft) => {
+                            draft.title = value
+                          })
+                        }
+                      />
+                      <ColorField
+                        label={t('deck.background')}
+                        value={slide.background}
+                        commit={(value) =>
+                          editSlide((draft) => {
+                            draft.background = value
+                          })
+                        }
+                      />
+                      <Button
+                        variant="danger-ghost"
+                        size="sm"
+                        className="-ml-2.5 self-start"
+                        disabled={document.slides.length <= 1}
+                        onClick={() => {
+                          if (
+                            editor.edit((draft) => {
+                              draft.slides = draft.slides.filter((item) => item.id !== slide.id)
                             })
+                          ) {
+                            setSelected(null)
                           }
-                        />
-                      )}
-                      {element.kind === 'table' &&
-                        element.rows.map((row, rowIndex) => (
-                          <div key={rowIndex} className="flex gap-1">
-                            {row.map((cell, column) => (
+                        }}
+                      >
+                        <Trash2 />
+                        {t('deck.removeSlide')}
+                      </Button>
+                      {element ? (
+                        <div
+                          key={element.id}
+                          className="flex flex-col gap-4 border-t border-line pt-4"
+                        >
+                          <div className="grid grid-cols-2 gap-x-2 gap-y-3">
+                            {(['x', 'y', 'width', 'height'] as const).map((key) => (
                               <ValueField
-                                fieldKey={`${document.id}/${slide.id}/${element.id}/cell/${rowIndex}/${column}`}
-                                key={column}
-                                label={`${rowIndex + 1} · ${column + 1}`}
-                                value={cell}
+                                fieldKey={`${document.id}/${slide.id}/${element.id}/${key}`}
+                                key={key}
+                                dense
+                                label={t(`deck.${key}`)}
+                                value={String(element[key])}
+                                numeric
                                 commit={(value) =>
                                   editElement((draft) => {
-                                    if (draft.kind === 'table')
-                                      draft.rows[rowIndex]![column] = value
+                                    draft[key] = Number(value)
                                   })
                                 }
                               />
                             ))}
                           </div>
-                        ))}
-                      {element.kind === 'chart' &&
-                        element.categories.map((category, index) => (
-                          <div key={index} className="space-y-1">
+                          {element.kind === 'text' && (
                             <ValueField
-                              fieldKey={`${document.id}/${slide.id}/${element.id}/category/${index}`}
-                              label={`${t('deck.chart')} ${index + 1}`}
-                              value={category}
+                              fieldKey={`${document.id}/${slide.id}/${element.id}/text`}
+                              label={t('deck.text')}
+                              value={element.text}
+                              multiline
                               commit={(value) =>
                                 editElement((draft) => {
-                                  if (draft.kind === 'chart') draft.categories[index] = value
+                                  if (draft.kind === 'text') draft.text = value
                                 })
                               }
                             />
-                            {element.series.map((series, seriesIndex) => (
+                          )}
+                          {element.kind === 'image' && (
+                            <>
                               <ValueField
-                                fieldKey={`${document.id}/${slide.id}/${element.id}/series/${seriesIndex}/${index}`}
-                                key={seriesIndex}
-                                label={series.name}
-                                numeric
-                                value={String(series.values[index])}
+                                fieldKey={`${document.id}/${slide.id}/${element.id}/alt`}
+                                label={t('deck.imageAlt')}
+                                value={element.alt}
                                 commit={(value) =>
                                   editElement((draft) => {
-                                    if (draft.kind === 'chart')
-                                      draft.series[seriesIndex]!.values[index] = Number(value)
+                                    if (draft.kind === 'image') draft.alt = value
                                   })
                                 }
                               />
-                            ))}
-                          </div>
-                        ))}
-                      <Button
-                        variant="secondary"
-                        onClick={() => {
-                          if (
-                            editSlide((draft) => {
-                              draft.elements = draft.elements.filter((item) => item.id !== selected)
-                            })
-                          )
-                            setSelected(null)
-                        }}
-                      >
-                        {t('deck.remove')}
-                      </Button>
+                              <div>
+                                {/* The group below is named for assistive tech; this is its
+                                    visible caption. */}
+                                <span className="field-label" aria-hidden="true">
+                                  {t('deck.imageFit')}
+                                </span>
+                                <Segmented
+                                  size="sm"
+                                  label={t('deck.imageFit')}
+                                  value={element.fit}
+                                  onChange={(fit) =>
+                                    editElement((draft) => {
+                                      if (draft.kind === 'image') draft.fit = fit
+                                    })
+                                  }
+                                  items={(['contain', 'cover', 'stretch'] as const).map((fit) => ({
+                                    value: fit,
+                                    label: t(`deck.imageFit.${fit}`),
+                                  }))}
+                                />
+                              </div>
+                            </>
+                          )}
+                          {(element.kind === 'text' || element.kind === 'table') && (
+                            <>
+                              <ValueField
+                                fieldKey={`${document.id}/${slide.id}/${element.id}/fontSize`}
+                                layout="inline"
+                                label={t('deck.fontSize')}
+                                value={String(element.fontSize)}
+                                numeric
+                                commit={(value) =>
+                                  editElement((draft) => {
+                                    if (draft.kind === 'text' || draft.kind === 'table')
+                                      draft.fontSize = Number(value)
+                                  })
+                                }
+                              />
+                              <ColorField
+                                label={t('deck.color')}
+                                value={element.color}
+                                commit={(value) =>
+                                  editElement((draft) => {
+                                    if (draft.kind === 'text' || draft.kind === 'table')
+                                      draft.color = value
+                                  })
+                                }
+                              />
+                            </>
+                          )}
+                          {element.kind === 'shape' && (
+                            <ColorField
+                              label={t('deck.fill')}
+                              value={element.fill}
+                              commit={(value) =>
+                                editElement((draft) => {
+                                  if (draft.kind === 'shape') draft.fill = value
+                                })
+                              }
+                            />
+                          )}
+                          {element.kind === 'table' && (
+                            <div className="flex flex-col gap-1.5">
+                              {element.rows.map((row, rowIndex) => (
+                                <div
+                                  key={rowIndex}
+                                  className="grid grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-1.5"
+                                >
+                                  {row.map((cell, column) => (
+                                    <ValueField
+                                      fieldKey={`${document.id}/${slide.id}/${element.id}/cell/${rowIndex}/${column}`}
+                                      key={column}
+                                      dense
+                                      layout="bare"
+                                      label={`${rowIndex + 1} · ${column + 1}`}
+                                      value={cell}
+                                      commit={(value) =>
+                                        editElement((draft) => {
+                                          if (draft.kind === 'table')
+                                            draft.rows[rowIndex]![column] = value
+                                        })
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {element.kind === 'chart' && (
+                            <div className="flex flex-col gap-3">
+                              {element.categories.map((category, index) => (
+                                <div
+                                  key={index}
+                                  className="grid grid-cols-[repeat(auto-fit,minmax(4.5rem,1fr))] gap-x-2 gap-y-1.5"
+                                >
+                                  <ValueField
+                                    fieldKey={`${document.id}/${slide.id}/${element.id}/category/${index}`}
+                                    dense
+                                    label={`${t('deck.chart')} ${index + 1}`}
+                                    value={category}
+                                    commit={(value) =>
+                                      editElement((draft) => {
+                                        if (draft.kind === 'chart') draft.categories[index] = value
+                                      })
+                                    }
+                                  />
+                                  {element.series.map((series, seriesIndex) => (
+                                    <ValueField
+                                      fieldKey={`${document.id}/${slide.id}/${element.id}/series/${seriesIndex}/${index}`}
+                                      key={seriesIndex}
+                                      dense
+                                      label={series.name}
+                                      numeric
+                                      value={String(series.values[index])}
+                                      commit={(value) =>
+                                        editElement((draft) => {
+                                          if (draft.kind === 'chart')
+                                            draft.series[seriesIndex]!.values[index] = Number(value)
+                                        })
+                                      }
+                                    />
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <Button
+                            variant="danger-ghost"
+                            size="sm"
+                            className="-ml-2.5 self-start"
+                            onClick={() => {
+                              if (
+                                editSlide((draft) => {
+                                  draft.elements = draft.elements.filter(
+                                    (item) => item.id !== selected,
+                                  )
+                                })
+                              )
+                                setSelected(null)
+                            }}
+                          >
+                            <Trash2 />
+                            {t('deck.remove')}
+                          </Button>
+                        </div>
+                      ) : (
+                        <p className="border-t border-line pt-4 text-ui-sm text-faint">
+                          {t('deck.select')}
+                        </p>
+                      )}
                     </div>
-                  ) : (
-                    <p className="text-[12px] text-muted">{t('deck.select')}</p>
-                  )}
-                </fieldset>
-              </div>
-            </>
-          )}
+                  </fieldset>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
       {templatesOpen && (
@@ -628,6 +725,8 @@ function ValueField({
   value,
   multiline,
   numeric,
+  dense,
+  layout = 'stacked',
   commit,
 }: {
   fieldKey: string
@@ -635,12 +734,23 @@ function ValueField({
   value: string
   multiline?: boolean
   numeric?: boolean
+  /** The 28px field, for grids of numbers and table cells. */
+  dense?: boolean
+  /** Where the label sits: above the field, beside it, or for assistive tech only. */
+  layout?: 'stacked' | 'inline' | 'bare'
   commit: (value: string) => boolean
 }) {
   const pending = usePresentationEditor((state) => state.inputs[fieldKey])
   const apply = () => usePresentationEditor.getState().commitInput(fieldKey)
   const common = {
-    className: 'field-control w-full min-w-0',
+    className: [
+      'field-control min-w-0',
+      layout === 'inline' ? 'w-20 shrink-0' : 'w-full',
+      dense && 'field-control--sm',
+      multiline && 'min-h-20 resize-y',
+    ]
+      .filter(Boolean)
+      .join(' '),
     value: pending?.value ?? value,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const next = event.target.value
@@ -667,8 +777,24 @@ function ValueField({
     },
   }
   return (
-    <label className="block min-w-0 flex-1 space-y-1 text-[11px] text-muted">
-      <span>{label}</span>
+    <label
+      className={
+        layout === 'inline'
+          ? 'flex min-w-0 items-center justify-between gap-3'
+          : 'block min-w-0'
+      }
+    >
+      <span
+        className={
+          layout === 'inline'
+            ? 'field-label mb-0 truncate'
+            : layout === 'bare'
+              ? 'sr-only'
+              : 'field-label'
+        }
+      >
+        {label}
+      </span>
       {multiline ? (
         <textarea {...common} aria-label={label} rows={3} />
       ) : (
@@ -688,14 +814,14 @@ function ColorField({
   commit: (value: string) => boolean
 }) {
   return (
-    <label className="flex items-center justify-between text-[11px] text-muted">
-      <span>{label}</span>
+    <label className="flex min-w-0 items-center justify-between gap-3">
+      <span className="field-label mb-0 truncate">{label}</span>
       <input
         type="color"
         value={`#${value}`}
         aria-label={label}
         onChange={(event) => commit(event.target.value.slice(1))}
-        className="h-6 w-10 cursor-pointer rounded-control border border-line bg-transparent"
+        className="field-control w-14 shrink-0"
       />
     </label>
   )

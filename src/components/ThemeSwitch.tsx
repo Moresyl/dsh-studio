@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 
+import { Segmented } from '@/components/Segmented'
 import { t, type MessageKey } from '@/lib/i18n'
 import { useTheme, type Theme } from '@/state/theme'
 
@@ -28,31 +29,13 @@ export function ThemeSwitch() {
   const choose = useTheme((state) => state.choose)
 
   return (
-    <div
-      role="group"
-      aria-label={t('theme.label')}
-      className="flex items-center gap-0.5 rounded-[8px] bg-canvas-deep p-0.5 hairline"
-    >
-      {CHOICES.map(({ id, icon: Icon, label }) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={theme === id}
-          aria-label={t(label)}
-          data-hint={t(label)}
-          onClick={theme === id ? undefined : () => choose(id)}
-          className={[
-            'grid h-[22px] w-[24px] place-items-center rounded-[5px] transition-colors duration-100',
-            // Same rule as the view switch: the selected segment is inert, so it
-            // shows the arrow and the other two carry the hover surface.
-            theme === id
-              ? 'cursor-default bg-text text-canvas shadow-panel'
-              : 'text-faint hover:bg-surface-2/60 hover:text-text',
-          ].join(' ')}
-        >
-          <Icon size={12} strokeWidth={2.1} aria-hidden="true" />
-        </button>
-      ))}
-    </div>
+    <Segmented
+      size="sm"
+      iconOnly
+      label={t('theme.label')}
+      value={theme}
+      onChange={choose}
+      items={CHOICES.map(({ id, icon, label }) => ({ value: id, label: t(label), icon }))}
+    />
   )
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { ClipboardPaste, Copy, Eraser, Plus, SquareTerminal, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
 import { SelectControl } from '@/components/SelectControl'
 import { StatusDot } from '@/components/StatusDot'
@@ -87,6 +88,7 @@ export function TerminalPane() {
     <section className="flex min-h-0 flex-1 animate-rise flex-col">
       <PaneHeader title={t('terminal.title')} subtitle={t('terminal.subtitle')}>
         <SelectControl
+          size="md"
           aria-label={t('terminal.layout')}
           value={layout}
           onValueChange={chooseLayout}
@@ -97,51 +99,40 @@ export function TerminalPane() {
           <option value="grid">{t('terminal.layout.grid')}</option>
         </SelectControl>
         <Button variant="secondary" onClick={start} disabled={opening}>
-          <Plus size={13} strokeWidth={2.3} />
+          <Plus />
           {t('terminal.new')}
         </Button>
       </PaneHeader>
 
+      {/* Two parts rather than one scroller with a sticky end: the tabs are the
+          only thing that scrolls, and the three actions on the right are always
+          where the hand left them, however many shells there are. */}
       {tabs.length > 0 && (
-        <div className="chrome flex h-8 shrink-0 items-stretch overflow-x-auto border-b border-line">
-          {tabs.map((tab) => (
-            <Tab
-              key={tab.id}
-              tab={tab}
-              active={tab.id === active}
-              onSelect={() => select(tab.id)}
-              onClose={() => void close(tab.id)}
-            />
-          ))}
+        <div className="chrome flex shrink-0 items-center border-b border-line">
+          <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-1.5">
+            {tabs.map((tab) => (
+              <Tab
+                key={tab.id}
+                tab={tab}
+                active={tab.id === active}
+                onSelect={() => select(tab.id)}
+                onClose={() => void close(tab.id)}
+              />
+            ))}
+          </div>
           {active && (
-            <div className="sticky right-0 ml-auto flex shrink-0 items-center gap-0.5 border-l border-line bg-[var(--ground-chrome)] px-1.5">
-              <button
-                type="button"
-                data-hint={t('menu.copy')}
-                aria-label={t('menu.copy')}
-                onClick={() => screens.copy(active)}
-                className="grid size-[22px] place-items-center rounded-[4px] text-faint transition-colors hover:bg-surface-2 hover:text-text"
-              >
-                <Copy size={11} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                data-hint={t('menu.paste')}
-                aria-label={t('menu.paste')}
+            <div className="flex shrink-0 items-center gap-0.5 self-stretch border-l border-line px-1.5">
+              <IconButton icon={Copy} label={t('menu.copy')} onClick={() => screens.copy(active)} />
+              <IconButton
+                icon={ClipboardPaste}
+                label={t('menu.paste')}
                 onClick={() => screens.paste(active)}
-                className="grid size-[22px] place-items-center rounded-[4px] text-faint transition-colors hover:bg-surface-2 hover:text-text"
-              >
-                <ClipboardPaste size={11} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                data-hint={t('terminal.clear')}
-                aria-label={t('terminal.clear')}
+              />
+              <IconButton
+                icon={Eraser}
+                label={t('terminal.clear')}
                 onClick={() => screens.clear(active)}
-                className="grid size-[22px] place-items-center rounded-[4px] text-faint transition-colors hover:bg-surface-2 hover:text-text"
-              >
-                <Eraser size={11} aria-hidden="true" />
-              </button>
+              />
             </div>
           )}
         </div>
@@ -151,7 +142,7 @@ export function TerminalPane() {
         <button
           type="button"
           onClick={dismiss}
-          className="shrink-0 border-b border-danger/25 bg-danger/10 px-4 py-2 text-left text-[12px] leading-relaxed text-danger"
+          className="shrink-0 border-b border-danger/30 bg-danger/10 px-4 py-2 text-left text-ui-sm text-danger transition-colors hover:bg-danger/15"
         >
           {error}
         </button>
@@ -159,12 +150,15 @@ export function TerminalPane() {
 
       {/* Positioned, because the emulators inside it are: switching tabs moves
           one out and another in, and for the frame in between the host holds
-          both. */}
+          both. The hairline colour is the gap between split panes, so it is only
+          the ground while there are panes to separate — an empty pane sits on the
+          canvas, like every other pane's empty state. */}
       <div
         ref={host}
         onContextMenu={menu}
         className={[
-          'relative grid min-h-0 min-w-0 flex-1 gap-px overflow-hidden bg-line',
+          'relative grid min-h-0 min-w-0 flex-1 gap-px overflow-hidden',
+          tabs.length > 0 ? 'bg-line' : 'bg-canvas',
           visible.length > 1 && layout === 'columns' ? 'grid-cols-2 grid-rows-1' : '',
           visible.length > 1 && layout === 'rows' ? 'grid-cols-1 grid-rows-2' : '',
           visible.length > 1 && layout === 'grid'
@@ -231,6 +225,9 @@ function TerminalSurface({
       onContextMenu={onSelect}
       className="flex min-h-0 min-w-0 flex-col bg-canvas-deep"
     >
+      {/* A title strip for the pane rather than a button that happens to look like
+          one, which is why it is a row: the selected pane is the raised one, the
+          way the selected tab above it is. */}
       {split && (
         <button
           type="button"
@@ -240,9 +237,9 @@ function TerminalSurface({
           }}
           aria-pressed={active}
           title={tab.cwd}
-          className={`flex h-8 shrink-0 items-center gap-2 truncate border-b px-3 text-left text-[11px] ${active ? 'border-brand/40 bg-brand/8 text-text' : 'border-line text-faint'}`}
+          className={`flex h-8 shrink-0 items-center gap-2 truncate border-b border-line px-3 text-left text-ui-sm transition-colors ${active ? 'bg-surface-2 text-text' : 'text-faint hover:bg-surface-2/70 hover:text-muted'}`}
         >
-          <SquareTerminal size={12} className="shrink-0" aria-hidden="true" />
+          <SquareTerminal size={14} className="shrink-0" aria-hidden="true" />
           <span className="truncate">
             {tab.label} · {tab.cwd}
           </span>
@@ -263,8 +260,16 @@ interface TabProps {
 /**
  * One shell's tab: what it is, whether it is still running, and the way out.
  *
+ * A tab is drawn by hand, at the height of a 28px control with that control's
+ * corner, because the segmented strip cannot hold what a tab needs: a second
+ * button inside it. The selected tab is the raised one; the strip has no other
+ * marker, which is what keeps it from being a second row of underlines next to
+ * the header's rule.
+ *
  * The close control is on the active tab always and on the others under the
- * pointer, which is the rule every tab strip a user has already met follows.
+ * pointer, which is the rule every tab strip a user has already met follows. It
+ * is inset by the gutter the tab's corner leaves it, so the two corners stay
+ * concentric.
  */
 function Tab({ tab, active, onSelect, onClose }: TabProps) {
   const finished = tab.exit !== null
@@ -272,18 +277,10 @@ function Tab({ tab, active, onSelect, onClose }: TabProps) {
   return (
     <div
       className={[
-        'group relative flex h-full shrink-0 items-center border-r border-line/70 transition-colors duration-100',
-        active ? 'bg-canvas-deep' : 'hover:bg-surface-2/50',
+        'group flex h-7 shrink-0 items-center rounded-md transition-colors',
+        active ? 'bg-surface-2' : 'hover:bg-surface-2/60',
       ].join(' ')}
     >
-      {/* On the strip's own edge, matching how the nav rail marks its place. */}
-      {active && (
-        <span
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-[2px] rounded-b-full bg-brand"
-        />
-      )}
-
       <button
         type="button"
         aria-current={active ? 'true' : undefined}
@@ -291,8 +288,8 @@ function Tab({ tab, active, onSelect, onClose }: TabProps) {
         data-hint={tab.cwd}
         onClick={onSelect}
         className={[
-          'flex h-full min-w-0 items-center gap-2 pr-1.5 pl-3 text-[11.5px]',
-          active ? 'text-text' : 'text-faint group-hover:text-muted',
+          'flex h-full min-w-0 items-center gap-2 rounded-md pr-1 pl-2.5 text-ui-sm',
+          active ? 'text-text' : 'text-muted group-hover:text-text',
         ].join(' ')}
       >
         <StatusDot
@@ -300,23 +297,21 @@ function Tab({ tab, active, onSelect, onClose }: TabProps) {
             color: finished ? 'var(--color-danger)' : 'var(--color-ok)',
             live: false,
           }}
-          size={5}
+          size={6}
         />
         <span className="max-w-[132px] truncate font-mono">{tab.label}</span>
       </button>
 
-      <button
-        type="button"
+      <IconButton
+        size="xs"
+        icon={X}
+        label={t('terminal.close')}
         onClick={onClose}
-        aria-label={t('terminal.close')}
         className={[
-          'mr-1.5 grid size-[18px] shrink-0 place-items-center rounded-[4px] transition duration-100',
-          'text-faint/70 hover:bg-surface-2 hover:text-text',
+          'mr-0.5',
           active ? '' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
         ].join(' ')}
-      >
-        <X size={11} strokeWidth={2.4} aria-hidden="true" />
-      </button>
+      />
     </div>
   )
 }
@@ -333,11 +328,16 @@ function Empty({ onStart, busy }: { onStart: () => void; busy: boolean }) {
   return (
     <div className="absolute inset-0 grid place-items-center px-6">
       <div className="flex max-w-[380px] flex-col items-center gap-3 text-center">
-        <SquareTerminal size={26} strokeWidth={1.5} className="text-faint" aria-hidden="true" />
-        <p className="text-[12.5px] text-muted">{t('terminal.empty')}</p>
-        <p className="text-[11.5px] leading-relaxed text-faint">{t('terminal.emptyHint')}</p>
+        <SquareTerminal
+          size={24}
+          strokeWidth={1.4}
+          className="text-faint opacity-60"
+          aria-hidden="true"
+        />
+        <p className="text-ui-base text-muted">{t('terminal.empty')}</p>
+        <p className="text-ui-sm text-faint">{t('terminal.emptyHint')}</p>
         <Button variant="primary" className="mt-1" onClick={onStart} disabled={busy}>
-          <Plus size={13} strokeWidth={2.3} />
+          <Plus />
           {t('terminal.new')}
         </Button>
       </div>

@@ -39,7 +39,7 @@ export function PresentationImage({ element }: { element: ImageElement }) {
   return (
     <foreignObject width={element.width} height={element.height}>
       <div
-        className="flex h-full flex-col items-center justify-center gap-2 bg-canvas text-[12px] text-muted"
+        className="flex h-full flex-col items-center justify-center gap-2 bg-canvas text-ui-sm text-muted"
         role={current?.error ? 'alert' : 'status'}
         title={current?.error}
       >

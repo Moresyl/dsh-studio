@@ -201,30 +201,44 @@ export function RecoveryCenter() {
             })
           : ''
 
+  // Three outcomes, one tile: a plugin profile put back is the good news, one
+  // that could not be is the failure, and a profile that would not start is the
+  // warning the rest of this dialog is about.
+  const status =
+    current.kind === 'plugin'
+      ? current.notice.restored
+        ? { Icon: CheckCircle2, tone: 'bg-ok/12 text-ok' }
+        : { Icon: TriangleAlert, tone: 'bg-danger/12 text-danger' }
+      : { Icon: ShieldAlert, tone: 'bg-warn/12 text-warn' }
+
   return (
     <div
       role="presentation"
       onKeyDown={onKeyDown}
-      className="dialog-backdrop fixed inset-0 z-50 grid place-items-center bg-canvas-deep/80 p-8 backdrop-blur-[2px]"
+      // One layer above the confirm dialog's: a startup failure is answered
+      // first, and nothing raised behind it may cover it.
+      className="dialog-backdrop fixed inset-0 z-50 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
     >
+      {/* The large-modal shape: the header and the actions stay put and the
+          body between them scrolls, so a profile with a long list of plugins
+          or a short window never pushes the buttons off the screen. */}
       <div
         ref={card}
         role="alertdialog"
         aria-modal="true"
         aria-label={t('recovery.centerTitle')}
-        className="dialog-panel w-full max-w-[560px] rounded-panel border border-line-strong bg-surface p-5 shadow-lift"
+        className="dialog-panel flex max-h-[min(720px,calc(100vh-64px))] w-full max-w-[560px] animate-pop flex-col overflow-hidden rounded-xl border border-line-strong bg-surface shadow-lift"
       >
-        <div className="flex items-start gap-3">
-          {current.kind === 'plugin' && current.notice.restored ? (
-            <CheckCircle2 size={21} className="mt-0.5 shrink-0 text-ok" aria-hidden="true" />
-          ) : current.kind === 'plugin' ? (
-            <TriangleAlert size={21} className="mt-0.5 shrink-0 text-danger" aria-hidden="true" />
-          ) : (
-            <ShieldAlert size={21} className="mt-0.5 shrink-0 text-warn" aria-hidden="true" />
-          )}
-          <div className="min-w-0 flex-1">
-            <h2 className="text-[14px] font-semibold text-text">{t('recovery.centerTitle')}</h2>
-            <p className="mt-2 text-[12px] leading-relaxed text-muted">
+        <header className="flex items-start gap-3 border-b border-line px-5 py-4">
+          <span
+            aria-hidden="true"
+            className={`grid size-9 shrink-0 place-items-center rounded-lg ${status.tone}`}
+          >
+            <status.Icon size={18} strokeWidth={2} />
+          </span>
+          <div className="min-w-0 flex-1 pt-1.5">
+            <h2 className="text-ui-lg font-semibold text-text">{t('recovery.centerTitle')}</h2>
+            <p className="mt-1 text-ui-base text-muted">
               {current.kind === 'plugin'
                 ? current.notice.restored
                   ? t('recovery.restored')
@@ -236,99 +250,107 @@ export function RecoveryCenter() {
                     })
                   : t('profileRecovery.noFallback', { failed: current.notice.failedProfile })}
             </p>
+          </div>
+        </header>
 
-            <dl className="mt-3 grid grid-cols-[92px_1fr] gap-x-3 gap-y-1.5 rounded-control border border-line bg-canvas-deep/55 p-3 text-[11px]">
-              <dt className="text-faint">{t('recovery.profile')}</dt>
-              <dd className="truncate font-mono text-muted">
-                {current.kind === 'plugin' ? current.notice.profile : current.notice.failedProfile}
-              </dd>
-              {current.kind === 'plugin' && (
-                <>
-                  <dt className="text-faint">{t('recovery.operation')}</dt>
-                  <dd className="truncate font-mono text-muted">{current.notice.operation}</dd>
-                  <dt className="text-faint">{t('recovery.subject')}</dt>
-                  <dd className="truncate font-mono text-muted">{current.notice.subject}</dd>
-                </>
-              )}
-            </dl>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
+          <dl className="list-card">
+            <Fact
+              label={t('recovery.profile')}
+              value={
+                current.kind === 'plugin' ? current.notice.profile : current.notice.failedProfile
+              }
+            />
+            {current.kind === 'plugin' && (
+              <>
+                <Fact label={t('recovery.operation')} value={current.notice.operation} />
+                <Fact label={t('recovery.subject')} value={current.notice.subject} />
+              </>
+            )}
+          </dl>
 
-            {preview ? (
-              <div className="mt-4 rounded-control border border-brand/40 bg-brand/5 p-3">
-                <p className="text-[11.5px] font-medium text-text">{t('recovery.previewTitle')}</p>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted">{previewText}</p>
-                <p className="mt-1.5 text-[10.5px] leading-relaxed text-faint">
-                  {t('recovery.changedGuard')}
-                </p>
-              </div>
-            ) : current.kind === 'plugin' ? (
-              <p className="mt-3 text-[11px] text-muted">
-                {current.notice.retry ? t('recovery.evidenceHint') : t('recovery.noRetry')}
-              </p>
-            ) : (
-              <div className="mt-4">
-                <p className="mb-2 text-[11.5px] text-muted">{t('profileRecovery.disableHint')}</p>
-                <div className="max-h-36 space-y-1.5 overflow-auto">
+          {preview ? (
+            <div className="flex flex-col gap-2 rounded-xl border border-brand/40 bg-brand/5 px-4 py-3">
+              <p className="text-ui-base font-medium text-text">{t('recovery.previewTitle')}</p>
+              <p className="text-ui-base text-muted">{previewText}</p>
+              <p className="text-ui-sm text-faint">{t('recovery.changedGuard')}</p>
+            </div>
+          ) : current.kind === 'plugin' ? (
+            <p className="text-ui-base text-muted">
+              {current.notice.retry ? t('recovery.evidenceHint') : t('recovery.noRetry')}
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <p className="text-ui-base text-muted">{t('profileRecovery.disableHint')}</p>
+              {current.notice.plugins.length > 0 && (
+                <ul className="list-card">
                   {current.notice.plugins.map((name) => (
-                    <div
-                      key={name}
-                      className="flex items-center gap-3 rounded-control border border-line bg-canvas-deep/35 px-3 py-2"
-                    >
-                      <code className="min-w-0 flex-1 truncate text-[11px] text-text">{name}</code>
+                    <li key={name} className="list-row">
+                      <code className="min-w-0 flex-1 truncate font-mono text-ui-sm text-text">
+                        {name}
+                      </code>
                       <Button
                         variant="secondary"
+                        size="sm"
                         disabled={working !== null}
                         onClick={() => setPreview({ kind: 'profile-disable', subject: name })}
                       >
                         {t('profileRecovery.disable')}
                       </Button>
-                    </div>
+                    </li>
                   ))}
-                </div>
-              </div>
-            )}
-
-            <div className="mt-4 rounded-control border border-line bg-canvas-deep/35 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[11px] text-muted">
-                  {evidenceReady ? t('recovery.evidenceReady') : t('recovery.evidenceHint')}
-                </p>
-                <Button
-                  variant="secondary"
-                  disabled={working !== null}
-                  onClick={() => void saveEvidence()}
-                >
-                  {working === 'evidence' ? (
-                    <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Archive size={13} aria-hidden="true" />
-                  )}
-                  {working === 'evidence' ? t('recovery.exporting') : t('recovery.evidence')}
-                </Button>
-              </div>
-              {evidenceReady && evidencePath && (
-                <p className="mt-2 truncate font-mono text-[10px] text-faint">
-                  {t('recovery.savedAt', { path: evidencePath })}
-                </p>
+                </ul>
               )}
             </div>
-            {error && <p className="mt-3 text-[11px] text-danger">{error}</p>}
+          )}
+
+          <div className="card flex flex-col gap-2 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-ui-sm text-muted">
+                {evidenceReady ? t('recovery.evidenceReady') : t('recovery.evidenceHint')}
+              </p>
+              <Button
+                variant="secondary"
+                disabled={working !== null}
+                onClick={() => void saveEvidence()}
+              >
+                {working === 'evidence' ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Archive aria-hidden="true" />
+                )}
+                {working === 'evidence' ? t('recovery.exporting') : t('recovery.evidence')}
+              </Button>
+            </div>
+            {evidenceReady && evidencePath && (
+              <p className="truncate font-mono text-ui-sm text-faint">
+                {t('recovery.savedAt', { path: evidencePath })}
+              </p>
+            )}
           </div>
+
+          {error && (
+            <p className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger">
+              {error}
+            </p>
+          )}
         </div>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3">
           {preview ? (
             <>
               <Button variant="ghost" disabled={working !== null} onClick={() => setPreview(null)}>
                 {t('recovery.back')}
               </Button>
               <Button
+                variant="primary"
                 disabled={!evidenceReady || working !== null}
                 onClick={() => void applyPreview()}
               >
                 {working === 'apply' ? (
-                  <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                  <Loader2 className="animate-spin" aria-hidden="true" />
                 ) : (
-                  <RotateCcw size={13} aria-hidden="true" />
+                  <RotateCcw aria-hidden="true" />
                 )}
                 {working === 'apply' ? t('recovery.retrying') : t('recovery.apply')}
               </Button>
@@ -341,9 +363,9 @@ export function RecoveryCenter() {
                 onClick={() => void startSafeMode()}
               >
                 {working === 'safe-mode' ? (
-                  <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                  <Loader2 className="animate-spin" aria-hidden="true" />
                 ) : (
-                  <LifeBuoy size={13} aria-hidden="true" />
+                  <LifeBuoy aria-hidden="true" />
                 )}
                 {working === 'safe-mode' ? t('recovery.safeModeStarting') : t('recovery.safeMode')}
               </Button>
@@ -352,6 +374,7 @@ export function RecoveryCenter() {
               </Button>
               {current.kind === 'plugin' && current.notice.retry && (
                 <Button
+                  variant="primary"
                   disabled={working !== null}
                   onClick={() => setPreview({ kind: 'plugin-retry' })}
                 >
@@ -360,6 +383,7 @@ export function RecoveryCenter() {
               )}
               {current.kind === 'profile' && (
                 <Button
+                  variant="primary"
                   disabled={working !== null}
                   onClick={() => setPreview({ kind: 'profile-retry' })}
                 >
@@ -368,8 +392,18 @@ export function RecoveryCenter() {
               )}
             </>
           )}
-        </div>
+        </footer>
       </div>
+    </div>
+  )
+}
+
+/** One fact about what failed, as a row of the list above the actions. */
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="list-row">
+      <dt className="shrink-0 text-ui-base text-muted">{label}</dt>
+      <dd className="ml-auto min-w-0 truncate font-mono text-ui-sm text-text">{value}</dd>
     </div>
   )
 }

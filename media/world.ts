@@ -28,6 +28,8 @@ import { mockIPC, mockWindows } from '@tauri-apps/api/mocks'
 import appPackage from '../package.json'
 import runtimePackage from '../src-tauri/runtime-contract/package.json'
 
+import { fixture as presentationFixture } from '@/lib/presentation/fixtures.test-support'
+
 import type {
   About,
   CatalogSource,
@@ -746,6 +748,8 @@ const flag = (args: unknown, key: string): boolean => {
   return (args as Record<string, unknown>)[key] === true
 }
 
+let shells = 0
+
 /** Answer every command the application makes, for as long as the page lives. */
 export function answerCommands(): void {
   mockWindows('main')
@@ -835,6 +839,40 @@ export function answerCommands(): void {
         case 'preset_choose':
           selectedPreset = text(args, 'id') || selectedPreset
           return presetRoster()
+
+        /* Terminals: none running, which is the state a fresh window is in. Opening
+           one answers with a shell that never prints, so the tab strip can be
+           drawn without pretending to be a machine. */
+        case 'terminal_list':
+          return []
+        case 'terminal_open':
+          shells += 1
+          return { id: `shell-${shells}`, label: shells % 2 ? 'pwsh' : 'bash', cwd: `${HOME}\projects\atlas` }
+        case 'terminal_write':
+        case 'terminal_resize':
+        case 'terminal_close':
+          return null
+
+        /* Application versions: a short history, so the dialog has rows to draw. */
+        case 'application_versions':
+          return {
+            page: 1,
+            hasMore: false,
+            releases: [
+              { version: '0.9.21', title: 'Interface pass', published: '2026-09-30', url: 'https://example.invalid/0.9.21', direction: 'newer', hasUpdater: true },
+              { version: about.version, title: 'Presentations and attachments', published: '2026-09-29', url: 'https://example.invalid/current', direction: 'current', hasUpdater: true },
+              { version: '0.9.19', title: 'Sessions', published: '2026-09-22', url: 'https://example.invalid/0.9.19', direction: 'older', hasUpdater: true },
+            ],
+          }
+
+        /* Presentations: one saved deck, so the library and the editor both have
+           something to draw. */
+        case 'presentation_list':
+          return [{ id: presentationFixture().id, title: presentationFixture().title }]
+        case 'presentation_load':
+          return { document: presentationFixture(), revision: '1'.repeat(64) }
+        case 'presentation_save':
+          return { document: presentationFixture(), revision: '2'.repeat(64) }
 
         /* About */
         case 'app_about':

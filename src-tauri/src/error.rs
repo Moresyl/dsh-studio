@@ -63,6 +63,9 @@ pub enum Error {
     #[error("could not authenticate remote access with Harness; restart Harness and try again")]
     RemoteAuthentication,
 
+    #[error("remote tunnel failed: {0}")]
+    RemoteTunnel(String),
+
     #[error("the system entropy source is unavailable, so no pairing secret can be made")]
     NoEntropy,
 

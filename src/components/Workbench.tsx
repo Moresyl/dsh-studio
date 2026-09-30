@@ -59,9 +59,9 @@ function PaneLoading() {
     <div
       role="status"
       aria-live="polite"
-      className="flex flex-1 items-center justify-center text-ui-caption text-muted"
+      className="flex flex-1 items-center justify-center text-ui-base"
     >
-      {t('common.loading')}
+      <span className="shimmer">{t('common.loading')}</span>
     </div>
   )
 }

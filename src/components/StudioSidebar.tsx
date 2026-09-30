@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { IconButton } from '@/components/IconButton'
 import { ProfileSwitch } from '@/components/ProfileSwitch'
 import { SETTINGS, VIEWS, type View } from '@/components/workbench-contract'
 import { t } from '@/lib/i18n'
@@ -75,7 +76,7 @@ export function StudioSidebar({
     >
       <nav
         aria-label={t('sidebar.navigation')}
-        className="min-h-0 flex-1 overflow-y-auto px-2 pt-2.5 pb-3"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2 pt-2.5 pb-3"
       >
         {serving && (
           <SidebarItem
@@ -120,17 +121,14 @@ export function StudioSidebar({
 
         {!collapsed && recent.length > 0 && (
           <div className="mt-5">
-            <div className="flex items-center justify-between px-2 text-ui-xs font-medium text-faint">
-              <span>{t('sidebar.recent')}</span>
-              <button
-                type="button"
-                aria-label={t('nav.sessions')}
-                data-hint={t('nav.sessions')}
+            <div className="flex items-center justify-between pr-0.5 pl-2.5">
+              <span className="caption">{t('sidebar.recent')}</span>
+              <IconButton
+                size="xs"
+                label={t('nav.sessions')}
+                icon={ChevronRight}
                 onClick={() => onSelect('sessions')}
-                className="grid size-6 place-items-center rounded-control hover:bg-surface-2 hover:text-text"
-              >
-                <ChevronRight size={14} aria-hidden="true" />
-              </button>
+              />
             </div>
             <div className="mt-1 space-y-0.5">
               {recent.map((card) => (
@@ -142,7 +140,7 @@ export function StudioSidebar({
                     !inHarness && view === 'sessions' && opened === card.id ? 'page' : undefined
                   }
                   onClick={() => onOpenSession(card.id)}
-                  className="block h-8 w-full truncate rounded-control px-2 text-left text-ui-caption text-muted transition-colors hover:bg-surface-2 hover:text-text aria-[current=page]:bg-surface-2 aria-[current=page]:text-text"
+                  className="block h-8 w-full truncate rounded-lg px-2.5 text-left text-ui-base text-muted transition-colors hover:bg-surface-2/70 hover:text-text aria-[current=page]:bg-surface-2 aria-[current=page]:text-text"
                 >
                   {card.title}
                 </button>
@@ -181,7 +179,7 @@ export function StudioSidebar({
               onClick={onManageProfiles}
             />
           ) : (
-            <div className="mt-1 flex min-h-9 items-center border-t border-line px-1 pt-2">
+            <div className="mt-1 border-t border-line pt-2">
               <ProfileSwitch onManage={onManageProfiles} />
             </div>
           ))}
@@ -215,16 +213,32 @@ function SidebarItem({
       data-hint={collapsed ? hint : undefined}
       onClick={onClick}
       className={[
-        'flex h-9 w-full items-center gap-2.5 rounded-[7px] px-2.5 text-left text-[13px] transition-colors duration-100',
+        'flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-ui-base transition-colors duration-100',
         active
           ? 'bg-surface-2 font-medium text-text'
-          : 'text-muted hover:bg-surface-2/80 hover:text-text',
+          : 'text-muted hover:bg-surface-2/70 hover:text-text',
       ].join(' ')}
     >
-      <Icon size={16} strokeWidth={1.8} className="shrink-0" aria-hidden="true" />
+      {/* Collapsed, there is no room beside the icon for a count, so it rides on the
+          icon's corner instead — a number in a small chip, a state as its bare dot. */}
+      <span className="relative grid shrink-0 place-items-center">
+        <Icon size={16} strokeWidth={1.8} aria-hidden="true" />
+        {collapsed && badge !== undefined && (
+          <span
+            aria-hidden="true"
+            className={
+              typeof badge === 'number'
+                ? 'absolute -top-2 -right-2.5 grid h-4 min-w-4 place-items-center rounded-sm bg-brand px-1 text-ui-xs leading-none font-medium text-on-brand tabular-nums'
+                : 'absolute -top-1 -right-1 grid place-items-center'
+            }
+          >
+            {badge}
+          </span>
+        )}
+      </span>
       {!collapsed && <span className="min-w-0 flex-1 truncate">{label}</span>}
-      {badge !== undefined && (
-        <span className={collapsed ? 'ml-auto' : 'text-ui-xs text-faint'} aria-hidden="true">
+      {!collapsed && badge !== undefined && (
+        <span className="text-ui-sm text-faint tabular-nums" aria-hidden="true">
           {badge}
         </span>
       )}

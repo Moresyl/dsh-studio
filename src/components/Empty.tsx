@@ -22,13 +22,13 @@ export function Empty({
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2.5 px-8 py-12 text-center">
       <Icon
-        size={22}
+        size={24}
         strokeWidth={1.4}
         className={`text-faint opacity-60 ${spin ? 'animate-spin' : ''}`}
         aria-hidden="true"
       />
-      <p className="text-[12.5px] text-muted">{message}</p>
-      {hint && <p className="max-w-[46ch] text-[11.5px] leading-relaxed text-faint">{hint}</p>}
+      <p className="text-ui-base text-muted">{message}</p>
+      {hint && <p className="max-w-[46ch] text-ui-sm text-faint">{hint}</p>}
     </div>
   )
 }

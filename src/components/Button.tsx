@@ -1,39 +1,59 @@
 import type { ComponentPropsWithRef, ReactNode } from 'react'
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost'
+
+/**
+ * Four heights, and the reasons for each are in the `.btn` rules in `app.css`.
+ * Short version: `xs` is furniture, `sm` repeats, `md` is the default, `lg` is
+ * the one thing a screen is for.
+ */
+export type ControlSize = 'xs' | 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ComponentPropsWithRef<'button'> {
-  variant?: Variant
+  variant?: ButtonVariant
+  size?: ControlSize
   children: ReactNode
 }
 
-/** The default ChatGPT desktop button: 20px high, 12px text and a 6px radius. */
-const BASE =
-  'inline-flex h-5 shrink-0 items-center justify-center gap-[3px] rounded-[6px] px-1.5 text-[12px] leading-none font-normal whitespace-nowrap transition-[background-color,border-color,color,filter,opacity,transform] duration-150 ease-out select-none disabled:opacity-40 enabled:active:scale-[0.97]'
-
-const VARIANT: Record<Variant, string> = {
-  // Flat accent, dark ink. The one saturated element on the surface, which is
-  // what makes it findable without an animation or a glow.
-  primary: 'bg-brand text-on-brand enabled:hover:brightness-[1.08] enabled:active:brightness-95',
-  secondary:
-    'border border-control-border bg-transparent text-text enabled:hover:border-control-border-hover enabled:hover:bg-control-fill enabled:active:bg-control-fill-hover',
-  // The press has to be visible on a variant that has no fill to darken, so it
-  // borrows the hover surface and goes one step further.
-  ghost:
-    'text-muted enabled:hover:bg-control-fill enabled:hover:text-text enabled:active:bg-control-fill-hover',
-  // Filled, like the primary, because the button that removes something should
-  // be as easy to aim at as the one that keeps it — the safety is in the
-  // question above it, not in making the answer hard to hit.
-  danger: 'bg-danger text-on-danger enabled:hover:brightness-[1.08] enabled:active:brightness-95',
+/**
+ * The class list for anything that has to look like a button but cannot be one
+ * — a link that opens a page, a label wrapped around a file input. Kept next to
+ * the component so the two cannot drift apart.
+ */
+export function buttonClass({
+  variant = 'primary',
+  size = 'md',
+  icon = false,
+  className,
+}: {
+  variant?: ButtonVariant
+  size?: ControlSize
+  icon?: boolean
+  className?: string
+}): string {
+  return ['btn', `btn--${size}`, `btn--${variant}`, icon && 'btn--icon', className]
+    .filter(Boolean)
+    .join(' ')
 }
 
-export function Button({ variant = 'primary', className, children, ...rest }: ButtonProps) {
+/**
+ * The button. Every colour and number comes from the `.btn` rules; this only
+ * picks which of them apply, so a screen cannot end up with a fifth size by
+ * passing a `className` that says `h-[26px]`.
+ *
+ * Callers that want less height ask for `size="sm"`, and callers that want the
+ * screen's one action to stand out ask for `size="lg"` — nothing else about the
+ * geometry is theirs to change.
+ */
+export function Button({
+  variant = 'primary',
+  size = 'md',
+  className,
+  children,
+  ...rest
+}: ButtonProps) {
   return (
-    <button
-      type="button"
-      className={[BASE, VARIANT[variant], className].filter(Boolean).join(' ')}
-      {...rest}
-    >
+    <button type="button" className={buttonClass({ variant, size, className })} {...rest}>
       {children}
     </button>
   )

@@ -37,10 +37,10 @@ export function PaneHeader({
         ].join(' ')}
       >
         <div className="min-w-0 flex-[1_1_180px]">
-          <h2 className="break-words text-[20px] leading-tight font-semibold text-text">{title}</h2>
+          <h2 className="break-words text-ui-xl font-semibold text-text">{title}</h2>
           {subtitle && (
             <p
-              className="mt-1.5 truncate text-[12.5px] leading-relaxed text-muted"
+              className="mt-1 truncate text-ui-base text-muted"
               data-hint={subtitleHint}
             >
               {subtitle}

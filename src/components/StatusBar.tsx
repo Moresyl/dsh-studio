@@ -41,7 +41,7 @@ export function StatusBar({
   const node = environment?.node ?? null
 
   return (
-    <footer className="chrome relative z-20 flex h-[26px] shrink-0 items-stretch border-t border-line text-ui-xs text-muted select-none">
+    <footer className="chrome relative z-20 flex h-7 shrink-0 items-stretch border-t border-line text-ui-xs text-muted select-none">
       <Segment hint={labelOf(status)}>
         <StatusDot tone={toneOf(status)} size={7} />
         {labelOf(status)}
@@ -97,7 +97,7 @@ export function StatusBar({
             },
           ])}
         >
-          <FolderOpen size={11} strokeWidth={2} className="shrink-0 text-faint" />
+          <FolderOpen size={12} strokeWidth={2} className="shrink-0 text-faint" />
           <span className="max-w-[22rem] truncate">{tail(environment.workspace)}</span>
         </Segment>
       )}
@@ -132,7 +132,7 @@ function UpdateNotice({ onOpen }: { onOpen: () => void }) {
         type="button"
         data-hint={t('update.view')}
         onClick={onOpen}
-        className="flex h-[19px] items-center gap-1.5 rounded-l-control bg-brand/12 pr-1.5 pl-2 text-brand transition-colors duration-100 hover:bg-brand/20"
+        className="flex h-5 items-center gap-1.5 rounded-l-control bg-brand/12 pr-1.5 pl-2 text-brand transition-colors duration-100 hover:bg-brand/20"
       >
         <ArrowUpCircle size={12} strokeWidth={2.2} className="shrink-0" aria-hidden="true" />
         <span className="whitespace-nowrap">
@@ -145,9 +145,9 @@ function UpdateNotice({ onOpen }: { onOpen: () => void }) {
         data-hint={t('update.dismiss')}
         aria-label={t('update.dismiss')}
         onClick={dismiss}
-        className="flex h-[19px] w-[19px] items-center justify-center rounded-r-control bg-brand/12 text-brand/70 transition-colors duration-100 hover:bg-brand/20 hover:text-brand"
+        className="flex h-5 w-5 items-center justify-center rounded-r-control bg-brand/12 text-brand/70 transition-colors duration-100 hover:bg-brand/20 hover:text-brand"
       >
-        <X size={11} strokeWidth={2.4} aria-hidden="true" />
+        <X size={12} strokeWidth={2.4} aria-hidden="true" />
       </button>
     </div>
   )

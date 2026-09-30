@@ -10,6 +10,7 @@
 import { Check, Download, Loader2, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 
+import { Button } from '@/components/Button'
 import { CheckList, type CheckItem } from '@/components/CheckList'
 import { SelectControl } from '@/components/SelectControl'
 import { megabytes } from '@/lib/format'
@@ -118,33 +119,29 @@ export function EnvironmentChecks() {
   ]
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <CheckList items={items} />
-      <div className="rounded-panel border border-line bg-canvas-deep/40 px-2.5 py-2">
+      <div className="card flex flex-col gap-3 px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-[12px] font-medium text-text">{t('harness.versions')}</span>
-          <button
-            type="button"
+          <span className="text-ui-base font-medium text-text">{t('harness.versions')}</span>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => void refreshHarnessVersions()}
             disabled={loadingHarnessVersions}
-            className="ml-auto inline-flex h-[22px] items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 enabled:hover:brightness-[1.2] disabled:opacity-55"
+            className="ml-auto -mr-2"
           >
-            <RefreshCw
-              size={11}
-              className={loadingHarnessVersions ? 'animate-spin' : ''}
-              aria-hidden="true"
-            />
+            <RefreshCw className={loadingHarnessVersions ? 'animate-spin' : ''} aria-hidden="true" />
             {loadingHarnessVersions ? t('harness.versions.loading') : t('action.recheck')}
-          </button>
+          </Button>
         </div>
         {harnessVersions.length > 0 ? (
-          <div className="mt-2 flex gap-2">
+          <div className="flex gap-2">
             <SelectControl
               aria-label={t('harness.versions')}
               value={selectedVersion}
               onValueChange={setSelectedVersion}
               disabled={busy || installing || provisioningNode}
-              density="compact"
               containerClassName="min-w-0 flex-1"
             >
               <option value="">{t('harness.versions.choose')}</option>
@@ -156,8 +153,8 @@ export function EnvironmentChecks() {
                 </option>
               ))}
             </SelectControl>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => void install(selectedVersion)}
               disabled={
                 !selectedVersion ||
@@ -167,13 +164,12 @@ export function EnvironmentChecks() {
                 provisioningNode ||
                 !node
               }
-              className="rounded border border-line-strong bg-surface-2 px-2 py-1 text-xs text-text disabled:opacity-55"
             >
               {installing ? t('action.installing') : t('harness.versions.install')}
-            </button>
+            </Button>
           </div>
         ) : null}
-        <p className="mt-1.5 text-[11px] text-faint">{t('harness.versions.hint')}</p>
+        <p className="text-ui-sm text-faint">{t('harness.versions.hint')}</p>
       </div>
     </div>
   )
@@ -213,17 +209,17 @@ export function EnvironmentProgress() {
  */
 function InstallProgress({ packages }: { packages: number }) {
   return (
-    <div className="rounded-panel border border-line bg-canvas-deep/50 px-3 py-2.5">
+    <div className="card px-4 py-3">
       <div className="flex items-center gap-2">
-        <Loader2 size={13} className="shrink-0 animate-spin text-brand" />
-        <span className="text-[12.5px] text-text">{t('install.working')}</span>
+        <Loader2 size={16} className="shrink-0 animate-spin text-brand" />
+        <span className="text-ui-base text-text">{t('install.working')}</span>
         {packages > 0 && (
-          <span className="ml-auto font-mono text-[11.5px] tabular-nums text-muted">
+          <span className="ml-auto font-mono text-ui-sm tabular-nums text-muted">
             {t('install.progress', { count: packages })}
           </span>
         )}
       </div>
-      <p className="mt-1.5 pl-[21px] text-[11.5px] text-faint">{t('install.slow')}</p>
+      <p className="mt-1.5 pl-6 text-ui-sm text-faint">{t('install.slow')}</p>
     </div>
   )
 }
@@ -246,16 +242,16 @@ function NodeInstallProgress({ progress }: { progress: NodeProgress | null }) {
   const fraction = bytes && bytes.total ? Math.min(bytes.received / bytes.total, 1) : null
 
   return (
-    <div className="rounded-panel border border-line bg-canvas-deep/50 px-3 py-2.5">
+    <div className="card px-4 py-3">
       <div className="flex items-center gap-2">
         {done ? (
-          <Check size={13} strokeWidth={2.6} className="shrink-0 text-ok" aria-hidden="true" />
+          <Check size={16} strokeWidth={2.4} className="shrink-0 text-ok" aria-hidden="true" />
         ) : (
-          <Loader2 size={13} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
+          <Loader2 size={16} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
         )}
-        <span className="truncate text-[12.5px] text-text">{phaseText(progress)}</span>
+        <span className="truncate text-ui-base text-text">{phaseText(progress)}</span>
         {bytes && (
-          <span className="ml-auto shrink-0 font-mono text-[11.5px] text-muted tabular-nums">
+          <span className="ml-auto shrink-0 font-mono text-ui-sm text-muted tabular-nums">
             {bytes.total
               ? `${megabytes(bytes.received)} / ${megabytes(bytes.total)}`
               : megabytes(bytes.received)}
@@ -264,7 +260,7 @@ function NodeInstallProgress({ progress }: { progress: NodeProgress | null }) {
       </div>
 
       <div
-        className="mt-2 ml-[21px] h-[3px] overflow-hidden rounded-full bg-line-strong"
+        className="mt-2.5 ml-6 h-1 overflow-hidden rounded-full bg-line-strong"
         role="progressbar"
         aria-valuenow={fraction === null ? undefined : Math.round(fraction * 100)}
       >
@@ -278,7 +274,7 @@ function NodeInstallProgress({ progress }: { progress: NodeProgress | null }) {
         />
       </div>
 
-      <p className="mt-1.5 ml-[21px] text-[11.5px] text-faint">{t('node.explain')}</p>
+      <p className="mt-2 ml-6 text-ui-sm text-faint">{t('node.explain')}</p>
     </div>
   )
 }

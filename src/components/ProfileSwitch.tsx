@@ -67,11 +67,11 @@ export function ProfileSwitch({ onManage }: ProfileSwitchProps) {
       aria-label={t('profile.switch')}
       data-hint={t('profile.switch')}
       onClick={open}
-      className="select-trigger ml-1 max-w-[164px] shrink-0"
+      className="select-trigger w-full"
     >
-      <Layers size={11} strokeWidth={2.1} className="shrink-0 text-brand" aria-hidden="true" />
-      <span className="truncate">{selected}</span>
-      <ChevronDown size={10} strokeWidth={2.4} className="shrink-0 opacity-55" aria-hidden="true" />
+      <Layers size={14} strokeWidth={2} className="shrink-0 text-brand" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate text-left">{selected}</span>
+      <ChevronDown size={14} strokeWidth={2} className="shrink-0 opacity-55" aria-hidden="true" />
     </button>
   )
 }

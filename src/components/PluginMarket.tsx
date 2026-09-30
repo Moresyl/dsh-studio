@@ -19,13 +19,16 @@ import {
   X,
 } from 'lucide-react'
 
-import { Button } from '@/components/Button'
+import { Badge } from '@/components/Badge'
+import { Button, buttonClass } from '@/components/Button'
+import { Empty } from '@/components/Empty'
+import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
 import { PluginDialog } from '@/components/PluginDialog'
 import { CatalogSourcesDialog } from '@/components/CatalogSourcesDialog'
+import { Segmented, type SegmentedItem } from '@/components/Segmented'
 import { SelectControl } from '@/components/SelectControl'
 import { Switch } from '@/components/Switch'
-import { TabButton } from '@/components/TabButton'
 import { count, filesize } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import { pluginDisplayName } from '@/lib/plugin-presentation'
@@ -178,6 +181,23 @@ export function PluginMarket() {
 
   const installed = profile?.plugins ?? []
   const removable = installed.filter((plugin) => !plugin.builtin).length
+  const registryView = tab === 'discover' || tab === 'installable'
+
+  const tabs: SegmentedItem<Tab>[] = [
+    { value: 'discover', label: t('plugins.tab.discover') },
+    { value: 'installable', label: t('plugins.tab.installable') },
+    {
+      value: 'installed',
+      label: t('plugins.tab.installed'),
+      // Inherits the segment's ink, so the count stays legible on the raised
+      // inverse segment as well as on the track.
+      trailing:
+        removable > 0 ? (
+          <span className="text-ui-xs tabular-nums opacity-70">{removable}</span>
+        ) : undefined,
+    },
+    { value: 'sources', label: t('plugins.tab.sources') },
+  ]
 
   return (
     <>
@@ -187,58 +207,39 @@ export function PluginMarket() {
           subtitle={t('plugins.subtitle', { profile: profile?.profile ?? '' })}
           subtitleHint={profile?.profileDir}
         >
-          <div className="flex items-center gap-0.5 rounded-xl bg-canvas-deep p-1 hairline [&>button]:h-8 [&>button]:rounded-lg [&>button]:text-[13px]">
-            <TabButton
-              label={t('plugins.tab.discover')}
-              active={tab === 'discover'}
-              onClick={() => {
-                setTab('discover')
-                setPage(0)
-              }}
-            />
-            <TabButton
-              label={t('plugins.tab.installable')}
-              active={tab === 'installable'}
-              onClick={() => {
-                setTab('installable')
-                setPage(0)
-              }}
-            />
-            <TabButton
-              label={
-                removable > 0
-                  ? `${t('plugins.tab.installed')} ${removable}`
-                  : t('plugins.tab.installed')
-              }
-              active={tab === 'installed'}
-              onClick={() => setTab('installed')}
-            />
-            <TabButton
-              label={t('plugins.tab.sources')}
-              active={tab === 'sources'}
-              onClick={() => setTab('sources')}
-            />
-          </div>
+          <Segmented
+            size="md"
+            label={t('plugins.title')}
+            items={tabs}
+            value={tab}
+            onChange={(next) => {
+              setTab(next)
+              // The two registry views page; the other two have no pages to reset.
+              if (next === 'discover' || next === 'installable') setPage(0)
+            }}
+          />
 
           {/* Beside the tabs rather than inside either one: this installs, so it
               belongs with discovery, but it is the only way in on a machine
               where discovery finds nothing at all. */}
           <Button
             variant="secondary"
-            className="!h-9 !gap-2 !rounded-xl !px-3"
             onClick={() => void importArchive()}
             disabled={working !== null}
             data-hint={t('plugins.importHint')}
           >
-            <PackagePlus size={13} strokeWidth={2.2} aria-hidden="true" />
+            <PackagePlus aria-hidden="true" />
             {t('plugins.import')}
           </Button>
         </PaneHeader>
 
-        <div className="@container mx-auto mb-5 flex min-h-0 w-[calc(100%-48px)] max-w-[1040px] flex-1 flex-col">
-          {(tab === 'discover' || tab === 'installable') && (
-            <div className="shrink-0 pb-4">
-              <div className="flex min-h-14 items-center gap-3 rounded-2xl border border-line-strong bg-canvas-deep px-4 transition-colors focus-within:border-control-border-hover">
+        <div className="@container mx-auto mb-6 flex min-h-0 w-[calc(100%-48px)] max-w-[1040px] flex-1 flex-col">
+          {registryView && (
+            <div className="flex shrink-0 flex-col gap-3 pb-4">
+              {/* One toolbar: where to look, how to manage where, and what for.
+                  All three are the default control height so the row reads as a
+                  single strip rather than a field with things pinned inside it. */}
+              <div className="flex items-center gap-2">
                 <SelectControl
                   value={activeSource?.id ?? 'npm'}
                   disabled={working !== null || sourceWorking}
@@ -248,9 +249,7 @@ export function PluginMarket() {
                     void selectSource(value)
                   }}
                   aria-label={t('plugins.source')}
-                  density="compact"
-                  containerClassName="max-w-[150px]"
-                  className="text-muted"
+                  containerClassName="w-44 shrink-0"
                 >
                   {sources.map((source) => (
                     <option key={source.id} value={source.id}>
@@ -258,73 +257,60 @@ export function PluginMarket() {
                     </option>
                   ))}
                 </SelectControl>
-                <button
-                  type="button"
+                <IconButton
+                  icon={Settings2}
+                  size="md"
+                  label={t('plugins.sources.manage')}
                   onClick={() => setManagingSources(true)}
                   disabled={working !== null || sourceWorking}
-                  data-hint={t('plugins.sources.manage')}
-                  aria-label={t('plugins.sources.manage')}
-                  className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text"
-                >
-                  <Settings2 size={13} aria-hidden="true" />
-                </button>
-                <Search
-                  size={18}
-                  strokeWidth={2.1}
-                  className="shrink-0 text-faint"
-                  aria-hidden="true"
                 />
-                <input
-                  ref={field}
-                  aria-label={t('plugins.search')}
-                  type="search"
-                  value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value)
-                    setPage(0)
-                  }}
-                  // Escape empties a search field on every platform, and does it
-                  // without taking the caret out of the field.
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape' && query !== '') {
-                      event.stopPropagation()
-                      setQuery('')
+                <label className="field-shell min-w-0 flex-1">
+                  <Search size={16} strokeWidth={1.9} aria-hidden="true" />
+                  <input
+                    ref={field}
+                    aria-label={t('plugins.search')}
+                    type="search"
+                    value={query}
+                    onChange={(event) => {
+                      setQuery(event.target.value)
                       setPage(0)
-                    }
-                  }}
-                  placeholder={t('plugins.search')}
-                  spellCheck={false}
-                  autoComplete="off"
-                  className="selectable h-14 min-w-0 flex-1 bg-transparent text-[14px] text-text outline-none placeholder:text-faint"
-                />
-                {searching && (
-                  <Loader2
-                    size={13}
-                    className="shrink-0 animate-spin text-faint"
-                    aria-hidden="true"
-                  />
-                )}
-                {/* The browser's own clear button is hidden, so here is one that
-                matches the rest of the window — and clearing puts the caret
-                back where the typing was. */}
-                {query !== '' && !searching && (
-                  <button
-                    type="button"
-                    data-hint={t('action.clearSearch')}
-                    aria-label={t('action.clearSearch')}
-                    onClick={() => {
-                      setQuery('')
-                      setPage(0)
-                      field.current?.focus()
                     }}
-                    className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
-                  >
-                    <X size={11} strokeWidth={2.4} aria-hidden="true" />
-                  </button>
-                )}
+                    // Escape empties a search field on every platform, and does it
+                    // without taking the caret out of the field.
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && query !== '') {
+                        event.stopPropagation()
+                        setQuery('')
+                        setPage(0)
+                      }
+                    }}
+                    placeholder={t('plugins.search')}
+                    spellCheck={false}
+                    autoComplete="off"
+                    className="selectable"
+                  />
+                  {searching && <Loader2 size={14} className="animate-spin" aria-hidden="true" />}
+                  {/* The browser's own clear button is hidden, so here is one that
+                      matches the rest of the window — and clearing puts the caret
+                      back where the typing was. Pulled toward the edge so the gap
+                      round it is the same on all four sides. */}
+                  {query !== '' && !searching && (
+                    <IconButton
+                      icon={X}
+                      size="xs"
+                      label={t('action.clearSearch')}
+                      onClick={() => {
+                        setQuery('')
+                        setPage(0)
+                        field.current?.focus()
+                      }}
+                      className="-mr-2"
+                    />
+                  )}
+                </label>
               </div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <SelectControl
                   value={category ?? ''}
                   onValueChange={(value) => {
@@ -332,9 +318,8 @@ export function PluginMarket() {
                     setPage(0)
                   }}
                   aria-label={t('plugins.category.all')}
-                  density="compact"
-                  containerClassName="max-w-[170px]"
-                  className="text-muted"
+                  size="sm"
+                  containerClassName="w-36"
                 >
                   <option value="">{t('plugins.category.all')}</option>
                   {categories.map((value) => (
@@ -350,8 +335,8 @@ export function PluginMarket() {
                     setSort(value as PluginSort)
                     setPage(0)
                   }}
-                  density="compact"
-                  className="text-muted"
+                  size="sm"
+                  containerClassName="w-36"
                 >
                   {(['relevance', 'updated', 'name', 'downloads'] as const).map((value) => (
                     <option key={value} value={value}>
@@ -359,48 +344,38 @@ export function PluginMarket() {
                     </option>
                   ))}
                 </SelectControl>
-                <button
-                  type="button"
+                <IconButton
+                  icon={RefreshCw}
+                  size="sm"
+                  label={t('plugins.index.refresh')}
                   onClick={() => {
                     setPage(0)
                     void search(query, category, sort, 0, true, tab === 'installable')
                   }}
                   disabled={searching}
-                  data-hint={t('plugins.index.refresh')}
-                  aria-label={t('plugins.index.refresh')}
-                  className="grid size-7 shrink-0 place-items-center rounded-control text-faint transition-colors hover:bg-surface-2 hover:text-text disabled:opacity-40"
-                >
-                  <RefreshCw
-                    size={12}
-                    className={searching ? 'animate-spin' : ''}
-                    aria-hidden="true"
-                  />
-                </button>
-                <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
+                  className={searching ? '[&>svg]:animate-spin' : undefined}
+                />
+                <span className="min-w-0 flex-1 truncate text-ui-sm text-muted">
                   {t('plugins.index.summary', {
                     total,
                     page: landedPage + 1,
                     pages: Math.max(1, Math.ceil(total / pageSize)),
                   })}
                 </span>
-                <button
-                  type="button"
+                <IconButton
+                  icon={ChevronLeft}
+                  size="sm"
+                  label={t('plugins.page.previous')}
                   onClick={() => setPage(Math.max(0, landedPage - 1))}
                   disabled={searching || landedPage === 0}
-                  aria-label={t('plugins.page.previous')}
-                  className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
-                >
-                  <ChevronLeft size={13} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
+                />
+                <IconButton
+                  icon={ChevronRight}
+                  size="sm"
+                  label={t('plugins.page.next')}
                   onClick={() => setPage(landedPage + 1)}
                   disabled={searching || !hasMore}
-                  aria-label={t('plugins.page.next')}
-                  className="grid size-7 place-items-center rounded-control text-faint hover:bg-surface-2 hover:text-text disabled:opacity-30"
-                >
-                  <ChevronRight size={13} aria-hidden="true" />
-                </button>
+                />
               </div>
             </div>
           )}
@@ -417,9 +392,15 @@ export function PluginMarket() {
             </Notice>
           )}
 
+          {/* Grown by the reach of a focus ring on every side and padded back, so
+              a card at the edge of the list keeps its ring instead of having it
+              clipped by the scroller. On the right it is grown by the scrollbar
+              too (11px, set in app.css), and the track is always reserved — the
+              thumb is transparent until there is something to scroll — so the
+              list is as wide as the toolbar above it whether or not it scrolls. */}
           <div
             ref={resultsViewport}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
+            className="-mt-1 -mr-[15px] -mb-1 -ml-1 min-h-0 flex-1 overflow-y-scroll overscroll-contain p-1"
           >
             {tab === 'discover' ? (
               <Discover
@@ -469,15 +450,20 @@ export function PluginMarket() {
           </div>
 
           {working !== null && (
-            <div className="flex h-8 shrink-0 items-center gap-2 border-t border-line bg-canvas-deep px-4">
-              <Loader2 size={12} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
-              <span className="truncate font-mono text-[11px] text-muted">{latest || working}</span>
+            <div className="card mt-3 flex shrink-0 items-center gap-2 px-4 py-2">
+              <Loader2 size={16} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
+              <span className="truncate font-mono text-ui-sm text-muted">{latest || working}</span>
             </div>
           )}
 
-          <footer className="mt-3 flex min-h-8 shrink-0 items-center gap-2 px-1">
-            <Info size={12} strokeWidth={2} className="shrink-0 text-faint" aria-hidden="true" />
-            <p className="text-[12px] leading-relaxed text-muted">{t('plugins.restart')}</p>
+          <footer className="mt-3 flex shrink-0 items-start gap-2 px-1">
+            <Info
+              size={14}
+              strokeWidth={1.9}
+              className="mt-0.5 shrink-0 text-faint"
+              aria-hidden="true"
+            />
+            <p className="text-ui-sm text-muted">{t('plugins.restart')}</p>
           </footer>
         </div>
       </section>
@@ -502,64 +488,62 @@ interface SourcesProps {
 
 function Sources({ sources, working, onSelect, onManage }: SourcesProps) {
   return (
-    <div className="p-4">
-      <div className="mb-3 flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-[12.5px] font-medium text-text">{t('plugins.sources.title')}</h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-faint">
-            {t('plugins.sources.subtitle')}
-          </p>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1 basis-64">
+          <h3 className="text-ui-base font-semibold text-text">{t('plugins.sources.title')}</h3>
+          <p className="mt-1 text-ui-sm text-muted">{t('plugins.sources.subtitle')}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => void reportAction(() => openExternalUrl(DSH_HUB))}
-          >
-            <ExternalLink size={13} aria-hidden="true" />
-            {t('plugins.hub.open')}
-          </Button>
-          <Button variant="secondary" onClick={onManage} disabled={working}>
-            <Settings2 size={13} aria-hidden="true" />
-            {t('plugins.sources.manage')}
-          </Button>
-        </div>
+        <Button variant="secondary" onClick={onManage} disabled={working}>
+          <Settings2 aria-hidden="true" />
+          {t('plugins.sources.manage')}
+        </Button>
       </div>
-      <div className="mb-3 rounded-control border border-line bg-canvas-deep/50 px-3 py-2.5">
-        <p className="text-[11.5px] font-medium text-text">{t('plugins.hub.title')}</p>
-        <p className="mt-1 text-[10.5px] leading-relaxed text-faint">{t('plugins.hub.detail')}</p>
-      </div>
-      <ul className="overflow-hidden rounded-control border border-line">
+
+      <ul className="list-card">
         {sources.map((source) => (
-          <li key={source.id} className="border-b border-line last:border-b-0">
+          <li key={source.id}>
             <button
               type="button"
               disabled={working || source.active}
               onClick={() => onSelect(source.id)}
-              className="flex w-full items-center gap-3 px-3 py-3 text-left transition-colors enabled:hover:bg-surface-2/60 disabled:cursor-default"
+              className="list-row list-row--roomy w-full text-left transition-colors enabled:hover:bg-surface-2/70 disabled:cursor-default"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-control border border-line bg-surface-2 text-brand">
-                <Database size={14} aria-hidden="true" />
+              <span className="grid size-8 shrink-0 place-items-center rounded-md bg-surface-2 text-muted">
+                <Database size={16} strokeWidth={1.9} aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2 text-[12px] font-medium text-text">
+                <span className="flex items-center gap-2 text-ui-base font-medium text-text">
                   <span className="truncate">{source.label}</span>
-                  {source.builtIn && (
-                    <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[9.5px] text-faint">
-                      {t('plugins.builtin')}
-                    </span>
-                  )}
+                  {source.builtIn && <Badge>{t('plugins.builtin')}</Badge>}
                 </span>
-                <span className="mt-1 block truncate font-mono text-[10px] text-faint">
+                <span className="mt-0.5 block truncate font-mono text-ui-sm text-faint">
                   {source.endpoint ?? source.kind}
                 </span>
               </span>
-              <span className={source.active ? 'text-[11px] text-ok' : 'text-[11px] text-faint'}>
-                {source.active ? t('plugins.sources.active') : t('plugins.sources.use')}
-              </span>
+              {source.active ? (
+                <Badge tone="ok">{t('plugins.sources.active')}</Badge>
+              ) : (
+                <span className="shrink-0 text-ui-sm text-muted">{t('plugins.sources.use')}</span>
+              )}
             </button>
           </li>
         ))}
       </ul>
+
+      <div className="card flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3">
+        <div className="min-w-0 flex-1 basis-64">
+          <p className="text-ui-base font-medium text-text">{t('plugins.hub.title')}</p>
+          <p className="mt-1 text-ui-sm text-muted">{t('plugins.hub.detail')}</p>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => void reportAction(() => openExternalUrl(DSH_HUB))}
+        >
+          <ExternalLink aria-hidden="true" />
+          {t('plugins.hub.open')}
+        </Button>
+      </div>
     </div>
   )
 }
@@ -597,20 +581,26 @@ export function Discover({
     >
       {results.map((listing) => {
         const here = isInstalled(listing.name)
+        const busy = working === listing.name
 
         return (
           <li key={`${listing.sourceId}:${listing.name}`} className="min-w-0">
+            {/* The whole card is the one button, so a second real button cannot
+                live on it. The action drawn at the foot is that button's own
+                label, dressed as the button it stands for. */}
             <button
               type="button"
               onClick={() => onOpen(listing)}
               disabled={working !== null}
               aria-label={`${pluginDisplayName(listing.name)} · ${listing.name} · ${t('plugins.details')}`}
               className={[
-                'group flex h-full min-h-[228px] w-full flex-col rounded-2xl border p-5 text-left transition-colors duration-150 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-text',
-                selected === listing.name
-                  ? 'border-control-border-hover bg-surface-2'
-                  : 'border-line bg-canvas-deep hover:border-line-strong hover:bg-surface-2/55',
-              ].join(' ')}
+                'card card--interactive flex h-full w-full flex-col p-4 text-left disabled:cursor-wait',
+                // Whatever is installing stays legible; only the rest step back.
+                busy ? '' : 'disabled:opacity-60',
+                selected === listing.name ? 'border-line-strong' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
             >
               <span className="flex w-full items-center gap-3">
                 <Tile
@@ -619,55 +609,68 @@ export function Discover({
                 />
 
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[16px] font-semibold tracking-tight text-text">
+                  <span className="block truncate text-ui-base font-semibold text-text">
                     {pluginDisplayName(listing.name)}
                   </span>
-                  <span className="mt-1 block truncate text-[12px] text-muted">
+                  <span className="block truncate text-ui-sm text-muted">
                     {listing.publisher || listing.sourceLabel}
                   </span>
                 </span>
-                <ChevronRight
-                  size={16}
-                  className="shrink-0 text-faint transition-transform group-hover:translate-x-0.5"
-                  aria-hidden="true"
-                />
               </span>
-              <span className="mt-4 line-clamp-3 text-[13px] leading-[1.65] text-muted [overflow-wrap:anywhere]">
+
+              {/* Three lines are always reserved, so a row of cards is one height
+                  whether or not each description fills them. */}
+              <span className="mt-3 line-clamp-3 min-h-[3lh] text-ui-sm text-muted [overflow-wrap:anywhere]">
                 {listing.description || t('plugins.noDescription')}
               </span>
-              <span className="mt-auto flex w-full items-center gap-2 pt-5">
+
+              <span className="mt-auto flex w-full items-center gap-2 pt-4">
                 <span
-                  className="min-w-0 flex-1 truncate text-[11.5px] text-muted"
+                  className="min-w-0 flex-1 truncate font-mono text-ui-sm text-faint"
                   title={listing.name}
                 >
                   {listing.name}
                 </span>
-                <span className="shrink-0 rounded-full bg-control-fill px-2.5 py-1 text-[11px] text-muted">
+                <Badge>
                   {listing.name.startsWith('@deepseek-ai/')
                     ? t('plugins.officialComponent')
                     : t('plugins.community')}
-                </span>
+                </Badge>
               </span>
-              <span className="mt-3 flex w-full items-center gap-2 border-t border-line pt-3 text-[11.5px] text-muted">
+
+              <span className="mt-3 flex w-full items-center gap-3 border-t border-line pt-3 text-ui-sm text-faint">
                 <span className="truncate tabular-nums">v{listing.version}</span>
                 {listing.weeklyDownloads > 0 && (
-                  <span className="ml-1 truncate tabular-nums">
+                  <span className="truncate tabular-nums">
                     {t('plugins.downloads', { count: count(listing.weeklyDownloads) })}
                   </span>
                 )}
-                <span
-                  className={`ml-auto inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium ${here ? 'bg-ok/10 text-ok' : 'bg-text text-canvas'}`}
-                >
-                  {working === listing.name ? (
-                    <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+                {/* Fixed at the button's height, so an installed card and one that
+                    is not keep their rules and rows on the same lines. */}
+                <span className="ml-auto flex h-7 shrink-0 items-center">
+                  {busy ? (
+                    <Badge>
+                      <Loader2 className="animate-spin" aria-hidden="true" />
+                      {t('plugins.installing')}
+                    </Badge>
                   ) : here ? (
-                    <Check size={13} aria-hidden="true" />
-                  ) : null}
-                  {working === listing.name
-                    ? t('plugins.installing')
-                    : here
-                      ? t('plugins.installed')
-                      : t('plugins.details')}
+                    <Badge tone="ok">
+                      <Check aria-hidden="true" />
+                      {t('plugins.installed')}
+                    </Badge>
+                  ) : (
+                    <span
+                      className={buttonClass({
+                        variant: 'secondary',
+                        size: 'sm',
+                        // While another install runs the card is inert, and its
+                        // label should not answer the pointer as if it were not.
+                        className: working !== null ? 'pointer-events-none' : undefined,
+                      })}
+                    >
+                      {t('plugins.details')}
+                    </span>
+                  )}
                 </span>
               </span>
             </button>
@@ -709,7 +712,7 @@ function Installed({
   }
 
   return (
-    <ul className="flex flex-col gap-3" aria-label={t('plugins.tab.installed')}>
+    <ul className="list-card" aria-label={t('plugins.tab.installed')}>
       {plugins.map((plugin) => {
         // In the stack or taken out of it — either way there is a layer here to
         // switch. A package that declares no patch has none, and offering a
@@ -719,64 +722,63 @@ function Installed({
         const incompatible = plugin.compatibility?.state === 'incompatible'
 
         return (
-          <li
-            key={plugin.name}
-            className="flex items-start gap-4 rounded-2xl border border-line bg-canvas-deep p-5"
-          >
+          <li key={plugin.name} className="list-row list-row--roomy">
             <Tile muted={plugin.builtin || plugin.disabled} />
 
             <div className="min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={() => onOpen(plugin)}
-                data-hint={plugin.name}
-                className="flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-1 text-left"
-              >
-                <span
-                  className={[
-                    'truncate text-[15px] font-semibold transition-colors duration-100 hover:text-brand',
-                    plugin.disabled ? 'text-muted' : 'text-text',
-                  ].join(' ')}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <button
+                  type="button"
+                  onClick={() => onOpen(plugin)}
+                  data-hint={plugin.name}
+                  className="group flex max-w-full min-w-0 items-baseline gap-2 text-left"
                 >
-                  {pluginDisplayName(plugin.name)}
-                </span>
-                {(plugin.installedVersion || plugin.spec) && (
-                  <span className="max-w-full truncate font-mono text-[11px] text-faint tabular-nums">
-                    {plugin.installedVersion || plugin.spec}
+                  <span
+                    className={[
+                      'truncate text-ui-base font-semibold group-hover:underline',
+                      plugin.disabled ? 'text-muted' : 'text-text',
+                    ].join(' ')}
+                  >
+                    {pluginDisplayName(plugin.name)}
                   </span>
-                )}
-              </button>
+                  {(plugin.installedVersion || plugin.spec) && (
+                    <span className="max-w-full truncate font-mono text-ui-sm text-faint tabular-nums">
+                      {plugin.installedVersion || plugin.spec}
+                    </span>
+                  )}
+                </button>
 
-              <p className="mt-1 truncate text-[12px] text-muted">{plugin.name}</p>
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 {plugin.disabled ? (
-                  <Badge tone="faint">{t('plugins.off')}</Badge>
+                  <Badge>{t('plugins.off')}</Badge>
                 ) : incompatible ? (
                   <Badge tone="warn">{t('plugins.runtimeBlocked')}</Badge>
                 ) : (
-                  <Badge tone={plugin.active ? 'ok' : 'faint'}>
+                  <Badge tone={plugin.active ? 'ok' : 'neutral'}>
                     {plugin.active ? t('plugins.layer') : t('plugins.library')}
                   </Badge>
                 )}
-                {plugin.builtin && <Badge tone="faint">{t('plugins.builtin')}</Badge>}
-                {!plugin.builtin && (
-                  <button
-                    type="button"
-                    onClick={() => void onCheckVersion(plugin.name)}
-                    disabled={working !== null}
-                    className="ml-1 rounded-lg px-2 py-1 text-[12px] text-muted hover:bg-control-fill hover:text-text disabled:opacity-40"
-                  >
-                    {t('plugins.checkVersion')}
-                  </button>
-                )}
+                {plugin.builtin && <Badge>{t('plugins.builtin')}</Badge>}
                 {plugin.marketReceipt && <Badge tone="ok">{t('plugins.marketManaged')}</Badge>}
               </div>
+
+              <p className="mt-0.5 truncate text-ui-sm text-muted">{plugin.name}</p>
               {incompatible && !plugin.disabled && (
-                <p className="mt-3 text-[12px] leading-relaxed text-warn [overflow-wrap:anywhere]">
+                <p className="mt-1 text-ui-sm text-warn [overflow-wrap:anywhere]">
                   {t('plugins.runtimeBlockedHint')}
                 </p>
               )}
             </div>
+
+            {!plugin.builtin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void onCheckVersion(plugin.name)}
+                disabled={working !== null}
+              >
+                {t('plugins.checkVersion')}
+              </Button>
+            )}
 
             {/* The reversible change sits before the one that is not, and the
                 profile template's own bundles get neither: switching one off
@@ -792,16 +794,14 @@ function Installed({
             )}
 
             {!plugin.builtin && (
-              <button
-                type="button"
-                data-hint={t('plugins.remove')}
-                aria-label={t('plugins.remove')}
+              <IconButton
+                icon={Trash2}
+                variant="danger-ghost"
+                size="sm"
+                label={t('plugins.remove')}
                 onClick={() => onRemove(plugin.name)}
                 disabled={working !== null}
-                className="grid size-[26px] shrink-0 place-items-center rounded-control border border-line-strong bg-surface-2 text-muted transition duration-100 enabled:hover:border-danger/40 enabled:hover:text-danger enabled:active:brightness-95 disabled:opacity-45"
-              >
-                <Trash2 size={12} strokeWidth={2.2} aria-hidden="true" />
-              </button>
+              />
             )}
           </li>
         )
@@ -843,7 +843,7 @@ function Tile({ listing, muted = false }: { listing?: PluginListing; muted?: boo
     <span
       aria-hidden="true"
       className={[
-        'grid size-11 shrink-0 place-items-center rounded-xl border border-line',
+        'grid size-10 shrink-0 place-items-center rounded-lg border border-line',
         muted ? 'bg-surface-2/50 text-faint' : 'bg-surface-2 text-brand',
       ].join(' ')}
     >
@@ -853,28 +853,11 @@ function Tile({ listing, muted = false }: { listing?: PluginListing; muted?: boo
           alt=""
           loading="lazy"
           decoding="async"
-          className="size-full rounded-xl object-cover"
+          className="size-full rounded-lg object-cover"
         />
       ) : (
-        <Package size={21} strokeWidth={1.6} />
+        <Package size={20} strokeWidth={1.8} />
       )}
-    </span>
-  )
-}
-
-function Badge({ tone, children }: { tone: 'ok' | 'faint' | 'warn'; children: ReactNode }) {
-  return (
-    <span
-      className={[
-        'rounded-[4px] px-1.5 py-0.5 text-[10.5px] font-medium',
-        tone === 'ok'
-          ? 'bg-ok/15 text-ok'
-          : tone === 'warn'
-            ? 'bg-warn/10 text-warn'
-            : 'bg-surface-2 text-faint',
-      ].join(' ')}
-    >
-      {children}
     </span>
   )
 }
@@ -891,26 +874,14 @@ function Notice({
   return (
     <div
       className={[
-        'flex shrink-0 items-start gap-2 border-b px-4 py-2',
-        tone === 'warn' ? 'border-line bg-warn/10' : 'border-danger/25 bg-danger/10',
+        'mb-3 flex shrink-0 items-start gap-2 rounded-lg border px-3 py-2 text-ui-sm',
+        tone === 'warn'
+          ? 'border-warn/30 bg-warn/10 text-warn'
+          : 'border-danger/30 bg-danger/10 text-danger',
       ].join(' ')}
     >
-      <Icon
-        size={13}
-        strokeWidth={2.1}
-        className={`mt-[2px] shrink-0 ${tone === 'warn' ? 'text-warn' : 'text-danger'}`}
-        aria-hidden="true"
-      />
-      <p className="selectable text-[11.5px] leading-relaxed text-muted">{children}</p>
-    </div>
-  )
-}
-
-function Empty({ icon: Icon, message }: { icon: typeof Package; message: string }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2.5 px-6 py-12 text-center">
-      <Icon size={22} strokeWidth={1.4} className="text-faint opacity-60" aria-hidden="true" />
-      <p className="text-[12px] text-faint">{message}</p>
+      <Icon size={14} strokeWidth={1.9} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <p className="selectable">{children}</p>
     </div>
   )
 }

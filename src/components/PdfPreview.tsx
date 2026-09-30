@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, Minus, Plus, RefreshCw } from 'lucide-react'
 import type { PDFPageProxy, RenderTask } from 'pdfjs-dist'
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 import { openPdf, pdfGeometry, type PdfSession } from '@/lib/pdf-preview'
 import { t } from '@/lib/i18n'
 
@@ -138,7 +139,7 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
   return (
     <div className="flex w-full min-w-0 flex-col gap-3">
       {error ? (
-        <div role="status" className="space-y-3 p-4 text-center text-[13px] text-muted">
+        <div role="status" className="space-y-3 p-4 text-center text-ui-base text-muted">
           <p>{t(error === 'password' ? 'sessions.pdfPassword' : 'sessions.pdfFailed')}</p>
           {error === 'password' ? (
             <form
@@ -162,7 +163,7 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
             </form>
           ) : (
             <Button variant="secondary" onClick={() => retry()}>
-              <RefreshCw size={14} />
+              <RefreshCw />
               {t('sessions.previewRetry')}
             </Button>
           )}
@@ -170,64 +171,66 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
       ) : (
         <>
           {session && (
-            <div className="flex flex-wrap items-center justify-center gap-3 text-[12px]">
-              <Button
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <IconButton
                 variant="secondary"
-                aria-label={t('sessions.pdfPrevious')}
+                size="sm"
+                icon={ChevronLeft}
+                label={t('sessions.pdfPrevious')}
                 disabled={page <= 1}
                 onClick={() => move(page - 1)}
-              >
-                <ChevronLeft size={16} />
-              </Button>
-              <span role="status">
+              />
+              <span role="status" className="text-ui-sm text-muted tabular-nums">
                 {t('sessions.pdfPage', { page, total: session.document.numPages })}
               </span>
-              <Button
+              <IconButton
                 variant="secondary"
-                aria-label={t('sessions.pdfNext')}
+                size="sm"
+                icon={ChevronRight}
+                label={t('sessions.pdfNext')}
                 disabled={page >= session.document.numPages}
                 onClick={() => move(page + 1)}
-              >
-                <ChevronRight size={16} />
-              </Button>
-              <Button
+              />
+              <IconButton
                 variant="secondary"
-                aria-label={t('sessions.pdfZoomOut')}
+                size="sm"
+                icon={Minus}
+                label={t('sessions.pdfZoomOut')}
                 disabled={zoom <= 0.5}
                 onClick={() => {
                   setBusy(true)
                   setZoom(zoom - 0.25)
                 }}
-              >
-                <Minus size={14} />
-              </Button>
+              />
               <Button
                 variant="secondary"
+                size="sm"
                 disabled={zoom === 1}
                 onClick={() => {
                   setBusy(true)
                   setZoom(1)
                 }}
               >
-                {t('sessions.pdfFit')} · {Math.round(zoom * 100)}%
+                {t('sessions.pdfFit')} ·{' '}
+                <span className="tabular-nums">{Math.round(zoom * 100)}%</span>
               </Button>
-              <Button
+              <IconButton
                 variant="secondary"
-                aria-label={t('sessions.pdfZoomIn')}
+                size="sm"
+                icon={Plus}
+                label={t('sessions.pdfZoomIn')}
                 disabled={zoom >= 2}
                 onClick={() => {
                   setBusy(true)
                   setZoom(zoom + 0.25)
                 }}
-              >
-                <Plus size={14} />
-              </Button>
+              />
             </div>
           )}
           {busy && (
             <p
               role="status"
-              className="flex items-center justify-center gap-2 text-[12px] text-muted"
+              className="flex items-center justify-center gap-2 text-ui-sm text-muted"
             >
               <Loader2 size={14} className="animate-spin" />
               {t('sessions.pdfLoading')}
@@ -238,10 +241,10 @@ export default function PdfPreview({ blob }: { blob: Blob }) {
             tabIndex={0}
             role="region"
             aria-label={t('sessions.previewPdf')}
-            className="max-h-[calc(100dvh-260px)] min-h-32 overflow-auto rounded-lg bg-canvas-deep p-3"
+            className="max-h-[min(520px,calc(100vh-260px))] min-h-32 overflow-auto rounded-lg bg-canvas-deep p-3"
           />
           {text && (
-            <details className="text-[12px] text-muted">
+            <details className="text-ui-sm text-muted">
               <summary tabIndex={0} className="cursor-pointer">
                 {t('sessions.pdfText')}
               </summary>

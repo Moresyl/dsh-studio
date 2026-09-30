@@ -84,35 +84,37 @@ export function Dialog() {
         aria-modal="true"
         aria-labelledby="dialog-title"
         aria-describedby="dialog-body"
-        className="dialog-panel w-full max-w-[450px] animate-pop rounded-[12px] border border-line-strong bg-surface p-5 shadow-lift"
+        className="dialog-panel w-full max-w-[450px] animate-pop rounded-xl border border-line-strong bg-surface p-5 shadow-lift"
       >
-        <div className="flex gap-3.5">
+        <div className="flex gap-3">
           <span
             aria-hidden="true"
             className={[
-              'grid size-9 shrink-0 place-items-center rounded-[9px]',
+              'grid size-9 shrink-0 place-items-center rounded-lg',
               danger ? 'bg-danger/12 text-danger' : 'bg-brand/12 text-brand',
             ].join(' ')}
           >
-            <Icon size={17} strokeWidth={2} />
+            <Icon size={18} strokeWidth={2} />
           </span>
 
-          <div className="min-w-0 flex-1 pt-0.5">
-            <h2 id="dialog-title" className="text-[13.5px] leading-snug font-semibold text-text">
+          {/* The top padding is what puts the 24px title line on the tile's
+              centre line; the body then hangs below it, as long as it needs. */}
+          <div className="min-w-0 flex-1 pt-1.5">
+            <h2 id="dialog-title" className="text-ui-lg font-semibold text-text">
               {pending.title}
             </h2>
-            <p id="dialog-body" className="mt-1.5 text-[12px] leading-relaxed text-muted">
+            <p id="dialog-body" className="mt-1 text-ui-base text-muted">
               {pending.body}
             </p>
 
             {!notice && pending.subject && (
-              <p className="selectable mt-2.5 truncate rounded-control border border-line bg-canvas-deep px-2.5 py-1.5 font-mono text-[11.5px] text-muted">
+              <p className="selectable mt-3 truncate rounded-lg border border-line bg-canvas-deep px-3 py-2 font-mono text-ui-sm text-muted">
                 {pending.subject}
               </p>
             )}
 
             {notice && (
-              <pre className="selectable mt-2.5 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-control border border-line bg-canvas-deep px-2.5 py-2 font-mono text-[11.5px] leading-relaxed text-muted">
+              <pre className="selectable mt-3 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-canvas-deep px-3 py-2 font-mono text-ui-sm text-muted">
                 {pending.details}
               </pre>
             )}
@@ -125,7 +127,7 @@ export function Dialog() {
           {notice ? (
             <>
               <Button variant="secondary" onClick={() => void copyError()}>
-                <Copy size={13} aria-hidden="true" />
+                <Copy aria-hidden="true" />
                 {copied ? pending.copied : pending.copy}
               </Button>
               <Button ref={accept} variant="primary" onClick={dismiss}>

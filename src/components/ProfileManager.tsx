@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
@@ -29,8 +30,11 @@ import {
 } from 'lucide-react'
 import { open as pickFile, save as pickPath } from '@tauri-apps/plugin-dialog'
 
+import { Badge, type BadgeTone } from '@/components/Badge'
 import { Button } from '@/components/Button'
-import { TabButton } from '@/components/TabButton'
+import { Empty } from '@/components/Empty'
+import { IconButton } from '@/components/IconButton'
+import { Segmented } from '@/components/Segmented'
 import { t } from '@/lib/i18n'
 import type { Comparison, Difference, Profile, Standing } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
@@ -259,7 +263,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
       role="presentation"
       onMouseDown={onBackdrop}
       onKeyDown={onKeyDown}
-      className="dialog-backdrop fixed inset-0 z-30 grid animate-fade place-items-center bg-canvas-deep/70 p-8 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
@@ -267,73 +271,65 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
         aria-modal="true"
         aria-label={t('profile.title')}
         tabIndex={-1}
-        className="dialog-panel flex max-h-full w-full max-w-[620px] animate-pop flex-col overflow-hidden rounded-panel border border-line-strong bg-surface shadow-lift outline-none"
+        className="dialog-panel flex max-h-[min(720px,calc(100vh-64px))] min-h-[min(416px,calc(100vh-64px))] w-full max-w-[620px] animate-pop flex-col overflow-hidden rounded-xl border border-line-strong bg-surface shadow-lift outline-none"
       >
-        <header className="flex shrink-0 items-start gap-3 border-b border-line px-4 py-3.5">
+        <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
           <span
             aria-hidden="true"
-            className="grid size-9 shrink-0 place-items-center rounded-[8px] border border-line bg-surface-2 text-brand"
+            className="grid size-9 shrink-0 place-items-center rounded-lg border border-line bg-surface-2 text-brand"
           >
-            <Layers size={17} strokeWidth={1.9} />
+            <Layers size={18} strokeWidth={1.9} />
           </span>
 
-          <div className="min-w-0 flex-1 pt-px">
-            <h2 className="text-[13px] leading-snug font-semibold text-text">
-              {t('profile.title')}
-            </h2>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-ui-lg font-semibold text-text">{t('profile.title')}</h2>
             {/* The root is the tooltip rather than the line, because a profile
                 being a directory matters exactly once — when looking for it. */}
-            <p className="mt-1 truncate text-[11px] text-faint" data-hint={roster?.root}>
+            <p className="truncate text-ui-sm text-faint" data-hint={roster?.root}>
               {t('profile.subtitle')}
             </p>
           </div>
 
-          <button
-            type="button"
-            aria-label={t('profile.close')}
-            data-hint={t('profile.close')}
-            onClick={onClose}
-            className="-mt-0.5 -mr-1 grid size-[26px] shrink-0 place-items-center rounded-control text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
-          >
-            <X size={14} strokeWidth={2.2} aria-hidden="true" />
-          </button>
+          <IconButton icon={X} label={t('profile.close')} onClick={onClose} />
         </header>
 
-        <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
-          <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
-            <TabButton
-              label={t('profile.tab.list')}
-              active={tab === 'list'}
-              onClick={() => setTab('list')}
-            />
-            <TabButton
-              label={t('profile.tab.compare')}
-              active={tab === 'compare'}
-              onClick={() => setTab('compare')}
-            />
-          </div>
+        <div className="flex shrink-0 items-center gap-2 border-b border-line px-5 py-2">
+          <Segmented
+            size="sm"
+            label={t('profile.title')}
+            value={tab}
+            onChange={setTab}
+            items={[
+              { value: 'list', label: t('profile.tab.list') },
+              { value: 'compare', label: t('profile.tab.compare') },
+            ]}
+          />
 
           {tab === 'list' ? (
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="ml-auto flex items-center gap-2">
               <Button
                 variant="secondary"
+                size="sm"
                 onClick={() => void importProfile()}
                 disabled={working !== null}
               >
-                <FileInput size={13} strokeWidth={2.2} aria-hidden="true" />
+                <FileInput aria-hidden="true" />
                 {t('profile.importFile')}
               </Button>
+              {/* One primary to a dialog: while a form is open, the button that
+                  finishes it is the one this window is waiting for. */}
               <Button
-                variant="primary"
+                variant={form === null ? 'primary' : 'secondary'}
+                size="sm"
                 onClick={() => setForm({ kind: 'create' })}
                 disabled={working !== null}
               >
-                <Plus size={14} strokeWidth={2.4} aria-hidden="true" />
+                <Plus aria-hidden="true" />
                 {t('profile.new')}
               </Button>
             </div>
           ) : (
-            <span className="ml-auto shrink-0 text-[11.5px] text-faint tabular-nums">
+            <span className="ml-auto shrink-0 text-ui-sm text-faint tabular-nums">
               {comparing
                 ? t('profile.comparing')
                 : comparison && comparison.differences > 0
@@ -355,21 +351,25 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
           />
         )}
 
-        {error ? (
-          <Notice tone="danger" icon={TriangleAlert}>
-            {error}
-          </Notice>
-        ) : (
-          note && (
-            <Notice tone="ok" icon={Check}>
-              {note}
-            </Notice>
-          )
+        {(error || note) && (
+          <div className="shrink-0 border-b border-line px-5 py-3">
+            {error ? (
+              <Notice tone="danger" icon={TriangleAlert}>
+                {error}
+              </Notice>
+            ) : (
+              <Notice tone="ok" icon={Check}>
+                {note}
+              </Notice>
+            )}
+          </div>
         )}
 
         {/* One height for both tabs: switching between them should move the
-            content, not the window. */}
-        <div className="flex min-h-[232px] flex-col overflow-hidden">
+            content, not the window. The floor is the panel's rather than this
+            region's, so a form and a message stacked above it make the body
+            scroll instead of pushing the footer out of a short window. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {tab === 'list' ? (
             <List
               profiles={roster?.profiles ?? []}
@@ -392,18 +392,18 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
           )}
         </div>
 
-        <footer className="flex shrink-0 items-center gap-2.5 border-t border-line bg-canvas-deep/40 px-4 py-3">
+        <footer className="flex shrink-0 items-center gap-2 border-t border-line px-5 py-3">
           {working !== null ? (
             <>
-              <Loader2 size={12} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
-              <p className="min-w-0 flex-1 truncate font-mono text-[10.5px] text-faint">
+              <Loader2 size={14} className="shrink-0 animate-spin text-brand" aria-hidden="true" />
+              <p className="min-w-0 flex-1 truncate font-mono text-ui-sm text-faint">
                 {latest || working}
               </p>
             </>
           ) : (
             <>
-              <Info size={12} strokeWidth={2} className="shrink-0 text-faint" aria-hidden="true" />
-              <p className="min-w-0 flex-1 truncate text-[11.5px] text-faint">
+              <Info size={14} strokeWidth={2} className="shrink-0 text-faint" aria-hidden="true" />
+              <p className="min-w-0 flex-1 truncate text-ui-sm text-faint">
                 {t('profile.restartNote')}
               </p>
             </>
@@ -430,105 +430,101 @@ interface ListProps {
 
 function List({ profiles, selected, working, onUse, actions }: ListProps) {
   if (profiles.length === 0) {
-    return <Empty icon={Boxes} message={t('profile.empty')} hint={t('profile.emptyHint')} />
+    return <Blank icon={Boxes} message={t('profile.empty')} hint={t('profile.emptyHint')} />
   }
 
   return (
-    <ul className="min-h-0 flex-1 overflow-y-auto">
-      {profiles.map((profile) => {
-        const hosted = profile.name === selected
-        const busy = working === profile.name
-        const menu = () => actions(profile)
+    <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <ul className="list-card">
+        {profiles.map((profile) => {
+          const hosted = profile.name === selected
+          const busy = working === profile.name
+          const menu = () => actions(profile)
 
-        return (
-          <li
-            key={profile.name}
-            onContextMenu={contextMenu(menu)}
-            className="relative flex items-center gap-3 border-b border-line px-4 py-2.5"
-          >
-            {hosted && (
-              <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[2px] bg-brand" />
-            )}
-
-            <span
-              aria-hidden="true"
-              className={[
-                'grid size-8 shrink-0 place-items-center rounded-[7px] border border-line',
-                hosted ? 'bg-surface-2 text-brand' : 'bg-surface-2/50 text-faint',
-              ].join(' ')}
+          // The profile this window is on is the filled row, and says so in a
+          // badge as well: a fill alone is a colour, and a colour is not a word.
+          return (
+            <li
+              key={profile.name}
+              onContextMenu={contextMenu(menu)}
+              className={['list-row list-row--roomy', hosted ? 'bg-surface-2' : ''].join(' ')}
             >
-              <Boxes size={15} strokeWidth={1.9} />
-            </span>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-baseline gap-2">
-                <span
-                  data-hint={profile.dir}
-                  className="truncate text-[12.5px] font-medium text-text"
-                >
-                  {profile.name}
-                </span>
-                {profile.shipped && <Badge>{t('profile.builtinTag')}</Badge>}
-              </div>
-
-              <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] text-faint">
-                <span className="tabular-nums">
-                  {profile.plugins > 0
-                    ? t('profile.installedCount', { count: profile.plugins })
-                    : t('profile.noPlugins')}
-                </span>
-                {profile.disabled > 0 && (
-                  <span className="tabular-nums">
-                    {t('profile.offCount', { count: profile.disabled })}
-                  </span>
-                )}
-                {!profile.initialized && (
-                  <span className="text-warn">{t('profile.uninitialized')}</span>
-                )}
-                {/* Reported here rather than found out after switching, which is
-                    the version of this where the window comes back empty. */}
-                {profile.initialized && !profile.servesWindow && (
-                  <span data-hint={t('profile.noInterfaceNote')} className="text-warn">
-                    {t('profile.noInterfaceTag')}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {hosted ? (
-              <span className="inline-flex h-[22px] shrink-0 items-center gap-1 px-1 text-[11.5px] font-medium text-ok">
-                <Check size={11} strokeWidth={2.6} aria-hidden="true" />
-                {t('profile.inUse')}
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onUse(profile.name)}
-                disabled={working !== null}
-                className="inline-flex h-[22px] shrink-0 items-center gap-1 rounded-[4px] border border-line-strong bg-surface-2 px-2 text-[11.5px] font-medium text-text transition duration-100 enabled:hover:brightness-[1.2] enabled:active:brightness-95 disabled:opacity-45"
+              <span
+                aria-hidden="true"
+                className={[
+                  'grid size-8 shrink-0 place-items-center rounded-lg border border-line bg-control-fill',
+                  hosted ? 'text-brand' : 'text-faint',
+                ].join(' ')}
               >
-                {busy && <Loader2 size={11} className="animate-spin" aria-hidden="true" />}
-                {t('profile.use')}
-              </button>
-            )}
+                <Boxes size={16} strokeWidth={1.9} />
+              </span>
 
-            <button
-              type="button"
-              aria-haspopup="menu"
-              aria-label={t('profile.actions')}
-              data-hint={t('profile.actions')}
-              onClick={(event) => {
-                const box = event.currentTarget.getBoundingClientRect()
-                useMenu.getState().show(box.left, box.bottom + 4, menu())
-              }}
-              className="grid size-[26px] shrink-0 place-items-center rounded-control border border-line-strong bg-surface-2 text-muted transition duration-100 enabled:hover:text-text enabled:hover:brightness-[1.15] enabled:active:brightness-95 disabled:opacity-45"
-            >
-              <MoreHorizontal size={13} strokeWidth={2.2} aria-hidden="true" />
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    data-hint={profile.dir}
+                    className="truncate text-ui-base font-medium text-text"
+                  >
+                    {profile.name}
+                  </span>
+                  {profile.shipped && <Badge>{t('profile.builtinTag')}</Badge>}
+                </div>
+
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ui-sm text-faint">
+                  <span className="tabular-nums">
+                    {profile.plugins > 0
+                      ? t('profile.installedCount', { count: profile.plugins })
+                      : t('profile.noPlugins')}
+                  </span>
+                  {profile.disabled > 0 && (
+                    <span className="tabular-nums">
+                      {t('profile.offCount', { count: profile.disabled })}
+                    </span>
+                  )}
+                  {!profile.initialized && (
+                    <span className="text-warn">{t('profile.uninitialized')}</span>
+                  )}
+                  {/* Reported here rather than found out after switching, which is
+                      the version of this where the window comes back empty. */}
+                  {profile.initialized && !profile.servesWindow && (
+                    <span data-hint={t('profile.noInterfaceNote')} className="text-warn">
+                      {t('profile.noInterfaceTag')}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {hosted ? (
+                <Badge tone="ok">
+                  <Check aria-hidden="true" />
+                  {t('profile.inUse')}
+                </Badge>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => onUse(profile.name)}
+                  disabled={working !== null}
+                >
+                  {busy && <Loader2 className="animate-spin" aria-hidden="true" />}
+                  {t('profile.use')}
+                </Button>
+              )}
+
+              <IconButton
+                icon={MoreHorizontal}
+                label={t('profile.actions')}
+                aria-haspopup="menu"
+                onClick={(event) => {
+                  const box = event.currentTarget.getBoundingClientRect()
+                  useMenu.getState().show(box.left, box.bottom + 4, menu())
+                }}
+              />
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 
@@ -544,7 +540,7 @@ interface CompareProps {
 }
 
 /** The three columns, shared by the header and every row under it. */
-const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_92px_92px] items-center gap-2'
+const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_96px_96px] items-center gap-2'
 
 /**
  * Two profiles, package by package.
@@ -557,24 +553,19 @@ const COLUMNS = 'grid grid-cols-[minmax(0,1fr)_92px_92px] items-center gap-2'
  */
 function Compare({ names, left, right, comparison, comparing, onPick }: CompareProps) {
   if (names.length < 2 || !left || !right) {
-    return <Empty icon={ArrowLeftRight} message={t('profile.needTwo')} />
+    return <Blank icon={ArrowLeftRight} message={t('profile.needTwo')} />
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-line px-5 py-3">
         <SidePicker
           label={t('profile.left')}
           value={left}
           options={names.filter((name) => name !== right)}
           onPick={(name) => onPick('left', name)}
         />
-        <ArrowLeftRight
-          size={13}
-          strokeWidth={2.1}
-          className="shrink-0 text-faint"
-          aria-hidden="true"
-        />
+        <ArrowLeftRight size={14} strokeWidth={2} className="shrink-0 text-faint" aria-hidden="true" />
         <SidePicker
           label={t('profile.right')}
           value={right}
@@ -584,30 +575,39 @@ function Compare({ names, left, right, comparison, comparing, onPick }: CompareP
       </div>
 
       {comparison === null ? (
-        <Empty icon={Loader2} message={t('profile.comparing')} spin={comparing} />
+        <Blank icon={Loader2} message={t('profile.comparing')} spin={comparing} />
       ) : comparison.rows.length === 0 ? (
-        <Empty icon={Boxes} message={t('profile.identical')} />
+        <Blank icon={Boxes} message={t('profile.identical')} />
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {comparison.differences === 0 && (
-            <p className="border-b border-line bg-ok/8 px-4 py-2 text-[11.5px] text-muted">
+            <Notice tone="ok" icon={Check} className="mb-3">
               {t('profile.identical')}
-            </p>
+            </Notice>
           )}
 
-          {/* The two names again, over the two columns they belong to: by the
-              time a row is being read the pickers are off the top of the list. */}
-          <div className={`${COLUMNS} sticky top-0 border-b border-line bg-surface px-4 py-1.5`}>
-            <span />
-            <span className="caption truncate">{comparison.left}</span>
-            <span className="caption truncate">{comparison.right}</span>
-          </div>
+          {/* Clipped rather than hidden: `overflow: hidden` would make the card
+              the thing the header sticks to, and the card does not scroll. */}
+          <div className="list-card overflow-clip">
+            {/* The two names again, over the two columns they belong to: by the
+                time a row is being read the pickers are off the top of the list.
+                A sticky element stops at the edge of its scroller's padding, so
+                the -top-4 hands back the body's py-4 — without it the rows would
+                slide by in the gap above the header. */}
+            <div className={`${COLUMNS} sticky -top-4 z-10 bg-surface-2 px-3.5 py-1.5`}>
+              <span />
+              <span className="caption truncate">{comparison.left}</span>
+              <span className="caption truncate">{comparison.right}</span>
+            </div>
 
-          <ul>
-            {comparison.rows.map((row) => (
-              <Row key={row.name} row={row} />
-            ))}
-          </ul>
+            {/* Not a direct child of the card, so the card's own hairlines do not
+                reach between these. */}
+            <ul className="divide-y divide-line">
+              {comparison.rows.map((row) => (
+                <Row key={row.name} row={row} />
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </div>
@@ -616,20 +616,10 @@ function Compare({ names, left, right, comparison, comparing, onPick }: CompareP
 
 function Row({ row }: { row: Difference }) {
   return (
-    <li
-      className={[
-        COLUMNS,
-        'relative border-b border-line px-4 py-2',
-        row.same ? '' : 'bg-surface-2/40',
-      ].join(' ')}
-    >
-      {!row.same && (
-        <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[2px] bg-brand" />
-      )}
-
+    <li className={['list-row', COLUMNS, row.same ? '' : 'bg-surface-2/50'].join(' ')}>
       <span
         data-hint={row.name}
-        className={['truncate text-[12px]', row.same ? 'text-muted' : 'font-medium text-text'].join(
+        className={['truncate text-ui-base', row.same ? 'text-muted' : 'font-medium text-text'].join(
           ' ',
         )}
       >
@@ -643,12 +633,12 @@ function Row({ row }: { row: Difference }) {
 }
 
 /** How a standing reads, and how it is coloured. */
-const STANDING: Record<Standing, { label: string; tone: string }> = {
-  active: { label: t('profile.standing.active'), tone: 'bg-ok/15 text-ok' },
-  disabled: { label: t('profile.standing.disabled'), tone: 'bg-surface-2 text-faint' },
-  library: { label: t('profile.standing.library'), tone: 'bg-surface-2 text-muted' },
-  builtin: { label: t('profile.standing.builtin'), tone: 'bg-surface-2 text-faint' },
-  absent: { label: t('profile.standing.absent'), tone: '' },
+const STANDING: Record<Standing, { label: string; tone: BadgeTone }> = {
+  active: { label: t('profile.standing.active'), tone: 'ok' },
+  disabled: { label: t('profile.standing.disabled'), tone: 'neutral' },
+  library: { label: t('profile.standing.library'), tone: 'neutral' },
+  builtin: { label: t('profile.standing.builtin'), tone: 'neutral' },
+  absent: { label: t('profile.standing.absent'), tone: 'neutral' },
 }
 
 function Side({ standing, spec }: { standing: Standing; spec: string }) {
@@ -657,7 +647,7 @@ function Side({ standing, spec }: { standing: Standing; spec: string }) {
       <span
         data-hint={STANDING.absent.label}
         aria-label={STANDING.absent.label}
-        className="text-[12px] text-faint opacity-45"
+        className="text-ui-sm text-faint opacity-45"
       >
         —
       </span>
@@ -666,16 +656,9 @@ function Side({ standing, spec }: { standing: Standing; spec: string }) {
 
   return (
     <span className="flex min-w-0 flex-col items-start gap-0.5">
-      <span
-        className={[
-          'rounded-[4px] px-1.5 py-0.5 text-[10.5px] font-medium',
-          STANDING[standing].tone,
-        ].join(' ')}
-      >
-        {STANDING[standing].label}
-      </span>
+      <Badge tone={STANDING[standing].tone}>{STANDING[standing].label}</Badge>
       {spec && (
-        <span className="max-w-full truncate font-mono text-[10px] text-faint tabular-nums">
+        <span className="max-w-full truncate font-mono text-ui-xs text-faint tabular-nums">
           {spec}
         </span>
       )}
@@ -711,13 +694,13 @@ function SidePicker({ label, value, options, onPick }: SidePickerProps) {
       aria-haspopup="menu"
       aria-label={label}
       onClick={open}
-      className="select-trigger select-trigger--compact flex-1"
+      className="select-trigger select-trigger--sm flex-1"
     >
-      <span className="shrink-0 text-[11px] text-faint">{label}</span>
-      <span className="truncate font-medium text-text">{value}</span>
+      <span className="shrink-0 text-ui-xs text-faint">{label}</span>
+      <span className="truncate text-text">{value}</span>
       <ChevronDown
-        size={11}
-        strokeWidth={2.4}
+        size={14}
+        strokeWidth={2}
         className="ml-auto shrink-0 text-faint"
         aria-hidden="true"
       />
@@ -801,15 +784,15 @@ function NameForm({ form, busy, onCancel, onSubmit }: NameFormProps) {
     isNewProfileName(trimmed) && !(form.kind === 'rename' && trimmed === form.from) && !busy
 
   return (
-    <section className="flex shrink-0 flex-col gap-2 border-b border-line bg-canvas-deep/45 px-4 py-3">
-      <div className="flex items-baseline justify-between gap-3">
+    <section className="flex shrink-0 flex-col gap-1.5 border-b border-line bg-canvas-deep/45 px-5 py-3">
+      <div className="flex items-center justify-between gap-3">
         <h3 className="caption truncate">{heading}</h3>
         {form.kind === 'import' && (
-          <div className="flex shrink-0 items-center gap-2 text-[11px] tabular-nums">
-            <span className={form.verified ? 'text-ok' : 'text-warn'}>
+          <div className="flex shrink-0 items-center gap-2 text-ui-sm text-faint tabular-nums">
+            <Badge tone={form.verified ? 'ok' : 'warn'}>
               {form.verified ? t('profile.backupVerified') : t('profile.backupLegacy')}
-            </span>
-            <span className="text-faint">
+            </Badge>
+            <span>
               {form.plugins > 0
                 ? t('profile.installedCount', { count: form.plugins })
                 : t('profile.noPlugins')}
@@ -833,7 +816,7 @@ function NameForm({ form, busy, onCancel, onSubmit }: NameFormProps) {
           placeholder={t('profile.namePlaceholder')}
           spellCheck={false}
           autoComplete="off"
-          className="field-control field-control--large selectable min-w-0 flex-1 font-mono placeholder:font-sans"
+          className="field-control selectable min-w-0 flex-1 font-mono placeholder:font-sans"
         />
 
         <Button variant="ghost" onClick={onCancel}>
@@ -841,17 +824,13 @@ function NameForm({ form, busy, onCancel, onSubmit }: NameFormProps) {
         </Button>
 
         <Button variant="primary" onClick={() => onSubmit(trimmed)} disabled={!ready}>
-          {busy ? (
-            <Loader2 size={13} className="animate-spin" aria-hidden="true" />
-          ) : (
-            <Icon size={13} strokeWidth={2.3} aria-hidden="true" />
-          )}
+          {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Icon aria-hidden="true" />}
           {label}
         </Button>
       </div>
 
       {form.kind === 'import' && (
-        <p data-hint={form.path} className="selectable truncate font-mono text-[10.5px] text-faint">
+        <p data-hint={form.path} className="selectable truncate font-mono text-ui-sm text-faint">
           {form.path}
         </p>
       )}
@@ -861,62 +840,51 @@ function NameForm({ form, busy, onCancel, onSubmit }: NameFormProps) {
 
 /* -------------------------------------------------------------------------- */
 
-function Badge({ children }: { children: ReactNode }) {
-  return (
-    <span className="shrink-0 rounded-[4px] bg-surface-2 px-1.5 py-0.5 text-[10.5px] font-medium text-faint">
-      {children}
-    </span>
-  )
-}
-
+/**
+ * A message about what just happened, in a box of its own.
+ *
+ * The tone is the colour of the whole message and not only of its mark: a
+ * failure that has to be read — a path, a name the shell refused — is worth
+ * reading in the colour that says it is one.
+ */
 function Notice({
   tone,
   icon: Icon,
+  className,
   children,
 }: {
   tone: 'ok' | 'danger'
   icon: LucideIcon
+  className?: string
   children: ReactNode
 }) {
   return (
     <div
       className={[
-        'flex shrink-0 items-start gap-2 border-b px-4 py-2',
-        tone === 'ok' ? 'border-line bg-ok/10' : 'border-danger/25 bg-danger/10',
-      ].join(' ')}
+        'flex items-start gap-2 rounded-lg border px-3 py-2 text-ui-sm',
+        tone === 'ok' ? 'border-ok/30 bg-ok/10 text-ok' : 'border-danger/30 bg-danger/10 text-danger',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
-      <Icon
-        size={13}
-        strokeWidth={2.1}
-        className={`mt-[2px] shrink-0 ${tone === 'ok' ? 'text-ok' : 'text-danger'}`}
-        aria-hidden="true"
-      />
-      <p className="selectable text-[11.5px] leading-relaxed break-all text-muted">{children}</p>
+      <Icon size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden="true" />
+      <p className="selectable min-w-0 break-all">{children}</p>
     </div>
   )
 }
 
-function Empty({
-  icon: Icon,
-  message,
-  hint,
-  spin = false,
-}: {
-  icon: LucideIcon
-  message: string
-  hint?: string
-  spin?: boolean
-}) {
+/**
+ * The shared empty state, centred in whatever room the tab has left.
+ *
+ * `Empty` fills its parent's height, and the tab's own height comes from its
+ * content — so without a frame that has a height to give, it would sit at the
+ * top of a region that is deliberately taller than it.
+ */
+function Blank(props: ComponentProps<typeof Empty>) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-      <Icon
-        size={22}
-        strokeWidth={1.4}
-        className={`text-faint opacity-60 ${spin ? 'animate-spin' : ''}`}
-        aria-hidden="true"
-      />
-      <p className="text-[12px] text-faint">{message}</p>
-      {hint && <p className="max-w-[320px] text-[11px] text-faint opacity-75">{hint}</p>}
+    <div className="flex min-h-0 flex-1 flex-col justify-center">
+      <Empty {...props} />
     </div>
   )
 }

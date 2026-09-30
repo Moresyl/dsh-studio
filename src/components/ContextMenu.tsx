@@ -220,12 +220,15 @@ export function ContextMenu() {
             ].join(' ')}
           >
             {/* A fixed gutter whether or not this row has an icon, so labels
-                line up the way they do in a system menu. */}
+                line up the way they do in a system menu. The tick and the
+                icons share one size — the 16px step that goes with 14px text
+                — so a menu that mixes the two does not change weight down the
+                column. */}
             <span className="menu-item__indicator">
               {entry.selected ? (
-                <Check size={18} strokeWidth={2.2} aria-hidden="true" />
+                <Check size={16} strokeWidth={2.2} aria-hidden="true" />
               ) : (
-                entry.icon && <entry.icon size={14} strokeWidth={2} aria-hidden="true" />
+                entry.icon && <entry.icon size={16} strokeWidth={1.8} aria-hidden="true" />
               )}
             </span>
             <span className="menu-item__label">{entry.label}</span>

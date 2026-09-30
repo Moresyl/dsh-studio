@@ -9,7 +9,20 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
-## [0.9.20] — 2026-09-29
+## [0.9.20] — 2026-09-30
+
+### Changed
+
+- Rebuild the interface on one control system taken from the reference desktop design instead of per-screen sizes. Buttons, icon buttons, fields, selectors and segmented controls now share four heights (24, 28, 32 and 40 px) whose corner, gutter, type and icon sizes step together, so a toolbar, a form row and a dialog footer line up instead of mixing 20 px buttons, 26 px icon tiles and 40 px pills. Five button voices — primary, secondary, ghost, danger and a quiet danger — replace the hand-drawn variants.
+- Put all text on the reference type ladder (11, 12, 14, 16, 20 and 24 px, each with its own line height) and all corners on its radius steps. Where the WebView supports `corner-shape`, corners are drawn as the reference's superellipse at 1.25× radius; engines without it keep plain rounded corners. Text buttons are never pills, and badges and key caps are small rectangles.
+- Replace hand-built tab strips, chips, cards and list rows with shared segmented controls, badges, cards and 40 px list rows, and bring every modal onto one anatomy: a 12 px corner, 20 px gutters, a 16 px semibold title and a right-aligned footer with the confirming action last. The plugin market, presentation editor, sessions and usage views, settings, about, remote, terminal, profile manager, version history, command palette, dialogs and first-run guide are rebuilt on these components.
+
+### Fixes and polish
+
+- Replace the presentation editor's native `fieldset` borders and bright default input outlines with the same labelled fields, panels and buttons as the rest of the application.
+- Move the collapsed sidebar's counts onto the icon's corner. They used to overflow the 52 px rail and add a horizontal scrollbar to the navigation.
+- Show loading text with the reference's shimmer sweep; reduced-motion settings keep it as plain muted text.
+- Give the About page's directory paths a full-size hit target instead of an 18 px text link.
 
 ### Added
 

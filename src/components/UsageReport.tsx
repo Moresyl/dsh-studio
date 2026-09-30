@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { save as pickPath } from '@tauri-apps/plugin-dialog'
 import { Check, Coins, Download, Pencil, Wallet } from 'lucide-react'
 
+import { Button } from '@/components/Button'
 import { Empty } from '@/components/Empty'
-import { TabButton } from '@/components/TabButton'
+import { IconButton } from '@/components/IconButton'
+import { Segmented } from '@/components/Segmented'
 import { count, day } from '@/lib/format'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
@@ -38,6 +40,13 @@ const SPANS: { days: number; label: MessageKey }[] = [
 const TOP = 8
 
 const CURRENCIES: Currency[] = ['CNY', 'USD']
+
+/**
+ * The header's own column, so the toolbar and the cards start where the title
+ * does. The same measure the sessions list uses; kept beside it rather than
+ * imported from it, because that file imports this one.
+ */
+const COLUMN = 'mx-auto w-full max-w-[1040px]'
 
 /** Which fields a price has, in the order somebody would read them off a page. */
 const FIELDS: { key: keyof Rate; label: MessageKey }[] = [
@@ -159,111 +168,114 @@ export function UsageReport({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
-        <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
-          {SPANS.map((choice) => (
-            <TabButton
-              key={choice.days}
-              label={t(choice.label)}
-              active={span === choice.days}
-              onClick={() => setSpan(choice.days)}
-            />
-          ))}
-        </div>
-
-        <label className="field-shell ml-auto flex h-7 items-center gap-1.5 px-2 text-[10.5px] text-faint">
-          {t('usage.monthlyBudget')}
-          <span>{symbol}</span>
-          <input
-            type="number"
-            min={0}
-            step="1"
-            inputMode="decimal"
-            value={budgetDraft}
-            onChange={(event) => setBudgetDraft(event.target.value)}
-            onBlur={commitBudget}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') event.currentTarget.blur()
-            }}
-            placeholder={t('usage.noBudget')}
-            className="w-16 bg-transparent text-[11px] text-text tabular-nums outline-none placeholder:text-faint"
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Every control in the row is the toolbar size, so the range, the budget
+          field, the export and the currency all sit on one line. */}
+      <div className="shrink-0 px-6">
+        <div className={`${COLUMN} flex flex-wrap items-center gap-2 pb-3`}>
+          <Segmented
+            size="sm"
+            label={t('sessions.tab.usage')}
+            value={String(span)}
+            onChange={(value) => setSpan(Number(value))}
+            items={SPANS.map((choice) => ({
+              value: String(choice.days),
+              label: t(choice.label),
+            }))}
           />
-        </label>
 
-        <button
-          type="button"
-          onClick={() => void exportTrend()}
-          data-hint={t('usage.export')}
-          aria-label={t('usage.export')}
-          className="grid size-7 place-items-center rounded-control border border-line text-faint hover:bg-surface-2 hover:text-text"
-        >
-          {exported ? (
-            <Check size={13} className="text-ok" aria-hidden="true" />
-          ) : (
-            <Download size={13} aria-hidden="true" />
-          )}
-        </button>
-
-        <div
-          className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline"
-          data-hint={t('usage.currency')}
-        >
-          {CURRENCIES.map((one) => (
-            <TabButton
-              key={one}
-              label={`${SYMBOL[one]} ${one}`}
-              active={currency === one}
-              onClick={() => choose(one)}
+          <label className="field-shell field-shell--sm ml-auto">
+            <span className="text-faint">{t('usage.monthlyBudget')}</span>
+            <span className="-mr-1 text-muted">{symbol}</span>
+            <input
+              type="number"
+              min={0}
+              step="1"
+              inputMode="decimal"
+              value={budgetDraft}
+              onChange={(event) => setBudgetDraft(event.target.value)}
+              onBlur={commitBudget}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') event.currentTarget.blur()
+              }}
+              placeholder={t('usage.noBudget')}
+              className="w-16 tabular-nums"
             />
-          ))}
+          </label>
+
+          {/* The tick is the button's own colour for as long as it lasts: the
+              icon is the whole button, so there is nothing else to tint. */}
+          <IconButton
+            size="sm"
+            variant="secondary"
+            icon={exported ? Check : Download}
+            label={t('usage.export')}
+            onClick={() => void exportTrend()}
+            className={exported ? 'text-ok' : undefined}
+          />
+
+          <Segmented
+            size="sm"
+            label={t('usage.currency')}
+            value={currency}
+            onChange={choose}
+            items={CURRENCIES.map((one) => ({
+              value: one,
+              label: `${SYMBOL[one]} ${one}`,
+              hint: t('usage.currency'),
+            }))}
+          />
         </div>
       </div>
 
-      {total === 0 ? (
-        <Empty icon={Coins} message={t('usage.empty')} hint={t('usage.emptyHint')} />
-      ) : (
-        <div className="flex flex-col gap-4 p-4">
-          <Headline
-            money={priced ? statement.total : null}
-            symbol={symbol}
-            tokens={total}
-            sessions={within.length}
-          />
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-line">
+        {total === 0 ? (
+          <Empty icon={Coins} message={t('usage.empty')} hint={t('usage.emptyHint')} />
+        ) : (
+          <div className="px-6 py-6">
+            <div className={`${COLUMN} flex flex-col gap-5`}>
+              <Headline
+                money={priced ? statement.total : null}
+                symbol={symbol}
+                tokens={total}
+                sessions={within.length}
+              />
 
-          {monthlyBudget !== null && (
-            <Budget
-              spent={month.total}
-              budget={monthlyBudget}
-              complete={budgetComplete}
-              symbol={symbol}
-            />
-          )}
+              {monthlyBudget !== null && (
+                <Budget
+                  spent={month.total}
+                  budget={monthlyBudget}
+                  complete={budgetComplete}
+                  symbol={symbol}
+                />
+              )}
 
-          {statement.unpriced.length > 0 && (
-            <Short models={statement.unpriced} onPrice={(model) => setEditing(model)} />
-          )}
+              {statement.unpriced.length > 0 && (
+                <Short models={statement.unpriced} onPrice={(model) => setEditing(model)} />
+              )}
 
-          <Daily days={days} symbol={symbol} money={settled} />
+              <Daily days={days} symbol={symbol} money={settled} />
 
-          <Models
-            models={models}
-            rates={rates}
-            symbol={symbol}
-            heaviest={total}
-            editing={editing}
-            onEdit={setEditing}
-          />
+              <Models
+                models={models}
+                rates={rates}
+                symbol={symbol}
+                heaviest={total}
+                editing={editing}
+                onEdit={setEditing}
+              />
 
-          <Costliest
-            cards={within}
-            rates={rates}
-            symbol={symbol}
-            settled={settled}
-            onOpen={onOpen}
-          />
-        </div>
-      )}
+              <Costliest
+                cards={within}
+                rates={rates}
+                symbol={symbol}
+                settled={settled}
+                onOpen={onOpen}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -282,7 +294,7 @@ function Budget({
   const share = complete ? spent / budget : null
   const tone =
     share === null
-      ? 'border-line bg-surface'
+      ? ''
       : share >= 1
         ? 'border-danger/30 bg-danger/[0.07]'
         : share >= 0.8
@@ -300,10 +312,12 @@ function Budget({
           })
 
   return (
-    <section className={`rounded-panel border px-3 py-2 ${tone}`}>
-      <div className="flex items-center justify-between gap-3 text-[11px]">
-        <span className="font-medium text-text">{t('usage.monthBudgetStatus')}</span>
-        <span className={share !== null && share >= 1 ? 'text-danger' : 'text-muted'}>
+    <section className={`card px-4 py-3 ${tone}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-ui-base font-medium text-text">{t('usage.monthBudgetStatus')}</span>
+        <span
+          className={`text-ui-sm ${share !== null && share >= 1 ? 'text-danger' : 'text-muted'}`}
+        >
           {message}
         </span>
       </div>
@@ -340,7 +354,7 @@ function Headline({
   sessions: number
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       <Card
         label={t('usage.total')}
         value={money === null ? '—' : cash(money, symbol)}
@@ -375,17 +389,17 @@ function Card({
   lead?: boolean
 }) {
   return (
-    <div className="rounded-panel border border-line bg-surface px-3 py-2.5">
-      <p className="text-[10.5px] tracking-[0.04em] text-faint uppercase">{label}</p>
+    <div className="card card--pad min-w-0">
+      <p className="truncate text-ui-sm text-muted">{label}</p>
       <p
         className={[
-          'mt-1.5 truncate text-[19px] leading-none font-semibold tabular-nums',
+          'mt-1.5 truncate text-ui-xl font-semibold tabular-nums',
           lead ? 'text-brand' : 'text-text',
         ].join(' ')}
       >
         {value}
       </p>
-      {note && <p className="mt-1 text-[10.5px] leading-none text-faint">{note}</p>}
+      {note && <p className="mt-1 text-ui-sm text-faint">{note}</p>}
     </div>
   )
 }
@@ -393,22 +407,22 @@ function Card({
 /** Which models the total is short by — said plainly, with the way to fix it. */
 function Short({ models, onPrice }: { models: string[]; onPrice: (model: string) => void }) {
   return (
-    <div className="flex items-center gap-2 rounded-panel border border-warn/25 bg-warn/[0.07] px-3 py-2">
-      <Wallet size={13} strokeWidth={2.1} className="shrink-0 text-warn" aria-hidden="true" />
-      <p className="min-w-0 flex-1 truncate text-[11.5px] text-muted" data-hint={models.join(', ')}>
+    <div className="card flex items-center gap-3 border-warn/30 bg-warn/[0.07] px-4 py-2">
+      <Wallet size={16} strokeWidth={1.8} className="shrink-0 text-warn" aria-hidden="true" />
+      <p className="min-w-0 flex-1 truncate text-ui-sm text-muted" data-hint={models.join(', ')}>
         {t('usage.short', { models: models.map(named).join('、') })}
       </p>
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         data-hint={t('usage.shortHint')}
         onClick={() => {
           const first = models[0]
           if (first !== undefined) onPrice(first)
         }}
-        className="shrink-0 text-[11.5px] text-brand transition-opacity duration-100 hover:opacity-75"
       >
         {t('usage.priceThem')}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -429,50 +443,52 @@ function Daily({ days, symbol, money }: { days: DayUsage[]; symbol: string; mone
   const ceiling = Math.max(...values, 0)
 
   return (
-    <section className="rounded-panel border border-line bg-surface px-3 pt-2.5 pb-2">
-      <div className="mb-2.5 flex items-baseline gap-2">
-        <h3 className="text-[11.5px] font-semibold text-text">{t('usage.daily')}</h3>
-        <span className="text-[10.5px] text-faint">
+    <section className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-2">
+        <h3 className="caption">{t('usage.daily')}</h3>
+        <span className="text-ui-xs text-faint">
           {money ? t('usage.dailyMoney') : t('usage.dailyTokens')}
         </span>
       </div>
 
-      {ceiling === 0 ? (
-        <p className="py-6 text-center text-[11.5px] text-faint">{t('usage.dailyEmpty')}</p>
-      ) : (
-        <>
-          <div className="flex h-28 items-end gap-[2px]">
-            {days.map((one, index) => {
-              const value = values[index] ?? 0
-              return (
-                <div
-                  key={one.date}
-                  data-hint={`${one.date} · ${count(weigh(one.tokens))} tokens${
-                    one.cost === null ? '' : ` · ${cash(one.cost, symbol)}`
-                  }`}
-                  className="group flex h-full min-w-0 flex-1 items-end"
-                >
-                  {value > 0 ? (
-                    <span
-                      // Percent of the tallest, so the shape is the comparison
-                      // and no bar needs a number printed on it.
-                      style={{ height: `${Math.max((value / ceiling) * 100, 3)}%` }}
-                      className="w-full rounded-t-[2px] bg-brand/55 transition-colors duration-100 group-hover:bg-brand"
-                    />
-                  ) : (
-                    <span className="h-px w-full bg-line-strong" />
-                  )}
-                </div>
-              )
-            })}
-          </div>
+      <div className="card card--pad">
+        {ceiling === 0 ? (
+          <p className="py-6 text-center text-ui-sm text-faint">{t('usage.dailyEmpty')}</p>
+        ) : (
+          <>
+            <div className="flex h-28 items-end gap-0.5">
+              {days.map((one, index) => {
+                const value = values[index] ?? 0
+                return (
+                  <div
+                    key={one.date}
+                    data-hint={`${one.date} · ${count(weigh(one.tokens))} tokens${
+                      one.cost === null ? '' : ` · ${cash(one.cost, symbol)}`
+                    }`}
+                    className="group flex h-full min-w-0 flex-1 items-end"
+                  >
+                    {value > 0 ? (
+                      <span
+                        // Percent of the tallest, so the shape is the comparison
+                        // and no bar needs a number printed on it.
+                        style={{ height: `${Math.max((value / ceiling) * 100, 3)}%` }}
+                        className="w-full rounded-t-2xs bg-brand/55 transition-colors duration-100 group-hover:bg-brand"
+                      />
+                    ) : (
+                      <span className="h-px w-full bg-line-strong" />
+                    )}
+                  </div>
+                )
+              })}
+            </div>
 
-          <div className="mt-1.5 flex justify-between text-[10.5px] text-faint tabular-nums">
-            <span>{days[0]?.date}</span>
-            <span>{days[days.length - 1]?.date}</span>
-          </div>
-        </>
-      )}
+            <div className="mt-2 flex justify-between text-ui-xs text-faint tabular-nums">
+              <span>{days[0]?.date}</span>
+              <span>{days[days.length - 1]?.date}</span>
+            </div>
+          </>
+        )}
+      </div>
     </section>
   )
 }
@@ -492,22 +508,20 @@ interface ModelsProps {
 /** Who spent it, and what that comes to once somebody says what they charge. */
 function Models({ models, rates, symbol, heaviest, editing, onEdit }: ModelsProps) {
   return (
-    <section className="overflow-hidden rounded-panel border border-line bg-surface">
-      <h3 className="border-b border-line px-3 py-2 text-[11.5px] font-semibold text-text">
-        {t('usage.byModel')}
-      </h3>
+    <section className="flex flex-col gap-2">
+      <h3 className="caption">{t('usage.byModel')}</h3>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[11.5px] tabular-nums">
+      <div className="card overflow-x-auto">
+        <table className="w-full border-collapse text-ui-sm tabular-nums">
           <thead>
-            <tr className="text-[10.5px] tracking-[0.04em] text-faint uppercase">
-              <th className="px-3 py-1.5 text-left font-medium">{t('usage.model')}</th>
-              <th className="px-3 py-1.5 text-right font-medium">{t('usage.share')}</th>
-              <th className="px-3 py-1.5 text-right font-medium">{t('sessions.input')}</th>
-              <th className="px-3 py-1.5 text-right font-medium">{t('sessions.output')}</th>
-              <th className="px-3 py-1.5 text-right font-medium">{t('sessions.cached')}</th>
-              <th className="px-3 py-1.5 text-right font-medium">{t('usage.cost')}</th>
-              <th className="w-8 px-3 py-1.5" />
+            <tr className="h-8 text-ui-sm text-faint">
+              <th className="px-4 text-left font-medium">{t('usage.model')}</th>
+              <th className="px-4 text-right font-medium">{t('usage.share')}</th>
+              <th className="px-4 text-right font-medium">{t('sessions.input')}</th>
+              <th className="px-4 text-right font-medium">{t('sessions.output')}</th>
+              <th className="px-4 text-right font-medium">{t('sessions.cached')}</th>
+              <th className="px-4 text-right font-medium">{t('usage.cost')}</th>
+              <th className="w-12 pr-3 pl-1" />
             </tr>
           </thead>
 
@@ -555,12 +569,12 @@ function Row({
 }) {
   return (
     <>
-      <tr className="border-t border-line/70 transition-colors duration-100 hover:bg-surface-2/45">
-        <td className="max-w-[220px] truncate px-3 py-1.5 font-mono text-[11px] text-text">
+      <tr className="h-10 border-t border-line transition-colors duration-100 hover:bg-surface-2/60">
+        <td className="max-w-[220px] truncate px-4 font-mono text-ui-sm text-text">
           {named(model)}
         </td>
-        <td className="px-3 py-1.5 text-right">
-          <span className="inline-flex items-center gap-1.5">
+        <td className="px-4 text-right">
+          <span className="inline-flex items-center gap-2">
             {/* The bar is the column: percentages of a total this size are read
                 by comparing lengths, not by reading four decimal numbers. */}
             <span aria-hidden="true" className="h-1 w-10 overflow-hidden rounded-full bg-line">
@@ -569,39 +583,35 @@ function Row({
                 className="block h-full rounded-full bg-brand/70"
               />
             </span>
-            <span className="w-8 text-right text-faint">{Math.round(share * 100)}%</span>
+            <span className="w-9 text-right text-faint">{Math.round(share * 100)}%</span>
           </span>
         </td>
-        <td className="px-3 py-1.5 text-right text-muted">{count(usage.tokens.input)}</td>
-        <td className="px-3 py-1.5 text-right text-muted">{count(usage.tokens.output)}</td>
-        <td className="px-3 py-1.5 text-right text-muted">{count(usage.tokens.cacheRead)}</td>
+        <td className="px-4 text-right text-muted">{count(usage.tokens.input)}</td>
+        <td className="px-4 text-right text-muted">{count(usage.tokens.output)}</td>
+        <td className="px-4 text-right text-muted">{count(usage.tokens.cacheRead)}</td>
         <td
-          className={['px-3 py-1.5 text-right', money === null ? 'text-faint' : 'text-text'].join(
-            ' ',
-          )}
+          className={[
+            'px-4 text-right text-ui-base',
+            money === null ? 'text-faint' : 'text-text',
+          ].join(' ')}
         >
           {money === null ? t('usage.unpriced') : cash(money, symbol)}
         </td>
-        <td className="px-3 py-1.5 text-right">
-          <button
-            type="button"
+        <td className="pr-3 pl-1 text-right">
+          <IconButton
+            size="xs"
+            variant={open ? 'secondary' : 'ghost'}
+            icon={Pencil}
+            label={t('usage.setPrice')}
             aria-expanded={open}
-            data-hint={t('usage.setPrice')}
-            aria-label={t('usage.setPrice')}
             onClick={onToggle}
-            className={[
-              'grid size-[19px] place-items-center rounded-control transition-colors duration-100',
-              open ? 'bg-surface-2 text-text' : 'text-faint hover:bg-surface-2 hover:text-text',
-            ].join(' ')}
-          >
-            <Pencil size={11} strokeWidth={2.2} aria-hidden="true" />
-          </button>
+          />
         </td>
       </tr>
 
       {open && (
-        <tr className="border-t border-line/70 bg-canvas-deep/40">
-          <td colSpan={7} className="px-3 py-3">
+        <tr className="border-t border-line bg-surface-2/40">
+          <td colSpan={7} className="px-4 py-4">
             <Editor model={model} symbol={symbol} onDone={onToggle} />
           </td>
         </tr>
@@ -646,15 +656,15 @@ function Editor({ model, symbol, onDone }: { model: string; symbol: string; onDo
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-[11px] text-faint">{t('usage.priceTitle', { model: named(model) })}</p>
+    <div className="flex flex-col gap-3">
+      <p className="text-ui-sm text-muted">{t('usage.priceTitle', { model: named(model) })}</p>
 
-      <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-wrap items-end gap-3">
         {FIELDS.map(({ key, label }) => (
-          <label key={key} className="flex flex-col gap-1">
-            <span className="text-[10.5px] text-faint">{t(label)}</span>
-            <span className="field-shell flex h-[26px] items-center px-1.5">
-              <span className="mr-1 text-[11px] text-faint">{symbol}</span>
+          <label key={key} className="flex flex-col">
+            <span className="field-label">{t(label)}</span>
+            <span className="field-shell field-shell--sm">
+              <span className="text-faint">{symbol}</span>
               <input
                 type="number"
                 min={0}
@@ -663,31 +673,23 @@ function Editor({ model, symbol, onDone }: { model: string; symbol: string; onDo
                 value={draft[key] ?? ''}
                 onChange={(event) => set(key, event.target.value)}
                 placeholder="0"
-                className="w-[68px] bg-transparent text-[11.5px] text-text tabular-nums outline-none placeholder:text-faint"
+                className="w-16 tabular-nums"
               />
             </span>
           </label>
         ))}
 
-        <span className="ml-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={clear}
-            className="h-[26px] rounded-control border border-line px-2.5 text-[11.5px] text-muted transition-colors duration-100 hover:border-line-strong hover:bg-surface-2 hover:text-text"
-          >
+        <span className="ml-auto flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={clear}>
             {t('usage.clearPrice')}
-          </button>
-          <button
-            type="button"
-            onClick={onDone}
-            className="h-[26px] rounded-control bg-brand px-2.5 text-[11.5px] font-medium text-on-brand transition-opacity duration-100 hover:opacity-90"
-          >
+          </Button>
+          <Button size="sm" onClick={onDone}>
             {t('usage.done')}
-          </button>
+          </Button>
         </span>
       </div>
 
-      <p className="text-[10.5px] text-faint">{t('usage.priceHint')}</p>
+      <p className="text-ui-sm text-faint">{t('usage.priceHint')}</p>
     </div>
   )
 }
@@ -726,31 +728,29 @@ function Costliest({
   if (ranked.length === 0) return null
 
   return (
-    <section className="overflow-hidden rounded-panel border border-line bg-surface">
-      <h3 className="border-b border-line px-3 py-2 text-[11.5px] font-semibold text-text">
-        {t('usage.top')}
-      </h3>
+    <section className="flex flex-col gap-2">
+      <h3 className="caption">{t('usage.top')}</h3>
 
-      <ul>
+      <ul className="list-card">
         {ranked.map(({ card, money }) => (
           <li key={card.id}>
             <button
               type="button"
               onClick={() => onOpen(card.id)}
-              className="flex w-full items-baseline gap-3 border-t border-line/70 px-3 py-2 text-left transition-colors duration-100 hover:bg-surface-2/45"
+              className="flex h-10 w-full items-center gap-3 px-4 text-left transition-colors duration-100 hover:bg-surface-2/60 focus-visible:-outline-offset-2"
             >
-              <span className="min-w-0 flex-1 truncate text-[11.5px] text-text">
+              <span className="min-w-0 flex-1 truncate text-ui-base text-text">
                 {card.title || t('sessions.untitled')}
               </span>
               {card.started > 0 && (
-                <span className="shrink-0 text-[10.5px] text-faint tabular-nums">
+                <span className="shrink-0 text-ui-sm text-faint tabular-nums">
                   {day(new Date(card.started).toISOString())}
                 </span>
               )}
-              <span className="w-16 shrink-0 text-right text-[11px] text-faint tabular-nums">
+              <span className="w-16 shrink-0 text-right text-ui-sm text-faint tabular-nums">
                 {count(weigh(card.tokens))}
               </span>
-              <span className="w-20 shrink-0 text-right text-[11.5px] text-text tabular-nums">
+              <span className="w-20 shrink-0 text-right text-ui-base text-text tabular-nums">
                 {money === null ? '—' : cash(money, symbol)}
               </span>
             </button>

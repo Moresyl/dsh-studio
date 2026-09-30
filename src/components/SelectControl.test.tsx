@@ -21,15 +21,15 @@ describe('SelectControl', () => {
     expect(markup).toContain('aria-hidden="true"')
   })
 
-  it('forwards disabled state and density to the trigger', () => {
+  it('forwards disabled state and size to the trigger', () => {
     const markup = renderToStaticMarkup(
-      <SelectControl aria-label="Channel" disabled density="small">
+      <SelectControl aria-label="Channel" disabled size="sm">
         <option>Default</option>
       </SelectControl>,
     )
 
     expect(markup).toContain('disabled=""')
-    expect(markup).toContain('field-control--small')
+    expect(markup).toContain('field-control--sm')
   })
 
   it('joins version text and conditional badges without array separators', () => {

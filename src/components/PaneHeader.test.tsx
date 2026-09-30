@@ -13,7 +13,7 @@ describe('PaneHeader', () => {
 
     expect(markup).toContain('pane-header')
     expect(markup).toContain('max-w-[1040px]')
-    expect(markup).toContain('text-[20px]')
+    expect(markup).toContain('text-ui-xl')
     expect(markup).toContain('Manage extensions')
     expect(markup).toContain('Import')
   })

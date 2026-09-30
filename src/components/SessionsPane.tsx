@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
   ArrowLeft,
   Archive,
@@ -27,11 +27,13 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { AttachmentPreview } from '@/components/AttachmentPreview'
 import { Empty } from '@/components/Empty'
+import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
-import { TabButton } from '@/components/TabButton'
+import { Segmented } from '@/components/Segmented'
 import { UsageReport } from '@/components/UsageReport'
 import { count, day, filesize, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
@@ -60,6 +62,16 @@ const PEEK_CHARS = 640
 
 /** How long an export leaves its tick behind, before the button is itself again. */
 const CONFIRM = 1600
+
+/**
+ * The column everything in this pane sits in.
+ *
+ * The header centres its content in 1040px, so the strips, rows and transcript
+ * lines do too. Their fills and hairlines still run edge to edge, but their text
+ * stays on the header's left edge at every window width — not only while the
+ * window is narrower than the column.
+ */
+const COLUMN = 'mx-auto w-full max-w-[1040px]'
 
 /**
  * The formats a session can leave in, and what a save dialog calls each one.
@@ -228,37 +240,29 @@ export function SessionsPane() {
               : t('sessions.subtitle')
         }
       >
-        <div className="flex items-center gap-0.5 rounded-control bg-canvas-deep p-0.5 hairline">
-          <TabButton
-            label={t('sessions.tab.list')}
-            active={tab === 'list'}
-            onClick={() => setTab('list')}
-          />
-          <TabButton
-            label={t('sessions.tab.archived')}
-            active={tab === 'archived'}
-            onClick={() => setTab('archived')}
-          />
-          <TabButton
-            label={t('sessions.tab.usage')}
-            active={tab === 'usage'}
-            onClick={() => setTab('usage')}
-          />
-        </div>
+        <Segmented
+          label={t('sessions.title')}
+          value={tab}
+          onChange={setTab}
+          items={[
+            { value: 'list', label: t('sessions.tab.list') },
+            { value: 'archived', label: t('sessions.tab.archived') },
+            { value: 'usage', label: t('sessions.tab.usage') },
+          ]}
+        />
 
-        <Button
+        {/* The icon spins through the button's own `svg` rather than through a
+            prop of its own: a refresh that only disables itself gives no sign
+            that anything is being read. */}
+        <IconButton
           variant="secondary"
+          size="md"
+          icon={RefreshCw}
+          label={t('sessions.refresh')}
           onClick={() => void refresh()}
           disabled={scanning}
-          data-hint={t('sessions.refresh')}
-          aria-label={t('sessions.refresh')}
-        >
-          <RefreshCw
-            size={13}
-            strokeWidth={2.2}
-            className={scanning ? 'animate-spin' : undefined}
-          />
-        </Button>
+          className={scanning ? '[&>svg]:animate-spin' : undefined}
+        />
       </PaneHeader>
 
       {listed.some((card) => card.limited) && <Warning message={t('sessions.limitedShelf')} />}
@@ -267,51 +271,51 @@ export function SessionsPane() {
         <UsageReport cards={listed} onOpen={(id) => show(id, null)} />
       ) : (
         <>
-          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line px-4">
-            <Search
-              size={14}
-              strokeWidth={2.1}
-              className="shrink-0 text-faint"
-              aria-hidden="true"
-            />
-            <input
-              ref={field}
-              aria-label={t('sessions.search')}
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape' && query !== '') {
-                  event.stopPropagation()
-                  setQuery('')
-                }
-              }}
-              placeholder={t('sessions.search')}
-              spellCheck={false}
-              autoComplete="off"
-              className="selectable h-full min-w-0 flex-1 bg-transparent text-[12.5px] text-text outline-none placeholder:text-faint"
-            />
-            {searching && (
-              <Loader2 size={13} className="shrink-0 animate-spin text-faint" aria-hidden="true" />
-            )}
-            {query !== '' && !searching && (
-              <button
-                type="button"
-                data-hint={t('action.clearSearch')}
-                aria-label={t('action.clearSearch')}
-                onClick={() => {
-                  setQuery('')
-                  field.current?.focus()
-                }}
-                className="grid size-[17px] shrink-0 place-items-center rounded-full text-faint transition-colors duration-100 hover:bg-surface-2 hover:text-text"
-              >
-                <X size={11} strokeWidth={2.4} aria-hidden="true" />
-              </button>
-            )}
+          <div className="shrink-0 px-6">
+            <div className={`${COLUMN} flex items-center gap-2 pb-3`}>
+              <label className="field-shell min-w-0 flex-1">
+                <Search size={16} strokeWidth={1.8} aria-hidden="true" />
+                <input
+                  ref={field}
+                  aria-label={t('sessions.search')}
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape' && query !== '') {
+                      event.stopPropagation()
+                      setQuery('')
+                    }
+                  }}
+                  placeholder={t('sessions.search')}
+                  spellCheck={false}
+                  autoComplete="off"
+                  className="selectable"
+                />
+                {searching && (
+                  <Loader2
+                    size={16}
+                    strokeWidth={1.8}
+                    className="animate-spin"
+                    aria-hidden="true"
+                  />
+                )}
+                {query !== '' && !searching && (
+                  <IconButton
+                    size="xs"
+                    icon={X}
+                    label={t('action.clearSearch')}
+                    onClick={() => {
+                      setQuery('')
+                      field.current?.focus()
+                    }}
+                    className="-mr-2"
+                  />
+                )}
+              </label>
 
-            <span aria-hidden="true" className="h-4 w-px shrink-0 bg-line" />
-
-            <Filter project={project} reach={reach} onPick={(picked) => void narrow(picked)} />
+              <Filter project={project} reach={reach} onPick={(picked) => void narrow(picked)} />
+            </div>
           </div>
 
           {listed.length > 0 && <Totals cards={listed} hits={visibleHits} />}
@@ -377,14 +381,30 @@ export function SessionsPane() {
 /** Something that went wrong, said in place rather than over the top of anything. */
 function Warning({ message }: { message: string }) {
   return (
-    <div className="flex shrink-0 items-start gap-2 border-b border-danger/25 bg-danger/10 px-4 py-2">
-      <TriangleAlert
-        size={13}
-        strokeWidth={2.1}
-        className="mt-[2px] shrink-0 text-danger"
-        aria-hidden="true"
-      />
-      <p className="selectable text-[11.5px] leading-relaxed text-muted">{message}</p>
+    <div className="shrink-0 px-6 pb-3">
+      <div
+        className={`${COLUMN} flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger`}
+      >
+        <TriangleAlert size={14} strokeWidth={2} className="mt-0.5 shrink-0" aria-hidden="true" />
+        <p className="selectable min-w-0 break-words">{message}</p>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The line of sums under a toolbar: what the shelf on screen adds up to, or what
+ * the session being read does. Muted, because it is the answer to a question
+ * nobody asked out loud, and a hairline under it because the rows start there.
+ */
+function Strip({ children }: { children: ReactNode }) {
+  return (
+    <div className="shrink-0 border-b border-line px-6">
+      <div
+        className={`${COLUMN} flex flex-wrap items-center gap-x-4 gap-y-1 py-2 text-ui-sm text-muted tabular-nums`}
+      >
+        {children}
+      </div>
     </div>
   )
 }
@@ -395,23 +415,16 @@ function Totals({ cards, hits }: { cards: SessionCard[]; hits: SessionHit[] | nu
   const turns = cards.reduce((sum, card) => sum + card.turns, 0)
 
   return (
-    <div className="flex h-8 shrink-0 flex-wrap items-center gap-x-4 border-b border-line bg-canvas-deep/40 px-4 text-[11px] text-faint">
-      <span className="tabular-nums">
+    <Strip>
+      <span>
         {hits
           ? t('sessions.found', { count: hits.length, total: cards.length })
           : t('sessions.count', { count: cards.length })}
       </span>
-      <span className="tabular-nums">{t('sessions.turns', { count: turns })}</span>
+      <span>{t('sessions.turns', { count: turns })}</span>
 
-      <span
-        className="ml-auto flex items-center gap-3 tabular-nums"
-        data-hint={t('sessions.spentHint')}
-      >
-        <Figure label={t('sessions.input')} value={tokens.input} />
-        <Figure label={t('sessions.output')} value={tokens.output} />
-        <Figure label={t('sessions.cached')} value={tokens.cacheRead} />
-      </span>
-    </div>
+      <Spend tokens={tokens} />
+    </Strip>
   )
 }
 
@@ -419,7 +432,7 @@ function Figure({ label, value }: { label: string; value: number }) {
   return (
     <span>
       <span className="text-faint">{label} </span>
-      <span className="font-medium text-muted">{count(value)}</span>
+      <span className="font-medium">{count(value)}</span>
     </span>
   )
 }
@@ -446,71 +459,70 @@ function Entry({ card, matches, marks, onOpen }: EntryProps) {
             onOpen(null)
           }
         }}
-        className="flex w-full flex-col gap-1.5 border-b border-line px-4 py-3 text-left transition-colors duration-100 hover:bg-surface-2/55"
+        className="border-b border-line px-6 py-3 text-left transition-colors duration-100 hover:bg-surface-2/60 focus-visible:-outline-offset-2"
       >
-        <div className="flex items-baseline gap-2">
-          <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-text">
-            {card.title || t('sessions.untitled')}
-          </span>
-          {card.delegated && (
-            <span
-              data-hint={t('sessions.delegatedHint')}
-              className="shrink-0 rounded-full border border-line-strong px-1.5 text-[10px] leading-[15px] text-faint"
-            >
-              {t('sessions.delegated')}
+        <div className={`${COLUMN} flex flex-col gap-1`}>
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-ui-base font-medium text-text">
+              {card.title || t('sessions.untitled')}
             </span>
-          )}
-          {card.limited && (
-            <span className="shrink-0 text-[11px] text-warn" data-hint={t('sessions.limited')}>
-              {t('sessions.limitedBadge')}
+            {card.delegated && (
+              <Badge data-hint={t('sessions.delegatedHint')}>{t('sessions.delegated')}</Badge>
+            )}
+            {card.limited && (
+              <Badge tone="warn" data-hint={t('sessions.limited')}>
+                {t('sessions.limitedBadge')}
+              </Badge>
+            )}
+            <span className="shrink-0 text-ui-sm text-faint tabular-nums">
+              {when(card.touched)}
             </span>
-          )}
-          <span className="shrink-0 text-[11px] text-faint tabular-nums">{when(card.touched)}</span>
-        </div>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
-          <span className="truncate" data-hint={card.project || undefined}>
-            {card.project ? leaf(card.project) : t('sessions.noProject')}
-          </span>
-          <span className="tabular-nums">{t('sessions.turns', { count: card.turns })}</span>
-          <span className="tabular-nums">
-            {count(card.tokens.input + card.tokens.output)} tokens
-          </span>
-          {matches !== undefined && (
-            <span className="tabular-nums text-brand">
-              {t('sessions.matches', { count: matches })}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-faint">
+            <span className="truncate" data-hint={card.project || undefined}>
+              {card.project ? leaf(card.project) : t('sessions.noProject')}
             </span>
+            <span className="tabular-nums">{t('sessions.turns', { count: card.turns })}</span>
+            <span className="tabular-nums">
+              {count(card.tokens.input + card.tokens.output)} tokens
+            </span>
+            {matches !== undefined && (
+              <Badge tone="info" className="tabular-nums">
+                {t('sessions.matches', { count: matches })}
+              </Badge>
+            )}
+          </div>
+
+          {marks && marks.length > 0 && (
+            <ul className="mt-1 flex flex-col gap-1">
+              {marks.map((mark, index) => (
+                <li key={`${mark.seq}-${index}`}>
+                  <button
+                    type="button"
+                    data-hint={t('sessions.jump')}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onOpen(mark.seq)
+                    }}
+                    className="flex h-7 w-full items-center gap-2 rounded-md border-l-2 border-line-strong bg-canvas-deep/60 px-2 text-left transition-colors duration-100 hover:border-brand hover:bg-canvas-deep"
+                  >
+                    <span className="shrink-0 text-ui-xs text-faint uppercase">
+                      {mark.tool ?? t(ROLE[mark.role])}
+                    </span>
+                    {/* One line, cut at both ends by the native side, so a match
+                        in the middle of a file dump still arrives as a sentence. */}
+                    <span className="min-w-0 flex-1 truncate text-ui-sm text-muted">
+                      {mark.before}
+                      <mark>{mark.hit}</mark>
+                      {mark.after}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-
-        {marks && marks.length > 0 && (
-          <ul className="mt-0.5 flex flex-col gap-1">
-            {marks.map((mark, index) => (
-              <li key={`${mark.seq}-${index}`}>
-                <button
-                  type="button"
-                  data-hint={t('sessions.jump')}
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onOpen(mark.seq)
-                  }}
-                  className="flex w-full items-baseline gap-2 rounded-control border-l-2 border-line-strong bg-canvas-deep/60 py-1 pr-2 pl-2 text-left transition-colors duration-100 hover:border-brand hover:bg-canvas-deep"
-                >
-                  <span className="shrink-0 text-[10px] text-faint uppercase">
-                    {mark.tool ?? t(ROLE[mark.role])}
-                  </span>
-                  {/* One line, cut at both ends by the native side, so a match
-                      in the middle of a file dump still arrives as a sentence. */}
-                  <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted">
-                    {mark.before}
-                    <mark>{mark.hit}</mark>
-                    {mark.after}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
     </li>
   )
@@ -574,39 +586,37 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
             }
           >
             {archiving === card.id ? (
-              <Loader2 size={13} className="animate-spin" />
+              <Loader2 className="animate-spin" />
             ) : archived.includes(card.id) ? (
-              <ArchiveRestore size={13} />
+              <ArchiveRestore />
             ) : (
-              <Archive size={13} />
+              <Archive />
             )}
             {archived.includes(card.id) ? t('sessions.restore') : t('sessions.archive')}
           </Button>
         )}
 
         <Button variant="secondary" onClick={onBack}>
-          <ArrowLeft size={13} strokeWidth={2.3} />
+          <ArrowLeft />
           {t('sessions.back')}
         </Button>
       </PaneHeader>
 
+      {error && <Warning message={error} />}
+      {card?.limited && <Warning message={t('sessions.limited')} />}
+
       {card && (
-        <div className="flex h-8 shrink-0 flex-wrap items-center gap-x-4 border-b border-line bg-canvas-deep/40 px-5 text-[11px] text-faint">
-          {card.started > 0 && (
-            <span className="tabular-nums">{day(new Date(card.started).toISOString())}</span>
-          )}
-          <span className="tabular-nums">{t('sessions.turns', { count: card.turns })}</span>
+        <Strip>
+          {card.started > 0 && <span>{day(new Date(card.started).toISOString())}</span>}
+          <span>{t('sessions.turns', { count: card.turns })}</span>
           {card.models.map((model) => (
-            <span key={model} className="truncate font-mono text-[10.5px]">
+            <span key={model} className="truncate font-mono">
               {model}
             </span>
           ))}
           <Spend tokens={card.tokens} />
-        </div>
+        </Strip>
       )}
-
-      {error && <Warning message={error} />}
-      {card?.limited && <Warning message={t('sessions.limited')} />}
 
       <div ref={body} className="min-h-0 flex-1 overflow-y-auto">
         {lines ? (
@@ -627,52 +637,53 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
       {lines && page.pages > 1 && (
         <nav
           aria-label={t('sessions.page.navigation')}
-          className="flex shrink-0 flex-wrap items-center gap-2 border-t border-line px-4 py-2"
+          className="shrink-0 border-t border-line px-6 py-3"
         >
-          <span role="status" className="min-w-0 flex-1 text-ui-caption text-muted tabular-nums">
-            {t('sessions.page.range', {
-              start: page.start + 1,
-              end: page.end,
-              total: lines.length,
-            })}
-          </span>
-          {[
-            {
-              label: t('sessions.page.first'),
-              icon: ChevronsLeft,
-              target: 0,
-              disabled: page.page === 0,
-            },
-            {
-              label: t('sessions.page.previous'),
-              icon: ChevronLeft,
-              target: page.page - 1,
-              disabled: page.page === 0,
-            },
-            {
-              label: t('sessions.page.next'),
-              icon: ChevronRight,
-              target: page.page + 1,
-              disabled: page.page === page.pages - 1,
-            },
-            {
-              label: t('sessions.page.last'),
-              icon: ChevronsRight,
-              target: page.pages - 1,
-              disabled: page.page === page.pages - 1,
-            },
-          ].map(({ label, icon: Icon, target, disabled }) => (
-            <Button
-              key={label}
-              variant="secondary"
-              aria-label={label}
-              data-hint={label}
-              disabled={disabled}
-              onClick={() => setRequestedPage(target)}
-            >
-              <Icon size={14} aria-hidden="true" />
-            </Button>
-          ))}
+          <div className={`${COLUMN} flex flex-wrap items-center gap-2`}>
+            <span role="status" className="min-w-0 flex-1 text-ui-sm text-muted tabular-nums">
+              {t('sessions.page.range', {
+                start: page.start + 1,
+                end: page.end,
+                total: lines.length,
+              })}
+            </span>
+            {[
+              {
+                label: t('sessions.page.first'),
+                icon: ChevronsLeft,
+                target: 0,
+                disabled: page.page === 0,
+              },
+              {
+                label: t('sessions.page.previous'),
+                icon: ChevronLeft,
+                target: page.page - 1,
+                disabled: page.page === 0,
+              },
+              {
+                label: t('sessions.page.next'),
+                icon: ChevronRight,
+                target: page.page + 1,
+                disabled: page.page === page.pages - 1,
+              },
+              {
+                label: t('sessions.page.last'),
+                icon: ChevronsRight,
+                target: page.pages - 1,
+                disabled: page.page === page.pages - 1,
+              },
+            ].map(({ label, icon, target, disabled }) => (
+              <IconButton
+                key={label}
+                variant="secondary"
+                size="sm"
+                icon={icon}
+                label={label}
+                disabled={disabled}
+                onClick={() => setRequestedPage(target)}
+              />
+            ))}
+          </div>
         </nav>
       )}
     </section>
@@ -726,7 +737,7 @@ function Export({ id }: { id: string }) {
     ]
 
     const box = event.currentTarget.getBoundingClientRect()
-    useMenu.getState().show(box.left, box.bottom + 6, entries)
+    useMenu.getState().show(box.left, box.bottom + 4, entries)
   }
 
   return (
@@ -741,11 +752,11 @@ function Export({ id }: { id: string }) {
           renamed itself to "Copied" would move the one beside it, and a header
           that shifts under the pointer is how a click lands on the wrong thing. */}
       {exporting ? (
-        <Loader2 size={13} className="animate-spin" aria-hidden="true" />
+        <Loader2 className="animate-spin" aria-hidden="true" />
       ) : done ? (
-        <Check size={13} strokeWidth={2.4} className="text-ok" aria-hidden="true" />
+        <Check className="text-ok" aria-hidden="true" />
       ) : (
-        <FileOutput size={13} strokeWidth={2.2} aria-hidden="true" />
+        <FileOutput aria-hidden="true" />
       )}
       {t('sessions.export')}
     </Button>
@@ -754,10 +765,7 @@ function Export({ id }: { id: string }) {
 
 function Spend({ tokens }: { tokens: Tokens }) {
   return (
-    <span
-      className="ml-auto flex items-center gap-3 tabular-nums"
-      data-hint={t('sessions.spentHint')}
-    >
+    <span className="ml-auto flex items-center gap-3" data-hint={t('sessions.spentHint')}>
       <Figure label={t('sessions.input')} value={tokens.input} />
       <Figure label={t('sessions.output')} value={tokens.output} />
       <Figure label={t('sessions.cached')} value={tokens.cacheRead} />
@@ -778,122 +786,117 @@ function Turn({ line, lit, sessionId }: { line: SessionLine; lit: boolean; sessi
       data-seq={line.seq}
       data-search-hit={lit || undefined}
       className={[
-        'border-b border-l-2 border-b-line/60 px-5 py-2.5',
+        'border-b border-l-2 border-b-line/60 px-6 py-3',
         RAIL[line.role],
         lit ? 'bg-brand/[0.11]' : '',
       ].join(' ')}
     >
-      <div className="mb-1 flex items-center gap-1.5">
-        <Icon
-          size={11}
-          strokeWidth={2.2}
-          className={line.role === 'user' ? 'text-brand' : 'text-faint'}
-          aria-hidden="true"
-        />
-        <span
-          className={[
-            'text-[10.5px] leading-none font-semibold tracking-[0.05em]',
-            line.role === 'user' ? 'text-brand' : 'text-faint',
-          ].join(' ')}
-        >
-          {line.tool ?? t(ROLE[line.role])}
-        </span>
-        {line.time > 0 && (
-          <span className="ml-auto text-[10.5px] leading-none text-faint tabular-nums">
-            {clock(line.time)}
+      <div className={COLUMN}>
+        <div className="mb-1 flex items-center gap-2">
+          <Icon
+            size={14}
+            strokeWidth={1.8}
+            className={line.role === 'user' ? 'text-brand' : 'text-faint'}
+            aria-hidden="true"
+          />
+          <span
+            className={[
+              'text-ui-sm font-semibold',
+              line.role === 'user' ? 'text-brand' : 'text-faint',
+            ].join(' ')}
+          >
+            {line.tool ?? t(ROLE[line.role])}
           </span>
-        )}
-      </div>
-
-      <p
-        className={[
-          'selectable break-words whitespace-pre-wrap',
-          machine
-            ? 'font-mono text-[11.5px] leading-[1.6] text-muted'
-            : 'text-[12.5px] leading-relaxed',
-          line.role === 'context' ? 'text-faint' : 'text-text',
-        ].join(' ')}
-      >
-        {shown ? line.text : head}
-        {folded && !shown && '…'}
-      </p>
-
-      {folded && (
-        <button
-          type="button"
-          onClick={() => setShown(!shown)}
-          className="mt-1.5 text-[11px] text-brand transition-opacity duration-100 hover:opacity-75"
-        >
-          {shown ? t('sessions.collapse') : t('sessions.expand')}
-        </button>
-      )}
-      {!!line.attachments?.length && (
-        <div className="mt-3 space-y-2">
-          <ul className="grid gap-2 sm:grid-cols-2" aria-label={t('sessions.attachments')}>
-            {line.attachments.map((item, index) => {
-              const AttachmentIcon = item.kind === 'image' ? Image : FileText
-              return (
-                <li
-                  key={index}
-                  className="flex min-w-0 items-start gap-3 rounded-xl border border-line bg-surface-2/50 px-3 py-2.5"
-                >
-                  <AttachmentIcon
-                    size={18}
-                    className="mt-0.5 shrink-0 text-muted"
-                    aria-hidden="true"
-                  />
-                  <div className="min-w-0">
-                    <p className="selectable break-words text-[12px] font-medium text-text">
-                      {item.name || t(item.kind === 'image' ? 'sessions.image' : 'sessions.file')}
-                    </p>
-                    {item.id && (
-                      <button
-                        type="button"
-                        onClick={() => setPreview(item)}
-                        className="mt-2 rounded-control px-1 py-0.5 text-[11px] font-medium text-text hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-text"
-                      >
-                        {t(
-                          attachmentPreviewKind(item) === 'pdf'
-                            ? 'sessions.previewPdf'
-                            : item.kind === 'file'
-                              ? 'sessions.previewFile'
-                              : 'sessions.previewImage',
-                        )}
-                      </button>
-                    )}
-                    <p className="mt-0.5 break-words text-[11px] text-muted">
-                      {[
-                        item.bytes !== null
-                          ? item.bytes < 1000
-                            ? `${item.bytes} B`
-                            : filesize(item.bytes)
-                          : null,
-                        item.mediaType,
-                        item.width && item.height ? `${item.width} × ${item.height}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-          <p className="text-[11px] leading-relaxed text-muted">{t('sessions.attachmentNotice')}</p>
-          {!!line.attachmentsOmitted && (
-            <p className="text-[11px] text-muted">
-              {t('sessions.attachmentsOmitted', { n: line.attachmentsOmitted })}
-            </p>
+          {line.time > 0 && (
+            <span className="ml-auto text-ui-xs text-faint tabular-nums">{clock(line.time)}</span>
           )}
         </div>
-      )}
-      {preview && (
-        <AttachmentPreview
-          sessionId={sessionId}
-          attachment={preview}
-          onClose={() => setPreview(null)}
-        />
-      )}
+
+        <p
+          className={[
+            'selectable break-words whitespace-pre-wrap',
+            machine ? 'font-mono text-ui-sm' : 'text-ui-base leading-relaxed',
+            line.role === 'context' ? 'text-faint' : machine ? 'text-muted' : 'text-text',
+          ].join(' ')}
+        >
+          {shown ? line.text : head}
+          {folded && !shown && '…'}
+        </p>
+
+        {folded && (
+          <Button variant="ghost" size="xs" onClick={() => setShown(!shown)} className="mt-1 -ml-2">
+            {shown ? t('sessions.collapse') : t('sessions.expand')}
+          </Button>
+        )}
+        {!!line.attachments?.length && (
+          <div className="mt-3 flex flex-col gap-2">
+            <ul className="grid gap-2 sm:grid-cols-2" aria-label={t('sessions.attachments')}>
+              {line.attachments.map((item, index) => {
+                const AttachmentIcon = item.kind === 'image' ? Image : FileText
+                return (
+                  <li key={index} className="card flex min-w-0 items-start gap-3 px-4 py-3">
+                    <AttachmentIcon
+                      size={18}
+                      strokeWidth={1.8}
+                      className="mt-0.5 shrink-0 text-muted"
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      <p className="selectable break-words text-ui-base font-medium text-text">
+                        {item.name || t(item.kind === 'image' ? 'sessions.image' : 'sessions.file')}
+                      </p>
+                      <p className="mt-0.5 break-words text-ui-sm text-faint">
+                        {[
+                          item.bytes !== null
+                            ? item.bytes < 1000
+                              ? `${item.bytes} B`
+                              : filesize(item.bytes)
+                            : null,
+                          item.mediaType,
+                          item.width && item.height ? `${item.width} × ${item.height}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                      {item.id && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setPreview(item)}
+                          className="mt-2"
+                        >
+                          {t(
+                            attachmentPreviewKind(item) === 'pdf'
+                              ? 'sessions.previewPdf'
+                              : item.kind === 'file'
+                                ? 'sessions.previewFile'
+                                : 'sessions.previewImage',
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="text-ui-sm leading-relaxed text-muted">
+              {t('sessions.attachmentNotice')}
+            </p>
+            {!!line.attachmentsOmitted && (
+              <p className="text-ui-sm text-muted">
+                {t('sessions.attachmentsOmitted', { n: line.attachmentsOmitted })}
+              </p>
+            )}
+          </div>
+        )}
+        {preview && (
+          <AttachmentPreview
+            sessionId={sessionId}
+            attachment={preview}
+            onClose={() => setPreview(null)}
+          />
+        )}
+      </div>
     </article>
   )
 }
@@ -927,7 +930,7 @@ function Filter({
     }
 
     const box = event.currentTarget.getBoundingClientRect()
-    useMenu.getState().show(box.left, box.bottom + 6, entries)
+    useMenu.getState().show(box.left, box.bottom + 4, entries)
   }
 
   return (
@@ -937,10 +940,10 @@ function Filter({
       data-hint={project ?? t('sessions.filter')}
       aria-label={t('sessions.filter')}
       onClick={open}
-      className="select-trigger max-w-[168px] shrink-0"
+      className="select-trigger max-w-[200px] shrink-0"
     >
       <span className="truncate">{project ? leaf(project) : t('sessions.allProjects')}</span>
-      <ChevronDown size={10} strokeWidth={2.4} className="shrink-0 opacity-55" aria-hidden="true" />
+      <ChevronDown size={14} strokeWidth={2} className="shrink-0 opacity-55" aria-hidden="true" />
     </button>
   )
 }

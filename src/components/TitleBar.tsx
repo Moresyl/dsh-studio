@@ -6,10 +6,12 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PanelsTopLeft,
-  type LucideIcon,
 } from 'lucide-react'
 
+import { Badge } from '@/components/Badge'
 import { BrandMark } from '@/components/BrandMark'
+import { IconButton } from '@/components/IconButton'
+import { Segmented } from '@/components/Segmented'
 import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
@@ -137,10 +139,10 @@ export function TitleBar({
         ].join(' ')}
       >
         {(!sidebarCollapsed || !onToggleSidebar) && (
-          <BrandMark size={19} className="shrink-0 rounded-control" />
+          <BrandMark size={20} className="shrink-0 rounded-md" />
         )}
         {!sidebarCollapsed && (
-          <span className="min-w-0 flex-1 truncate text-ui-base font-medium text-text">
+          <span className="min-w-0 flex-1 truncate text-ui-base font-semibold text-text">
             DSH Studio
           </span>
         )}
@@ -149,24 +151,19 @@ export function TitleBar({
             them referable — the same one the system title carries, so the
             taskbar and the strip agree about which window this is. */}
         {ordinal && !sidebarCollapsed && (
-          <span
-            data-hint={t('window.ordinal', { name: ordinal })}
-            className="grid h-[15px] min-w-[15px] shrink-0 place-items-center rounded-[4px] border border-line px-1 text-ui-xs text-faint tabular-nums"
-          >
+          <Badge data-hint={t('window.ordinal', { name: ordinal })} className="tabular-nums">
             {ordinal}
-          </span>
+          </Badge>
         )}
 
         {onToggleSidebar && (
-          <button
-            type="button"
-            aria-label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
-            data-hint={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+          <IconButton
+            size="xs"
+            label={sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
+            icon={sidebarCollapsed ? PanelLeftOpen : PanelLeftClose}
             onClick={onToggleSidebar}
-            className="ml-auto grid size-6 shrink-0 place-items-center rounded-[6px] text-muted transition-colors hover:bg-surface-2 hover:text-text"
-          >
-            {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-          </button>
+            className="ml-auto"
+          />
         )}
       </div>
 
@@ -178,9 +175,9 @@ export function TitleBar({
           data-tauri-drag-region
           className="flex w-[calc(50%_-_160px)] min-w-0 items-baseline gap-2 pl-4 max-[1100px]:hidden"
         >
-          <span className="truncate text-[13px] font-semibold text-text">{pageTitle}</span>
+          <span className="truncate text-ui-base font-semibold text-text">{pageTitle}</span>
           {sectionTitle && (
-            <span className="truncate text-[11px] text-faint before:mr-2 before:content-['·']">
+            <span className="truncate text-ui-xs text-faint before:mr-2 before:content-['·']">
               {sectionTitle}
             </span>
           )}
@@ -243,7 +240,12 @@ export function TitleBar({
   )
 }
 
-/** Two views, both named, with the current one raised. */
+/**
+ * Two views, both named, with the current one raised.
+ *
+ * Icon and label while the strip has room, the icon alone when it does not:
+ * this is the one piece of chrome that has to give when the window narrows.
+ */
 function ViewSwitch({
   mode,
   onChoose,
@@ -252,58 +254,18 @@ function ViewSwitch({
   onChoose: (mode: Presentation) => void
 }) {
   return (
-    <div className="flex items-center gap-0.5 rounded-[8px] bg-canvas-deep p-0.5 hairline">
-      <SwitchTab
-        label={t('view.harness')}
-        icon={MessageSquare}
-        active={mode === 'compatibility'}
-        onClick={() => onChoose('compatibility')}
-      />
-      <SwitchTab
-        label={t('view.extended')}
-        icon={PanelsTopLeft}
-        active={mode === 'extended'}
-        onClick={() => onChoose('extended')}
-      />
-      <SwitchTab
-        label={t('view.panel')}
-        icon={LayoutDashboard}
-        active={mode === 'advanced'}
-        onClick={() => onChoose('advanced')}
-      />
-    </div>
-  )
-}
-
-interface SwitchTabProps {
-  label: string
-  icon: LucideIcon
-  active: boolean
-  onClick: () => void
-}
-
-function SwitchTab({ label, icon: Icon, active, onClick }: SwitchTabProps) {
-  return (
-    <button
-      type="button"
-      // The pair is one control, so the pressed one is the state of the whole
-      // rather than two buttons that happen to look related.
-      aria-pressed={active}
-      aria-label={label}
-      data-hint={label}
-      onClick={active ? undefined : onClick}
-      className={[
-        'flex h-7 shrink-0 items-center justify-center whitespace-nowrap rounded-[6px] px-2.5 text-[12px] font-medium transition-[background-color,color,box-shadow,transform] duration-100 ease-[var(--ease-out-soft)] active:translate-y-px max-[760px]:px-1.5',
-        // The raised half of the pair does nothing when pressed, so it does not
-        // offer the hand that promises it would.
-        active
-          ? 'cursor-default bg-text text-canvas shadow-panel'
-          : 'text-faint hover:bg-surface-2/60 hover:text-text',
-      ].join(' ')}
-    >
-      <Icon size={16} aria-hidden="true" className="hidden max-[760px]:block" />
-      <span className="max-[760px]:sr-only">{label}</span>
-    </button>
+    <Segmented
+      size="sm"
+      responsive
+      label={t('view.label')}
+      value={mode}
+      onChange={onChoose}
+      items={[
+        { value: 'compatibility', label: t('view.harness'), icon: MessageSquare },
+        { value: 'extended', label: t('view.extended'), icon: PanelsTopLeft },
+        { value: 'advanced', label: t('view.panel'), icon: LayoutDashboard },
+      ]}
+    />
   )
 }
 

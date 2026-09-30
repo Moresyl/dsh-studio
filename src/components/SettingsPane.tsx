@@ -1,32 +1,38 @@
 import { useEffect, useState } from 'react'
-import type { ComponentType, KeyboardEvent, ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import {
   BellRing,
   CircleCheck,
   CircleX,
   Keyboard,
+  Monitor,
+  Moon,
   Network,
   Power,
   PanelsTopLeft,
   ScrollText,
+  Sun,
   SunMoon,
   TriangleAlert,
   X,
+  type LucideIcon,
 } from 'lucide-react'
 
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
+import { Segmented } from '@/components/Segmented'
 import { SelectControl } from '@/components/SelectControl'
 import { Switch } from '@/components/Switch'
-import { ThemeSwitch } from '@/components/ThemeSwitch'
 import { WorktreeManager } from '@/components/WorktreeManager'
 import { WorktreeReview } from '@/components/WorktreeReview'
 import type { GitWorktree } from '@/lib/ipc'
-import { t } from '@/lib/i18n'
+import { t, type MessageKey } from '@/lib/i18n'
 import { readCombination, spellCombination } from '@/lib/keys'
 import { isMac } from '@/lib/platform'
 import { useStartup } from '@/state/startup'
 import { usePresentation } from '@/state/presentation'
+import { useTheme, type Theme } from '@/state/theme'
 
 /**
  * Settings that outlive the window.
@@ -77,9 +83,9 @@ export function SettingsPane() {
       <section className="flex min-h-0 flex-1 animate-rise flex-col">
         <PaneHeader title={t('settings.title')} subtitle={t('settings.subtitle')} width="narrow" />
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-8">
-          <div className="mx-auto flex max-w-[780px] flex-col gap-4">
-            <div className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-canvas px-6 pb-6">
+          <div className="mx-auto flex max-w-[780px] flex-col gap-6">
+            <ul className="list-card">
               <Row icon={Power} label={t('settings.autostart')} hint={t('settings.autostartHint')}>
                 <Switch
                   on={state?.autostart ?? false}
@@ -99,17 +105,17 @@ export function SettingsPane() {
                     <span className="text-brand">{t('settings.recordingHint')}</span>
                   ) : (
                     occupied && (
-                      <span className="flex items-center gap-2 text-warn">
-                        <TriangleAlert size={12} strokeWidth={2.2} aria-hidden="true" />
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-warn">
+                        <TriangleAlert size={14} strokeWidth={2} className="shrink-0" aria-hidden="true" />
                         {t('settings.taken')}
-                        <button
-                          type="button"
+                        <Button
+                          variant="secondary"
+                          size="xs"
                           onClick={() => void retry()}
                           disabled={busy}
-                          className="shrink-0 font-medium underline decoration-warn/40 underline-offset-2 transition-colors duration-100 enabled:hover:decoration-warn"
                         >
                           {t('settings.retake')}
-                        </button>
+                        </Button>
                       </span>
                     )
                   )
@@ -123,7 +129,7 @@ export function SettingsPane() {
                 label={t('settings.appearance')}
                 hint={t('settings.appearanceHint')}
               >
-                <ThemeSwitch />
+                <ThemeChoice />
               </Row>
 
               <Row
@@ -137,7 +143,7 @@ export function SettingsPane() {
                   onValueChange={(value) =>
                     choosePresentation(value as 'compatibility' | 'extended' | 'advanced')
                   }
-                  density="compact"
+                  containerClassName={VALUE_WIDTH}
                 >
                   <option value="compatibility">{t('settings.presentation.compatibility')}</option>
                   <option value="extended">{t('settings.presentation.extended')}</option>
@@ -157,7 +163,7 @@ export function SettingsPane() {
                   onValueChange={(value) =>
                     void setLogLevel(value as 'debug' | 'info' | 'warn' | 'error')
                   }
-                  density="compact"
+                  containerClassName={VALUE_WIDTH}
                 >
                   <option value="debug">{t('settings.logLevel.debug')}</option>
                   <option value="info">{t('settings.logLevel.info')}</option>
@@ -248,12 +254,12 @@ export function SettingsPane() {
                   {t('settings.notificationTestAction')}
                 </Button>
               </Row>
-            </div>
+            </ul>
 
             <WorktreeManager onReview={setReview} />
 
             {error && (
-              <p className="selectable rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] leading-relaxed text-danger">
+              <p className="selectable rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger [overflow-wrap:anywhere]">
                 {error}
               </p>
             )}
@@ -265,6 +271,14 @@ export function SettingsPane() {
     </>
   )
 }
+
+/**
+ * The width every value control in this list shares — the two selects, the port
+ * field and the shortcut button — so that the column they form has a left edge
+ * as well as a right one. Without it each is as wide as whatever it currently
+ * says, and the column shifts every time a select is set to a longer word.
+ */
+const VALUE_WIDTH = 'w-40'
 
 /**
  * The combination itself, which is also the control that changes it.
@@ -285,6 +299,12 @@ function Recorder({ recording, onRecording: setRecording }: RecorderProps) {
 
   const held = state?.shortcut ?? null
   const keys = held ? spellCombination(held, isMac) : []
+
+  // Hidden rather than removed while the button is listening. The room they take
+  // is what keeps the button from sliding sideways under the pointer at the
+  // moment it is pressed, and `visibility` takes them out of the tab order and
+  // the accessibility tree, so nothing can reach them mid-recording.
+  const aside = recording ? 'invisible' : undefined
 
   const capture = (event: KeyboardEvent<HTMLButtonElement>) => {
     // Held before anything is read. While this button has the keyboard it has
@@ -311,9 +331,13 @@ function Recorder({ recording, onRecording: setRecording }: RecorderProps) {
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <button
-        type="button"
+    <div className="flex items-center gap-2">
+      <Button
+        // Listening is the one moment this list is asking something of you, so it
+        // is the one moment this button takes the inverse fill. The state has no
+        // other colour to borrow: an `aria-pressed` fill would be a toggle's, and
+        // pressing this again does not turn it off.
+        variant={recording ? 'primary' : 'secondary'}
         disabled={busy || state === null}
         data-hint={recording ? undefined : t('settings.record')}
         onClick={(event) => {
@@ -324,12 +348,9 @@ function Recorder({ recording, onRecording: setRecording }: RecorderProps) {
         }}
         onKeyDown={recording ? capture : undefined}
         onBlur={() => setRecording(false)}
-        className={[
-          'flex h-[30px] min-w-[152px] items-center justify-center gap-1 rounded-control border px-2.5 text-[12px] transition duration-100 ease-[var(--ease-out-soft)] select-none disabled:opacity-40',
-          recording
-            ? 'border-brand bg-brand/10 text-brand'
-            : 'border-line-strong bg-surface-2 text-text enabled:hover:brightness-[1.15] enabled:active:brightness-95',
-        ].join(' ')}
+        // Wide enough for the longest thing it says in either language, so the
+        // prompt does not make the row reflow when it replaces the key caps.
+        className="min-w-40"
       >
         {recording ? (
           t('settings.recording')
@@ -338,40 +359,40 @@ function Recorder({ recording, onRecording: setRecording }: RecorderProps) {
         ) : (
           <span className="text-muted">{t('settings.none')}</span>
         )}
-      </button>
+      </Button>
 
-      {!recording &&
-        (held ? (
+      {held ? (
+        <IconButton
+          icon={X}
+          size="sm"
+          label={t('settings.clear')}
+          disabled={busy}
+          onClick={() => void setShortcut(null)}
+          className={aside}
+        />
+      ) : (
+        // Offered rather than applied. Somebody who wants a global key almost
+        // never has an opinion about which one, and inventing a combination
+        // that nothing else on the machine has taken is the tedious half of
+        // this setting — but taking a key without being asked is the rude half.
+        state && (
           <Button
             variant="ghost"
+            size="sm"
             disabled={busy}
-            aria-label={t('settings.clear')}
-            data-hint={t('settings.clear')}
-            onClick={() => void setShortcut(null)}
+            aria-label={t('settings.suggest', {
+              keys: spellCombination(state.suggested, isMac).join(' '),
+            })}
+            data-hint={t('settings.suggest', {
+              keys: spellCombination(state.suggested, isMac).join(' '),
+            })}
+            onClick={() => void setShortcut(state.suggested)}
+            className={aside}
           >
-            <X size={13} strokeWidth={2.3} aria-hidden="true" />
+            <Chips keys={spellCombination(state.suggested, isMac)} />
           </Button>
-        ) : (
-          // Offered rather than applied. Somebody who wants a global key almost
-          // never has an opinion about which one, and inventing a combination
-          // that nothing else on the machine has taken is the tedious half of
-          // this setting — but taking a key without being asked is the rude half.
-          state && (
-            <Button
-              variant="ghost"
-              disabled={busy}
-              aria-label={t('settings.suggest', {
-                keys: spellCombination(state.suggested, isMac).join(' '),
-              })}
-              data-hint={t('settings.suggest', {
-                keys: spellCombination(state.suggested, isMac).join(' '),
-              })}
-              onClick={() => void setShortcut(state.suggested)}
-            >
-              <Chips keys={spellCombination(state.suggested, isMac)} />
-            </Button>
-          )
-        ))}
+        )
+      )}
     </div>
   )
 }
@@ -417,7 +438,7 @@ function PortField({ value, disabled, onSave }: PortFieldProps) {
           event.currentTarget.blur()
         }
       }}
-      className="field-control field-control--compact w-[112px] text-right tabular-nums"
+      className={`field-control tabular-nums ${VALUE_WIDTH}`}
     />
   )
 }
@@ -425,23 +446,55 @@ function PortField({ value, disabled, onSave }: PortFieldProps) {
 /** A combination, drawn as keys rather than spelled out with plus signs. */
 function Chips({ keys }: { keys: string[] }) {
   return (
-    <>
+    // Closer together than a button's own gap would put them: a chord reads as
+    // one thing, and keys a full gap apart read as a list of them.
+    <span className="flex items-center gap-1">
       {keys.map((key, index) => (
         <kbd
           // Not the key itself: a combination can repeat one, and a duplicate
           // React key is a rendering bug rather than a display one.
           key={`${index}-${key}`}
-          className="grid h-[17px] min-w-[18px] place-items-center rounded-[4px] border border-line bg-canvas px-1 font-sans text-[10.5px] text-text"
+          className="kbd"
         >
           {key}
         </kbd>
       ))}
-    </>
+    </span>
+  )
+}
+
+/** System first: it is the default, and the one the other two are a departure from. */
+const THEMES: { id: Theme; icon: LucideIcon; label: MessageKey }[] = [
+  { id: 'system', icon: Monitor, label: 'theme.system' },
+  { id: 'light', icon: Sun, label: 'theme.light' },
+  { id: 'dark', icon: Moon, label: 'theme.dark' },
+]
+
+/**
+ * The title bar's three palettes, with their names written out.
+ *
+ * The strip up there is icon-only because a 36px bar has no room for words, and
+ * it is fixed at that size and form. Here there is a whole row, and a setting
+ * somebody has come looking for is better off saying what each choice is than
+ * asking to be hovered. It reads and writes the same store, so the two can never
+ * disagree about which one is on.
+ */
+function ThemeChoice() {
+  const theme = useTheme((store) => store.theme)
+  const choose = useTheme((store) => store.choose)
+
+  return (
+    <Segmented
+      label={t('theme.label')}
+      value={theme}
+      onChange={choose}
+      items={THEMES.map(({ id, icon, label }) => ({ value: id, label: t(label), icon }))}
+    />
   )
 }
 
 interface RowProps {
-  icon: ComponentType<{ size?: number; strokeWidth?: number; className?: string }>
+  icon: LucideIcon
   label: string
   hint: string
   /** Shown under the hint when there is something to say about this setting. */
@@ -449,16 +502,25 @@ interface RowProps {
   children: ReactNode
 }
 
+/**
+ * One setting: what it is, a sentence on what it does, and the control at the
+ * far end.
+ *
+ * The reference's own settings row, two lines and a control in 4rem. The control
+ * is centred against however tall the text turns out to be, because a hint that
+ * takes one line in one language takes three in another; and it is the text block
+ * that gives way when the window narrows, never the control.
+ */
 function Row({ icon: Icon, label, hint, note, children }: RowProps) {
   return (
-    <div className="flex items-start gap-3.5 px-4 py-3.5">
-      <Icon size={15} strokeWidth={2} className="mt-[3px] shrink-0 text-faint" />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="text-[12.5px] font-medium text-text">{label}</span>
-        <p className="text-[11.5px] leading-relaxed text-faint">{hint}</p>
-        {note && <div className="mt-0.5 text-[11.5px] leading-relaxed">{note}</div>}
+    <li className="list-row list-row--roomy">
+      <Icon size={16} strokeWidth={1.9} className="shrink-0 text-muted" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="text-ui-base font-medium text-text">{label}</p>
+        <p className="text-ui-sm text-muted">{hint}</p>
+        {note && <div className="mt-1 text-ui-sm">{note}</div>}
       </div>
-      <div className="flex shrink-0 items-center gap-2 pt-[3px]">{children}</div>
-    </div>
+      <div className="flex shrink-0 items-center gap-2">{children}</div>
+    </li>
   )
 }

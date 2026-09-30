@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ChevronRight, Copy, ExternalLink, Loader2, RotateCw, Square, Terminal } from 'lucide-react'
 
+import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
 import { EnvironmentChecks, EnvironmentProgress } from '@/components/Environment'
 import { LogConsole } from '@/components/LogConsole'
@@ -64,22 +65,20 @@ function ConsoleRail() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 px-7 pt-6 pb-5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
-            <h1 className="text-[20px] leading-tight font-semibold text-text">
-              {t('nav.console')}
-            </h1>
-            <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-muted">
+            <h1 className="text-ui-xl font-semibold text-text">{t('nav.console')}</h1>
+            <p className="mt-1 flex items-center gap-2 text-ui-base text-muted">
               <StatusDot tone={toneOf(status)} size={6} />
               {labelOf(status)}
             </p>
           </div>
           {running ? (
             <Button variant="secondary" onClick={() => void stop()} disabled={busy}>
-              <Square size={13} strokeWidth={2.6} />
+              <Square />
               {t('action.stop')}
             </Button>
           ) : (
             <Button onClick={() => void start()} disabled={!runnable || starting || working}>
-              {starting ? <Loader2 size={14} className="animate-spin" /> : <Terminal size={14} />}
+              {starting ? <Loader2 className="animate-spin" /> : <Terminal />}
               {starting
                 ? t('action.starting')
                 : status.phase === 'failed'
@@ -95,11 +94,11 @@ function ConsoleRail() {
             action={
               <Button
                 variant="ghost"
-                className="h-6 px-1.5 text-ui-sm"
+                size="sm"
                 onClick={() => void inspect().catch(() => {})}
                 disabled={working}
               >
-                <RotateCw size={12} strokeWidth={2.2} />
+                <RotateCw />
                 {t('action.recheck')}
               </Button>
             }
@@ -140,7 +139,7 @@ function ConsoleRail() {
         <EnvironmentProgress />
 
         {error && (
-          <p className="selectable max-h-36 overflow-y-auto rounded-control border border-danger/30 bg-danger/10 px-3 py-2 text-ui-caption leading-relaxed whitespace-pre-wrap text-danger [overflow-wrap:anywhere]">
+          <p className="selectable max-h-36 overflow-y-auto rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm whitespace-pre-wrap text-danger [overflow-wrap:anywhere]">
             {error}
           </p>
         )}
@@ -168,9 +167,9 @@ function Section({
 }) {
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex h-5 items-center">
+      <div className="flex min-h-7 items-center">
         <h2 className="caption">{title}</h2>
-        {action && <div className="ml-auto">{action}</div>}
+        {action && <div className="-mr-2 ml-auto">{action}</div>}
       </div>
       {children}
     </section>
@@ -193,22 +192,19 @@ function Advanced({ children }: { children: ReactNode }) {
 
   return (
     <section className="flex flex-col gap-2">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="group flex h-5 cursor-pointer items-center gap-1 text-left"
+        className="-ml-2 self-start"
       >
         <ChevronRight
-          size={12}
-          strokeWidth={2.6}
           aria-hidden="true"
-          className={`shrink-0 text-faint transition-transform duration-150 ease-[var(--ease-out-soft)] group-hover:text-muted ${open ? 'rotate-90' : ''}`}
+          className={`transition-transform duration-150 ease-[var(--ease-out-soft)] ${open ? 'rotate-90' : ''}`}
         />
-        <span className="caption transition-colors group-hover:text-muted">
-          {t('section.advanced')}
-        </span>
-      </button>
+        {t('section.advanced')}
+      </Button>
 
       {/* Unmounted rather than hidden. There is nothing in here holding state
           worth keeping — both children read what they show from the store. */}
@@ -243,9 +239,9 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
   }
 
   return (
-    <dl className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
-      <div className="flex h-[30px] items-center gap-2 px-2.5">
-        <dt className="shrink-0 text-[12px] text-muted">{t('service.address')}</dt>
+    <dl className="list-card">
+      <div className="list-row">
+        <dt className="shrink-0 text-ui-base text-muted">{t('service.address')}</dt>
         <dd className="ml-auto min-w-0">
           <button
             type="button"
@@ -263,23 +259,23 @@ function ServiceFacts({ origin, pid }: { origin: string; pid: number }) {
                 run: () => copy(origin),
               },
             ])}
-            className="flex items-center gap-1.5 font-mono text-[11.5px] text-text tabular-nums transition-colors duration-100 hover:text-brand"
+            className="flex items-center gap-2 font-mono text-ui-sm text-text tabular-nums transition-colors duration-100 hover:text-brand"
           >
             <span className="truncate">
               {copied ? t('statusbar.copied') : new URL(origin).host}
             </span>
-            <ExternalLink size={11} strokeWidth={2.2} className="shrink-0 text-faint" />
+            <ExternalLink size={14} strokeWidth={2} className="shrink-0 text-faint" />
           </button>
         </dd>
       </div>
 
-      <div className="flex h-[30px] items-center gap-2 px-2.5">
-        <dt className="shrink-0 text-[12px] text-muted">{t('service.process')}</dt>
+      <div className="list-row">
+        <dt className="shrink-0 text-ui-base text-muted">{t('service.process')}</dt>
         <dd
           onContextMenu={contextMenu([
             { label: t('menu.copyPid'), icon: Copy, run: () => copy(String(pid)) },
           ])}
-          className="ml-auto font-mono text-[11.5px] text-text tabular-nums"
+          className="ml-auto font-mono text-ui-sm text-text tabular-nums"
         >
           {pid}
         </dd>
@@ -310,17 +306,13 @@ function RuntimeList({
   onSelect: (path: string) => void
 }) {
   return (
-    <ul className="divide-y divide-line overflow-hidden rounded-panel border border-line bg-canvas-deep/50">
+    <ul className="list-card">
       {runtimes.map((runtime) => {
         const active = runtime.path === activePath
         const usable = isAtLeast(runtime.version, minimum)
 
         return (
-          <li
-            key={runtime.path}
-            data-hint={runtime.path}
-            className="flex h-[30px] items-center gap-2 px-2.5"
-          >
+          <li key={runtime.path} data-hint={runtime.path} className="list-row">
             <button
               type="button"
               disabled={disabled || !usable || active}
@@ -330,22 +322,22 @@ function RuntimeList({
               className="flex min-w-0 flex-1 items-center gap-2 text-left disabled:cursor-default"
             >
               <span
-                className={`shrink-0 font-mono text-[11.5px] tabular-nums ${usable ? 'text-text' : 'text-faint'}`}
+                className={`shrink-0 font-mono text-ui-sm tabular-nums ${usable ? 'text-text' : 'text-faint'}`}
               >
                 {formatVersion(runtime.version)}
               </span>
-              <span className="truncate text-[11.5px] text-faint">
+              <span className="truncate text-ui-sm text-faint">
                 {t(`source.${runtime.source}`)}
               </span>
             </button>
 
             {active ? (
-              <span className="ml-auto shrink-0 rounded-[4px] bg-ok/15 px-1.5 py-0.5 text-[10.5px] font-medium text-ok">
+              <Badge tone="ok" className="ml-auto">
                 {t('runtime.active')}
-              </span>
+              </Badge>
             ) : (
               !usable && (
-                <span className="ml-auto shrink-0 text-[11px] text-faint">
+                <span className="ml-auto shrink-0 text-ui-sm text-faint">
                   {t('runtime.tooOld')}
                 </span>
               )

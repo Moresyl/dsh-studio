@@ -11,7 +11,8 @@ import {
 
 import { useMenu, type MenuEntry } from '@/state/menu'
 
-type Density = 'default' | 'compact' | 'small'
+/** The same three steps as a button, so a select and a button in one row line up. */
+type Size = 'sm' | 'md' | 'lg'
 
 interface SelectControlProps {
   'aria-label': string
@@ -22,19 +23,19 @@ interface SelectControlProps {
   children: ReactNode
   containerClassName?: string
   className?: string
-  density?: Density
+  size?: Size
 }
 
-const DENSITY: Record<Density, string> = {
-  default: '',
-  compact: 'field-control--compact',
-  small: 'field-control--small',
+const SIZE: Record<Size, string> = {
+  sm: 'field-control--sm',
+  md: '',
+  lg: 'field-control--lg',
 }
 
 export function SelectControl({
   className,
   containerClassName,
-  density = 'default',
+  size = 'md',
   children,
   value,
   defaultValue,
@@ -102,7 +103,7 @@ export function SelectControl({
         disabled={disabled}
         onClick={(event) => open(event.currentTarget)}
         onKeyDown={onKeyDown}
-        className={['select-control__trigger', DENSITY[density], className]
+        className={['select-control__trigger', SIZE[size], className]
           .filter(Boolean)
           .join(' ')}
       >

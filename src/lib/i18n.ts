@@ -83,6 +83,7 @@ const en = {
 
   'view.harness': 'Harness',
   'view.panel': 'Control panel',
+  'view.label': 'View',
 
   'statusbar.open': 'Open in your browser',
   'statusbar.copied': 'Copied',
@@ -1030,6 +1031,7 @@ const zh: Record<MessageKey, string> = {
 
   'view.harness': 'Harness',
   'view.panel': '控制面板',
+  'view.label': '视图',
 
   'statusbar.open': '在浏览器中打开',
   'statusbar.copied': '已复制',

@@ -1,5 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { TriangleAlert } from 'lucide-react'
 
+import { Button } from '@/components/Button'
 import { crashPayload } from '@/lib/crash'
 import { frontendCrash } from '@/lib/ipc'
 import { reloadPreservingPresentation } from '@/lib/presentation/renderer-recovery'
@@ -46,22 +48,33 @@ export class RendererBoundary extends Component<Props, State> {
     const copy = rendererFailureCopy(window.navigator.language)
     return (
       <main role="alert" className="grid h-full place-items-center bg-canvas px-6 text-text">
-        <section className="w-full max-w-[520px] rounded-panel border border-line bg-surface p-6 shadow-2xl">
-          <div className="mb-4 grid size-11 place-items-center rounded-panel bg-danger/10 text-xl text-danger">
-            !
-          </div>
-          <h1 className="text-lg font-semibold">{copy.title}</h1>
-          <p className="mt-2 text-sm leading-6 text-muted">{copy.body}</p>
-          <PresentationPendingInputs />
-          {this.state.error && <p className="mt-3 text-sm text-danger">{this.state.error}</p>}
-          <button
-            type="button"
-            onClick={() => void this.recover()}
-            disabled={this.state.recovering}
-            className="mt-5 min-h-9 rounded-control bg-brand px-4 text-sm font-medium text-on-brand enabled:hover:brightness-[1.08] enabled:active:brightness-95"
+        {/* The confirm dialog's own surface and status tile: this is the same
+            kind of thing — a failure that has to be read — with the window to
+            itself instead of a dimmed one behind it. */}
+        <section className="w-full max-w-[520px] rounded-xl border border-line-strong bg-surface p-5 shadow-lift">
+          <div
+            aria-hidden="true"
+            className="mb-4 grid size-9 place-items-center rounded-lg bg-danger/12 text-danger"
           >
-            {this.state.recovering ? copy.working : copy.retry}
-          </button>
+            <TriangleAlert size={18} strokeWidth={2} />
+          </div>
+          <h1 className="text-ui-xl font-semibold text-text">{copy.title}</h1>
+          <p className="mt-2 text-ui-base text-muted">{copy.body}</p>
+          <PresentationPendingInputs />
+          {this.state.error && (
+            <p className="selectable mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger">
+              {this.state.error}
+            </p>
+          )}
+          <div className="mt-5 flex justify-end">
+            <Button
+              variant="primary"
+              onClick={() => void this.recover()}
+              disabled={this.state.recovering}
+            >
+              {this.state.recovering ? copy.working : copy.retry}
+            </Button>
+          </div>
         </section>
       </main>
     )

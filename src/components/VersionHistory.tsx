@@ -10,16 +10,30 @@ import {
   X,
 } from 'lucide-react'
 
+import { Badge, type BadgeTone } from '@/components/Badge'
 import { Button } from '@/components/Button'
+import { Empty } from '@/components/Empty'
+import { IconButton } from '@/components/IconButton'
 import { UpdateProgress } from '@/components/UpdateProgress'
 import { openExternalUrl } from '@/lib/external-url'
 import { t } from '@/lib/i18n'
+import type { ApplicationReleaseSummary } from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import { notesForDisplay } from '@/lib/updater'
 import { ask } from '@/state/dialog'
 import { reportAction } from '@/state/failure'
 import { useReleaseHistory } from '@/state/releases'
 import { useUpdate } from '@/state/update'
+
+/**
+ * How a release reads next to the one that is installed. The running version is
+ * the fact worth colouring; newer is worth a glance; older only reports itself.
+ */
+const DIRECTION_TONE: Record<ApplicationReleaseSummary['direction'], BadgeTone> = {
+  current: 'ok',
+  newer: 'info',
+  older: 'neutral',
+}
 
 export function VersionHistory({ onClose }: { onClose: () => void }) {
   const card = useRef<HTMLDivElement>(null)
@@ -63,8 +77,10 @@ export function VersionHistory({ onClose }: { onClose: () => void }) {
   }
 
   return (
+    // The app's own dialog is mounted after this one, at the same layer, so the
+    // install confirmation asked from in here paints over it.
     <div
-      className="fixed inset-0 z-30 grid place-items-center bg-canvas-deep/65 p-4 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
       role="presentation"
       onMouseDown={(event) => pressedBackdrop(event, dismiss)}
       onKeyDown={(event) => holdFocus(card.current, event, dismiss)}
@@ -74,54 +90,48 @@ export function VersionHistory({ onClose }: { onClose: () => void }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="version-history-title"
-        className="flex max-h-[min(680px,calc(100dvh-32px))] w-full max-w-[920px] animate-pop flex-col overflow-hidden rounded-[16px] border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-[min(720px,calc(100vh-64px))] w-full max-w-[920px] animate-pop flex-col overflow-hidden rounded-xl border border-line-strong bg-surface shadow-lift"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
-          <div className="min-w-0">
-            <h2
-              id="version-history-title"
-              className="flex items-center gap-2 text-[15px] font-semibold text-text"
-            >
-              <History size={17} aria-hidden="true" />
+        <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
+          <span
+            aria-hidden="true"
+            className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-brand"
+          >
+            <History size={18} strokeWidth={1.8} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="version-history-title" className="text-ui-lg font-semibold text-text">
               {t('versions.title')}
             </h2>
-            <p className="mt-1.5 text-[12px] leading-relaxed text-muted">
-              {t('versions.subtitle')}
-            </p>
+            <p className="mt-0.5 text-ui-sm text-faint">{t('versions.subtitle')}</p>
           </div>
-          <button
+          <IconButton
             ref={close}
-            type="button"
-            aria-label={t('versions.close')}
+            icon={X}
+            size="sm"
+            label={t('versions.close')}
             aria-disabled={installing}
             onClick={dismiss}
-            className="grid size-8 shrink-0 place-items-center rounded-control text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-2 focus-visible:outline-brand"
-          >
-            <X size={17} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="grid min-h-0 flex-1 grid-cols-[190px_minmax(0,1fr)] max-[620px]:grid-cols-1">
-          <div className="flex min-h-0 flex-col border-r border-line bg-canvas-deep/30 max-[620px]:max-h-[180px] max-[620px]:border-r-0 max-[620px]:border-b">
-            <div className="flex items-center justify-between px-3 py-2 text-[11.5px] text-muted">
-              <span>{t('versions.page', { page: state.page })}</span>
-              <button
-                type="button"
-                aria-label={t('versions.refresh')}
+          />
+        </header>
+
+        <div className="grid min-h-0 flex-1 grid-cols-[208px_minmax(0,1fr)] max-[620px]:grid-cols-1 max-[620px]:grid-rows-[auto_minmax(0,1fr)]">
+          <div className="flex min-h-0 flex-col border-r border-line bg-canvas-deep/30 max-[620px]:max-h-44 max-[620px]:border-r-0 max-[620px]:border-b">
+            <div className="flex items-center justify-between py-2 pr-2 pl-5">
+              <span className="caption">{t('versions.page', { page: state.page })}</span>
+              <IconButton
+                icon={RefreshCw}
+                size="sm"
+                label={t('versions.refresh')}
                 disabled={state.loading || installing}
                 onClick={refresh}
-                className="grid size-7 place-items-center rounded-control hover:bg-surface-2 disabled:opacity-50"
-              >
-                <RefreshCw
-                  size={13}
-                  className={state.loading ? 'animate-spin' : ''}
-                  aria-hidden="true"
-                />
-              </button>
+                className={state.loading ? '[&>svg]:animate-spin' : undefined}
+              />
             </div>
             {state.error && (
               <p
                 role="alert"
-                className="selectable px-3 pb-3 text-[12px] leading-relaxed text-danger"
+                className="selectable mx-2 mb-2 shrink-0 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger [overflow-wrap:anywhere]"
               >
                 {state.error}
               </p>
@@ -134,61 +144,57 @@ export function VersionHistory({ onClose }: { onClose: () => void }) {
                   disabled={state.loading || installing}
                   aria-pressed={state.selected === item.version}
                   onClick={() => void state.select(item.version)}
-                  className={`mb-1 flex w-full flex-col gap-1 rounded-control px-3 py-2.5 text-left disabled:opacity-50 ${state.selected === item.version ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface-2/60 hover:text-text'}`}
+                  className={`mb-1 flex w-full flex-col gap-0.5 rounded-lg px-3 py-2 text-left transition-colors disabled:opacity-40 ${state.selected === item.version ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface-2/70 hover:text-text'}`}
                 >
-                  <span className="flex items-center justify-between gap-2 text-[13px] font-medium tabular-nums">
-                    <span>{item.version}</span>
-                    <span className="text-[10px] font-normal text-faint">
-                      {t(`versions.${item.direction}`)}
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="min-w-0 truncate font-mono text-ui-base font-medium">
+                      {item.version}
                     </span>
+                    <Badge tone={DIRECTION_TONE[item.direction]}>
+                      {t(`versions.${item.direction}`)}
+                    </Badge>
                   </span>
-                  <span className="text-[11px] text-faint">{item.published.slice(0, 10)}</span>
+                  <span className="text-ui-sm text-faint tabular-nums">
+                    {item.published.slice(0, 10)}
+                  </span>
                 </button>
               ))}
               {!state.loading && !state.error && state.entries.length === 0 && (
-                <p className="px-2 py-5 text-[12px] text-muted">{t('versions.empty')}</p>
+                <p className="px-3 py-4 text-ui-base text-muted">{t('versions.empty')}</p>
               )}
             </div>
-            <div className="flex justify-between border-t border-line px-3 py-2">
-              <button
-                type="button"
-                aria-label={t('versions.previous')}
+            <div className="flex justify-between border-t border-line p-2">
+              <IconButton
+                icon={ChevronLeft}
+                size="sm"
+                label={t('versions.previous')}
                 disabled={state.page <= 1 || state.loading || installing}
                 onClick={() => void state.load(state.page - 1)}
-                className="grid size-7 place-items-center rounded-control text-muted hover:bg-surface-2 disabled:opacity-40"
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <button
-                type="button"
-                aria-label={t('versions.next')}
+              />
+              <IconButton
+                icon={ChevronRight}
+                size="sm"
+                label={t('versions.next')}
                 disabled={!state.hasMore || state.loading || installing}
                 onClick={() => void state.load(state.page + 1)}
-                className="grid size-7 place-items-center rounded-control text-muted hover:bg-surface-2 disabled:opacity-40"
-              >
-                <ChevronRight size={15} />
-              </button>
+              />
             </div>
           </div>
-          <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden p-5">
+
+          <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden px-5 py-4">
             {entry ? (
               <>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-[17px] font-semibold tracking-tight text-text">
-                    DSH Studio {entry.version}
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={() => void reportAction(() => openExternalUrl(entry.url))}
-                    className="inline-flex items-center gap-1 text-[12px] text-muted hover:text-text"
-                  >
-                    {t('about.release')}
-                    <ArrowUpRight size={13} />
-                  </button>
+                <div>
+                  <h3 className="text-ui-lg font-semibold text-text">DSH Studio {entry.version}</h3>
+                  {review && (
+                    <p className="mt-1 text-ui-sm text-muted">
+                      {t('versions.package', { size: (review.bytes / 1024 / 1024).toFixed(1) })}
+                    </p>
+                  )}
                 </div>
                 {state.reviewing && (
-                  <p role="status" className="flex items-center gap-2 text-[12px] text-muted">
-                    <Loader2 size={14} className="animate-spin" />
+                  <p role="status" className="flex items-center gap-2 text-ui-base text-muted">
+                    <Loader2 size={16} className="animate-spin" aria-hidden="true" />
                     {t('versions.reviewing')}
                   </p>
                 )}
@@ -196,7 +202,7 @@ export function VersionHistory({ onClose }: { onClose: () => void }) {
                   <div className="flex flex-col items-start gap-3">
                     <p
                       role="alert"
-                      className="selectable max-h-48 overflow-y-auto text-[12px] leading-relaxed text-danger"
+                      className="selectable max-h-48 w-full overflow-y-auto rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-ui-sm text-danger [overflow-wrap:anywhere]"
                     >
                       {state.reviewError}
                     </p>
@@ -206,28 +212,23 @@ export function VersionHistory({ onClose }: { onClose: () => void }) {
                   </div>
                 )}
                 {!entry.hasUpdater && (
-                  <p className="text-[12px] leading-relaxed text-muted">
-                    {t('versions.noUpdater')}
-                  </p>
+                  <p className="text-ui-base text-muted">{t('versions.noUpdater')}</p>
                 )}
                 {review && (
                   <>
-                    <p className="text-[11.5px] text-muted">
-                      {t('versions.package', { size: (review.bytes / 1024 / 1024).toFixed(1) })}
-                    </p>
                     <div
                       tabIndex={0}
                       role="region"
                       aria-label={t('about.release')}
-                      className="selectable min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap break-words pr-2 text-[12.5px] leading-6 text-text focus-visible:outline-2 focus-visible:outline-brand"
+                      className="selectable min-h-0 flex-1 overflow-y-auto pr-2 text-ui-base break-words whitespace-pre-wrap text-text"
                     >
                       {notesForDisplay(review.notes) || t('versions.noNotes')}
                     </div>
-                    <p className="border-t border-line pt-3 text-[11.5px] leading-relaxed text-muted">
+                    <p className="border-t border-line pt-3 text-ui-sm text-muted">
                       {t('versions.runtimeNotice')}
                     </p>
                     {!review.canInstall && (
-                      <p className="text-[11.5px] text-muted">
+                      <p className="text-ui-sm text-muted">
                         {t(
                           review.installBlock === 'rpmDowngrade'
                             ? 'versions.rpmDowngrade'
@@ -235,36 +236,49 @@ export function VersionHistory({ onClose }: { onClose: () => void }) {
                         )}
                       </p>
                     )}
-                    {installing ? (
-                      <UpdateProgress />
-                    ) : (
-                      <div className="flex justify-end">
-                        <Button
-                          variant="primary"
-                          disabled={!review.canInstall || checking}
-                          onClick={() => void apply()}
-                        >
-                          <ArrowDownToLine size={14} />
-                          {t(
-                            review.direction === 'older'
-                              ? 'versions.downgrade'
-                              : review.direction === 'current'
-                                ? 'versions.reinstall'
-                                : 'versions.install',
-                          )}
-                        </Button>
-                      </div>
-                    )}
+                    {installing && <UpdateProgress />}
                   </>
                 )}
               </>
             ) : (
-              <p className="m-auto text-[12.5px] text-muted">
-                {state.loading ? t('versions.loading') : t('versions.choose')}
-              </p>
+              <div className="m-auto">
+                <Empty
+                  icon={state.loading ? Loader2 : History}
+                  spin={state.loading}
+                  message={state.loading ? t('versions.loading') : t('versions.choose')}
+                />
+              </div>
             )}
           </div>
         </div>
+
+        {entry && (
+          <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-line px-5 py-3">
+            <Button
+              variant="secondary"
+              onClick={() => void reportAction(() => openExternalUrl(entry.url))}
+            >
+              {t('about.release')}
+              <ArrowUpRight aria-hidden="true" />
+            </Button>
+            {review && (
+              <Button
+                variant="primary"
+                disabled={!review.canInstall || checking || installing}
+                onClick={() => void apply()}
+              >
+                <ArrowDownToLine aria-hidden="true" />
+                {t(
+                  review.direction === 'older'
+                    ? 'versions.downgrade'
+                    : review.direction === 'current'
+                      ? 'versions.reinstall'
+                      : 'versions.install',
+                )}
+              </Button>
+            )}
+          </footer>
+        )}
       </div>
     </div>
   )

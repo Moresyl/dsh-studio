@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Check, Download, ImagePlus, Loader2, RefreshCw, X } from 'lucide-react'
 
 import { Button } from '@/components/Button'
+import { IconButton } from '@/components/IconButton'
 import { downloadFile, previewImage, previewText } from '@/lib/attachment-preview'
 import {
   attachmentPreviewCanDismiss,
@@ -21,12 +22,21 @@ const PdfPreview = lazy(() =>
 
 function PdfUnavailable() {
   return (
-    <p role="status" className="p-4 text-[13px] text-muted">
+    <p role="status" className="p-4 text-ui-base text-muted">
       {t('sessions.pdfFailed')}
     </p>
   )
 }
 
+/**
+ * An attachment, opened over the transcript it was sent in.
+ *
+ * The dialog is a fixed height at most — 720px, or the window less its margins —
+ * and what it holds has to fit inside that without a second scrollbar, so the
+ * caps on the image, the text and the PDF page below are that height less what
+ * the header and the padding take. Under that the panel simply shrinks to what
+ * it is showing.
+ */
 export function AttachmentPreview({
   sessionId,
   attachment,
@@ -146,25 +156,26 @@ export function AttachmentPreview({
       role="presentation"
       onMouseDown={(event) => pressedBackdrop(event, dismiss)}
       onKeyDown={(event) => holdFocus(card.current, event, dismiss)}
-      className="fixed inset-0 z-30 grid place-items-center bg-canvas-deep/70 p-4 backdrop-blur-[2px]"
+      className="dialog-backdrop fixed inset-0 z-40 grid animate-fade place-items-center bg-canvas-deep/65 px-8 backdrop-blur-[2px]"
     >
       <div
         ref={card}
         role="dialog"
         aria-modal="true"
         aria-labelledby="attachment-preview-title"
-        className="flex max-h-[calc(100dvh-32px)] w-full max-w-[960px] flex-col overflow-hidden rounded-2xl border border-line-strong bg-surface shadow-lift"
+        className="dialog-panel flex max-h-[min(720px,calc(100vh-64px))] w-full max-w-[960px] animate-pop flex-col overflow-hidden rounded-xl border border-line-strong bg-surface shadow-lift"
       >
         <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4">
           <h2
             id="attachment-preview-title"
-            className="min-w-[12rem] flex-[1_1_16rem] break-words text-[15px] font-semibold"
+            className="min-w-[12rem] flex-[1_1_16rem] break-words text-ui-lg font-semibold text-text"
           >
             {attachment.name || t(attachment.kind === 'file' ? 'sessions.file' : 'sessions.image')}
           </h2>
           {kind === 'image' && editor.document && (
             <Button
               variant="secondary"
+              size="sm"
               onClick={() => void addToPresentation()}
               disabled={
                 !image ||
@@ -175,11 +186,11 @@ export function AttachmentPreview({
               }
             >
               {addState === 'adding' ? (
-                <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+                <Loader2 className="animate-spin" aria-hidden="true" />
               ) : addState === 'added' ? (
-                <Check size={14} aria-hidden="true" />
+                <Check aria-hidden="true" />
               ) : (
-                <ImagePlus size={14} aria-hidden="true" />
+                <ImagePlus aria-hidden="true" />
               )}
               {t(
                 addState === 'adding'
@@ -192,41 +203,40 @@ export function AttachmentPreview({
           )}
           <Button
             variant="secondary"
+            size="sm"
             onClick={() => void saveOriginal()}
             disabled={saveState === 'saving'}
           >
             {saveState === 'saving' ? (
-              <Loader2 size={14} className="animate-spin" aria-hidden="true" />
+              <Loader2 className="animate-spin" aria-hidden="true" />
             ) : (
-              <Download size={14} aria-hidden="true" />
+              <Download aria-hidden="true" />
             )}
             {t('sessions.saveAttachment')}
           </Button>
-          <button
+          <IconButton
             ref={close}
-            type="button"
+            size="sm"
+            icon={X}
+            label={t('sessions.closePreview')}
             onClick={dismiss}
             disabled={addState === 'adding'}
-            aria-label={t('sessions.closePreview')}
-            className="grid size-8 shrink-0 place-items-center rounded-control text-muted hover:bg-surface-2 hover:text-text disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+          />
         </div>
         {(saveState === 'saved' || saveState === 'failed') && (
-          <p role="status" className="px-5 pt-3 text-[12px] text-muted">
+          <p role="status" className="px-5 pt-3 text-ui-sm text-muted">
             {t(
               saveState === 'saved' ? 'sessions.attachmentSaved' : 'sessions.attachmentSaveFailed',
             )}
           </p>
         )}
         {addState === 'failed' && (
-          <p role="status" className="px-5 pt-3 text-[12px] text-danger">
+          <p role="status" className="px-5 pt-3 text-ui-sm text-danger">
             {editor.error || t('sessions.addToPresentationFailed')}
           </p>
         )}
         {image && imageIssue && (
-          <p role="status" className="px-5 pt-3 text-[12px] text-muted">
+          <p role="status" className="px-5 pt-3 text-ui-sm text-muted">
             {t(
               imageIssue === 'size'
                 ? 'sessions.presentationImageTooLarge'
@@ -234,9 +244,9 @@ export function AttachmentPreview({
             )}
           </p>
         )}
-        <div className="grid min-h-40 min-w-0 place-items-center overflow-auto p-4">
+        <div className="grid min-h-40 min-w-0 flex-1 place-items-center overflow-auto px-5 py-4">
           {failed ? (
-            <div role="status" className="space-y-4 text-center text-[13px] text-muted">
+            <div role="status" className="space-y-4 text-center text-ui-base text-muted">
               <p>
                 {t(
                   attachment.kind === 'file'
@@ -245,19 +255,25 @@ export function AttachmentPreview({
                 )}
               </p>
               <Button variant="secondary" onClick={retry}>
-                <RefreshCw size={14} aria-hidden="true" />
+                <RefreshCw aria-hidden="true" />
                 {t('sessions.previewRetry')}
               </Button>
             </div>
           ) : pdf ? (
-            <Suspense fallback={<p role="status">{t('sessions.pdfLoading')}</p>}>
+            <Suspense
+              fallback={
+                <p role="status" className="text-ui-base text-muted">
+                  {t('sessions.pdfLoading')}
+                </p>
+              }
+            >
               <PdfPreview blob={pdf} />
             </Suspense>
           ) : text !== null ? (
             <pre
               tabIndex={0}
               aria-label={t('sessions.fileContent')}
-              className="selectable max-h-[calc(100dvh-160px)] w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-canvas-deep p-4 font-mono text-[12px] leading-relaxed text-text"
+              className="selectable max-h-[min(584px,calc(100vh-200px))] w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-canvas-deep p-4 font-mono text-ui-sm text-text"
             >
               {text || t('sessions.emptyFile')}
             </pre>
@@ -266,10 +282,10 @@ export function AttachmentPreview({
               src={url}
               alt={attachment.name || t('sessions.image')}
               onError={() => setFailed(true)}
-              className="max-h-[calc(100dvh-160px)] max-w-full object-contain"
+              className="max-h-[min(584px,calc(100vh-200px))] max-w-full object-contain"
             />
           ) : (
-            <p role="status" className="flex items-center gap-2 text-[13px] text-muted">
+            <p role="status" className="flex items-center gap-2 text-ui-base text-muted">
               <Loader2 size={16} className="animate-spin" aria-hidden="true" />
               {t('sessions.previewLoading')}
             </p>
