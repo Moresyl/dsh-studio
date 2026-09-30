@@ -13,6 +13,9 @@ import {
 
 test('desktop plugin capabilities stay on the reviewed least-privilege surface', () => {
   const permissions = [
+    'core:window:allow-close',
+    'core:window:allow-destroy',
+    'core:window:allow-hide',
     'dialog:allow-open',
     'dialog:allow-save',
     'clipboard-manager:allow-read-text',
@@ -21,6 +24,17 @@ test('desktop plugin capabilities stay on the reviewed least-privilege surface',
     'shell-commands',
   ]
   assert.doesNotThrow(() => validateCapabilities({ permissions }))
+  for (const permission of [
+    'core:window:allow-close',
+    'core:window:allow-destroy',
+    'core:window:allow-hide',
+  ]) {
+    assert.throws(
+      () =>
+        validateCapabilities({ permissions: permissions.filter((item) => item !== permission) }),
+      new RegExp(permission),
+    )
+  }
   assert.throws(
     () => validateCapabilities({ permissions: [...permissions, 'process:default'] }),
     /broad process:default/,

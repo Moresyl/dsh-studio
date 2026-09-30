@@ -3,6 +3,7 @@ import { isPresentationDirty, usePresentationEditor } from '@/state/presentation
 import { ask } from '@/state/dialog'
 import { reportFailure } from '@/state/failure'
 import { t } from '@/lib/i18n'
+import { status } from '@/lib/ipc'
 
 /** Keep native window close from silently discarding the current editor draft. */
 export async function guardPresentationClose(): Promise<() => void> {
@@ -11,6 +12,25 @@ export async function guardPresentationClose(): Promise<() => void> {
   let asking = false
   let disposed = false
   const stop = await window.onCloseRequested(async (event) => {
+    // Tauri's listener destroys a window when its handler does not prevent
+    // closure. The main window's tray action must retain its WebView and draft.
+    if (window.label === 'main') {
+      try {
+        const current = await status()
+        if (current.phase !== 'stopped' && current.phase !== 'failed') {
+          accepted = false
+          event.preventDefault()
+          await window.hide()
+          return
+        }
+      } catch (cause) {
+        accepted = false
+        event.preventDefault()
+        await window.show().catch(() => {})
+        reportFailure(cause)
+        return
+      }
+    }
     if (accepted) {
       accepted = false
       return

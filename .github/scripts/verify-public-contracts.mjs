@@ -138,6 +138,10 @@ export function validateCapabilities(capabilities) {
     typeof permission === 'string' ? permission : permission?.identifier,
   )
   const exact = [
+    // onCloseRequested uses destroy after approval; tray closure uses hide.
+    'core:window:allow-close',
+    'core:window:allow-destroy',
+    'core:window:allow-hide',
     'dialog:allow-open',
     'dialog:allow-save',
     'clipboard-manager:allow-read-text',

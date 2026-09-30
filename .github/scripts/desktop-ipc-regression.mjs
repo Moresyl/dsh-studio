@@ -1,6 +1,6 @@
 // Exercises native commands through the real WebView ACL, using QA data only.
 import { execFile } from 'node:child_process'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -202,6 +202,13 @@ const normalized = (value) => resolve(value).replaceAll('\\', '/').toLowerCase()
 if (!normalized(actualProfile).startsWith(`${normalized(qaHome)}/profiles/`)) {
   throw new Error('The live WebView is not using QA_HOME')
 }
+// Choosing a legacy preset can migrate it into the selected Profile. Restore
+// the QA patch as well as deleting its source so no synthetic loader survives.
+const patchPath = join(actualProfile, 'cordis.patch.yml')
+const originalPatch = await readFile(patchPath).catch((error) => {
+  if (error.code !== 'ENOENT') throw error
+  return null
+})
 const fixtureId = `qa-native-${Date.now().toString(36)}`
 const presetDir = join(resolve(qaHome), '.agent-presets', fixtureId)
 const sessionDir = join(resolve(qaHome), 'sessions', 'qa-native', fixtureId)
@@ -253,4 +260,6 @@ try {
 } finally {
   // Only directories created exclusively by this run are removed.
   for (const directory of created) await rm(directory, { recursive: true })
+  if (originalPatch === null) await rm(patchPath, { force: true })
+  else await writeFile(patchPath, originalPatch)
 }
