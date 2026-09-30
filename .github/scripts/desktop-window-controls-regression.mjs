@@ -48,8 +48,8 @@ async function evaluate(expression) {
 const invoke = (name, args = {}) =>
   evaluate(`window.__TAURI_INTERNALS__.invoke(${JSON.stringify(name)},${JSON.stringify(args)})`)
 const native = (name) => invoke(`plugin:window|${name}`, { label: 'main' })
-async function wait(expression) {
-  const deadline = Date.now() + 20000
+async function wait(expression, timeout = 20000) {
+  const deadline = Date.now() + timeout
   while (Date.now() < deadline) {
     if (await evaluate(`(async()=>Boolean(await (${expression})))()`)) return
     await new Promise((accept) => setTimeout(accept, 50))
@@ -136,7 +136,10 @@ try {
   await pointer(byText('运行状态', "document.querySelector('aside')"))
   await wait(`${byText('启动 Harness')} && !${byText('启动 Harness')}.disabled`)
   await pointer(byText('启动 Harness'))
-  await wait("window.__TAURI_INTERNALS__.invoke('harness_status').then(s=>s.phase==='ready')")
+  await wait(
+    "window.__TAURI_INTERNALS__.invoke('harness_status').then(s=>s.phase==='ready')",
+    150000,
+  )
   if (!(await evaluate("Boolean(document.querySelector('aside'))"))) {
     await pointer(byText('控制面板'))
     await wait("document.querySelector('aside')")

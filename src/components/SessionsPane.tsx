@@ -39,6 +39,7 @@ import { Segmented } from '@/components/Segmented'
 import { UsageReport } from '@/components/UsageReport'
 import { SessionActions } from '@/components/SessionOrganizer'
 import {
+  annotationFor,
   annotationMatches,
   emptyAnnotation,
   organizeSessions,
@@ -361,7 +362,11 @@ export function SessionsPane() {
               <FilterTags
                 value={tag}
                 values={[
-                  ...new Set((cards ?? []).flatMap((card) => annotations[card.id]?.tags ?? [])),
+                  ...new Set(
+                    (cards ?? []).flatMap(
+                      (card) => annotationFor(annotations, card.id)?.tags ?? [],
+                    ),
+                  ),
                 ].sort()}
                 onChange={setTag}
               />
@@ -518,7 +523,7 @@ interface EntryProps {
 /** One session in the list: what was asked, where, and what it cost. */
 function Entry({ card, matches, marks, onOpen }: EntryProps) {
   const annotations = useLibrary((state) => state.data.sessions)
-  const item = annotations[card.id]
+  const item = annotationFor(annotations, card.id)
   return (
     <li>
       <div
@@ -625,7 +630,7 @@ interface ReaderProps {
 function Reader({ card, lines, anchor, onBack }: ReaderProps) {
   const annotations = useLibrary((state) => state.data.sessions)
   const [bookmarksOnly, setBookmarksOnly] = useState(false)
-  const bookmarks = card ? (annotations[card.id]?.bookmarks ?? []) : []
+  const bookmarks = card ? (annotationFor(annotations, card.id)?.bookmarks ?? []) : []
   const shownLines = bookmarksOnly
     ? (lines ?? []).filter((line) => bookmarks.includes(line.seq))
     : (lines ?? [])
@@ -886,7 +891,8 @@ function Spend({ tokens }: { tokens: Tokens }) {
 
 /** One line of the transcript, long ones folded until asked for. */
 function Turn({ line, lit, sessionId }: { line: SessionLine; lit: boolean; sessionId: string }) {
-  const item = useLibrary((state) => state.data.sessions[sessionId]) ?? emptyAnnotation()
+  const item =
+    useLibrary((state) => annotationFor(state.data.sessions, sessionId)) ?? emptyAnnotation()
   const marked = item.bookmarks.includes(line.seq)
   const disabled = useLibrary((state) => state.busy || !state.loaded)
   const [shown, setShown] = useState(false)

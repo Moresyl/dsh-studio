@@ -6,10 +6,17 @@ import { t } from '@/lib/i18n'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
 import type { SessionCard } from '@/lib/ipc'
 import { ask } from '@/state/dialog'
-import { emptyAnnotation, parseTags, validTags, sessionTitle, useLibrary } from '@/state/library'
+import {
+  annotationFor,
+  emptyAnnotation,
+  parseTags,
+  validTags,
+  sessionTitle,
+  useLibrary,
+} from '@/state/library'
 
 export function SessionActions({ card }: { card: SessionCard }) {
-  const item = useLibrary((state) => state.data.sessions[card.id])
+  const item = useLibrary((state) => annotationFor(state.data.sessions, card.id))
   const disabled = useLibrary((state) => state.busy || !state.loaded)
   const annotate = useLibrary((state) => state.annotate)
   const [editing, setEditing] = useState(false)
@@ -41,7 +48,8 @@ export function SessionActions({ card }: { card: SessionCard }) {
 }
 
 function SessionEditor({ card, onClose }: { card: SessionCard; onClose: () => void }) {
-  const annotation = useLibrary.getState().data.sessions[card.id] ?? emptyAnnotation()
+  const annotation =
+    annotationFor(useLibrary.getState().data.sessions, card.id) ?? emptyAnnotation()
   const [title, setTitle] = useState(annotation.title)
   const [tags, setTags] = useState(annotation.tags.join(', '))
   const [note, setNote] = useState(annotation.note)

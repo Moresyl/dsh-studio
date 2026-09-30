@@ -68,8 +68,13 @@ export const useLibrary = create<LibraryState>((set, get) => {
   }
 })
 
+export const annotationFor = (
+  annotations: PersonalLibrary['sessions'],
+  id: string,
+): SessionAnnotation | undefined => (Object.hasOwn(annotations, id) ? annotations[id] : undefined)
+
 export const sessionTitle = (card: SessionCard, annotations: PersonalLibrary['sessions']): string =>
-  annotations[card.id]?.title || card.title
+  annotationFor(annotations, card.id)?.title || card.title
 
 /** Pins rank first without changing the runtime's own timestamps. */
 export function organizeSessions(
@@ -80,12 +85,13 @@ export function organizeSessions(
   return cards
     .filter(
       (card) =>
-        (!options.pinned || annotations[card.id]?.pinned) &&
-        (!options.tag || annotations[card.id]?.tags.includes(options.tag)),
+        (!options.pinned || annotationFor(annotations, card.id)?.pinned) &&
+        (!options.tag || annotationFor(annotations, card.id)?.tags.includes(options.tag)),
     )
     .sort(
       (a, b) =>
-        Number(Boolean(annotations[b.id]?.pinned)) - Number(Boolean(annotations[a.id]?.pinned)) ||
+        Number(Boolean(annotationFor(annotations, b.id)?.pinned)) -
+          Number(Boolean(annotationFor(annotations, a.id)?.pinned)) ||
         (options.order === 'title'
           ? sessionTitle(a, annotations).localeCompare(sessionTitle(b, annotations))
           : options.order === 'oldest'
@@ -120,7 +126,7 @@ export function annotationMatches(
   annotations: PersonalLibrary['sessions'],
   query: string,
 ): boolean {
-  const item = annotations[card.id]
+  const item = annotationFor(annotations, card.id)
   if (!item || !query.trim()) return false
   const text = [item.title, item.note, ...item.tags].join(' ').toLocaleLowerCase()
   return query

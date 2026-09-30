@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as ipc from '@/lib/ipc'
 import {
+  annotationFor,
   annotationMatches,
   emptyAnnotation,
   organizeSessions,
@@ -115,5 +116,16 @@ describe('session organization', () => {
     expect(validTags('😀'.repeat(40))).toBe(true)
     expect(validTags('😀'.repeat(41))).toBe(false)
     expect(validTags('bad\u0000tag')).toBe(false)
+  })
+
+  it('never treats inherited object properties as session annotations', () => {
+    for (const id of ['constructor', '__proto__', 'toString']) {
+      expect(annotationFor({}, id)).toBeUndefined()
+      expect(sessionTitle(card(id, 0), {})).toBe(id)
+      expect(annotationMatches(card(id, 0), {}, 'note')).toBe(false)
+      expect(organizeSessions([card(id, 0)], {}, { tag: 'release' })).toEqual([])
+      const own = JSON.parse(JSON.stringify({ [id]: { ...emptyAnnotation(), title: 'Saved' } }))
+      expect(sessionTitle(card(id, 0), own)).toBe('Saved')
+    }
   })
 })

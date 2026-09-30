@@ -19,7 +19,7 @@ import { useRemote } from '@/state/remote'
 import { useSessions } from '@/state/sessions'
 import { runningCount, useTerminals } from '@/state/terminals'
 import { useUpdate } from '@/state/update'
-import { organizeSessions, sessionTitle, useLibrary } from '@/state/library'
+import { annotationFor, organizeSessions, sessionTitle, useLibrary } from '@/state/library'
 
 interface StudioSidebarProps {
   collapsed: boolean
@@ -152,7 +152,7 @@ export function StudioSidebar({
                   onClick={() => onOpenSession(card.id)}
                   className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-ui-base text-muted transition-colors hover:bg-surface-2/70 hover:text-text aria-[current=page]:bg-surface-2 aria-[current=page]:text-text"
                 >
-                  {annotations[card.id]?.pinned && (
+                  {annotationFor(annotations, card.id)?.pinned && (
                     <Pin size={12} className="shrink-0" aria-hidden="true" />
                   )}
                   <span className="truncate">
