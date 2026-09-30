@@ -27,6 +27,7 @@ pre-1.0 caveat that anything may still move.
 
 ### Fixes and polish
 
+- Reduce the default window from 1360×880 to 1100×740 for a more compact first launch and default new windows, while retaining user-adjusted size and position.
 - Bind release identity to a canonical stable tag and the exact workflow commit, require all five application/SDK/native version sources to agree, reject partial-platform rebuilds and older versions replacing the latest channel, and clear stale assets only from the matching unpublished draft before rebuilding every platform.
 - Keep Tauri JavaScript bindings on patch-only ranges matching their native plugin minor versions, and fail release verification before packaging when a resolved guest/native pair drifts.
 - Run the recursive XML tree parser on a bounded dedicated stack while retaining input depth limits, protecting callers with small thread stacks; add a 512 KiB caller-stack regression.

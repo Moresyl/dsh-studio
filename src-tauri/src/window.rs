@@ -58,8 +58,8 @@ const CASCADE: f64 = 30.0;
 /// What every window is called before its number is added.
 const TITLE: &str = "DSH Studio";
 
-const DEFAULT_WIDTH: f64 = 1360.0;
-const DEFAULT_HEIGHT: f64 = 880.0;
+const DEFAULT_WIDTH: f64 = 1100.0;
+const DEFAULT_HEIGHT: f64 = 740.0;
 
 /// Below this the sidebar and the transcript stop coexisting.
 const MIN_WIDTH: f64 = 900.0;
