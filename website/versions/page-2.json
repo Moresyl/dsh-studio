@@ -1,5 +1,194 @@
 [
   {
+    "tag_name": "v0.9.4",
+    "name": "DSH Studio v0.9.4",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-09-11T17:12:30Z",
+    "assets": [
+      {
+        "id": 557778627,
+        "name": "DSH.Studio-0.9.4-1.x86_64-full-x86_64-unknown-linux-gnu.rpm",
+        "size": 124282750,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio-0.9.4-1.x86_64-full-x86_64-unknown-linux-gnu.rpm"
+      },
+      {
+        "id": 557751791,
+        "name": "DSH.Studio-0.9.4-1.x86_64.rpm",
+        "size": 6359205,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio-0.9.4-1.x86_64.rpm"
+      },
+      {
+        "id": 557751811,
+        "name": "DSH.Studio-0.9.4-1.x86_64.rpm.sig",
+        "size": 420,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio-0.9.4-1.x86_64.rpm.sig"
+      },
+      {
+        "id": 557768799,
+        "name": "DSH.Studio_0.9.4_aarch64-full-aarch64-apple-darwin.dmg",
+        "size": 107845370,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_aarch64-full-aarch64-apple-darwin.dmg"
+      },
+      {
+        "id": 557750804,
+        "name": "DSH.Studio_0.9.4_aarch64.app.tar.gz",
+        "size": 5673698,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_aarch64.app.tar.gz"
+      },
+      {
+        "id": 557750860,
+        "name": "DSH.Studio_0.9.4_aarch64.app.tar.gz.sig",
+        "size": 408,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_aarch64.app.tar.gz.sig"
+      },
+      {
+        "id": 557750780,
+        "name": "DSH.Studio_0.9.4_aarch64.dmg",
+        "size": 5780852,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_aarch64.dmg"
+      },
+      {
+        "id": 557778628,
+        "name": "DSH.Studio_0.9.4_amd64-full-x86_64-unknown-linux-gnu.AppImage",
+        "size": 201832952,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_amd64-full-x86_64-unknown-linux-gnu.AppImage"
+      },
+      {
+        "id": 557778626,
+        "name": "DSH.Studio_0.9.4_amd64-full-x86_64-unknown-linux-gnu.deb",
+        "size": 124281486,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_amd64-full-x86_64-unknown-linux-gnu.deb"
+      },
+      {
+        "id": 557751822,
+        "name": "DSH.Studio_0.9.4_amd64.AppImage",
+        "size": 83831288,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_amd64.AppImage"
+      },
+      {
+        "id": 557751887,
+        "name": "DSH.Studio_0.9.4_amd64.AppImage.sig",
+        "size": 424,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_amd64.AppImage.sig"
+      },
+      {
+        "id": 557751755,
+        "name": "DSH.Studio_0.9.4_amd64.deb",
+        "size": 6358566,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_amd64.deb"
+      },
+      {
+        "id": 557751775,
+        "name": "DSH.Studio_0.9.4_amd64.deb.sig",
+        "size": 416,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_amd64.deb.sig"
+      },
+      {
+        "id": 557757924,
+        "name": "DSH.Studio_0.9.4_universal.app.tar.gz",
+        "size": 11272642,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_universal.app.tar.gz"
+      },
+      {
+        "id": 557757952,
+        "name": "DSH.Studio_0.9.4_universal.app.tar.gz.sig",
+        "size": 408,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_universal.app.tar.gz.sig"
+      },
+      {
+        "id": 557757887,
+        "name": "DSH.Studio_0.9.4_universal.dmg",
+        "size": 11221470,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_universal.dmg"
+      },
+      {
+        "id": 557796533,
+        "name": "DSH.Studio_0.9.4_x64-full-x86_64-apple-darwin.dmg",
+        "size": 110638552,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64-full-x86_64-apple-darwin.dmg"
+      },
+      {
+        "id": 557756491,
+        "name": "DSH.Studio_0.9.4_x64-portable.exe",
+        "size": 15695360,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64-portable.exe"
+      },
+      {
+        "id": 557782866,
+        "name": "DSH.Studio_0.9.4_x64-setup-full-x86_64-pc-windows-msvc.exe",
+        "size": 92993416,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64-setup-full-x86_64-pc-windows-msvc.exe"
+      },
+      {
+        "id": 557756293,
+        "name": "DSH.Studio_0.9.4_x64-setup.exe",
+        "size": 4379989,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64-setup.exe"
+      },
+      {
+        "id": 557756310,
+        "name": "DSH.Studio_0.9.4_x64-setup.exe.sig",
+        "size": 420,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64-setup.exe.sig"
+      },
+      {
+        "id": 557765355,
+        "name": "DSH.Studio_0.9.4_x64.app.tar.gz",
+        "size": 5911244,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64.app.tar.gz"
+      },
+      {
+        "id": 557765416,
+        "name": "DSH.Studio_0.9.4_x64.app.tar.gz.sig",
+        "size": 408,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64.app.tar.gz.sig"
+      },
+      {
+        "id": 557765315,
+        "name": "DSH.Studio_0.9.4_x64.dmg",
+        "size": 6071951,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64.dmg"
+      },
+      {
+        "id": 557782863,
+        "name": "DSH.Studio_0.9.4_x64_en-US-full-x86_64-pc-windows-msvc.msi",
+        "size": 95105024,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64_en-US-full-x86_64-pc-windows-msvc.msi"
+      },
+      {
+        "id": 557756269,
+        "name": "DSH.Studio_0.9.4_x64_en-US.msi",
+        "size": 6184960,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64_en-US.msi"
+      },
+      {
+        "id": 557756287,
+        "name": "DSH.Studio_0.9.4_x64_en-US.msi.sig",
+        "size": 420,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/DSH.Studio_0.9.4_x64_en-US.msi.sig"
+      },
+      {
+        "id": 557765501,
+        "name": "latest.json",
+        "size": 8461,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/latest.json"
+      },
+      {
+        "id": 557797485,
+        "name": "moresyl-dsh-studio-sdk-0.9.4.tgz",
+        "size": 3460,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/moresyl-dsh-studio-sdk-0.9.4.tgz"
+      },
+      {
+        "id": 557797730,
+        "name": "SHA256SUMS.txt",
+        "size": 3026,
+        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.9.4/SHA256SUMS.txt"
+      }
+    ]
+  },
+  {
     "tag_name": "v0.9.3",
     "name": "",
     "draft": false,
@@ -2884,69 +3073,6 @@
         "name": "DSH.Studio_x64.app.tar.gz",
         "size": 2689172,
         "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.2.0/DSH.Studio_x64.app.tar.gz"
-      }
-    ]
-  },
-  {
-    "tag_name": "v0.1.1",
-    "name": "DSH Studio v0.1.1",
-    "draft": false,
-    "prerelease": false,
-    "published_at": "2026-08-15T04:46:55Z",
-    "assets": [
-      {
-        "id": 515333472,
-        "name": "DSH.Studio-0.1.1-1.x86_64.rpm",
-        "size": 2822431,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio-0.1.1-1.x86_64.rpm"
-      },
-      {
-        "id": 515331339,
-        "name": "DSH.Studio_0.1.1_aarch64.dmg",
-        "size": 2797676,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_aarch64.dmg"
-      },
-      {
-        "id": 515333493,
-        "name": "DSH.Studio_0.1.1_amd64.AppImage",
-        "size": 80665080,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_amd64.AppImage"
-      },
-      {
-        "id": 515333440,
-        "name": "DSH.Studio_0.1.1_amd64.deb",
-        "size": 2821500,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_amd64.deb"
-      },
-      {
-        "id": 515333741,
-        "name": "DSH.Studio_0.1.1_x64-setup.exe",
-        "size": 1910172,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_x64-setup.exe"
-      },
-      {
-        "id": 515336466,
-        "name": "DSH.Studio_0.1.1_x64.dmg",
-        "size": 2884808,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_x64.dmg"
-      },
-      {
-        "id": 515333736,
-        "name": "DSH.Studio_0.1.1_x64_en-US.msi",
-        "size": 2793472,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_0.1.1_x64_en-US.msi"
-      },
-      {
-        "id": 515331346,
-        "name": "DSH.Studio_aarch64.app.tar.gz",
-        "size": 2479343,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_aarch64.app.tar.gz"
-      },
-      {
-        "id": 515336482,
-        "name": "DSH.Studio_x64.app.tar.gz",
-        "size": 2570563,
-        "browser_download_url": "https://github.com/Moresyl/dsh-studio/releases/download/v0.1.1/DSH.Studio_x64.app.tar.gz"
       }
     ]
   }
