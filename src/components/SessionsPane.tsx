@@ -38,6 +38,8 @@ import { PaneHeader } from '@/components/PaneHeader'
 import { Segmented } from '@/components/Segmented'
 import { UsageReport } from '@/components/UsageReport'
 import { SessionActions } from '@/components/SessionOrganizer'
+import { SessionBatch } from '@/components/SessionBatch'
+import { toggleSelection, visibleSelection, type SessionSelection } from '@/lib/batch-selection'
 import {
   annotationFor,
   annotationMatches,
@@ -184,6 +186,10 @@ export function SessionsPane() {
   const [pinned, setPinned] = useState(false)
   const [tag, setTag] = useState('')
   const [order, setOrder] = useState<'recent' | 'oldest' | 'title'>('recent')
+  const [selecting, setSelecting] = useState(false)
+  const [selection, setSelection] = useState<SessionSelection>({ scope: '', ids: [] })
+  const [batch, setBatch] = useState<string[] | null>(null)
+  const libraryReady = useLibrary((state) => state.loaded && !state.busy)
   /** The line an opened session should land on, when a quote is what opened it. */
   const [anchor, setAnchor] = useState<number | null>(null)
   // The statement is a second reading of the same shelf, not a seventh pane in
@@ -234,6 +240,13 @@ export function SessionsPane() {
   }, [hits, listed, annotations, asked])
 
   const reach = useMemo(() => projects(cards ?? []), [cards])
+  const scope = JSON.stringify([query, asked, project, tab, pinned, tag, order])
+  const visibleIds = visibleHits
+    ? visibleHits.map((hit) => hit.card.id)
+    : listed.map((card) => card.id)
+  const selectedIds = visibleSelection(selection, scope, visibleIds)
+  const selectionReady = libraryReady && !searching && query === asked
+  const choose = (id: string) => setSelection({ scope, ids: toggleSelection(selectedIds, id) })
 
   const show = (id: string, seq: number | null) => {
     setAnchor(seq)
@@ -390,6 +403,40 @@ export function SessionsPane() {
                 {t(`organize.order.${order}`)}
                 <ChevronDown size={14} aria-hidden="true" />
               </button>
+              <Button
+                variant={selecting ? 'secondary' : 'ghost'}
+                size="sm"
+                disabled={!selectionReady}
+                aria-pressed={selecting}
+                onClick={() => {
+                  setSelecting(!selecting)
+                  setSelection({ scope, ids: [] })
+                }}
+              >
+                {t('batch.open')}
+              </Button>
+              {selecting && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={!selectionReady || !visibleIds.length}
+                    onClick={() =>
+                      setSelection({ scope, ids: [...new Set(visibleIds)].slice(0, 500) })
+                    }
+                  >
+                    {t('batch.all')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    disabled={!selectionReady || !selectedIds.length}
+                    onClick={() => setBatch([...selectedIds])}
+                  >
+                    {t('batch.count', { count: selectedIds.length })}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -415,6 +462,17 @@ export function SessionsPane() {
                       card={hit.card}
                       matches={hit.matches}
                       marks={hit.marks}
+                      selection={
+                        selecting
+                          ? {
+                              selected: selectedIds.includes(hit.card.id),
+                              toggle: () => choose(hit.card.id),
+                              disabled:
+                                !selectionReady ||
+                                (!selectedIds.includes(hit.card.id) && selectedIds.length >= 500),
+                            }
+                          : undefined
+                      }
                       onOpen={(seq) => show(hit.card.id, seq)}
                     />
                   ))}
@@ -442,12 +500,37 @@ export function SessionsPane() {
             ) : (
               <ul>
                 {listed.map((card) => (
-                  <Entry key={card.id} card={card} onOpen={() => show(card.id, null)} />
+                  <Entry
+                    key={card.id}
+                    card={card}
+                    onOpen={() => show(card.id, null)}
+                    selection={
+                      selecting
+                        ? {
+                            selected: selectedIds.includes(card.id),
+                            toggle: () => choose(card.id),
+                            disabled:
+                              !selectionReady ||
+                              (!selectedIds.includes(card.id) && selectedIds.length >= 500),
+                          }
+                        : undefined
+                    }
+                  />
                 ))}
               </ul>
             )}
           </div>
         </>
+      )}
+      {batch && (
+        <SessionBatch
+          ids={batch}
+          onClose={() => setBatch(null)}
+          onSaved={() => {
+            setBatch(null)
+            setSelection({ scope, ids: [] })
+          }}
+        />
       )}
     </section>
   )
@@ -514,6 +597,7 @@ function Figure({ label, value }: { label: string; value: number }) {
 
 interface EntryProps {
   card: SessionCard
+  selection?: { selected: boolean; toggle: () => void; disabled: boolean }
   /** How many lines answered the search, on the rows a search produced. */
   matches?: number
   marks?: SessionMark[]
@@ -521,7 +605,7 @@ interface EntryProps {
 }
 
 /** One session in the list: what was asked, where, and what it cost. */
-function Entry({ card, matches, marks, onOpen }: EntryProps) {
+function Entry({ card, matches, marks, onOpen, selection }: EntryProps) {
   const annotations = useLibrary((state) => state.data.sessions)
   const item = annotationFor(annotations, card.id)
   return (
@@ -541,6 +625,19 @@ function Entry({ card, matches, marks, onOpen }: EntryProps) {
       >
         <div className={`${COLUMN} flex flex-col gap-1`}>
           <div className="flex items-center gap-2">
+            {selection && (
+              <input
+                type="checkbox"
+                className="size-4 shrink-0 accent-brand"
+                checked={selection.selected}
+                disabled={selection.disabled}
+                aria-label={t('batch.select', {
+                  title: sessionTitle(card, annotations) || t('sessions.untitled'),
+                })}
+                onClick={(event) => event.stopPropagation()}
+                onChange={selection.toggle}
+              />
+            )}
             <span className="min-w-0 flex-1 truncate text-ui-base font-medium text-text">
               {sessionTitle(card, annotations) || t('sessions.untitled')}
             </span>

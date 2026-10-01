@@ -87,7 +87,8 @@ window.__ModuleLoader__.load({
             return
           }
           if (event.source !== window.parent || request?.type !== 'dsh-studio:image-read') return
-          if (request.kind !== undefined && !['image', 'file', 'download'].includes(request.kind)) return
+          if (request.kind !== undefined && !['image', 'file', 'download'].includes(request.kind))
+            return
           if (
             typeof request.id !== 'string' ||
             request.id.length > 64 ||
@@ -213,7 +214,9 @@ window.__ModuleLoader__.load({
             paint(asked.theme)
             return
           }
-          settled = Date.now() + settling
+          // Saved settings can race the initial connection, but restarting this
+          // guard for every user choice would swallow quick successive clicks.
+          if (settled === 0) settled = Date.now() + settling
           if (service.getTheme().preference !== asked.preference) service.setTheme(asked.preference)
         }
         // Harness's answer, whoever changed it. Three things keep it from talking
@@ -223,7 +226,7 @@ window.__ModuleLoader__.load({
         // saved preference is whatever it was last time, and letting it speak first
         // would make a stale setting win over the window the user is looking at.
         //
-        // For a few seconds after the window speaks, a preference that disagrees with
+        // For a few seconds after the window first speaks, a preference that disagrees with
         // it is put right rather than reported. Harness reads and confirms its saved
         // settings asynchronously, so a preference set from here is followed by the
         // old saved value being adopted and then the new one being confirmed — changes

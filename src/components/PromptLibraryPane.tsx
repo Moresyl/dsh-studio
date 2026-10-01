@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BookOpen,
   Check,
@@ -9,7 +9,6 @@ import {
   Save,
   Search,
   Trash2,
-  X,
 } from 'lucide-react'
 import { Badge } from '@/components/Badge'
 import { Button } from '@/components/Button'
@@ -18,7 +17,8 @@ import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
 import { t } from '@/lib/i18n'
 import type { SavedPrompt } from '@/lib/ipc'
-import { holdFocus, pressedBackdrop } from '@/lib/modal'
+import { PersonalDialog as LibraryDialog } from '@/components/PersonalDialog'
+import { LibraryTransfer } from '@/components/LibraryTransfer'
 import { promptVariables, renderPrompt } from '@/lib/prompt-template'
 import { ask } from '@/state/dialog'
 import { reportAction } from '@/state/failure'
@@ -79,6 +79,9 @@ export function PromptLibraryPane() {
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8">
         <div className="mx-auto max-w-[1040px]">
+          <div className="mb-4">
+            <LibraryTransfer promptsOnly />
+          </div>
           <label className="field-shell mb-5">
             <Search size={16} aria-hidden="true" />
             <input
@@ -181,49 +184,6 @@ export function PromptLibraryPane() {
       )}
       {using && <PromptUse key={using.id} prompt={using} onClose={() => setUsing(null)} />}
     </section>
-  )
-}
-
-function LibraryDialog({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: ReactNode
-}) {
-  const panel = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const previous = document.activeElement
-    panel.current?.querySelector<HTMLInputElement>('input, textarea, button')?.focus()
-    return () => {
-      if (previous instanceof HTMLElement) previous.focus()
-    }
-  }, [])
-  return (
-    <div
-      role="presentation"
-      className="dialog-backdrop fixed inset-0 z-30 grid place-items-center bg-canvas-deep/65 px-5 backdrop-blur-[2px]"
-      onMouseDown={(event) => pressedBackdrop(event, onClose)}
-      onKeyDown={(event) => holdFocus(panel.current, event, onClose)}
-    >
-      <div
-        ref={panel}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="prompt-heading"
-        className="dialog-panel flex max-h-[85vh] w-full max-w-[640px] flex-col gap-4 overflow-y-auto rounded-2xl border border-line-strong bg-surface p-6 shadow-lift"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="prompt-heading" className="text-ui-lg font-semibold">
-            {title}
-          </h2>
-          <IconButton icon={X} label={t('organize.close')} onClick={onClose} />
-        </div>
-        {children}
-      </div>
-    </div>
   )
 }
 

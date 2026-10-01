@@ -9,6 +9,7 @@ import { IconButton } from '@/components/IconButton'
 import { PaneHeader } from '@/components/PaneHeader'
 import { WorktreeManager } from '@/components/WorktreeManager'
 import { WorktreeReview } from '@/components/WorktreeReview'
+import { WorkspaceFiles } from '@/components/WorkspaceFiles'
 import { count, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { GitWorktree } from '@/lib/ipc'
@@ -27,6 +28,7 @@ export function WorkspacesPane({ onSessions }: { onSessions: () => void }) {
   const [query, setQuery] = useState('')
   const [review, setReview] = useState<GitWorktree | null>(null)
   const [switching, setSwitching] = useState(false)
+  const [browsing, setBrowsing] = useState(false)
   useEffect(() => {
     void refresh()
   }, [refresh])
@@ -68,6 +70,14 @@ export function WorkspacesPane({ onSessions }: { onSessions: () => void }) {
         <Button disabled={switching} onClick={() => void select()}>
           <FolderOpen />
           {t('workspace.choose')}
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={switching || !current}
+          onClick={() => setBrowsing(true)}
+        >
+          <FolderOpen />
+          {t('files.open')}
         </Button>
       </PaneHeader>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-8">
@@ -163,6 +173,7 @@ export function WorkspacesPane({ onSessions }: { onSessions: () => void }) {
         </div>
       </div>
       {review && <WorktreeReview worktree={review} onClose={() => setReview(null)} />}
+      {browsing && <WorkspaceFiles onClose={() => setBrowsing(false)} />}
     </section>
   )
 }

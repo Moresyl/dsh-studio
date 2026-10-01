@@ -21,6 +21,31 @@ beforeEach(() => {
   useLibrary.setState({ data: snapshot(), loaded: false, loading: false, busy: false, error: null })
 })
 describe('durable personal library', () => {
+  it('serializes batch changes and restores with the exact reviewed revision', async () => {
+    const preview = {
+      revision: 'reviewed',
+      sourceHash: 'content',
+      prompts: 1,
+      sessions: 0,
+      conflicts: 1,
+      names: ['Review'],
+      promptsOnly: true,
+    }
+    expect(await useLibrary.getState().annotateMany(['one'], { pinned: true })).toBe(false)
+    expect(await useLibrary.getState().importData('{}', preview, false)).toBe(false)
+    useLibrary.setState({ loaded: true })
+    vi.mocked(ipc.sessionAnnotateMany).mockResolvedValue(snapshot())
+    expect(await useLibrary.getState().annotateMany(['one', 'two'], { addTags: ['review'] })).toBe(
+      true,
+    )
+    expect(ipc.sessionAnnotateMany).toHaveBeenCalledWith(['one', 'two'], { addTags: ['review'] })
+    vi.mocked(ipc.libraryImportApply).mockResolvedValue(snapshot())
+    expect(await useLibrary.getState().importData('{}', preview, false)).toBe(true)
+    expect(ipc.libraryImportApply).toHaveBeenCalledWith('{}', preview, false)
+    vi.mocked(ipc.libraryImportApply).mockRejectedValue(new Error('stale preview'))
+    expect(await useLibrary.getState().importData('{}', preview, true)).toBe(false)
+    expect(useLibrary.getState()).toMatchObject({ busy: false, error: 'Error: stale preview' })
+  })
   it('loads once at a time and exposes recoverable read errors', async () => {
     let resolve!: (data: PersonalLibrary) => void
     vi.mocked(ipc.libraryRead).mockReturnValue(

@@ -96,6 +96,10 @@ commands.allow = [
     "session_archive",
     "library_read",
     "session_annotate",
+    "session_annotate_many",
+    "library_export_save",
+    "library_import_preview",
+    "library_import_apply",
     "prompt_save",
     "prompt_remove",
     "session_export",
@@ -123,4 +127,6 @@ commands.allow = [
     "workspace_worktree_create",
     "workspace_worktree_review",
     "workspace_worktrees",
+    "workspace_files",
+    "workspace_file_read",
 ]

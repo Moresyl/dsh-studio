@@ -9,6 +9,7 @@ use tauri::State;
 use crate::error::{Error, Result};
 
 const LIMIT: usize = 2 * 1024 * 1024;
+pub mod transfer;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -28,6 +29,16 @@ pub struct AnnotationPatch {
     tags: Option<Vec<String>>,
     note: Option<String>,
     bookmarks: Option<BTreeSet<u64>>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct BatchPatch {
+    pinned: Option<bool>,
+    #[serde(default)]
+    add_tags: Vec<String>,
+    #[serde(default)]
+    remove_tags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -148,6 +159,10 @@ impl Store {
         })?;
         let mut state = self.read()?;
         change(&mut state);
+        self.commit(state)
+    }
+
+    fn commit(&self, state: Snapshot) -> Result<Snapshot> {
         state.validate()?;
         let body = serde_json::to_vec_pretty(&state).map_err(|_| invalid())?;
         if body.len() > LIMIT {
@@ -157,6 +172,35 @@ impl Store {
             Error::Session(format!("could not save the personal library: {error}"))
         })?;
         Ok(state)
+    }
+
+    pub fn patch_many(&self, ids: Vec<String>, patch: BatchPatch) -> Result<Snapshot> {
+        let ids: BTreeSet<_> = ids.into_iter().collect();
+        if ids.is_empty()
+            || ids.len() > 500
+            || !ids.iter().all(|id| id_valid(id))
+            || !tags_valid(&patch.add_tags)
+            || !tags_valid(&patch.remove_tags)
+        {
+            return Err(invalid());
+        }
+        self.update(|state| {
+            for id in ids {
+                let item = state.sessions.entry(id.clone()).or_default();
+                if let Some(pinned) = patch.pinned {
+                    item.pinned = pinned;
+                }
+                item.tags.retain(|tag| !patch.remove_tags.contains(tag));
+                for tag in &patch.add_tags {
+                    if !item.tags.contains(tag) {
+                        item.tags.push(tag.clone());
+                    }
+                }
+                if item == &Annotation::default() {
+                    state.sessions.remove(&id);
+                }
+            }
+        })
     }
 
     #[cfg(test)]
@@ -253,6 +297,32 @@ pub async fn prompt_save(store: State<'_, Arc<Store>>, prompt: Prompt) -> Result
 }
 
 #[tauri::command]
+pub async fn session_annotate_many(
+    store: State<'_, Arc<Store>>,
+    library: State<'_, Arc<crate::sessions::Library>>,
+    ids: Vec<String>,
+    annotation: BatchPatch,
+) -> Result<Snapshot> {
+    if ids.is_empty() || ids.len() > 500 {
+        return Err(invalid());
+    }
+    let library = Arc::clone(library.inner());
+    away(Arc::clone(store.inner()), move |store| {
+        let roster = library.roster();
+        if ids
+            .iter()
+            .any(|id| !roster.cards.iter().any(|card| &card.id == id))
+        {
+            return Err(Error::Session(
+                "a selected session is no longer on disk; refresh before retrying".into(),
+            ));
+        }
+        store.patch_many(ids, annotation)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn prompt_remove(store: State<'_, Arc<Store>>, id: String) -> Result<Snapshot> {
     away(Arc::clone(store.inner()), move |store| {
         store.remove_prompt(id)
@@ -263,13 +333,13 @@ pub async fn prompt_remove(store: State<'_, Arc<Store>>, id: String) -> Result<S
 #[cfg(test)]
 mod tests {
     use super::*;
-    struct Fixture(PathBuf);
+    pub(super) struct Fixture(PathBuf);
     impl Drop for Fixture {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
     }
-    fn store() -> (Fixture, Store) {
+    pub(super) fn store() -> (Fixture, Store) {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let dir = std::env::temp_dir().join(format!(
             "dsh-library-{}-{}-{}",

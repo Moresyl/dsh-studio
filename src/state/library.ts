@@ -22,6 +22,12 @@ interface LibraryState {
   error: string | null
   load: () => Promise<void>
   annotate: (id: string, patch: Partial<SessionAnnotation>) => Promise<boolean>
+  annotateMany: (ids: string[], patch: ipc.BatchAnnotation) => Promise<boolean>
+  importData: (
+    source: string,
+    preview: ipc.LibraryImportPreview,
+    overwrite: boolean,
+  ) => Promise<boolean>
   savePrompt: (prompt: SavedPrompt) => Promise<boolean>
   removePrompt: (id: string) => Promise<boolean>
 }
@@ -63,6 +69,9 @@ export const useLibrary = create<LibraryState>((set, get) => {
       }
     },
     annotate: (id, patch) => write(() => ipc.sessionAnnotate(id, patch)),
+    annotateMany: (ids, patch) => write(() => ipc.sessionAnnotateMany(ids, patch)),
+    importData: (source, preview, overwrite) =>
+      write(() => ipc.libraryImportApply(source, preview, overwrite)),
     savePrompt: (prompt) => write(() => ipc.promptSave(prompt)),
     removePrompt: (id) => write(() => ipc.promptRemove(id)),
   }

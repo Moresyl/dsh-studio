@@ -10,6 +10,7 @@ use tokio::process::Command;
 use crate::error::{Error, Result};
 use crate::paths;
 
+pub mod files;
 pub mod review;
 
 const SELECTION_FILE: &str = "workspace.json";
