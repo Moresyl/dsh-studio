@@ -2,7 +2,7 @@
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-10-01. The version baseline is v0.9.23. In-development work is not
+Updated 2026-10-01. The version baseline is v0.9.24. In-development work is not
 released until it appears in a published version's changelog. This document
 records product capabilities and acceptance boundaries, not relative rankings
 or promises of zero defects.
@@ -48,10 +48,15 @@ none alone proves final-installer or physical macOS acceptance.
 
 ## In development
 
-Session pins, display names, tags, notes, message bookmarks, workspace summaries
-and a personal prompt library enter v0.9.23. Bounded native persistence preserves
-damaged files; exit, update and reload protect editors and pending writes.
 Cross-device sync, workspace-linked documents and durable crash drafts remain future work.
+
+## v0.9.23–0.9.24
+
+Session pins, display names, tags, notes, message bookmarks, workspace summaries
+and a personal prompt library enter v0.9.23. v0.9.24 adds batch pins/tags, prompt
+JSON transfer, personal backups and read-only workspace file browsing. Bounded
+atomic writes and preview-bound imports preserve existing data; exit, update and
+reload protect editors and pending writes.
 
 ## Included in v0.9.20–0.9.22
 

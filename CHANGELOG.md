@@ -9,6 +9,26 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.24] — 2026-10-01
+
+### Added
+
+- Browse the current workspace with lazy folder loading, filtering, parent navigation and bounded read-only UTF-8 previews/copying. Reject stale workspace requests, traversal, links and binary/oversized previews.
+- Select up to 500 sessions for atomic batch pins and tag changes. Selection follows the current search/filter view; preserve names, notes and bookmarks and reject the entire batch on validation failure.
+- Import/export prompt JSON and back up/restore personal session annotations and prompts. Preview conflicts, keep existing records by default or explicitly replace conflicts, and reject stale confirmations after concurrent changes. Exclude credentials, runtime settings and Harness logs.
+
+### Fixes and safety
+
+- Synchronize shell and Harness appearance through Harness's own theme service, retaining System preference. Restrict saved-settings settling to initial connection so rapid subsequent choices are not discarded; validate incoming bridge source/origin and cancel pending reports on disposal.
+- Protect open personal-data dialogs and writes during close/update/recovery. Reject corrupt/future/oversized imports, preserve absent records, use one atomic merge, and prevent exports from overwriting Studio's managed data.
+- Share modal focus handling across personal tools, disable batch controls while search results settle, and confirm before discarding tag drafts. Refresh bilingual guides and actual desktop screenshots.
+
+### Verification
+
+- Two real Windows WebView rounds cover file navigation/preview/copy, batch persistence, JSON file selection, keep/replace/cancel imports, stale-preview protection and native ACL failures; include light 900×620 and dark regular layouts.
+- Regress ten desktop routes and five real PTYs. Three Harness stop/start cycles succeed on Node 24.21.0; rapid cross-surface appearance changes persist. First cold start was slower than subsequent approximately-three-second starts.
+- 679 frontend tests, 577 executed Rust tests including the runtime-range oracle, and 158 packaging tests; frontend line coverage 99.36%. Production bundle budget, strict Clippy, lint and contract/documentation gates pass. Paid providers, physical macOS/Linux GUI and the OS save-picker interaction are outside local WebView evidence; native export writes and failures are verified.
+
 ## [0.9.23] — 2026-10-01
 
 ### Added

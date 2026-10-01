@@ -70,11 +70,19 @@ navigation to associated records. Pin sessions, name them, add tags/notes and
 bookmark messages. The local prompt library supports editing, search, variables,
 preview and copying. Bounded native validation and atomic writes preserve original
 Harness logs; close, update and recovery protect unfinished edits.
+Batch pins/tags organize selected sessions. Prompt JSON import/export and personal
+backups preview conflicts and reject stale confirmations. Workspace browsing lazily
+loads directories and previews/copies bounded UTF-8 text without editing files.
 
 <img src="assets/prompt-library.png" width="820" alt="Local prompt library in the actual desktop: shared cards, tags and copy actions">
 
-The prompt-library image uses the v0.9.23 frontend in isolated Windows QA, with
+The prompt-library image uses v0.9.24 in isolated Windows QA, with
 demonstration content and processed local paths.
+
+<img src="assets/workspace-files.png" width="820" alt="Workspace files in the actual desktop: lazy folders, filtering, read-only text preview and copying">
+
+The file-browser image uses isolated demonstration data. Links, special files
+and oversized previews are rejected.
 
 **Supervises, rather than just launches.**
 The service runs under a supervisor that restarts it with backoff when it exits.
