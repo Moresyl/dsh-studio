@@ -9,9 +9,46 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
-### Fixes and polish
+## [0.9.24] — 2026-10-01
 
-- Make the window's Light / Dark / System choice and the Appearance row in Harness's own settings one setting. Choosing Light inside Harness under a dark window used to leave Harness drawing its light surfaces with the window's dark-theme text colours — pale text on a pale ground in half the dialog. The window's choice now goes through Harness's own theme service, the palette follows the scheme Harness is actually drawing, and a change made in Harness's row switches the window as well. Harness's saved appearance follows the window's, and a saved value left over from a previous run no longer overrules it at start-up.
+### Added
+
+- Browse the current workspace with lazy folder loading, filtering, parent navigation and bounded read-only UTF-8 previews/copying. Reject stale workspace requests, traversal, links and binary/oversized previews.
+- Select up to 500 sessions for atomic batch pins and tag changes. Selection follows the current search/filter view; preserve names, notes and bookmarks and reject the entire batch on validation failure.
+- Import/export prompt JSON and back up/restore personal session annotations and prompts. Preview conflicts, keep existing records by default or explicitly replace conflicts, and reject stale confirmations after concurrent changes. Exclude credentials, runtime settings and Harness logs.
+
+### Fixes and safety
+
+- Synchronize shell and Harness appearance through Harness's own theme service, retaining System preference. Restrict saved-settings settling to initial connection so rapid subsequent choices are not discarded; validate incoming bridge source/origin and cancel pending reports on disposal.
+- Protect open personal-data dialogs and writes during close/update/recovery. Reject corrupt/future/oversized imports, preserve absent records, use one atomic merge, and prevent exports from overwriting Studio's managed data.
+- Share modal focus handling across personal tools, disable batch controls while search results settle, and confirm before discarding tag drafts. Refresh bilingual guides and actual desktop screenshots.
+
+### Verification
+
+- Two real Windows WebView rounds cover file navigation/preview/copy, batch persistence, JSON file selection, keep/replace/cancel imports, stale-preview protection and native ACL failures; include light 900×620 and dark regular layouts.
+- Regress ten desktop routes and five real PTYs. Three Harness stop/start cycles succeed on Node 24.21.0; rapid cross-surface appearance changes persist. First cold start was slower than subsequent approximately-three-second starts.
+- 679 frontend tests, 577 executed Rust tests including the runtime-range oracle, and 158 packaging tests; frontend line coverage 99.36%. Production bundle budget, strict Clippy, lint and contract/documentation gates pass. Paid providers, physical macOS/Linux GUI and the OS save-picker interaction are outside local WebView evidence; native export writes and failures are verified.
+
+## [0.9.23] — 2026-10-01
+
+### Added
+
+- Pin sessions, set personal display names, tags and notes, filter/sort the shelf, search annotations alongside transcripts and bookmark individual messages. Show aliases and pins in the sidebar and command palette without changing Harness logs.
+- Add a workspace overview with current/recent directories, session/turn/token totals, recent activity, associated-session navigation and existing Git worktree management/review.
+- Add a local prompt library with editing, search, tags, original starter instructions, required template variables, preview and clipboard copying without sending messages or executing tools.
+
+### Fixes and safety
+
+- Store personal data in a bounded native library with validated schema, atomic writes and serialized field merges. Preserve corrupt/future files and reject invalid or oversized changes. Protect open editors and pending writes during close, update and renderer recovery.
+- Reject excess tags explicitly instead of silently truncating input. Reuse shared fields, cards, buttons, themes and modal focus handling across the new pages.
+- Guard inherited annotation keys for special session IDs, and prioritize the page name over secondary title-bar text in compact windows.
+- Update stale documentation that described shipped presentation/update capabilities as unreleased. Target visible search fields in long-transcript acceptance when hidden console controls remain mounted.
+
+### Verification
+
+- Exercise new workflows in two complete real-WebView rounds using compressed session logs, native persistence, actual pointer/keyboard input, clipboard reads, canceled actions, light/dark themes and a 900×620 viewport.
+- Regress all ten desktop routes, native profile/preset/session operations, five real PTYs, 4000-message pagination and read-limit warnings. Verify three Harness stop/start cycles and actual repair on Windows/Node 24.21.0.
+- Local tests cover 668 frontend cases, 569 executed Rust cases and 147 packaging cases; frontend line coverage is 99.36%. Production build, strict Clippy, lint, public ACL and bilingual documentation remain release gates. External paid providers and physical macOS/Linux GUI interaction are outside local Windows evidence.
 
 ## [0.9.22] — 2026-09-30
 

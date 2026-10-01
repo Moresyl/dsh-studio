@@ -11,6 +11,8 @@ test('desktop acceptance covers every visible workbench page in rail order', () 
     { label: '插件', heading: '插件市场' },
     { label: '远程', heading: '远程访问' },
     { label: '演示文稿', heading: '演示文稿' },
+    { label: '工作区', heading: '工作区' },
+    { label: '提示库', heading: '提示库' },
     { label: '关于', heading: '关于' },
     { label: '设置', heading: '设置' },
   ])

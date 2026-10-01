@@ -133,7 +133,9 @@ async function checkSession({ id, lineCount, mode }) {
     await wait(() => document.querySelector('[data-seq="1"]'), 'first segment')
     click('返回全部会话')
     await wait(() => document.querySelector('input[type="search"]'), 'search field')
-    const field = document.querySelector('input[type="search"]')
+    const field = [...document.querySelectorAll('input[type="search"]')].find(
+      (input) => input.getClientRects().length,
+    )
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(
       field,
       `needle-${id}`,
@@ -230,7 +232,7 @@ try {
   await evaluate(`(async () => {
     [...document.querySelectorAll('button')].find(button => button.innerText.trim() === '返回全部会话')?.click();
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    const field = document.querySelector('input[type="search"]');
+    const field = [...document.querySelectorAll('input[type="search"]')].find(input => input.getClientRects().length);
     if (field) {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(field, '');
       field.dispatchEvent(new Event('input', {bubbles: true}));

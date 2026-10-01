@@ -1,5 +1,7 @@
 import {
   Gauge,
+  FolderOpen,
+  BookOpen,
   History,
   Info,
   Puzzle,
@@ -22,6 +24,8 @@ export type View =
   | 'about'
   | 'settings'
   | 'presentations'
+  | 'workspaces'
+  | 'library'
 
 /** Stable numbered accelerator order; About remains sixth for compatibility. */
 export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
@@ -32,6 +36,8 @@ export const VIEWS: { id: View; icon: LucideIcon; label: MessageKey }[] = [
   { id: 'remote', icon: Smartphone, label: 'nav.remote' },
   { id: 'about', icon: Info, label: 'nav.about' },
   { id: 'presentations', icon: Presentation, label: 'nav.presentations' },
+  { id: 'workspaces', icon: FolderOpen, label: 'nav.workspaces' },
+  { id: 'library', icon: BookOpen, label: 'nav.library' },
 ]
 
 export const SETTINGS = { id: 'settings' as View, icon: Settings, label: 'nav.settings' as const }

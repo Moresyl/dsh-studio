@@ -2,7 +2,7 @@
 
 [简体中文](ROADMAP.zh-CN.md)
 
-Updated 2026-09-29. The shipped baseline is v0.9.19. In-development work is not
+Updated 2026-10-01. The version baseline is v0.9.24. In-development work is not
 released until it appears in a published version's changelog. This document
 records product capabilities and acceptance boundaries, not relative rankings
 or promises of zero defects.
@@ -48,10 +48,20 @@ none alone proves final-installer or physical macOS acceptance.
 
 ## In development
 
-The priorities below are future work, not capabilities claimed for v0.9.19.
+Cross-device sync, workspace-linked documents and durable crash drafts remain future work.
+
+## v0.9.23–0.9.24
+
+Session pins, display names, tags, notes, message bookmarks, workspace summaries
+and a personal prompt library enter v0.9.23. v0.9.24 adds batch pins/tags, prompt
+JSON transfer, personal backups and read-only workspace file browsing. Bounded
+atomic writes and preview-bound imports preserve existing data; exit, update and
+reload protect editors and pending writes.
+
+## Included in v0.9.20–0.9.22
 
 - Application version history, reviewed upgrades/reinstalls/downgrades and cancellable
-  signed downloads are under acceptance. A native, window-owned receipt binds the
+  signed downloads shipped. A native, window-owned receipt binds the
   version, notes, asset identity, byte count and signature; installation rechecks
   that receipt and serializes changes across windows and runtime operations.
 - Public release inventory snapshots provide a website fallback when GitHub's API
@@ -66,14 +76,13 @@ The priorities below are future work, not capabilities claimed for v0.9.19.
 
 ## Next priorities
 
-The current development branch also includes authorized image/text/PDF attachment
-reading and original-file saving, local presentation authoring with editable PPTX
-export, and multi-window save protection around exit/update/reload. These remain
-unreleased. Windows WebView checks and deterministic/native tests cover specific
-flows; they do not establish complete native-picker, installer or cross-platform
-GUI acceptance. PPTX import, imported personal templates, session/workspace-linked
-presentation projects, whole-process draft recovery and integrated image generation
-remain capability gaps. Public tunnel activation is not part of the shipped LAN gateway.
+Image/text/PDF attachment reading, original-file saving, local presentation editing,
+editable PPTX export and multi-window save protection have shipped. Windows
+WebView and deterministic/native tests cover specific flows; they do not establish
+complete native-picker or physical cross-platform GUI acceptance. PPTX import,
+personal template import, session/workspace-linked documents, whole-process draft
+recovery, knowledge bases and integrated image generation remain gaps. Public
+tunnel activation is outside the shipped LAN gateway.
 
 ### Reliability and complete user flows
 

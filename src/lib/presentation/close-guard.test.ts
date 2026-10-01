@@ -16,6 +16,7 @@ vi.mock('@/state/failure', () => ({ reportFailure: mocks.reportFailure }))
 vi.mock('@/lib/ipc', () => ({ status: mocks.status }))
 import { guardPresentationClose } from './close-guard'
 import { usePresentationEditor } from '@/state/presentation-editor'
+import { useLibrary } from '@/state/library'
 import { fixture } from './fixtures.test-support'
 
 const callback = () =>
@@ -25,6 +26,7 @@ const callback = () =>
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.label = 'main'
+  useLibrary.setState({ busy: false, editing: false })
   mocks.status.mockResolvedValue({ phase: 'stopped' })
   mocks.hide.mockResolvedValue(undefined)
   vi.stubGlobal('HTMLElement', class {})
@@ -35,6 +37,19 @@ beforeEach(() => {
   mocks.close.mockResolvedValue(undefined)
 })
 afterEach(() => vi.unstubAllGlobals())
+
+it.each([
+  { editing: true, busy: false },
+  { editing: false, busy: true },
+])('preserves a personal editor or pending write on stopped-window closure: %o', async (state) => {
+  useLibrary.setState(state)
+  await guardPresentationClose()
+  const preventDefault = vi.fn()
+  await callback()({ preventDefault })
+  expect(preventDefault).toHaveBeenCalledOnce()
+  expect(mocks.reportFailure).toHaveBeenCalledOnce()
+  expect(mocks.close).not.toHaveBeenCalled()
+})
 
 it('allows a clean window to close and owns listener cleanup', async () => {
   const stop = await guardPresentationClose()

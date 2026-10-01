@@ -934,6 +934,97 @@ export interface SessionHit {
 /** Every session the harness has run on this machine, newest first. */
 export const sessionRoster = (): Promise<Shelved> => invoke('session_roster')
 
+export interface SessionAnnotation {
+  title: string
+  pinned: boolean
+  tags: string[]
+  note: string
+  bookmarks: number[]
+}
+
+export interface SavedPrompt {
+  id: string
+  title: string
+  body: string
+  tags: string[]
+}
+
+export interface PersonalLibrary {
+  version: number
+  sessions: Record<string, SessionAnnotation>
+  prompts: Record<string, SavedPrompt>
+}
+
+export const libraryRead = (): Promise<PersonalLibrary> => invoke('library_read')
+export const sessionAnnotate = (
+  id: string,
+  annotation: Partial<SessionAnnotation>,
+): Promise<PersonalLibrary> => invoke('session_annotate', { id, annotation })
+export const promptSave = (prompt: SavedPrompt): Promise<PersonalLibrary> =>
+  invoke('prompt_save', { prompt })
+export const promptRemove = (id: string): Promise<PersonalLibrary> =>
+  invoke('prompt_remove', { id })
+
+export interface BatchAnnotation {
+  pinned?: boolean
+  addTags?: string[]
+  removeTags?: string[]
+}
+export interface LibraryImportPreview {
+  revision: string
+  sourceHash: string
+  prompts: number
+  sessions: number
+  conflicts: number
+  names: string[]
+  promptsOnly: boolean
+}
+export const sessionAnnotateMany = (
+  ids: string[],
+  annotation: BatchAnnotation,
+): Promise<PersonalLibrary> => invoke('session_annotate_many', { ids, annotation })
+export const libraryExportSave = (path: string, promptsOnly: boolean): Promise<void> =>
+  invoke('library_export_save', { path, promptsOnly })
+export const libraryImportPreview = (source: string): Promise<LibraryImportPreview> =>
+  invoke('library_import_preview', { source })
+export const libraryImportApply = (
+  source: string,
+  preview: LibraryImportPreview,
+  overwrite: boolean,
+): Promise<PersonalLibrary> =>
+  invoke('library_import_apply', {
+    source,
+    revision: preview.revision,
+    sourceHash: preview.sourceHash,
+    overwrite,
+  })
+export interface WorkspaceFile {
+  name: string
+  path: string
+  directory: boolean
+  bytes: number
+}
+export interface WorkspaceListing {
+  root: string
+  relative: string
+  entries: WorkspaceFile[]
+  limited: boolean
+  skipped: number
+}
+export interface WorkspaceText {
+  root: string
+  relative: string
+  text: string
+  bytes: number
+  lines: number
+}
+export const workspaceFiles = (
+  relative: string,
+  expectedRoot: string | null = null,
+): Promise<WorkspaceListing> => invoke('workspace_files', { relative, expectedRoot })
+export const workspaceFileRead = (relative: string, expectedRoot: string): Promise<WorkspaceText> =>
+  invoke('workspace_file_read', { relative, expectedRoot })
+
 /**
  * The sessions a query describes, best answer first.
  *

@@ -39,6 +39,48 @@ that cookie exactly like a browser tab — no Harness patching is involved.
 
 ## Session history
 
+Pin sessions, set personal display names, add tags and notes, and filter or sort by
+tag, name or activity. Search also matches those annotations. Bookmark individual
+messages and use **Important messages** to show only marked turns. Studio stores
+annotations in `personal-library.json` without rewriting Harness logs. Up to 12
+tags with 40 characters each are accepted; excess input must be corrected before saving.
+
+## Prompt library and workspaces
+
+Create, edit, search and delete local instructions in **Prompt library**. Use
+`{{file}}` or `{{topic}}` for variables. **Copy instruction** requires all values
+and previews the result before copying to the system clipboard; it never sends a
+message or runs tools. Canceling an unsaved edit requires confirmation. Exit,
+update and renderer reload protect open editors and pending writes. Up to 250
+prompts and a 2 MiB personal-library file are supported. Damaged or unsupported
+files are reported and preserved.
+
+**Workspaces** groups the current directory and directories associated with local
+sessions, with session/turn/token counts and recent activity. Search paths, switch
+directories, open associated sessions or use the existing Git worktree manager
+and read-only review. A running Harness still requires a confirmed restart to
+apply a directory switch. Summaries inherit transcript read limits and are not billing records.
+
+## Reading and export
+
+**Organize selection** selects current session results for batch pinning/unpinning
+and adding/removing tags. Select at most 500 sessions; changing search or filters
+clears selection. Validation precedes one atomic save, preserving names, notes
+and bookmarks. Any invalid record rejects the entire batch.
+
+Import/export prompt JSON in **Prompt library**, or back up/restore prompts and
+session annotations under **Personal data** in Settings. Backups exclude
+credentials, Harness logs and runtime preferences. Preview counts and conflicts
+before importing: keep existing records by default or explicitly replace
+conflicts. Records absent from the backup remain. Concurrent changes require a
+fresh preview; corrupt, unknown-format and over-2-MiB input is rejected.
+
+**Browse files** in Workspaces lazily lists the current workspace, with filtering,
+parent navigation, read-only text preview and copying. Each directory displays
+at most 1,500 entries; previews accept valid UTF-8 text up to 1 MiB. Binary files
+and editing are unsupported. Symlinks and Windows reparse points are not followed;
+requests for an old workspace are rejected after switching roots.
+
 Search saved conversations by their content, open a matching excerpt, and export
 the native transcript as Markdown, HTML or JSON. Long transcripts display up to
 120 messages per segment; the footer goes to earlier, later, first or latest
@@ -57,6 +99,10 @@ loaded portion. Markdown/HTML exports include a warning; JSON includes
 Discovery can use npm, DSH 1024Store, the rate-limited reviewed dshfind catalog, or a custom standard catalog. The Sources tab also opens [DSH Hub](https://dsh-hub.org/) for community discovery: copy a listed npm package name back into Studio search and the same native review applies. DSH Hub currently exposes a website directory rather than Studio's public catalog Schema 1.0.0 endpoint, so Studio does not scrape its HTML or treat the homepage as an install authority. Results are indexed for ten minutes and support category filters, sorting and 25-item pages. A catalog can only suggest an exact npm target. Before any mutation, Studio resolves that version again through npm and checks package syntax and the Harness peer range. A successful market install writes a receipt with the exact source, version and integrity; the managed badge is shown only while the installed version still matches that receipt. Plugin changes have a durable before-image; an interrupted operation is rolled back on the next launch and reported in the UI.
 
 ## Presentation and desktop integration
+
+Light, Dark and System choices synchronize between the window and Harness
+settings. System remains an automatic preference. Initial connection waits for
+saved Harness settings; subsequent rapid choices synchronize after confirmation.
 
 The terminal layout selector offers a single pane, side-by-side panes, stacked
 panes and a four-pane grid. Open shells explicitly with **New terminal**; layout
@@ -94,9 +140,9 @@ current Profile unchanged.
 
 Completion/failure notifications for user turns and background jobs can be enabled independently in Settings. Workspace selection uses the native folder picker and also accepts a dropped folder.
 
-## Local presentations (development branch)
+## Local presentations
 
-These controls are under acceptance and are not included in the published v0.9.19.
+Local presentation editing and editable PPTX export shipped in v0.9.20.
 
 Open **Presentations**, choose **New presentation**, preview a starting template,
 then create the document. Select objects to edit their properties; drag them to

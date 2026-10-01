@@ -22,6 +22,7 @@ import {
   type Release,
 } from '@/lib/updater'
 import { reportFailure } from '@/state/failure'
+import { useLibrary } from '@/state/library'
 import { readPreference, savePreference } from '@/lib/preferences'
 import { usePresentationEditor } from '@/state/presentation-editor'
 import { t } from '@/lib/i18n'
@@ -126,6 +127,11 @@ export const useUpdate = create<UpdateState>((set, get) => ({
     // Commit an input's pending value before deciding whether restarting is safe.
     if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
       document.activeElement.blur()
+    const personal = useLibrary.getState()
+    if (personal.editing || personal.busy) {
+      set({ error: reportFailure(new Error(t('organize.saveBeforeExit'))) })
+      return
+    }
     if (!usePresentationEditor.getState().lockForUpdate()) {
       set({ error: reportFailure(new Error(t('deck.saveBeforeUpdate'))) })
       return

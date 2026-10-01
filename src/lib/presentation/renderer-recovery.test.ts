@@ -5,9 +5,11 @@ vi.mock('@/lib/presentation/repository', () => repository)
 import { isPresentationDirty, usePresentationEditor as editor } from '@/state/presentation-editor'
 import { fixture } from './fixtures.test-support'
 import { canAutomaticallyReload, reloadPreservingPresentation } from './renderer-recovery'
+import { useLibrary } from '@/state/library'
 
 beforeEach(() => {
   vi.resetAllMocks()
+  useLibrary.setState({ editing: false, busy: false })
   editor.setState({
     document: null,
     revision: null,
@@ -20,6 +22,15 @@ beforeEach(() => {
   })
 })
 afterEach(() => vi.unstubAllGlobals())
+
+it('blocks recovery reloads while a personal edit or write is pending', async () => {
+  const reload = vi.fn()
+  useLibrary.setState({ editing: true })
+  expect(canAutomaticallyReload()).toBe(false)
+  expect(await reloadPreservingPresentation(reload, false)).toBe(false)
+  await expect(reloadPreservingPresentation(reload)).rejects.toThrow()
+  expect(reload).not.toHaveBeenCalled()
+})
 
 it('keeps the editor locked while asynchronous reload preparation runs and unlocks on failure', async () => {
   let reject!: (cause: Error) => void

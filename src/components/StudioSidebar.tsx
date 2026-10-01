@@ -5,6 +5,7 @@ import {
   Layers,
   MessageSquareText,
   Search,
+  Pin,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -18,6 +19,7 @@ import { useRemote } from '@/state/remote'
 import { useSessions } from '@/state/sessions'
 import { runningCount, useTerminals } from '@/state/terminals'
 import { useUpdate } from '@/state/update'
+import { annotationFor, organizeSessions, sessionTitle, useLibrary } from '@/state/library'
 
 interface StudioSidebarProps {
   collapsed: boolean
@@ -53,6 +55,11 @@ export function StudioSidebar({
   const archived = useSessions((state) => state.archived)
   const opened = useSessions((state) => state.opened?.card.id ?? state.opening)
   const refreshSessions = useSessions((state) => state.refresh)
+  const annotations = useLibrary((state) => state.data.sessions)
+  const loadLibrary = useLibrary((state) => state.load)
+  useEffect(() => {
+    void loadLibrary()
+  }, [loadLibrary])
 
   useEffect(() => {
     void refreshPlugins()
@@ -64,7 +71,10 @@ export function StudioSidebar({
     return () => window.clearTimeout(timer)
   }, [collapsed, refreshSessions])
 
-  const recent = cards?.filter((card) => !archived.includes(card.id)).slice(0, 8) ?? []
+  const recent = organizeSessions(
+    cards?.filter((card) => !archived.includes(card.id)) ?? [],
+    annotations,
+  ).slice(0, 12)
 
   return (
     <aside
@@ -135,14 +145,19 @@ export function StudioSidebar({
                 <button
                   key={card.id}
                   type="button"
-                  data-hint={card.title}
+                  data-hint={sessionTitle(card, annotations)}
                   aria-current={
                     !inHarness && view === 'sessions' && opened === card.id ? 'page' : undefined
                   }
                   onClick={() => onOpenSession(card.id)}
-                  className="block h-8 w-full truncate rounded-lg px-2.5 text-left text-ui-base text-muted transition-colors hover:bg-surface-2/70 hover:text-text aria-[current=page]:bg-surface-2 aria-[current=page]:text-text"
+                  className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-ui-base text-muted transition-colors hover:bg-surface-2/70 hover:text-text aria-[current=page]:bg-surface-2 aria-[current=page]:text-text"
                 >
-                  {card.title}
+                  {annotationFor(annotations, card.id)?.pinned && (
+                    <Pin size={12} className="shrink-0" aria-hidden="true" />
+                  )}
+                  <span className="truncate">
+                    {sessionTitle(card, annotations) || t('sessions.untitled')}
+                  </span>
                 </button>
               ))}
             </div>

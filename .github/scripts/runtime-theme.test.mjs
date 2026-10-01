@@ -250,6 +250,22 @@ test("a choice made in Harness's Appearance row is reported to the window exactl
 // Longer than the bridge waits for Harness's saved settings to catch up.
 const SETTLED = 3500
 
+test('successive choices after initial loading are never hidden by a new settling window', () => {
+  const service = fakeTheme('light')
+  const harness = mount({ theme: service })
+  ask(harness, 'light', 'light')
+  harness.advance(SETTLED)
+  ask(harness, 'dark', 'dark')
+  service.pickInHarness('system')
+  harness.flush()
+  assert.equal(service.getTheme().preference, 'system')
+  assert.equal(harness.parentMessages.at(-1).preference, 'system')
+  ask(harness, 'system', 'light')
+  service.pickInHarness('light')
+  harness.flush()
+  assert.equal(harness.parentMessages.at(-1).preference, 'light')
+})
+
 test('Harness does not speak before the window has said what it wants', () => {
   const service = fakeTheme('light')
   const harness = mount({ theme: service })
@@ -303,7 +319,7 @@ test("the window's choice stands while Harness's saved settings catch up", () =>
   assert.equal(harness.parentMessages[0].type, 'dsh-studio:theme-ready')
 })
 
-test("a saved value that disagrees is not reported however long it lingers inside the window", () => {
+test('a saved value that disagrees is not reported however long it lingers inside the window', () => {
   const service = fakeTheme('light')
   const harness = mount({ theme: service })
   ask(harness, 'light', 'light')

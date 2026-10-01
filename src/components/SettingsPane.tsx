@@ -26,6 +26,7 @@ import { SelectControl } from '@/components/SelectControl'
 import { Switch } from '@/components/Switch'
 import { WorktreeManager } from '@/components/WorktreeManager'
 import { WorktreeReview } from '@/components/WorktreeReview'
+import { LibraryTransfer } from '@/components/LibraryTransfer'
 import type { GitWorktree } from '@/lib/ipc'
 import { t, type MessageKey } from '@/lib/i18n'
 import { readCombination, spellCombination } from '@/lib/keys'
@@ -106,7 +107,12 @@ export function SettingsPane() {
                   ) : (
                     occupied && (
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-warn">
-                        <TriangleAlert size={14} strokeWidth={2} className="shrink-0" aria-hidden="true" />
+                        <TriangleAlert
+                          size={14}
+                          strokeWidth={2}
+                          className="shrink-0"
+                          aria-hidden="true"
+                        />
                         {t('settings.taken')}
                         <Button
                           variant="secondary"
@@ -256,6 +262,11 @@ export function SettingsPane() {
               </Row>
             </ul>
 
+            <div className="card flex flex-col gap-3 p-5">
+              <h2 className="text-ui-base font-medium">{t('transfer.title')}</h2>
+              <p className="text-ui-sm leading-relaxed text-muted">{t('transfer.notice')}</p>
+              <LibraryTransfer />
+            </div>
             <WorktreeManager onReview={setReview} />
 
             {error && (

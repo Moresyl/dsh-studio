@@ -11,6 +11,7 @@ mod diagnostics;
 mod error;
 mod fetch;
 mod harness;
+mod library;
 mod lifecycle;
 mod locale;
 mod logging;
@@ -110,6 +111,7 @@ pub fn run() {
             app.manage(Arc::new(PluginIntents::default()));
             app.manage(Arc::new(NodeJobs::default()));
             app.manage(Arc::new(sessions::Library::default()));
+            app.manage(Arc::new(library::Store::default()));
             app.manage(recovery::RendererHealth::default());
             app.manage(terminal::Terminals::new()?);
             app.manage(updates::UpdateState::default());
@@ -214,6 +216,14 @@ pub fn run() {
             terminal::commands::terminal_close,
             terminal::commands::terminal_list,
             sessions::commands::session_roster,
+            library::library_read,
+            library::session_annotate,
+            library::session_annotate_many,
+            library::transfer::library_export_save,
+            library::transfer::library_import_preview,
+            library::transfer::library_import_apply,
+            library::prompt_save,
+            library::prompt_remove,
             sessions::commands::session_search,
             sessions::commands::session_read,
             sessions::commands::session_archive,
@@ -255,6 +265,8 @@ pub fn run() {
             workspace::workspace_select,
             workspace::workspace_inspect,
             workspace::workspace_worktrees,
+            workspace::files::workspace_files,
+            workspace::files::workspace_file_read,
             workspace::workspace_worktree_create,
             workspace::review::workspace_worktree_review,
         ])

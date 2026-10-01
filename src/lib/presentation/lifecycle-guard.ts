@@ -9,6 +9,7 @@ import {
 import { isPresentationDirty, usePresentationEditor } from '@/state/presentation-editor'
 import { reportFailure } from '@/state/failure'
 import { t } from '@/lib/i18n'
+import { useLibrary } from '@/state/library'
 
 /** Hold a stable local document snapshot until the native all-window lease ends. */
 export async function guardApplicationLifecycle(): Promise<() => void> {
@@ -36,11 +37,13 @@ export async function guardApplicationLifecycle(): Promise<() => void> {
     const state = usePresentationEditor.getState()
     // The initiating window may already own the local updater lock.
     const inherited = state.busy === 'update' && !isPresentationDirty(state)
-    owned = !inherited && state.lockForUpdate()
-    const ready = inherited || owned
+    const personal = useLibrary.getState()
+    const personalReady = !personal.busy && !personal.editing
+    owned = personalReady && !inherited && state.lockForUpdate()
+    const ready = personalReady && (inherited || owned)
     if (!ready) {
       void getCurrentWindow().show().catch(reportFailure)
-      reportFailure(new Error(t('deck.saveBeforeExit')))
+      reportFailure(new Error(t(personalReady ? 'deck.saveBeforeExit' : 'organize.saveBeforeExit')))
     }
     // A reloaded document rejoins an already-approved lease without a second vote.
     if (awaiting)
