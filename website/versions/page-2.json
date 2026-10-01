@@ -1,5 +1,13 @@
 [
   {
+    "tag_name": "v0.9.3",
+    "name": "",
+    "draft": false,
+    "prerelease": false,
+    "published_at": "2026-09-11T17:02:55Z",
+    "assets": []
+  },
+  {
     "tag_name": "v0.9.2",
     "name": "DSH Studio v0.9.2",
     "draft": false,
