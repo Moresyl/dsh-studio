@@ -180,22 +180,120 @@ window.__ModuleLoader__.load({
         const originalDark = document.body.hasAttribute('data-ds-dark-theme')
         const originalColorScheme = document.documentElement.style.colorScheme
 
+        // Two things can decide this page's palette: the window's switch, and the
+        // Appearance row in Harness's own settings. Writing the window's choice
+        // straight onto the document — all this used to do — leaves the two to
+        // fight. Pick Light inside Harness while the window is dark and Harness
+        // draws its light surfaces while the window's dark text colours are laid
+        // over them: pale text on pale ground, in half the dialog.
+        //
+        // So when Harness has a theme service the two are one setting. The window's
+        // choice is made through that service, the palette below follows the scheme
+        // Harness is actually drawing rather than the scheme that was asked for, and
+        // a change made in Harness's own row is reported back so the window follows
+        // it. The direct write is what remains for a Harness without the service.
+        const preferences = ['system', 'light', 'dark']
+        let asked = null
+        let service = null
+        let parentOrigin = '*'
+        let painted = false
+
+        const show = (scheme) => {
+          document.body.dataset.dshStudioTheme = scheme
+        }
+        const paint = (scheme) => {
+          painted = true
+          show(scheme)
+          document.body.toggleAttribute('data-ds-dark-theme', scheme === 'dark')
+          document.documentElement.style.colorScheme = scheme
+        }
+        const follow = () => {
+          if (asked === null) return
+          if (service === null) {
+            paint(asked.theme)
+            return
+          }
+          settled = Date.now() + settling
+          if (service.getTheme().preference !== asked.preference) service.setTheme(asked.preference)
+        }
+        // Harness's answer, whoever changed it. Three things keep it from talking
+        // over the window.
+        //
+        // Nothing is reported before the window has said what it wants: Harness's
+        // saved preference is whatever it was last time, and letting it speak first
+        // would make a stale setting win over the window the user is looking at.
+        //
+        // For a few seconds after the window speaks, a preference that disagrees with
+        // it is put right rather than reported. Harness reads and confirms its saved
+        // settings asynchronously, so a preference set from here is followed by the
+        // old saved value being adopted and then the new one being confirmed — changes
+        // nobody made, arriving after a delay nobody can promise the length of.
+        // Reported as they came, they would flick the whole window to the wrong
+        // theme and back; the window's choice simply stands until they have passed.
+        //
+        // After that a difference is somebody clicking in Harness's own row, and is
+        // reported once it has held still — one change that stays, so it gets
+        // through a third of a second later.
+        const settling = 3000
+        let settled = 0
+        let holding = 0
+        const reflect = (snapshot) => {
+          show(snapshot.active.colorScheme)
+          clearTimeout(holding)
+          if (asked === null || snapshot.preference === asked.preference) return
+          if (Date.now() < settled) {
+            service.setTheme(asked.preference)
+            return
+          }
+          holding = setTimeout(() => {
+            if (service === null || asked === null) return
+            const held = service.getTheme()
+            if (held.preference === asked.preference) return
+            asked = { theme: held.active.colorScheme, preference: held.preference }
+            window.parent.postMessage(
+              { type: 'dsh-studio:theme-preference', preference: held.preference },
+              parentOrigin,
+            )
+          }, 350)
+        }
+
+        ctx.inject(['theme'], (client) => {
+          service = client.theme
+          client.on('theme/change', reflect)
+          show(service.getTheme().active.colorScheme)
+          follow()
+          client.effect(
+            () => () => {
+              service = null
+            },
+            'dsh-studio: theme service',
+          )
+        })
+
         const onTheme = (event) => {
           if (event.source !== window.parent || event.data?.type !== 'dsh-studio:theme') return
-          if (event.data.theme !== 'dark' && event.data.theme !== 'light') return
-          document.body.dataset.dshStudioTheme = event.data.theme
-          document.body.toggleAttribute('data-ds-dark-theme', event.data.theme === 'dark')
-          document.documentElement.style.colorScheme = event.data.theme
+          const { theme, preference } = event.data
+          if (theme !== 'dark' && theme !== 'light') return
+          if (typeof event.origin === 'string' && event.origin !== '' && event.origin !== 'null')
+            parentOrigin = event.origin
+          // A window that predates the preference field only ever named a scheme.
+          asked = { theme, preference: preferences.includes(preference) ? preference : theme }
+          follow()
         }
         window.addEventListener('message', onTheme)
         window.parent.postMessage({ type: 'dsh-studio:theme-ready' }, '*')
         ctx.effect(
           () => () => {
             window.removeEventListener('message', onTheme)
+            clearTimeout(holding)
             style.remove()
             delete document.body.dataset.dshStudioTheme
-            document.body.toggleAttribute('data-ds-dark-theme', originalDark)
-            document.documentElement.style.colorScheme = originalColorScheme
+            // Only what was written directly is this plugin's to take back; with
+            // the service the document belongs to Harness's own presenter.
+            if (painted) {
+              document.body.toggleAttribute('data-ds-dark-theme', originalDark)
+              document.documentElement.style.colorScheme = originalColorScheme
+            }
           },
           'dsh-studio: theme',
         )
