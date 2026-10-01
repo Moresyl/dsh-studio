@@ -10,12 +10,18 @@
  *
  * The managed integration plugin owns the small, documented theme-token bridge
  * inside Harness. This shell still never reaches into its DOM.
+ *
+ * Theme is the one thing that crosses in both directions. Harness has an
+ * Appearance setting of its own, so the window's choice is sent down and a choice
+ * made in Harness's row is sent back up — see `src/lib/theme-bridge.ts` for why
+ * they are one setting with two doors.
  */
 import { useCallback, useEffect, useRef } from 'react'
 
 import { serveDesktop } from '@/lib/bridge'
 import { serveImagePreview } from '@/lib/attachment-preview'
 import { ownAsync } from '@/lib/lifecycle'
+import { readPreferenceRequest, themeMessage } from '@/lib/theme-bridge'
 import { reportFailure } from '@/state/failure'
 import { useTheme } from '@/state/theme'
 
@@ -33,23 +39,27 @@ export function HarnessFrame({ origin, hidden }: HarnessFrameProps) {
   const frame = useRef<HTMLIFrameElement>(null)
   const theme = useTheme((state) => state.theme)
   const sendTheme = useCallback(() => {
-    const resolved =
+    const dark =
       theme === 'system'
         ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true)
-          ? 'dark'
-          : 'light'
-        : theme
-    frame.current?.contentWindow?.postMessage(
-      { type: 'dsh-studio:theme', theme: resolved },
-      new URL(origin).origin,
-    )
+        : theme === 'dark'
+    frame.current?.contentWindow?.postMessage(themeMessage(theme, dark), new URL(origin).origin)
   }, [origin, theme])
 
   useEffect(() => {
     const onReady = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow) return
       if (event.origin !== new URL(origin).origin) return
-      if (event.data?.type === 'dsh-studio:theme-ready') sendTheme()
+      if (event.data?.type === 'dsh-studio:theme-ready') {
+        sendTheme()
+        return
+      }
+      // The choice was made at Harness's door. Adopting it here is what sends it
+      // back down, so the page hears its own answer as a no-op; the comparison is
+      // what stops that echo from being announced to every other window again.
+      const requested = readPreferenceRequest(event.data)
+      const { theme: current, choose } = useTheme.getState()
+      if (requested !== null && requested !== current) choose(requested)
     }
     const media = window.matchMedia?.('(prefers-color-scheme: dark)')
     window.addEventListener('message', onReady)

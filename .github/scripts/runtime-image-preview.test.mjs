@@ -43,6 +43,8 @@ function mount(read, fetch) {
   })
   plugin.apply({
     inject: (names, setup) => {
+      // The theme bridge asks for its own service; this test is about the image one.
+      if (JSON.stringify(names) === JSON.stringify(['theme'])) return
       assert.equal(JSON.stringify(names), JSON.stringify(['remote', 'remote.session']))
       if (read)
         setup({

@@ -9,6 +9,10 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+### Fixes and polish
+
+- Make the window's Light / Dark / System choice and the Appearance row in Harness's own settings one setting. Choosing Light inside Harness under a dark window used to leave Harness drawing its light surfaces with the window's dark-theme text colours — pale text on a pale ground in half the dialog. The window's choice now goes through Harness's own theme service, the palette follows the scheme Harness is actually drawing, and a change made in Harness's row switches the window as well. Harness's saved appearance follows the window's, and a saved value left over from a previous run no longer overrules it at start-up.
+
 ## [0.9.22] — 2026-09-30
 
 ### Fixes and polish
