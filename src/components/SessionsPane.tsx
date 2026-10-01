@@ -385,7 +385,7 @@ export function SessionsPane() {
               />
               <button
                 type="button"
-                className="select-trigger"
+                className="select-trigger select-trigger--sm"
                 aria-haspopup="menu"
                 onClick={(event) => {
                   const box = event.currentTarget.getBoundingClientRect()
@@ -771,7 +771,7 @@ function Reader({ card, lines, anchor, onBack }: ReaderProps) {
         subtitleHint={card?.project}
       >
         {card && <Export id={card.id} />}
-        {card && <SessionActions card={card} />}
+        {card && <SessionActions card={card} size="md" variant="secondary" />}
         <Button
           variant="secondary"
           aria-pressed={bookmarksOnly}
@@ -1192,7 +1192,7 @@ function FilterTags({
   return (
     <button
       type="button"
-      className="select-trigger max-w-[180px]"
+      className="select-trigger select-trigger--sm max-w-[180px]"
       aria-haspopup="menu"
       aria-label={t('organize.tags')}
       onClick={(event) => {

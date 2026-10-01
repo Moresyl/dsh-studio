@@ -9,6 +9,13 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.25] — 2026-10-02
+
+### Fixes and polish
+
+- Make the middle view of the title bar's switch a page of its own. It used to be the Harness page with a strip of buttons laid across the top, so choosing it showed the same window as the first view, and pressing a button in the strip threw the window into the control panel, from where the way back was a different view. It is now Studio's quick-actions page — one-click entries for Harness, terminals, sessions, plugins, profiles and workspaces, with the current profile and workspace shown on their cards — and the Harness window stays out of it. The English label changes from "Extended" to "Quick actions", and the Chinese label from "扩展" to "快捷操作" (the setting from "扩展模式" to "快捷操作模式"), because in Chinese "扩展" also means a plugin and the plugin market already calls its packages "扩展包". Each view in the switch now also says what it is when pointed at.
+- Finish bringing the pages added in 0.9.23 and 0.9.24 — the prompt library, the workspace file browser and the session organizer with batch selection — onto the shared control system, so they use the same four control heights, type ladder and corners as the rest of the window. Checks across ten pages at 900×620, 1100×740 and 1440×900 in both themes, with actual clicks through the changed dialogs, accompany the final row alignment: the pin and bookmark buttons in the session header, the refresh button beside the deck editor toolbar, the update notice in the status bar (now a full-height segment like its neighbours), the guide's footer buttons, the links in the plugin details, and the installed-plugin rows, whose icon and name are now one button.
+
 ## [0.9.24] — 2026-10-01
 
 ### Added

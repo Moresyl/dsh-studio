@@ -269,9 +269,24 @@ function ViewSwitch({
       value={mode}
       onChange={onChoose}
       items={[
-        { value: 'compatibility', label: t('view.harness'), icon: MessageSquare },
-        { value: 'extended', label: t('view.extended'), icon: PanelsTopLeft },
-        { value: 'advanced', label: t('view.panel'), icon: LayoutDashboard },
+        {
+          value: 'compatibility',
+          label: t('view.harness'),
+          hint: t('view.harness.hint'),
+          icon: MessageSquare,
+        },
+        {
+          value: 'extended',
+          label: t('view.extended'),
+          hint: t('view.extended.hint'),
+          icon: PanelsTopLeft,
+        },
+        {
+          value: 'advanced',
+          label: t('view.panel'),
+          hint: t('view.panel.hint'),
+          icon: LayoutDashboard,
+        },
       ]}
     />
   )

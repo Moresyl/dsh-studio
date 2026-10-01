@@ -64,6 +64,8 @@ export function WorkspacesPane({ onSessions }: { onSessions: () => void }) {
         <IconButton
           icon={RefreshCw}
           label={t('sessions.refresh')}
+          variant="secondary"
+          size="md"
           disabled={loading}
           onClick={() => void refresh()}
         />

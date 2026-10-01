@@ -2,12 +2,12 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 
-import { Button } from '@/components/Button'
 import { CommandPalette } from '@/components/CommandPalette'
 import { ContextMenu } from '@/components/ContextMenu'
 import { Dialog } from '@/components/Dialog'
 import { HarnessFrame } from '@/components/HarnessFrame'
 import { Onboarding } from '@/components/Onboarding'
+import { QuickActions } from '@/components/QuickActions'
 import { RecoveryCenter } from '@/components/RecoveryCenter'
 import { StatusBar } from '@/components/StatusBar'
 import { TitleBar } from '@/components/TitleBar'
@@ -69,6 +69,10 @@ export default function App() {
   const choosePresentation = usePresentation((state) => state.choose)
   // With nothing serving there is nothing else to show.
   const showPanel = origin === null || presentation === 'advanced'
+  // The middle view is a page of Studio's own, so of the three surfaces exactly
+  // one is on screen: the panel, that page, or the Harness window.
+  const showQuick = !showPanel && presentation === 'extended'
+  const showHarness = !showPanel && !showQuick
   const [view, setView] = useState<View>('console')
   const [workbenchLoaded, setWorkbenchLoaded] = useState(presentation === 'advanced')
   const [inspected, setInspected] = useState(false)
@@ -269,10 +273,10 @@ export default function App() {
   }, [show])
 
   // A native drop belongs to the surface the user can see. In the Studio
-  // workbench it changes the next Harness working directory; in compatibility
-  // presentation it is handed to the upstream Workspace service so it creates
-  // a real Workspace row and session there instead of changing an unrelated
-  // shell setting.
+  // workbench and on the quick-actions page it changes the next Harness working
+  // directory; in compatibility presentation it is handed to the upstream
+  // Workspace service so it creates a real Workspace row and session there
+  // instead of changing an unrelated shell setting.
   useEffect(() => {
     return ownAsync(
       getCurrentWindow().onDragDropEvent((event) => {
@@ -283,12 +287,12 @@ export default function App() {
           openPreset(path)
           return
         }
-        if (!showPanel && origin) pushWorkspaceDrop(path, origin)
+        if (showHarness && origin) pushWorkspaceDrop(path, origin)
         else void switchWorkspace(path)
       }),
       reportFailure,
     )
-  }, [openPreset, origin, showPanel])
+  }, [openPreset, origin, showHarness])
 
   // Ctrl+K, Ctrl+1 through Ctrl+7 in stable view order, Ctrl+comma for settings,
   // and Ctrl+Shift+N for another window. Every application with a fixed set of views
@@ -354,15 +358,10 @@ export default function App() {
       ? 'DSH Studio'
       : showPanel && activePage
         ? t(activePage.label)
-        : t('view.harness')
-  const sectionTitle =
-    stage === 'guiding'
-      ? undefined
-      : showPanel
-        ? t('view.panel')
-        : presentation === 'extended'
+        : showQuick
           ? t('view.extended')
-          : undefined
+          : t('view.harness')
+  const sectionTitle = stage === 'guiding' ? undefined : showPanel ? t('view.panel') : undefined
 
   return (
     // No ground of its own: the body is the window's ground, and where a
@@ -405,19 +404,23 @@ export default function App() {
               />
             )}
             <div className="relative flex min-h-0 min-w-0 flex-1">
+              {/* Hidden rather than unmounted whenever it is not the surface: an
+                  agent session is long-lived work, and visiting the panel or the
+                  quick-actions page must not throw it away. */}
               {origin && (
-                <div className="flex min-h-0 min-w-0 flex-1 flex-col" hidden={showPanel}>
-                  {presentation === 'extended' && (
-                    <ExtendedToolbar
-                      onView={show}
-                      onProfiles={manage}
-                      onWorkspace={() => void chooseWorkspace()}
-                    />
-                  )}
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col" hidden={!showHarness}>
                   <div className="relative min-h-0 flex-1">
                     <HarnessFrame origin={origin} hidden={false} />
                   </div>
                 </div>
+              )}
+              {showQuick && (
+                <QuickActions
+                  onHarness={() => present('compatibility')}
+                  onView={show}
+                  onProfiles={manage}
+                  onWorkspace={() => void chooseWorkspace()}
+                />
               )}
               {/* Hidden rather than unmounted so pane state survives a visit to Harness. */}
               {inspected && needsWorkbench(origin !== null, presentation, workbenchLoaded) && (
@@ -456,38 +459,6 @@ export default function App() {
       <ContextMenu />
       <Tooltip />
     </div>
-  )
-}
-
-function ExtendedToolbar({
-  onView,
-  onProfiles,
-  onWorkspace,
-}: {
-  onView: (view: View) => void
-  onProfiles: () => void
-  onWorkspace: () => void
-}) {
-  return (
-    <nav
-      aria-label={t('extended.actions')}
-      className="chrome flex h-10 shrink-0 items-center gap-1 border-b border-line px-3"
-    >
-      <span className="caption mr-2">{t('extended.label')}</span>
-      <ToolbarButton onClick={() => onView('terminal')}>{t('nav.terminal')}</ToolbarButton>
-      <ToolbarButton onClick={() => onView('sessions')}>{t('nav.sessions')}</ToolbarButton>
-      <ToolbarButton onClick={() => onView('plugins')}>{t('nav.plugins')}</ToolbarButton>
-      <ToolbarButton onClick={onProfiles}>{t('profile.manage')}</ToolbarButton>
-      <ToolbarButton onClick={onWorkspace}>{t('workspace.choose')}</ToolbarButton>
-    </nav>
-  )
-}
-
-function ToolbarButton({ children, onClick }: { children: string; onClick: () => void }) {
-  return (
-    <Button variant="ghost" size="sm" onClick={onClick}>
-      {children}
-    </Button>
   )
 }
 

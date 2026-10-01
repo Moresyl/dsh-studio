@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Bookmark, Pin, Save, X } from 'lucide-react'
-import { Button } from '@/components/Button'
+import { Button, type ButtonVariant, type ControlSize } from '@/components/Button'
 import { IconButton } from '@/components/IconButton'
 import { t } from '@/lib/i18n'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
@@ -15,14 +15,28 @@ import {
   useLibrary,
 } from '@/state/library'
 
-export function SessionActions({ card }: { card: SessionCard }) {
+/**
+ * Pin and annotate one session. Down in a list row they are the smallest size,
+ * furniture on the row's own line; in a header they stand among buttons of the
+ * header's size and have to be that size too, so the caller says which.
+ */
+export function SessionActions({
+  card,
+  size = 'xs',
+  variant = 'ghost',
+}: {
+  card: SessionCard
+  size?: ControlSize
+  variant?: ButtonVariant
+}) {
   const item = useLibrary((state) => annotationFor(state.data.sessions, card.id))
   const disabled = useLibrary((state) => state.busy || !state.loaded)
   const annotate = useLibrary((state) => state.annotate)
   const [editing, setEditing] = useState(false)
+  const compact = size === 'xs'
   return (
     <span
-      className="flex shrink-0 items-center gap-1"
+      className={`flex shrink-0 items-center ${compact ? 'gap-1' : 'gap-2'}`}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
@@ -31,15 +45,19 @@ export function SessionActions({ card }: { card: SessionCard }) {
         label={t(item?.pinned ? 'organize.unpin' : 'organize.pin')}
         aria-pressed={item?.pinned ?? false}
         disabled={disabled}
-        size="xs"
-        className={item?.pinned ? 'text-text' : 'text-faint'}
+        size={size}
+        variant={variant}
+        // A pinned row says so in its colour; a header button says so in its
+        // fill, the way every toggle button does.
+        className={compact ? (item?.pinned ? 'text-text' : 'text-faint') : undefined}
         onClick={() => void annotate(card.id, { pinned: !item?.pinned })}
       />
       <IconButton
         icon={Bookmark}
         label={t('organize.edit')}
         disabled={disabled}
-        size="xs"
+        size={size}
+        variant={variant}
         onClick={() => setEditing(true)}
       />
       {editing && <SessionEditor card={card} onClose={() => setEditing(false)} />}
@@ -95,7 +113,7 @@ function SessionEditor({ card, onClose }: { card: SessionCard; onClose: () => vo
         role="dialog"
         aria-modal="true"
         aria-labelledby="organize-heading"
-        className="dialog-panel flex max-h-[85vh] w-full max-w-[520px] flex-col gap-4 overflow-y-auto rounded-2xl border border-line-strong bg-surface p-6 shadow-lift"
+        className="dialog-panel flex max-h-[85vh] w-full max-w-[520px] flex-col gap-4 overflow-y-auto rounded-xl border border-line-strong bg-surface p-5 shadow-lift"
         onSubmit={(event) => {
           event.preventDefault()
           if (!validTags(tags)) return

@@ -11,8 +11,8 @@ test('bilingual pair validation reports every missing shared fact', () => {
     '普通内容'.repeat(60),
   )
   assert.equal(problems.length, 8)
-  assert(problems.some((problem) => problem.includes('Extended')))
-  assert(problems.some((problem) => problem.includes('扩展模式')))
+  assert(problems.some((problem) => problem.includes('Quick actions')))
+  assert(problems.some((problem) => problem.includes('快捷操作模式')))
 })
 
 test('repository bilingual capability documents stay synchronized', async () => {

@@ -38,7 +38,7 @@ export function PersonalDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={heading}
-        className={`dialog-panel flex max-h-[85vh] w-full flex-col gap-4 overflow-y-auto rounded-2xl border border-line-strong bg-surface p-6 shadow-lift ${wide ? 'max-w-[1040px]' : 'max-w-[640px]'}`}
+        className={`dialog-panel flex max-h-[85vh] w-full flex-col gap-4 overflow-y-auto rounded-xl border border-line-strong bg-surface p-5 shadow-lift ${wide ? 'max-w-[1040px]' : 'max-w-[640px]'}`}
       >
         <div className="flex items-center justify-between gap-3">
           <h2 id={heading} className="text-ui-lg font-semibold">

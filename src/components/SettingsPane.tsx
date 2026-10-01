@@ -375,7 +375,7 @@ function Recorder({ recording, onRecording: setRecording }: RecorderProps) {
       {held ? (
         <IconButton
           icon={X}
-          size="sm"
+          size="md"
           label={t('settings.clear')}
           disabled={busy}
           onClick={() => void setShortcut(null)}

@@ -723,51 +723,59 @@ function Installed({
 
         return (
           <li key={plugin.name} className="list-row list-row--roomy">
-            <Tile muted={plugin.builtin || plugin.disabled} />
+            {/* The icon and the words beside it are one button — the same
+                target a card in Discover is — so the name is not a 20px sliver
+                of text that happens to be clickable. The controls to its right
+                are separate buttons and cannot live inside it. */}
+            <button
+              type="button"
+              onClick={() => onOpen(plugin)}
+              aria-label={`${pluginDisplayName(plugin.name)} · ${plugin.name} · ${t('plugins.details')}`}
+              className="group flex min-w-0 flex-1 items-center gap-3 text-left"
+            >
+              <Tile muted={plugin.builtin || plugin.disabled} />
 
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <button
-                  type="button"
-                  onClick={() => onOpen(plugin)}
-                  data-hint={plugin.name}
-                  className="group flex max-w-full min-w-0 items-baseline gap-2 text-left"
-                >
-                  <span
-                    className={[
-                      'truncate text-ui-base font-semibold group-hover:underline',
-                      plugin.disabled ? 'text-muted' : 'text-text',
-                    ].join(' ')}
-                  >
-                    {pluginDisplayName(plugin.name)}
-                  </span>
-                  {(plugin.installedVersion || plugin.spec) && (
-                    <span className="max-w-full truncate font-mono text-ui-sm text-faint tabular-nums">
-                      {plugin.installedVersion || plugin.spec}
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="flex max-w-full min-w-0 items-baseline gap-2">
+                    <span
+                      className={[
+                        'truncate text-ui-base font-semibold group-hover:underline',
+                        plugin.disabled ? 'text-muted' : 'text-text',
+                      ].join(' ')}
+                    >
+                      {pluginDisplayName(plugin.name)}
                     </span>
+                    {(plugin.installedVersion || plugin.spec) && (
+                      <span className="max-w-full truncate font-mono text-ui-sm text-faint tabular-nums">
+                        {plugin.installedVersion || plugin.spec}
+                      </span>
+                    )}
+                  </span>
+
+                  {plugin.disabled ? (
+                    <Badge>{t('plugins.off')}</Badge>
+                  ) : incompatible ? (
+                    <Badge tone="warn">{t('plugins.runtimeBlocked')}</Badge>
+                  ) : (
+                    <Badge tone={plugin.active ? 'ok' : 'neutral'}>
+                      {plugin.active ? t('plugins.layer') : t('plugins.library')}
+                    </Badge>
                   )}
-                </button>
+                  {plugin.builtin && <Badge>{t('plugins.builtin')}</Badge>}
+                  {plugin.marketReceipt && <Badge tone="ok">{t('plugins.marketManaged')}</Badge>}
+                </span>
 
-                {plugin.disabled ? (
-                  <Badge>{t('plugins.off')}</Badge>
-                ) : incompatible ? (
-                  <Badge tone="warn">{t('plugins.runtimeBlocked')}</Badge>
-                ) : (
-                  <Badge tone={plugin.active ? 'ok' : 'neutral'}>
-                    {plugin.active ? t('plugins.layer') : t('plugins.library')}
-                  </Badge>
+                <span className="mt-0.5 block truncate text-ui-sm text-muted" title={plugin.name}>
+                  {plugin.name}
+                </span>
+                {incompatible && !plugin.disabled && (
+                  <span className="mt-1 block text-ui-sm text-warn [overflow-wrap:anywhere]">
+                    {t('plugins.runtimeBlockedHint')}
+                  </span>
                 )}
-                {plugin.builtin && <Badge>{t('plugins.builtin')}</Badge>}
-                {plugin.marketReceipt && <Badge tone="ok">{t('plugins.marketManaged')}</Badge>}
-              </div>
-
-              <p className="mt-0.5 truncate text-ui-sm text-muted">{plugin.name}</p>
-              {incompatible && !plugin.disabled && (
-                <p className="mt-1 text-ui-sm text-warn [overflow-wrap:anywhere]">
-                  {t('plugins.runtimeBlockedHint')}
-                </p>
-              )}
-            </div>
+              </span>
+            </button>
 
             {!plugin.builtin && (
               <Button

@@ -629,21 +629,19 @@ function Link({ href }: { href: string }) {
     return <span className="text-faint">{t('common.unavailable')}</span>
   }
 
+  // A small ghost button, like every other link in a row. It is 28px inside a
+  // 40px row, so its margins give back what the row would otherwise grow by.
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="sm"
       data-hint={target}
       onClick={() => void reportAction(() => openExternalUrl(target))}
-      className="inline-flex max-w-full items-center gap-1.5 hover:underline"
+      className="-my-1 -mr-2.5 max-w-full min-w-0"
     >
-      <span className="truncate">{target.replace(/^https?:\/\//, '')}</span>
-      <ExternalLink
-        size={14}
-        strokeWidth={1.9}
-        className="shrink-0 text-faint"
-        aria-hidden="true"
-      />
-    </button>
+      <span className="truncate text-text">{target.replace(/^https?:\/\//, '')}</span>
+      <ExternalLink aria-hidden="true" />
+    </Button>
   )
 }
 

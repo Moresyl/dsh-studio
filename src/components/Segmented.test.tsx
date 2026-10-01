@@ -66,4 +66,25 @@ describe('Segmented', () => {
     expect(markup).toContain('segmented__label')
     expect(markup).toContain('aria-label="Control panel"')
   })
+
+  it('says what a segment is when it has more to say than its label', () => {
+    const markup = renderToStaticMarkup(
+      <Segmented
+        label="View"
+        responsive
+        items={[
+          { value: 'extended', label: 'Quick actions', hint: 'A quick page of its own' },
+          { value: 'panel', label: 'Control panel' },
+        ]}
+        value="panel"
+        onChange={vi.fn()}
+      />,
+    )
+
+    expect(markup).toContain('data-hint="A quick page of its own"')
+    // The label still names it for a reader; the hint is only what a pointer gets.
+    expect(markup).toContain('aria-label="Quick actions"')
+    // With nothing more to say, the label is the hint.
+    expect(markup).toContain('data-hint="Control panel"')
+  })
 })

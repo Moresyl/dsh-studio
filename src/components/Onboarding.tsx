@@ -140,17 +140,18 @@ export function Onboarding() {
           </div>
         </div>
 
-        {/* The one place on the screen with two sizes of button in a row, on
-            purpose: the way on is the hero action and takes the large one, and
-            the ways back and out are ordinary commands. */}
+        {/* The guide is a page, not a dialog, and this is the bar a person leaves
+            it by, so every button in it takes the large size. The way on is the
+            only filled one; the ways back and out are told apart by their fill,
+            not by being a different height. */}
         <footer className="chrome flex shrink-0 items-center gap-2 border-t border-line px-6 py-3">
-          <Button variant="ghost" onClick={finish}>
+          <Button variant="ghost" size="lg" onClick={finish}>
             {t('guide.skip')}
           </Button>
 
           <div className="ml-auto flex items-center gap-2">
             {step > 0 && (
-              <Button variant="secondary" onClick={() => go(step - 1)}>
+              <Button variant="secondary" size="lg" onClick={() => go(step - 1)}>
                 {t('guide.back')}
               </Button>
             )}

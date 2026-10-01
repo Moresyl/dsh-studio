@@ -52,7 +52,7 @@ export function QrCode({ matrix, size = 200, label }: QrCodeProps) {
       // Modules land on integer coordinates, so antialiasing here would only
       // soften the edges a camera is trying to threshold.
       shapeRendering="crispEdges"
-      className="rounded-[10px] shadow-lift"
+      className="rounded-lg shadow-lift"
     >
       <rect width={span} height={span} fill="#ffffff" />
       <path d={path} fill="#000000" />

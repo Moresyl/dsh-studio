@@ -66,6 +66,8 @@ export function PromptLibraryPane() {
         <IconButton
           icon={RefreshCw}
           label={t('sessions.refresh')}
+          variant="secondary"
+          size="md"
           disabled={loading || busy}
           onClick={() => void load()}
         />

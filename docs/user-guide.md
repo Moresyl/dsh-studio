@@ -115,10 +115,10 @@ Only the layout preference is saved across application restarts, not shell
 processes or transcripts. Hiding the main window in the tray keeps shells running;
 quitting the application ends them.
 
-**Compatibility** opens the upstream Harness interface directly. **Extended**
-keeps the full upstream interface and adds a compact native toolbar for terminal,
-sessions, plugins, Profile and workspace actions. **Advanced** opens Studio's
-complete workspace. The preference is shared by every window. The built-in
+**Compatibility** opens the upstream Harness interface directly. **Quick actions**
+is a page of Studio's own, without the Harness window, with one-click entries for
+terminal, sessions, plugins, Profile and workspace actions. **Advanced** opens
+Studio's complete workspace. The preference is shared by every window. The built-in
 terminal receives the selected Profile/workspace plus the managed Node, Harness
 and pnpm tools on `PATH`. Packaged macOS and Linux builds recover only an
 allowlisted set of development variables from the login shell; credentials are

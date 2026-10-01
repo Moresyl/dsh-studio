@@ -30,8 +30,8 @@ const CONTRACTS = Object.freeze([
   },
   {
     pair: 'docs/user-guide.md|docs/user-guide.zh-CN.md',
-    english: ['**Extended**', 'Host Protocol 1', '1024 to', 'static native recovery window'],
-    chinese: ['**扩展模式**', 'Host Protocol 1', '1024–65535', '静态原生恢复窗口'],
+    english: ['**Quick actions**', 'Host Protocol 1', '1024 to', 'static native recovery window'],
+    chinese: ['**快捷操作模式**', 'Host Protocol 1', '1024–65535', '静态原生恢复窗口'],
   },
   {
     pair: 'docs/plugin-interoperability.md|docs/plugin-interoperability.zh-CN.md',

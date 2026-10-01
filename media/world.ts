@@ -820,6 +820,53 @@ export function answerCommands(): void {
         case 'session_archive':
           return { cards: sampleSessions, loaded: sampleSessions.length, archived: [] }
 
+        /* The personal library: one saved prompt and one annotated session, so the
+           screens that draw them have something to draw. */
+        case 'library_read':
+          return {
+            version: 1,
+            sessions: {
+              [sampleSessions[0]?.id ?? 'none']: {
+                title: '',
+                pinned: true,
+                tags: ['atlas', 'review'],
+                note: 'Start from the build pipeline notes.',
+                bookmarks: [],
+              },
+            },
+            prompts: {
+              review: {
+                id: 'review',
+                title: 'Review a change',
+                body: 'List the risks in this change before suggesting edits.',
+                tags: ['review'],
+              },
+            },
+          }
+
+        /* The workspace file browser: a small tree and one readable file. */
+        case 'workspace_files':
+          return {
+            root: `${HOME}\\projects\\atlas`,
+            relative: text(args, 'relative'),
+            entries: [
+              { name: 'src', path: 'src', directory: true, bytes: 0 },
+              { name: 'docs', path: 'docs', directory: true, bytes: 0 },
+              { name: 'README.md', path: 'README.md', directory: false, bytes: 2048 },
+              { name: 'package.json', path: 'package.json', directory: false, bytes: 512 },
+            ],
+            limited: false,
+            skipped: 0,
+          }
+        case 'workspace_file_read':
+          return {
+            root: `${HOME}\\projects\\atlas`,
+            relative: text(args, 'relative'),
+            text: '# Atlas\n\nA small project used for screenshots.\n',
+            bytes: 48,
+            lines: 3,
+          }
+
         /* Machine settings and workspace isolation */
         case 'startup_state':
         case 'startup_autostart':

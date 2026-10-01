@@ -110,22 +110,20 @@ export function WorkspaceFiles({ onClose }: { onClose: () => void }) {
           aria-label={t('files.title')}
           className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-ui-sm"
         >
-          <button
-            className="rounded px-2 py-1 text-muted hover:bg-surface-2"
-            disabled={loading}
-            onClick={() => navigate('')}
-          >
+          <Button variant="ghost" size="sm" disabled={loading} onClick={() => navigate('')}>
             {t('files.root')}
-          </button>
+          </Button>
           {parts.map((part, index) => (
-            <button
+            <Button
               key={index}
-              className="max-w-40 truncate rounded px-2 py-1 text-muted hover:bg-surface-2"
+              variant="ghost"
+              size="sm"
+              className="max-w-40 min-w-0 shrink"
               disabled={loading}
               onClick={() => navigate(parts.slice(0, index + 1).join('/'))}
             >
-              / {part}
-            </button>
+              <span className="truncate">/ {part}</span>
+            </Button>
           ))}
         </nav>
         <IconButton
@@ -173,7 +171,7 @@ export function WorkspaceFiles({ onClose }: { onClose: () => void }) {
                 {entries.map((entry) => (
                   <li key={entry.path}>
                     <button
-                      className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-ui-sm hover:bg-surface-2 ${file === entry.path ? 'bg-surface-2 text-text' : 'text-muted'}`}
+                      className={`flex min-h-10 w-full items-center gap-2 px-3 py-2 text-left text-ui-base hover:bg-surface-2 ${file === entry.path ? 'bg-surface-2 text-text' : 'text-muted'}`}
                       aria-pressed={file === entry.path}
                       onClick={() => {
                         if (entry.directory) navigate(entry.path)
@@ -189,7 +187,7 @@ export function WorkspaceFiles({ onClose }: { onClose: () => void }) {
                         {entry.name}
                       </span>
                       {!entry.directory && (
-                        <span className="shrink-0 text-faint tabular-nums">
+                        <span className="shrink-0 text-ui-sm text-faint tabular-nums">
                           {filesize(entry.bytes)}
                         </span>
                       )}

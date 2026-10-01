@@ -215,6 +215,7 @@ export function PresentationsPane() {
         </Button>
         <IconButton
           variant="secondary"
+          size="md"
           icon={Undo2}
           label={t('deck.undo')}
           onClick={editor.undo}
@@ -222,6 +223,7 @@ export function PresentationsPane() {
         />
         <IconButton
           variant="secondary"
+          size="md"
           icon={Redo2}
           label={t('deck.redo')}
           onClick={editor.redo}
@@ -272,8 +274,10 @@ export function PresentationsPane() {
             <section className="flex flex-col gap-0.5">
               <div className="mb-1 flex items-center justify-between pl-2.5">
                 <h2 className="caption">{t('deck.library')}</h2>
+                {/* The editor's toolbar is beside this on the same line, and its buttons
+                    are the small size, so the refresh is too. */}
                 <IconButton
-                  size="xs"
+                  size="sm"
                   label={t('deck.refresh')}
                   icon={RefreshCw}
                   onClick={() => setRefresh((n) => n + 1)}

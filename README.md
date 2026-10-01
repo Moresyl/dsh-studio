@@ -300,7 +300,7 @@ tracked release conditions.
 | Light and dark, following the system or not    | ✅                                                                  |
 | Profile manager, import/export and comparison  | ✅                                                                  |
 | Terminal, session search/usage/export, windows | ✅                                                                  |
-| Compatibility / Extended / Advanced surfaces   | ✅                                                                  |
+| Compatibility / Quick actions / Advanced pages | ✅                                                                  |
 | Fixed or random loopback port                  | ✅ occupied fixed ports fail clearly                                |
 | Renderer-independent startup recovery          | ✅ static native retry/diagnostics/quit                             |
 | Read-only Host plugin contract                 | ✅ Host Protocol 1; no package or command authority                 |
