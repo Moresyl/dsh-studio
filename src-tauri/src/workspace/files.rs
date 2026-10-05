@@ -225,10 +225,11 @@ fn search(selected: &Path, expected: &str, query: &str) -> Result<Listing> {
                     continue;
                 }
                 children.push((path, depth + 1));
-            } else if {
+            } else {
                 let normalized = path.to_lowercase();
-                terms.iter().all(|term| normalized.contains(term))
-            } {
+                if !terms.iter().all(|term| normalized.contains(term)) {
+                    continue;
+                }
                 if entries.len() >= SEARCH_MATCH_LIMIT {
                     limited = true;
                     break 'walk;

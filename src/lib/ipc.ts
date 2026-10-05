@@ -1045,18 +1045,27 @@ export interface ProjectNoteDraft {
   revision: string
 }
 export type ProjectNoteInput = Omit<ProjectNote, 'updated'>
+// TypeScript allows a read result as input; omit native-owned metadata on the wire.
+const projectNoteInput = ({ id, title, body, revision }: ProjectNoteInput) => ({
+  id,
+  title,
+  body,
+  revision,
+})
 export const workspaceNotes = (expectedRoot: string | null = null): Promise<ProjectNotes> =>
   invoke('workspace_notes', { expectedRoot })
 export const workspaceNoteSave = (
   expectedRoot: string,
   note: ProjectNoteInput,
   editor: string,
-): Promise<ProjectNote> => invoke('workspace_note_save', { expectedRoot, note, editor })
+): Promise<ProjectNote> =>
+  invoke('workspace_note_save', { expectedRoot, note: projectNoteInput(note), editor })
 export const workspaceNoteCheckpoint = (
   expectedRoot: string,
   note: ProjectNoteInput,
   editor: string,
-): Promise<void> => invoke('workspace_note_checkpoint', { expectedRoot, note, editor })
+): Promise<void> =>
+  invoke('workspace_note_checkpoint', { expectedRoot, note: projectNoteInput(note), editor })
 export const workspaceNoteDraftRemove = (
   expectedRoot: string,
   editor: string,

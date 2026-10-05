@@ -7,10 +7,29 @@ import {
   sessionAnnotateMany,
   workspaceFileRead,
   workspaceFiles,
+  workspaceNoteSave,
+  workspaceNoteCheckpoint,
 } from './ipc'
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 beforeEach(() => vi.clearAllMocks())
 describe('private desktop personal-data and file commands', () => {
+  it('resaves read and recovered notes without sending native-owned metadata', async () => {
+    const note = { id: 'saved', title: 'Title', body: 'Restored text', revision: 2, updated: 100 }
+    const input = { id: note.id, title: note.title, body: note.body, revision: note.revision }
+    await workspaceNoteCheckpoint('C:/project', note, 'editor')
+    expect(invoke).toHaveBeenLastCalledWith('workspace_note_checkpoint', {
+      expectedRoot: 'C:/project',
+      note: input,
+      editor: 'editor',
+    })
+    await workspaceNoteSave('C:/project', note, 'editor')
+    expect(invoke).toHaveBeenLastCalledWith('workspace_note_save', {
+      expectedRoot: 'C:/project',
+      note: input,
+      editor: 'editor',
+    })
+    expect(note.updated).toBe(100)
+  })
   it('passes the exact preview binding and explicit conflict policy', async () => {
     const preview = {
       revision: 'reviewed',

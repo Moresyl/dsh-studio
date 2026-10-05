@@ -262,7 +262,7 @@ export function WorkspaceFiles({ onClose }: { onClose: () => void }) {
               )}
               {searching ? (
                 <p role="status" className="p-4 text-ui-sm text-muted">
-                  {t('sessions.scanning')}
+                  {t('files.loading')}
                 </p>
               ) : entries.length === 0 && !error ? (
                 <p className="p-4 text-ui-sm text-faint">
@@ -362,7 +362,7 @@ export function WorkspaceFiles({ onClose }: { onClose: () => void }) {
             >
               {reading ? (
                 <p role="status" className="text-ui-sm text-muted">
-                  {t('sessions.scanning')}
+                  {t('files.loading')}
                 </p>
               ) : previewError ? (
                 <div className="flex flex-col items-start gap-3">
