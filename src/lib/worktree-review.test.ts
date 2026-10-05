@@ -64,8 +64,24 @@ describe('file-based numbered diffs', () => {
     expect(files[1]!.label).toBe('gone')
     expect(files[1]!.lines.at(-1)?.before).toBeNull()
     expect(files[2]!.lines.at(-1)?.text).toContain('Binary files')
+    expect(files[2]!.label).toBe('image')
     expect(diffFiles('')).toEqual([])
     expect(splitDiff([])).toEqual([])
+  })
+  it('selects binary and mode-only files with spaces or quoted UTF-8 paths', () => {
+    expect(
+      diffFiles('diff --git a/foo b/bar b/foo b/bar\nold mode 100644\nnew mode 100755\n')[0]!.label,
+    ).toBe('foo b/bar')
+    expect(
+      diffFiles(
+        'diff --git "a/\\344\\270\\255.bin" "b/\\344\\270\\255.bin"\nBinary files differ\n',
+      )[0]!.label,
+    ).toBe('中.bin')
+    expect(
+      diffFiles(
+        'diff --git a/original b/copied file\ncopy from original\ncopy to copied file\n',
+      )[0]!.label,
+    ).toBe('copied file')
   })
   it('pairs unequal edit blocks and keeps unchanged lines and annotations', () => {
     const files = diffFiles(

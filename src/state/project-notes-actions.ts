@@ -23,6 +23,21 @@ const get = useProjectNotes.getState
 const set = useProjectNotes.setState
 /** Loaded on demand. Saving older text never erases typing that arrived during IPC. */
 export const actions = {
+  discard: (expected: ProjectNoteInput) => {
+    const state = get()
+    if (
+      state.busy ||
+      state.locked ||
+      !state.draft ||
+      !notesDirty(state) ||
+      content(state.draft) !== content(expected)
+    )
+      return false
+    cancelSave()
+    const draft = state.notes.find((note) => note.id === state.draft!.id) ?? null
+    set({ draft, saved: draft ? content(draft) : null, error: null })
+    return true
+  },
   load: async () => {
     const state = get()
     if (state.busy || state.locked || notesDirty(state)) return false

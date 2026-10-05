@@ -20,6 +20,7 @@ interface NotesState {
   recover: (editor: string) => Promise<boolean>
   discardDraft: (editor: string) => Promise<boolean>
   saveCopy: () => Promise<boolean>
+  discard: (expected: ProjectNoteInput) => boolean
   lock: () => boolean
   unlock: () => void
 }
@@ -30,7 +31,15 @@ export const notesDirty = (state: Pick<NotesState, 'draft' | 'saved'>) =>
 
 type Actions = Pick<
   NotesState,
-  'load' | 'choose' | 'change' | 'save' | 'remove' | 'recover' | 'discardDraft' | 'saveCopy'
+  | 'load'
+  | 'choose'
+  | 'change'
+  | 'save'
+  | 'remove'
+  | 'recover'
+  | 'discardDraft'
+  | 'saveCopy'
+  | 'discard'
 >
 let loaded: Actions | null = null
 const actions = async (): Promise<Actions | null> => {
@@ -68,6 +77,7 @@ export const useProjectNotes = create<NotesState>((set, get) => ({
   discardDraft: (id) =>
     loaded ? loaded.discardDraft(id) : actions().then((api) => api?.discardDraft(id) ?? false),
   saveCopy: () => (loaded ? loaded.saveCopy() : actions().then((api) => api?.saveCopy() ?? false)),
+  discard: (expected) => loaded?.discard(expected) ?? false,
   lock: () => {
     if (get().locked || get().busy || notesDirty(get())) return false
     set({ locked: true })

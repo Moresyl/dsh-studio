@@ -71,6 +71,15 @@ export function diffPath(value: string): string {
   return new TextDecoder().decode(new Uint8Array(bytes))
 }
 
+const headerPath = (header: string) => {
+  const middle = Math.floor(header.length / 2)
+  // Unquoted paths may contain spaces, including the apparent " b/" separator.
+  if (header.startsWith('a/') && header.slice(middle) === ` b/${header.slice(2, middle)}`)
+    return header.slice(middle + 3)
+  const pair = /^("(?:\\.|[^"\\])*"|a\/.*?) ("(?:\\.|[^"\\])*"|b\/.*)$/.exec(header)
+  return pair ? diffPath(pair[2]!).replace(/^b\//, '') : header
+}
+
 /** Preserve metadata and binary notices; only hunk content receives line numbers. */
 export function diffFiles(patch: string): DiffFile[] {
   const files: DiffFile[] = []
@@ -81,7 +90,7 @@ export function diffFiles(patch: string): DiffFile[] {
   if (source.at(-1) === '') source.pop()
   for (const text of source) {
     if (text.startsWith('diff --git ') || file === null) {
-      file = { label: text.replace(/^diff --git /, ''), lines: [] }
+      file = { label: headerPath(text.replace(/^diff --git /, '')), lines: [] }
       files.push(file)
       before = null
       after = null
@@ -90,7 +99,8 @@ export function diffFiles(patch: string): DiffFile[] {
       file.label = diffPath(text.slice(4)).replace(/^b\//, '')
     else if (text.startsWith('--- ') && text !== '--- /dev/null')
       file.label = diffPath(text.slice(4)).replace(/^a\//, '')
-    else if (text.startsWith('rename to ')) file.label = diffPath(text.slice(10))
+    else if (text.startsWith('rename to ') || text.startsWith('copy to '))
+      file.label = diffPath(text.slice(text.indexOf(' to ') + 4))
     const kind = diffLineKind(text)
     const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(text)
     if (hunk) {

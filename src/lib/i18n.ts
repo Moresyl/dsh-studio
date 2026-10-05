@@ -210,7 +210,8 @@ const en = {
   'notes.remove': 'Delete note',
   'notes.removeBody': 'Delete this saved note from the project?',
   'notes.storageHint': 'Auto-saved on this computer. Supports 64 KiB of text per note.',
-  'notes.saveBeforeExit': 'Save the project note before closing, switching workspace or updating.',
+  'notes.saveBeforeExit':
+    'Save or discard unfinished project-note edits before closing, switching workspace or updating.',
   'files.scope': 'File search scope',
   'files.folderScope': 'This folder',
   'files.workspaceScope': 'All project files',
@@ -1323,7 +1324,7 @@ const zh: Record<MessageKey, string> = {
   'notes.remove': '删除笔记',
   'notes.removeBody': '删除当前项目中的这篇已保存笔记？',
   'notes.storageHint': '自动保存到本机，每篇笔记支持 64 KiB 文本。',
-  'notes.saveBeforeExit': '请先保存项目笔记，再关闭窗口、切换工作区或安装更新。',
+  'notes.saveBeforeExit': '请先保存或放弃项目笔记的未完成修改，再关闭窗口、切换工作区或安装更新。',
   'files.scope': '文件搜索范围',
   'files.folderScope': '当前文件夹',
   'files.workspaceScope': '全部项目文件',

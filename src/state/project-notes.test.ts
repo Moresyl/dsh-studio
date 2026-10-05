@@ -46,6 +46,32 @@ afterEach(() => {
 })
 
 describe('project notes and durable draft checkpoints', () => {
+  it('discards only reviewed local edits, preserving saved notes and durable backups', async () => {
+    await store.getState().load()
+    await store.getState().choose('one')
+    store.getState().change({ body: 'first draft' })
+    const reviewed = store.getState().draft!
+    store.getState().change({ body: 'newer draft' })
+    expect(store.getState().discard(reviewed)).toBe(false)
+    const current = store.getState().draft!
+    store.setState({ busy: 'save' })
+    expect(store.getState().discard(current)).toBe(false)
+    store.setState({ busy: null, locked: true })
+    expect(store.getState().discard(current)).toBe(false)
+    store.setState({ locked: false })
+    expect(store.getState().discard(current)).toBe(true)
+    expect(store.getState().draft?.body).toBe('saved')
+    expect(store.getState().notes).toHaveLength(1)
+    expect(store.getState().recovered).toHaveLength(1)
+    expect(ipc.workspaceNoteDraftRemove).not.toHaveBeenCalled()
+    expect(store.getState().lock()).toBe(true)
+    store.getState().unlock()
+    await store.getState().choose(null)
+    expect(store.getState().discard(store.getState().draft!)).toBe(true)
+    expect(store.getState().draft).toBeNull()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(ipc.workspaceNoteSave).not.toHaveBeenCalled()
+  })
   it('loads recoverable drafts and keeps selection when the same workspace refreshes', async () => {
     expect(await store.getState().load()).toBe(true)
     expect(await store.getState().choose('one')).toBe(true)

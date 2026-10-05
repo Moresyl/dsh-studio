@@ -20,4 +20,5 @@ it('reports a failed editor load without rejecting UI actions or dropping a draf
   expect(await store.getState().recover('editor')).toBe(false)
   expect(await store.getState().discardDraft('editor')).toBe(false)
   expect(await store.getState().saveCopy()).toBe(false)
+  expect(store.getState().discard(draft)).toBe(false)
 })

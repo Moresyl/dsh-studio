@@ -190,6 +190,27 @@ export function ProjectNotes({ workspace }: { workspace: string | null }) {
                     {t('notes.saveCopy')}
                   </Button>
                 )}
+                {dirty && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={blocked}
+                    onClick={() => {
+                      const expected = state.draft!
+                      void ask({
+                        title: t('organize.discardTitle'),
+                        body: t('organize.discardBody'),
+                        subject: expected.title,
+                        confirm: t('organize.discard'),
+                        tone: 'danger',
+                      }).then((confirmed) => {
+                        if (confirmed) useProjectNotes.getState().discard(expected)
+                      })
+                    }}
+                  >
+                    {t('organize.discard')}
+                  </Button>
+                )}
                 <IconButton
                   icon={copied ? Check : ClipboardCopy}
                   label={t(copied ? 'library.copied' : 'files.copy')}
