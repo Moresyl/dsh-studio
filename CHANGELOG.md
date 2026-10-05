@@ -9,6 +9,21 @@ pre-1.0 caveat that anything may still move.
 
 ## [Unreleased]
 
+## [0.9.26] — 2026-10-06
+
+### Added
+
+- Search file names and relative paths across the current workspace, with bounded traversal, excluded dependency/build folders, directory history, Back/Forward shortcuts, wrapped text previews and line numbers.
+- Keep project notes locally with debounced saves, durable draft checkpoints, revision checks, conflict copies and explicit recovery/discard actions. Protect unfinished notes during workspace switching, close, updates and renderer recovery.
+- Review Git patches one file at a time in unified or side-by-side layouts, with old/new line numbers and decoded quoted UTF-8 paths. Preserve binary and truncation notices and read-only operation.
+
+### Fixes and polish
+
+- Align desktop typography, field corners, control heights, selection checkboxes and raised segmented selections with the refreshed desktop design system in both themes.
+- Load note editing on demand while retaining eager lifecycle guards and the existing production bundle limit. Report editor-load failures without dropping drafts.
+- Bound native note storage and file searches; reject stale roots, stale draft confirmations, concurrent note revisions, links and invalid/oversized input while preserving existing data.
+- Strip native-owned note timestamps from save/checkpoint requests so existing-note edits and recovered drafts can save. Normalize Windows Git path separators when identifying the current worktree.
+
 ## [0.9.25] — 2026-10-02
 
 ### Fixes and polish

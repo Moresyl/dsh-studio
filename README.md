@@ -73,6 +73,9 @@ Harness logs; close, update and recovery protect unfinished edits.
 Batch pins/tags organize selected sessions. Prompt JSON import/export and personal
 backups preview conflicts and reject stale confirmations. Workspace browsing lazily
 loads directories and previews/copies bounded UTF-8 text without editing files.
+Find file names and paths across the workspace, navigate folder history and read
+wrapped, numbered previews. Project notes auto-save with durable draft recovery
+and revision conflicts; Git review offers per-file unified and side-by-side views.
 
 <img src="assets/prompt-library.png" width="820" alt="Local prompt library in the actual desktop: shared cards, tags and copy actions">
 
@@ -80,6 +83,15 @@ The prompt-library image uses v0.9.24 in isolated Windows QA, with
 demonstration content and processed local paths.
 
 <img src="assets/workspace-files.png" width="820" alt="Workspace files in the actual desktop: lazy folders, filtering, read-only text preview and copying">
+
+Project notes stay separate for each workspace, with local autosave and recoverable
+drafts. Revision conflicts keep your text available for a separate copy.
+
+<img src="assets/project-notes.png" width="820" alt="Actual desktop project notes with workspace isolation, saved status and local editing">
+
+Select a changed file and compare its old/new lines side by side without modifying Git.
+
+<img src="assets/worktree-review.png" width="820" alt="Actual desktop read-only per-file Git review with side-by-side line numbers">
 
 The file-browser image uses isolated demonstration data. Links, special files
 and oversized previews are rejected.

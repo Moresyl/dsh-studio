@@ -61,6 +61,17 @@ directories, open associated sessions or use the existing Git worktree manager
 and read-only review. A running Harness still requires a confirmed restart to
 apply a directory switch. Summaries inherit transcript read limits and are not billing records.
 
+**Project notes** belong to the selected workspace and are stored in Studio's app
+data, not in the repository. Changes save after a short pause; Ctrl+S saves now.
+Draft checkpoints survive restart. Recover a draft as a new note or explicitly
+discard the reviewed backup. A concurrent revision is never overwritten silently:
+save a copy or reload after preserving your text. Workspace switching, close,
+updates and renderer recovery wait for safe saves. Each note accepts 64 KiB of
+UTF-8 body text; the native store is bounded to 4 MiB, 200 projects and 100 notes
+per project. These notes are separate from the personal-library JSON backup.
+If saving fails, **Discard changes** offers a confirmed way to leave the editor.
+It drops only the reviewed local edits, keeping saved notes and disk checkpoints.
+
 ## Reading and export
 
 **Organize selection** selects current session results for batch pinning/unpinning
@@ -76,7 +87,12 @@ conflicts. Records absent from the backup remain. Concurrent changes require a
 fresh preview; corrupt, unknown-format and over-2-MiB input is rejected.
 
 **Browse files** in Workspaces lazily lists the current workspace, with filtering,
-parent navigation, read-only text preview and copying. Each directory displays
+parent navigation, Back/Forward history, read-only text preview and copying.
+Alt+Left/Right navigates history. Switch to workspace search to match file names
+and relative paths recursively; it scans at most 20,000 entries and 32 levels,
+returns at most 300 matches and skips dependency/build folders. This does not
+search file contents. Preview line numbers, wrapping and the 5,000-line display
+limit do not change the original text copied to the clipboard. Each directory displays
 at most 1,500 entries; previews accept valid UTF-8 text up to 1 MiB. Binary files
 and editing are unsupported. Symlinks and Windows reparse points are not followed;
 requests for an old workspace are rejected after switching roots.
@@ -167,6 +183,10 @@ Settings lists the current repository's Git worktrees and can create an isolated
 The two status columns distinguish index changes from working-copy changes; untracked paths are
 listed without reading their contents. The current-worktree label follows the selected workspace,
 including linked worktrees. Refresh after edits because this is not a live editor.
+
+Choose an individual file and unified or side-by-side layout, with old/new line
+numbers. Quoted UTF-8 paths are decoded using Git's format. Click a staged or
+unstaged file entry to open its corresponding patch.
 
 Each diff is limited to 256 KiB and 5,000 lines. Oversized diffs are explicitly withheld, not silently
 shown as complete; the file list remains available. More than 5,000 changed paths or oversized Git

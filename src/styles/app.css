@@ -891,8 +891,8 @@
   }
 
   /*
-   * Segmented controls: a recessed track with the selected option raised out of
-   * it, inverse, the shape a desktop toolbar has used for thirty years. Track and
+   * Segmented controls: a recessed track with a neutral selected option raised
+   * out of it. Track and
    * option step with the button scale, so a segmented control and a button in the
    * same row share a height, and the option is the track less its own gutter.
    */
