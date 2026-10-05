@@ -315,7 +315,8 @@ fn same_path(left: &Path, right: &Path) -> bool {
     #[cfg(windows)]
     return left
         .to_string_lossy()
-        .eq_ignore_ascii_case(&right.to_string_lossy());
+        .replace('/', "\\")
+        .eq_ignore_ascii_case(&right.to_string_lossy().replace('/', "\\"));
     #[cfg(not(windows))]
     return left == right;
 }
@@ -598,6 +599,24 @@ mod tests {
         assert!(!is_not_git_repository(&Error::Workspace(
             "Git could not start: executable missing".into(),
         )));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_git_paths_match_native_paths_without_matching_other_roots() {
+        use std::path::Path;
+        assert!(super::same_path(
+            Path::new("C:/Work/项目"),
+            Path::new("c:\\work\\项目")
+        ));
+        assert!(!super::same_path(
+            Path::new("C:/Work/项目"),
+            Path::new("C:/Work/项目-copy")
+        ));
+        assert!(!super::same_path(
+            Path::new("C:/Work/项目"),
+            Path::new("D:/Work/项目")
+        ));
     }
 
     #[cfg(windows)]

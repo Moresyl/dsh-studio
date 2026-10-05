@@ -247,6 +247,10 @@ mod tests {
         assert_eq!(before, repo.run(&["status", "--porcelain=v1", "-z"]).await);
         let worktrees = super::super::worktrees_in(&repo.0).await.unwrap();
         assert!(worktrees[0].dirty);
+        assert!(
+            worktrees[0].primary,
+            "the selected worktree must be identified"
+        );
         repo.run(&["restore", "--staged", "tracked.txt"]).await;
         repo.run(&["restore", "tracked.txt"]).await;
         assert!(
