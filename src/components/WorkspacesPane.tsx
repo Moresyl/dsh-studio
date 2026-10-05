@@ -10,6 +10,7 @@ import { PaneHeader } from '@/components/PaneHeader'
 import { WorktreeManager } from '@/components/WorktreeManager'
 import { WorktreeReview } from '@/components/WorktreeReview'
 import { WorkspaceFiles } from '@/components/WorkspaceFiles'
+import { ProjectNotes } from '@/components/ProjectNotes'
 import { count, leaf, when } from '@/lib/format'
 import { t } from '@/lib/i18n'
 import type { GitWorktree } from '@/lib/ipc'
@@ -172,10 +173,11 @@ export function WorkspacesPane({ onSessions }: { onSessions: () => void }) {
             />
           )}
           <WorktreeManager key={current} onReview={setReview} />
+          <ProjectNotes workspace={current} />
         </div>
       </div>
       {review && <WorktreeReview worktree={review} onClose={() => setReview(null)} />}
-      {browsing && <WorkspaceFiles onClose={() => setBrowsing(false)} />}
+      {browsing && <WorkspaceFiles key={current} onClose={() => setBrowsing(false)} />}
     </section>
   )
 }

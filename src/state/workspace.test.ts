@@ -4,6 +4,7 @@ import * as ipc from '@/lib/ipc'
 import { useDialog } from '@/state/dialog'
 import { useHarness } from '@/state/harness'
 import { switchWorkspace } from '@/state/workspace'
+import { useProjectNotes } from '@/state/project-notes'
 
 vi.mock('@/lib/ipc')
 
@@ -14,6 +15,8 @@ const answer = async (taken: boolean): Promise<void> => {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  useProjectNotes.setState({ root: null, draft: null, saved: null, busy: null, locked: false })
+  vi.mocked(ipc.workspaceNotes).mockResolvedValue({ root: 'D:/work', notes: [], drafts: [] })
   useDialog.setState({ pending: null })
   useHarness.setState({
     status: { phase: 'stopped' },
@@ -35,6 +38,18 @@ describe('selecting a native workspace', () => {
     expect(ipc.workspaceSelect).toHaveBeenCalledWith('D:\\work')
     expect(useHarness.getState().inspect).toHaveBeenCalledTimes(1)
     expect(useHarness.getState().stop).not.toHaveBeenCalled()
+    expect(ipc.workspaceNotes).toHaveBeenCalledOnce()
+    expect(useProjectNotes.getState().locked).toBe(false)
+  })
+
+  it('refuses to change workspace while unsaved notes cannot be written', async () => {
+    useProjectNotes.setState({
+      draft: { id: 'one', title: 'Plan', body: 'kept', revision: 1 },
+      saved: null,
+    })
+    expect(await switchWorkspace('D:/next')).toBe(false)
+    expect(ipc.workspaceSelect).not.toHaveBeenCalled()
+    expect(useProjectNotes.getState().draft?.body).toBe('kept')
   })
 
   it('offers and performs the restart needed by a running Harness', async () => {

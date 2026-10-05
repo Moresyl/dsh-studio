@@ -5,11 +5,13 @@ vi.mock('@/state/failure', () => ({ reportFailure }))
 
 import { installPreloadRecovery, needsWorkbench } from '@/lib/renderer-recovery'
 import { usePresentationEditor } from '@/state/presentation-editor'
+import { useProjectNotes } from '@/state/project-notes'
 import { fixture } from '@/lib/presentation/fixtures.test-support'
 
 beforeEach(() => {
   vi.clearAllMocks()
   usePresentationEditor.setState({ document: null, saved: null, busy: null })
+  useProjectNotes.setState({ draft: null, saved: null, busy: null, locked: false })
 })
 
 class Target extends EventTarget {

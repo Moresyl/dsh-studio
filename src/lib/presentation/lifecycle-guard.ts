@@ -10,12 +10,14 @@ import { isPresentationDirty, usePresentationEditor } from '@/state/presentation
 import { reportFailure } from '@/state/failure'
 import { t } from '@/lib/i18n'
 import { useLibrary } from '@/state/library'
+import { notesDirty, useProjectNotes } from '@/state/project-notes'
 
 /** Hold a stable local document snapshot until the native all-window lease ends. */
 export async function guardApplicationLifecycle(): Promise<() => void> {
   const stops: (() => void)[] = []
   let request: string | null = null
   let owned = false
+  let ownedNotes = false
   let syncing = true
   const released = new Set<string>()
   const synchronized = () => {
@@ -28,6 +30,8 @@ export async function guardApplicationLifecycle(): Promise<() => void> {
     request = null
     if (owned) usePresentationEditor.getState().unlockUpdate()
     owned = false
+    if (ownedNotes) useProjectNotes.getState().unlock()
+    ownedNotes = false
   }
   const prepare = (id: string, awaiting = true) => {
     if (request !== null) return
@@ -39,11 +43,27 @@ export async function guardApplicationLifecycle(): Promise<() => void> {
     const inherited = state.busy === 'update' && !isPresentationDirty(state)
     const personal = useLibrary.getState()
     const personalReady = !personal.busy && !personal.editing
-    owned = personalReady && !inherited && state.lockForUpdate()
-    const ready = personalReady && (inherited || owned)
+    const notes = useProjectNotes.getState()
+    const inheritedNotes = inherited && notes.locked && !notes.busy && !notesDirty(notes)
+    ownedNotes = personalReady && !inheritedNotes && notes.lock()
+    const notesReady = inheritedNotes || ownedNotes
+    owned = notesReady && !inherited && state.lockForUpdate()
+    const ready = personalReady && notesReady && (inherited || owned)
     if (!ready) {
+      if (ownedNotes) useProjectNotes.getState().unlock()
+      ownedNotes = false
       void getCurrentWindow().show().catch(reportFailure)
-      reportFailure(new Error(t(personalReady ? 'deck.saveBeforeExit' : 'organize.saveBeforeExit')))
+      reportFailure(
+        new Error(
+          t(
+            !personalReady
+              ? 'organize.saveBeforeExit'
+              : !notesReady
+                ? 'notes.saveBeforeExit'
+                : 'deck.saveBeforeExit',
+          ),
+        ),
+      )
     }
     // A reloaded document rejoins an already-approved lease without a second vote.
     if (awaiting)

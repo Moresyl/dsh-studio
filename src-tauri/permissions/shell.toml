@@ -129,4 +129,9 @@ commands.allow = [
     "workspace_worktrees",
     "workspace_files",
     "workspace_file_read",
+    "workspace_notes",
+    "workspace_note_save",
+    "workspace_note_remove",
+    "workspace_note_checkpoint",
+    "workspace_note_draft_remove",
 ]

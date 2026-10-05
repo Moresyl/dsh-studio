@@ -15,6 +15,7 @@ vi.mock('@/state/failure', () => ({ reportFailure: mocks.reportFailure }))
 import { guardApplicationLifecycle } from './lifecycle-guard'
 import { usePresentationEditor } from '@/state/presentation-editor'
 import { useLibrary } from '@/state/library'
+import { useProjectNotes } from '@/state/project-notes'
 import { fixture } from './fixtures.test-support'
 const prepare = (id: string) => mocks.onLifecyclePrepare.mock.calls[0]![0](id)
 const release = (id: string) => mocks.onLifecycleRelease.mock.calls[0]![0](id)
@@ -33,6 +34,7 @@ beforeEach(() => {
   mocks.show.mockResolvedValue(undefined)
   usePresentationEditor.setState({ document: null, saved: null, busy: null })
   useLibrary.setState({ editing: false, busy: false })
+  useProjectNotes.setState({ draft: null, saved: null, busy: null, locked: false })
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -60,10 +62,12 @@ it('holds editing until its matching release and coalesces repeated prepare', as
   expect(mocks.applicationLifecycleReply).toHaveBeenCalledOnce()
   expect(mocks.applicationLifecycleReply).toHaveBeenCalledWith('one', true)
   expect(usePresentationEditor.getState().busy).toBe('update')
+  expect(useProjectNotes.getState().locked).toBe(true)
   release('old')
   expect(usePresentationEditor.getState().busy).toBe('update')
   release('one')
   expect(usePresentationEditor.getState().busy).toBeNull()
+  expect(useProjectNotes.getState().locked).toBe(false)
   prepare('two')
   stop()
   expect(usePresentationEditor.getState().busy).toBeNull()
@@ -89,11 +93,30 @@ it('refuses dirty or busy documents without destroying them', async () => {
 it('does not release a lock owned by the initiating updater', async () => {
   const stop = await guardApplicationLifecycle()
   usePresentationEditor.setState({ busy: 'update' })
+  useProjectNotes.setState({ locked: true })
   prepare('one')
   release('one')
   stop()
   expect(usePresentationEditor.getState().busy).toBe('update')
+  expect(useProjectNotes.getState().locked).toBe(true)
 })
+
+it.each(['dirty', 'save', 'load', 'remove'] as const)(
+  'refuses project notes during %s without taking an update lock',
+  async (state) => {
+    const stop = await guardApplicationLifecycle()
+    useProjectNotes.setState(
+      state === 'dirty'
+        ? { draft: { id: 'one', title: 'Plan', body: 'unsaved', revision: 1 }, saved: null }
+        : { busy: state },
+    )
+    prepare('notes')
+    expect(mocks.applicationLifecycleReply).toHaveBeenCalledWith('notes', false)
+    expect(useProjectNotes.getState().locked).toBe(false)
+    expect(usePresentationEditor.getState().busy).toBeNull()
+    stop()
+  },
+)
 
 it('commits pending input, reports failures and cleans partial subscriptions', async () => {
   class Input {

@@ -43,11 +43,22 @@ describe('private desktop personal-data and file commands', () => {
   })
   it('browses the selected root initially and binds all subsequent reads to it', async () => {
     await workspaceFiles('')
-    expect(invoke).toHaveBeenLastCalledWith('workspace_files', { relative: '', expectedRoot: null })
+    expect(invoke).toHaveBeenLastCalledWith('workspace_files', {
+      relative: '',
+      expectedRoot: null,
+      query: null,
+    })
     await workspaceFiles('src', 'C:/project')
     expect(invoke).toHaveBeenLastCalledWith('workspace_files', {
       relative: 'src',
       expectedRoot: 'C:/project',
+      query: null,
+    })
+    await workspaceFiles('', 'C:/project', '中文 title')
+    expect(invoke).toHaveBeenLastCalledWith('workspace_files', {
+      relative: '',
+      expectedRoot: 'C:/project',
+      query: '中文 title',
     })
     await workspaceFileRead('src/main.ts', 'C:/project')
     expect(invoke).toHaveBeenLastCalledWith('workspace_file_read', {

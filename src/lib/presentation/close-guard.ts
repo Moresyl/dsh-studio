@@ -5,6 +5,7 @@ import { reportFailure } from '@/state/failure'
 import { t } from '@/lib/i18n'
 import { status } from '@/lib/ipc'
 import { useLibrary } from '@/state/library'
+import { notesDirty, useProjectNotes } from '@/state/project-notes'
 
 /** Keep native window close from silently discarding the current editor draft. */
 export async function guardPresentationClose(): Promise<() => void> {
@@ -45,6 +46,13 @@ export async function guardPresentationClose(): Promise<() => void> {
       return
     }
     const state = usePresentationEditor.getState()
+    const notes = useProjectNotes.getState()
+    if (notes.busy || notes.locked || notesDirty(notes)) {
+      event.preventDefault()
+      await window.show().catch(reportFailure)
+      reportFailure(new Error(t('notes.saveBeforeExit')))
+      return
+    }
     if (!isPresentationDirty(state) && !state.busy) return
     event.preventDefault()
     if (asking) return

@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FileDiff, Loader2, RefreshCw, X } from 'lucide-react'
 
 import { IconButton } from '@/components/IconButton'
 import { Segmented } from '@/components/Segmented'
+import { SelectControl } from '@/components/SelectControl'
 import { describe } from '@/lib/errors'
 import { t } from '@/lib/i18n'
 import * as ipc from '@/lib/ipc'
 import { holdFocus, pressedBackdrop } from '@/lib/modal'
-import { changeCounts, diffLineKind } from '@/lib/worktree-review'
+import { changeCounts, diffFiles, splitDiff } from '@/lib/worktree-review'
 
 type View = 'files' | 'unstaged' | 'staged'
 
@@ -34,6 +35,8 @@ export function WorktreeReview({
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
   const [view, setView] = useState<View>('files')
+  const [layout, setLayout] = useState<'unified' | 'split'>('unified')
+  const [selectedFile, setSelectedFile] = useState<string | null>(null)
 
   useEffect(() => {
     const previous = document.activeElement
@@ -72,6 +75,10 @@ export function WorktreeReview({
   }
   const counts = changeCounts(review?.changes ?? [])
   const patch = review && view !== 'files' ? review[view] : null
+  const files = useMemo(() => diffFiles(patch?.text ?? ''), [patch?.text])
+  const activeFile =
+    selectedFile === null ? files[0] : files.find((file) => file.label === selectedFile)
+  const rows = useMemo(() => splitDiff(activeFile?.lines ?? []), [activeFile])
 
   return (
     <div
@@ -110,7 +117,10 @@ export function WorktreeReview({
             size="sm"
             label={t('worktrees.reviewViews')}
             value={view}
-            onChange={setView}
+            onChange={(next) => {
+              setSelectedFile(null)
+              setView(next)
+            }}
             items={[
               {
                 value: 'files',
@@ -124,6 +134,34 @@ export function WorktreeReview({
             <span className="text-ui-sm text-faint">
               {t('worktrees.untracked', { count: counts.untracked })}
             </span>
+          )}
+          {view !== 'files' && files.length > 0 && (
+            <>
+              <SelectControl
+                aria-label={t('worktrees.selectFile')}
+                value={activeFile?.label ?? ''}
+                onValueChange={setSelectedFile}
+                size="sm"
+                containerClassName="min-w-0 max-w-full flex-1"
+              >
+                {!activeFile && <option value="">{t('worktrees.noPatch')}</option>}
+                {files.map((file, index) => (
+                  <option key={index} value={file.label}>
+                    {file.label}
+                  </option>
+                ))}
+              </SelectControl>
+              <Segmented
+                size="sm"
+                label={t('worktrees.patchLayout')}
+                value={layout}
+                onChange={setLayout}
+                items={[
+                  { value: 'unified', label: t('worktrees.unified') },
+                  { value: 'split', label: t('worktrees.split') },
+                ]}
+              />
+            </>
           )}
         </div>
         <div
@@ -177,7 +215,17 @@ export function WorktreeReview({
                         {change.previousPath && (
                           <span className="text-faint">{change.previousPath} → </span>
                         )}
-                        {change.path}
+                        <button
+                          type="button"
+                          disabled={change.index === '?'}
+                          className="text-left underline-offset-4 hover:underline disabled:cursor-default disabled:no-underline"
+                          onClick={() => {
+                            setSelectedFile(change.path)
+                            setView(change.worktree.trim() ? 'unstaged' : 'staged')
+                          }}
+                        >
+                          {change.path}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -190,14 +238,57 @@ export function WorktreeReview({
             <p className="m-5 rounded-lg border border-warn/25 bg-warn/8 p-4 text-ui-sm text-warn">
               {t('worktrees.patchTooLarge')}
             </p>
-          ) : patch?.text ? (
-            <pre className="selectable min-w-max py-3 font-mono text-ui-sm leading-5" dir="ltr">
-              {patch.text.split('\n').map((line, index) => (
-                <span key={index} className={`block px-4 ${lineTone[diffLineKind(line)]}`}>
-                  {line || ' '}
-                </span>
-              ))}
-            </pre>
+          ) : activeFile ? (
+            <div
+              className={`diff-preview selectable font-mono text-ui-sm ${layout === 'split' ? 'diff-preview--split' : ''}`}
+              dir="ltr"
+            >
+              {layout === 'unified'
+                ? activeFile.lines.map((line, index) => (
+                    <div key={index} className={`diff-preview__row ${lineTone[line.kind]}`}>
+                      <span className="diff-preview__number" aria-hidden="true">
+                        {line.before}
+                      </span>
+                      <span className="diff-preview__number" aria-hidden="true">
+                        {line.after}
+                      </span>
+                      <span className="diff-preview__text">{line.text || ' '}</span>
+                    </div>
+                  ))
+                : rows.map((row, index) =>
+                    row.metadata ? (
+                      <div
+                        key={index}
+                        className={`diff-preview__metadata ${lineTone[row.metadata.kind]}`}
+                      >
+                        {row.metadata.text || ' '}
+                      </div>
+                    ) : (
+                      <div key={index} className="diff-preview__pair">
+                        <div
+                          className={`diff-preview__side ${row.before ? lineTone[row.before.kind] : 'bg-surface-2/30'}`}
+                        >
+                          <span className="diff-preview__number" aria-hidden="true">
+                            {row.before?.before}
+                          </span>
+                          <span className="diff-preview__text">
+                            {row.before?.text.slice(1) || ' '}
+                          </span>
+                        </div>
+                        <div
+                          className={`diff-preview__side ${row.after ? lineTone[row.after.kind] : 'bg-surface-2/30'}`}
+                        >
+                          <span className="diff-preview__number" aria-hidden="true">
+                            {row.after?.after}
+                          </span>
+                          <span className="diff-preview__text">
+                            {row.after?.text.slice(1) || ' '}
+                          </span>
+                        </div>
+                      </div>
+                    ),
+                  )}
+            </div>
           ) : (
             <p className="p-8 text-center text-ui-base text-muted">{t('worktrees.noPatch')}</p>
           )}

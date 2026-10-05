@@ -112,6 +112,7 @@ pub fn run() {
             app.manage(Arc::new(NodeJobs::default()));
             app.manage(Arc::new(sessions::Library::default()));
             app.manage(Arc::new(library::Store::default()));
+            app.manage(Arc::new(workspace::notes::Store::default()));
             app.manage(recovery::RendererHealth::default());
             app.manage(terminal::Terminals::new()?);
             app.manage(updates::UpdateState::default());
@@ -267,6 +268,11 @@ pub fn run() {
             workspace::workspace_worktrees,
             workspace::files::workspace_files,
             workspace::files::workspace_file_read,
+            workspace::notes::workspace_notes,
+            workspace::notes::workspace_note_save,
+            workspace::notes::workspace_note_remove,
+            workspace::notes::workspace_note_checkpoint,
+            workspace::notes::workspace_note_draft_remove,
             workspace::workspace_worktree_create,
             workspace::review::workspace_worktree_review,
         ])

@@ -138,6 +138,7 @@ export default defineConfig({
         'src/lib/session-page.ts',
         'src/lib/prompt-template.ts',
         'src/lib/workspace-summary.ts',
+        'src/lib/file-navigation.ts',
         'src/lib/updater.ts',
         'src/lib/usage.ts',
         'src/lib/worktree-review.ts',
@@ -153,6 +154,8 @@ export default defineConfig({
         'src/state/update.ts',
         'src/state/releases.ts',
         'src/state/workspace.ts',
+        'src/state/project-notes.ts',
+        'src/state/project-notes-actions.ts',
       ],
       thresholds: {
         statements: 80,

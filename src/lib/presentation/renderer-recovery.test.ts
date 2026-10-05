@@ -6,10 +6,12 @@ import { isPresentationDirty, usePresentationEditor as editor } from '@/state/pr
 import { fixture } from './fixtures.test-support'
 import { canAutomaticallyReload, reloadPreservingPresentation } from './renderer-recovery'
 import { useLibrary } from '@/state/library'
+import { useProjectNotes as notes } from '@/state/project-notes'
 
 beforeEach(() => {
   vi.resetAllMocks()
   useLibrary.setState({ editing: false, busy: false })
+  notes.setState({ root: null, draft: null, saved: null, busy: null, locked: false, error: null })
   editor.setState({
     document: null,
     revision: null,
@@ -88,12 +90,28 @@ it('locks a clean editor before navigation and releases it if navigation throws'
   expect(await reloadPreservingPresentation(reload)).toBe(true)
   expect(reload).toHaveBeenCalledOnce()
   editor.getState().unlockUpdate()
+  notes.getState().unlock()
   await expect(
     reloadPreservingPresentation(() => {
       throw new Error('navigation failed')
     }),
   ).rejects.toThrow('navigation failed')
   expect(editor.getState().busy).toBeNull()
+  expect(notes.getState().locked).toBe(false)
+})
+
+it('keeps unsaved project notes when automatic recovery or saving fails', async () => {
+  notes.setState({
+    draft: { id: 'note', title: 'Plan', body: 'unsaved', revision: 1 },
+    saved: null,
+  })
+  const reload = vi.fn()
+  expect(canAutomaticallyReload()).toBe(false)
+  expect(await reloadPreservingPresentation(reload, false)).toBe(false)
+  await expect(reloadPreservingPresentation(reload)).rejects.toThrow()
+  expect(reload).not.toHaveBeenCalled()
+  expect(notes.getState().draft?.body).toBe('unsaved')
+  expect(notes.getState().locked).toBe(false)
 })
 
 it('never saves or reloads a dirty document automatically', async () => {

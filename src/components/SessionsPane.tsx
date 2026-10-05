@@ -628,7 +628,7 @@ function Entry({ card, matches, marks, onOpen, selection }: EntryProps) {
             {selection && (
               <input
                 type="checkbox"
-                className="size-4 shrink-0 accent-brand"
+                className="selection-checkbox"
                 checked={selection.selected}
                 disabled={selection.disabled}
                 aria-label={t('batch.select', {

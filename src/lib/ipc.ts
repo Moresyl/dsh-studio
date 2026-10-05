@@ -1010,6 +1010,7 @@ export interface WorkspaceListing {
   entries: WorkspaceFile[]
   limited: boolean
   skipped: number
+  scanned: number
 }
 export interface WorkspaceText {
   root: string
@@ -1021,9 +1022,51 @@ export interface WorkspaceText {
 export const workspaceFiles = (
   relative: string,
   expectedRoot: string | null = null,
-): Promise<WorkspaceListing> => invoke('workspace_files', { relative, expectedRoot })
+  query: string | null = null,
+): Promise<WorkspaceListing> => invoke('workspace_files', { relative, expectedRoot, query })
 export const workspaceFileRead = (relative: string, expectedRoot: string): Promise<WorkspaceText> =>
   invoke('workspace_file_read', { relative, expectedRoot })
+
+export interface ProjectNote {
+  id: string
+  title: string
+  body: string
+  revision: number
+  updated: number
+}
+export interface ProjectNotes {
+  root: string
+  notes: ProjectNote[]
+  drafts: ProjectNoteDraft[]
+}
+export interface ProjectNoteDraft {
+  editor: string
+  note: ProjectNote
+  revision: string
+}
+export type ProjectNoteInput = Omit<ProjectNote, 'updated'>
+export const workspaceNotes = (expectedRoot: string | null = null): Promise<ProjectNotes> =>
+  invoke('workspace_notes', { expectedRoot })
+export const workspaceNoteSave = (
+  expectedRoot: string,
+  note: ProjectNoteInput,
+  editor: string,
+): Promise<ProjectNote> => invoke('workspace_note_save', { expectedRoot, note, editor })
+export const workspaceNoteCheckpoint = (
+  expectedRoot: string,
+  note: ProjectNoteInput,
+  editor: string,
+): Promise<void> => invoke('workspace_note_checkpoint', { expectedRoot, note, editor })
+export const workspaceNoteDraftRemove = (
+  expectedRoot: string,
+  editor: string,
+  revision: string,
+): Promise<void> => invoke('workspace_note_draft_remove', { expectedRoot, editor, revision })
+export const workspaceNoteRemove = (
+  expectedRoot: string,
+  id: string,
+  revision: number,
+): Promise<void> => invoke('workspace_note_remove', { expectedRoot, id, revision })
 
 /**
  * The sessions a query describes, best answer first.

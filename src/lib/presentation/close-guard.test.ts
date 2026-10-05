@@ -17,6 +17,7 @@ vi.mock('@/lib/ipc', () => ({ status: mocks.status }))
 import { guardPresentationClose } from './close-guard'
 import { usePresentationEditor } from '@/state/presentation-editor'
 import { useLibrary } from '@/state/library'
+import { useProjectNotes } from '@/state/project-notes'
 import { fixture } from './fixtures.test-support'
 
 const callback = () =>
@@ -27,6 +28,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   mocks.label = 'main'
   useLibrary.setState({ busy: false, editing: false })
+  useProjectNotes.setState({ draft: null, saved: null, busy: null, locked: false })
   mocks.status.mockResolvedValue({ phase: 'stopped' })
   mocks.hide.mockResolvedValue(undefined)
   vi.stubGlobal('HTMLElement', class {})
@@ -60,6 +62,25 @@ it('allows a clean window to close and owns listener cleanup', async () => {
   stop()
   expect(mocks.stop).toHaveBeenCalledOnce()
 })
+
+it.each(['dirty', 'save', 'load', 'remove', 'locked'] as const)(
+  'preserves project notes during %s on close',
+  async (state) => {
+    useProjectNotes.setState(
+      state === 'dirty'
+        ? { draft: { id: 'one', title: 'Plan', body: 'unsaved', revision: 1 }, saved: null }
+        : state === 'locked'
+          ? { locked: true }
+          : { busy: state },
+    )
+    await guardPresentationClose()
+    const preventDefault = vi.fn()
+    await callback()({ preventDefault })
+    expect(preventDefault).toHaveBeenCalledOnce()
+    expect(mocks.close).not.toHaveBeenCalled()
+    expect(mocks.reportFailure).toHaveBeenCalledOnce()
+  },
+)
 
 it.each(['starting', 'ready', 'restarting'])(
   'hides a %s main window without destroying or discarding its draft',

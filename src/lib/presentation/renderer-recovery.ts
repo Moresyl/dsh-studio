@@ -1,13 +1,18 @@
 import { isPresentationDirty, usePresentationEditor } from '@/state/presentation-editor'
 import { t } from '@/lib/i18n'
 import { useLibrary } from '@/state/library'
+import { notesDirty, useProjectNotes } from '@/state/project-notes'
 
 export function canAutomaticallyReload(): boolean {
   const state = usePresentationEditor.getState()
   const personal = useLibrary.getState()
+  const notes = useProjectNotes.getState()
   return (
     !personal.editing &&
     !personal.busy &&
+    !notes.busy &&
+    !notes.locked &&
+    !notesDirty(notes) &&
     !isPresentationDirty(state) &&
     (state.busy === null || (state.busy === 'synchronizing' && state.document === null))
   )
@@ -25,10 +30,22 @@ export async function reloadPreservingPresentation(
   }
   if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement)
     document.activeElement.blur()
+  const notes = useProjectNotes.getState()
+  if (notes.busy || notes.locked || notesDirty(notes)) {
+    if (!saveDirty) return false
+    if (notes.busy || notes.locked || !(await notes.save()))
+      throw new Error(useProjectNotes.getState().error ?? t('notes.saveBeforeExit'))
+  }
   let state = usePresentationEditor.getState()
   if (state.busy === 'synchronizing' && state.document === null) {
-    await reload()
-    return true
+    if (!useProjectNotes.getState().lock()) throw new Error(t('notes.saveBeforeExit'))
+    try {
+      await reload()
+      return true
+    } catch (cause) {
+      useProjectNotes.getState().unlock()
+      throw cause
+    }
   }
   if (state.busy !== null) {
     if (!saveDirty) return false
@@ -44,11 +61,17 @@ export async function reloadPreservingPresentation(
     if (!saveDirty) return false
     throw new Error(t('deck.recoveryChanged'))
   }
+  if (!useProjectNotes.getState().lock()) {
+    state.unlockUpdate()
+    if (!saveDirty) return false
+    throw new Error(t('notes.saveBeforeExit'))
+  }
   try {
     await reload()
     return true
   } catch (cause) {
     state.unlockUpdate()
+    useProjectNotes.getState().unlock()
     throw cause
   }
 }

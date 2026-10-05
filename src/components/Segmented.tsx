@@ -35,8 +35,8 @@ interface SegmentedProps<T extends string> {
  *
  * Segments rather than underlined tabs, because these strips sit inside pane
  * headers and toolbars where an underline would be a second horizontal rule next
- * to the one already there. The selected segment is inverse, so which one is on
- * can be read without reading the labels.
+ * to the one already there. The selected segment uses a raised neutral surface
+ * and a subtle shadow so its state is visible in either theme.
  *
  * It answers `aria-pressed`, one per segment, which is what the capture harness
  * and the tests look for. The group is one control, so the pressed one is the

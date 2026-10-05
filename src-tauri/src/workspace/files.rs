@@ -9,6 +9,9 @@ use std::path::{Component, Path, PathBuf};
 
 const TEXT_LIMIT: usize = 1024 * 1024;
 const ENTRY_LIMIT: usize = 1500;
+const SEARCH_ENTRY_LIMIT: usize = 20_000;
+const SEARCH_MATCH_LIMIT: usize = 300;
+const SEARCH_DEPTH_LIMIT: usize = 32;
 fn denied() -> Error {
     Error::Workspace(
         "only ordinary files and folders inside the current workspace can be browsed".into(),
@@ -27,7 +30,7 @@ fn linked(meta: &Metadata) -> bool {
     }
     false
 }
-fn root(selected: &Path, expected: Option<&str>) -> Result<PathBuf> {
+pub(super) fn root(selected: &Path, expected: Option<&str>) -> Result<PathBuf> {
     let root = selected.canonicalize().map_err(|_| denied())?;
     let root = node_runtime::plain_path(root);
     if !root.is_dir()
@@ -76,6 +79,7 @@ pub struct Listing {
     entries: Vec<Entry>,
     limited: bool,
     skipped: usize,
+    scanned: usize,
 }
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -134,12 +138,125 @@ fn list(selected: &Path, expected: Option<&str>, relative: &str) -> Result<Listi
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
             .then_with(|| a.name.cmp(&b.name))
     });
+    let scanned = entries.len() + skipped;
     Ok(Listing {
         root,
         relative: relative.into(),
         entries,
         limited,
         skipped,
+        scanned,
+    })
+}
+
+fn search_excluded(name: &str) -> bool {
+    matches!(
+        name,
+        ".git" | "node_modules" | ".pnpm" | "target" | "dist" | ".venv" | "__pycache__"
+    )
+}
+
+/// Search names and relative paths without reading file contents or following links.
+/// Both visited entries and returned matches are bounded, including skipped entries.
+fn search(selected: &Path, expected: &str, query: &str) -> Result<Listing> {
+    if query.len() > 512 || query.chars().any(char::is_control) {
+        return Err(Error::Workspace(
+            "the file search is too long or contains control characters".into(),
+        ));
+    }
+    let terms: Vec<_> = query.split_whitespace().map(str::to_lowercase).collect();
+    if terms.is_empty() {
+        return list(selected, Some(expected), "");
+    }
+    let root = root(selected, Some(expected))?;
+    let mut pending = vec![(String::new(), 0usize)];
+    let mut entries = Vec::new();
+    let mut scanned = 0;
+    let mut skipped = 0;
+    let mut limited = false;
+    'walk: while let Some((relative, depth)) = pending.pop() {
+        let directory = match resolve(&root, &relative)
+            .and_then(|path| std::fs::read_dir(path).map_err(|_| denied()))
+        {
+            Ok(reader) => reader,
+            Err(_) if relative.is_empty() => {
+                return Err(Error::Workspace("this folder could not be read".into()))
+            }
+            Err(_) => {
+                skipped += 1;
+                continue;
+            }
+        };
+        let mut children = Vec::new();
+        for entry in directory {
+            if scanned >= SEARCH_ENTRY_LIMIT {
+                limited = true;
+                break 'walk;
+            }
+            scanned += 1;
+            let Ok(entry) = entry else {
+                skipped += 1;
+                continue;
+            };
+            let Some(name) = entry.file_name().to_str().map(str::to_owned) else {
+                skipped += 1;
+                continue;
+            };
+            let Ok(meta) = std::fs::symlink_metadata(entry.path()) else {
+                skipped += 1;
+                continue;
+            };
+            if linked(&meta) || (!meta.is_file() && !meta.is_dir()) {
+                skipped += 1;
+                continue;
+            }
+            let path = if relative.is_empty() {
+                name.clone()
+            } else {
+                format!("{relative}/{name}")
+            };
+            if meta.is_dir() {
+                if search_excluded(&name) {
+                    skipped += 1;
+                    continue;
+                }
+                if depth >= SEARCH_DEPTH_LIMIT {
+                    limited = true;
+                    continue;
+                }
+                children.push((path, depth + 1));
+            } else if {
+                let normalized = path.to_lowercase();
+                terms.iter().all(|term| normalized.contains(term))
+            } {
+                if entries.len() >= SEARCH_MATCH_LIMIT {
+                    limited = true;
+                    break 'walk;
+                }
+                entries.push(Entry {
+                    name,
+                    path,
+                    directory: false,
+                    bytes: meta.len(),
+                });
+            }
+        }
+        children.sort_by(|a, b| b.0.cmp(&a.0));
+        pending.extend(children);
+    }
+    entries.sort_by(|a, b| {
+        a.path
+            .to_lowercase()
+            .cmp(&b.path.to_lowercase())
+            .then_with(|| a.path.cmp(&b.path))
+    });
+    Ok(Listing {
+        root,
+        relative: String::new(),
+        entries,
+        limited,
+        skipped,
+        scanned,
     })
 }
 
@@ -225,9 +342,18 @@ fn read(selected: &Path, expected: &str, relative: &str) -> Result<Text> {
 }
 
 #[tauri::command]
-pub async fn workspace_files(relative: String, expected_root: Option<String>) -> Result<Listing> {
-    tauri::async_runtime::spawn_blocking(move || {
-        list(&super::selected(), expected_root.as_deref(), &relative)
+pub async fn workspace_files(
+    relative: String,
+    expected_root: Option<String>,
+    query: Option<String>,
+) -> Result<Listing> {
+    tauri::async_runtime::spawn_blocking(move || match query {
+        Some(query) => search(
+            &super::selected(),
+            expected_root.as_deref().ok_or_else(denied)?,
+            &query,
+        ),
+        None => list(&super::selected(), expected_root.as_deref(), &relative),
     })
     .await
     .map_err(|_| denied())?
@@ -337,6 +463,74 @@ mod tests {
             "restored"
         );
     }
+    #[test]
+    fn project_search_matches_paths_and_unicode_without_entering_dependencies() {
+        let dir = fixture();
+        for name in [
+            "src/中文",
+            "src/lib",
+            "node_modules/pkg",
+            "target",
+            ".git",
+            "dist",
+        ] {
+            std::fs::create_dir_all(dir.0.join(name)).unwrap();
+        }
+        for name in [
+            "src/中文/笔记.md",
+            "src/lib/MAIN.ts",
+            "src/lib/other.ts",
+            "node_modules/pkg/MAIN.ts",
+            "target/MAIN.ts",
+            ".git/MAIN.ts",
+            "dist/MAIN.ts",
+        ] {
+            std::fs::write(dir.0.join(name), "text").unwrap();
+        }
+        let root = root(&dir.0, None).unwrap();
+        let expected = root.to_str().unwrap();
+        let result = search(&dir.0, expected, "SRC main").unwrap();
+        assert_eq!(result.entries.len(), 1);
+        assert_eq!(result.entries[0].path, "src/lib/MAIN.ts");
+        assert_eq!(result.skipped, 4);
+        assert!(!result.limited);
+        assert!(result.scanned > result.entries.len());
+        assert_eq!(
+            search(&dir.0, expected, "中文 笔记").unwrap().entries[0].path,
+            "src/中文/笔记.md"
+        );
+        assert!(search(&dir.0, expected, "no-match")
+            .unwrap()
+            .entries
+            .is_empty());
+        assert_eq!(
+            search(&dir.0, expected, " ").unwrap().entries.len(),
+            list(&dir.0, Some(expected), "").unwrap().entries.len()
+        );
+        assert!(search(&dir.0, expected, &"a".repeat(513)).is_err());
+        assert!(search(&dir.0, expected, "a\0b").is_err());
+        assert!(search(&dir.0, "not-the-selected-root", "src").is_err());
+    }
+    #[test]
+    fn search_reports_result_and_depth_limits_without_unbounded_recursion() {
+        let dir = fixture();
+        for n in 0..=SEARCH_MATCH_LIMIT {
+            std::fs::write(dir.0.join(format!("match-{n}")), "").unwrap();
+        }
+        let expected = root(&dir.0, None).unwrap();
+        let result = search(&dir.0, expected.to_str().unwrap(), "match").unwrap();
+        assert!(result.limited);
+        assert_eq!(result.entries.len(), SEARCH_MATCH_LIMIT);
+        let mut deep = dir.0.clone();
+        for _ in 0..=SEARCH_DEPTH_LIMIT {
+            deep.push("d");
+        }
+        std::fs::create_dir_all(&deep).unwrap();
+        std::fs::write(deep.join("unreachable"), "").unwrap();
+        let result = search(&dir.0, expected.to_str().unwrap(), "unreachable").unwrap();
+        assert!(result.limited);
+        assert!(result.entries.is_empty());
+    }
     #[cfg(unix)]
     #[test]
     fn symlinks_are_hidden_and_cannot_be_followed() {
@@ -345,6 +539,14 @@ mod tests {
         std::fs::write(other.0.join("secret"), "private").unwrap();
         std::os::unix::fs::symlink(&other.0, dir.0.join("link")).unwrap();
         assert_eq!(list(&dir.0, None, "").unwrap().skipped, 1);
+        let found = search(
+            &dir.0,
+            root(&dir.0, None).unwrap().to_str().unwrap(),
+            "secret",
+        )
+        .unwrap();
+        assert!(found.entries.is_empty());
+        assert_eq!(found.skipped, 1);
         assert!(read(
             &dir.0,
             root(&dir.0, None).unwrap().to_str().unwrap(),
