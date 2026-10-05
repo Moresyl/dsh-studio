@@ -194,6 +194,10 @@ fn is_not_git_repository(failure: &Error) -> bool {
 }
 
 async fn worktrees_in(repository: &Path) -> Result<Vec<Worktree>> {
+    let canonical_repository = repository.canonicalize().map_err(|cause| {
+        Error::Workspace(format!("the repository root could not be opened: {cause}"))
+    })?;
+    let canonical_repository = node_runtime::plain_path(canonical_repository);
     let output = git(
         repository,
         &["worktree", "list", "--porcelain", "-z"],
@@ -203,6 +207,11 @@ async fn worktrees_in(repository: &Path) -> Result<Vec<Worktree>> {
     let records = parse_worktrees(&output)?;
     let mut worktrees = Vec::with_capacity(records.len());
     for record in records {
+        let canonical = record.path.canonicalize().map_err(|cause| {
+            Error::Workspace(format!(
+                "the registered worktree could not be opened: {cause}"
+            ))
+        })?;
         let dirty = !git(
             &record.path,
             &["status", "--porcelain=v1", "--untracked-files=normal"],
@@ -212,7 +221,7 @@ async fn worktrees_in(repository: &Path) -> Result<Vec<Worktree>> {
         .trim()
         .is_empty();
         worktrees.push(Worktree {
-            primary: same_path(&record.path, repository),
+            primary: same_path(&node_runtime::plain_path(canonical), &canonical_repository),
             dirty,
             path: record.path,
             branch: record.branch,

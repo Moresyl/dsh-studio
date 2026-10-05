@@ -251,6 +251,17 @@ mod tests {
             worktrees[0].primary,
             "the selected worktree must be identified"
         );
+        #[cfg(unix)]
+        {
+            let alias = repo.0.join("same-repository");
+            std::os::unix::fs::symlink(&repo.0, &alias).unwrap();
+            let aliased = super::super::worktrees_in(&alias).await.unwrap();
+            assert!(
+                aliased[0].primary,
+                "filesystem aliases identify the same root"
+            );
+            std::fs::remove_file(alias).unwrap();
+        }
         repo.run(&["restore", "--staged", "tracked.txt"]).await;
         repo.run(&["restore", "tracked.txt"]).await;
         assert!(

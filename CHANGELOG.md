@@ -23,6 +23,8 @@ pre-1.0 caveat that anything may still move.
 - Load note editing on demand while retaining eager lifecycle guards and the existing production bundle limit. Report editor-load failures without dropping drafts.
 - Bound native note storage and file searches; reject stale roots, stale draft confirmations, concurrent note revisions, links and invalid/oversized input while preserving existing data.
 - Strip native-owned note timestamps from save/checkpoint requests so existing-note edits and recovered drafts can save. Normalize Windows Git path separators when identifying the current worktree.
+- Make the adopted-process reclamation fixture wait for job assignment before starting descendants, removing a Windows timing race without changing the documented adoption guarantee.
+- Resolve registered worktree roots before comparison so macOS filesystem aliases identify the current worktree correctly.
 
 ## [0.9.25] — 2026-10-02
 

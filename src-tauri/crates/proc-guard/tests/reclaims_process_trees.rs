@@ -110,6 +110,8 @@ async fn dropping_the_guard_ends_an_adopted_grandchild() {
     let workspace = scratch_dir("adopted");
     let ticks = workspace.join("ticks.log");
     let outer = write_tree_fixture(&workspace, &ticks);
+    let adopted = workspace.join("adopted.ready");
+    gate_tree_fixture(&outer, &adopted);
 
     let mut command = shell(&[&outer.to_string_lossy()]);
     // What a pty child gets from `setsid`, arranged by hand: `adopt` reclaims a
@@ -122,6 +124,10 @@ async fn dropping_the_guard_ends_an_adopted_grandchild() {
 
     let guard = ProcessGuard::new().expect("create guard");
     guard.adopt(pid).expect("adopt");
+    // Windows job assignment covers future descendants, not children already
+    // forked before adoption. Exercise the documented guarantee deterministically
+    // instead of racing cmd startup against AssignProcessToJobObject.
+    fs::write(&adopted, b"ready").expect("release adopted fixture");
 
     let alive = wait_until_growing(&ticks).await;
     assert!(alive > 0, "the grandchild never started ticking");
@@ -193,6 +199,22 @@ async fn wait_until_growing(ticks: &Path) -> u64 {
 
 fn size_of(path: &Path) -> u64 {
     fs::metadata(path).map(|meta| meta.len()).unwrap_or(0)
+}
+
+/// Keep the fixture's descendants from starting until adoption is complete.
+fn gate_tree_fixture(outer: &Path, adopted: &Path) {
+    let body = fs::read_to_string(outer).expect("read outer fixture");
+    #[cfg(windows)]
+    let gate = format!(
+        "@echo off\r\n:await_adoption\r\nif exist \"{}\" goto adopted\r\nping -n 2 127.0.0.1 >nul\r\ngoto await_adoption\r\n:adopted\r\n",
+        adopted.display()
+    );
+    #[cfg(not(windows))]
+    let gate = format!(
+        "#!/bin/sh\nwhile [ ! -f \"{}\" ]; do sleep 1; done\n",
+        adopted.display()
+    );
+    fs::write(outer, format!("{gate}{body}")).expect("gate outer fixture");
 }
 
 /// A command that runs `arguments` through the platform's command interpreter.
